@@ -81,14 +81,14 @@ struct CompanionListView: View {
     }
 
     var body: some View {
-        AppScaffold(title: title, spacing: 18) {
+        AppScaffold(title: title, spacing: DS.Space.lg) {
             ListHeader(title: title, count: filteredCompanions.count)
             PeakHourBanner()
             FilterStrip(filter: $filter, sort: $sort)
             if filteredCompanions.isEmpty {
                 EmptyStateView(symbol: "person.2.slash", title: "暂无匹配陪伴者", subtitle: "可以切换主题或重置筛选条件。")
             } else {
-                LazyVStack(spacing: 12) {
+                LazyVStack(spacing: DS.Space.md) {
                     ForEach(filteredCompanions) { companion in
                         Button {
                             store.navigate(.companionDetail(companion.id))
@@ -109,33 +109,37 @@ private struct ListHeader: View {
 
     var body: some View {
         HStack(alignment: .lastTextBaseline) {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: DS.Space.xxs) {
                 Text(title)
-                    .font(.title2.weight(.bold))
-                    .foregroundStyle(Color.appInk)
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(Color.dsTextPrimary)
                 Text("仅展示平台内线上文字/语音服务")
-                    .font(.caption)
-                    .foregroundStyle(Color.appMuted)
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color.dsTextSecondary)
             }
             Spacer()
-            StatusPill(text: "\(count)人", symbol: "person.2", color: Color.appTeal)
+            StatusPill(text: "\(count)人", symbol: "person.2", color: Color.dsPrimary)
         }
     }
 }
 
 private struct PeakHourBanner: View {
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: DS.Space.sm) {
             Image(systemName: "chart.line.uptrend.xyaxis")
-                .foregroundStyle(Color.appGold)
+                .foregroundStyle(Color.dsTextSecondary)
             Text(MockData.peakHourHint)
-                .font(.caption)
-                .foregroundStyle(Color.appMuted)
+                .font(.system(size: 11))
+                .foregroundStyle(Color.dsTextSecondary)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(.horizontal, DS.Space.md)
+        .padding(.vertical, DS.Space.sm)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.appGold.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Color.dsBackground, in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous)
+                .stroke(Color.dsBorder, lineWidth: 1)
+        }
     }
 }
 
@@ -144,9 +148,9 @@ private struct FilterStrip: View {
     @Binding var sort: CompanionListView.SortType
 
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: DS.Space.sm) {
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
+                HStack(spacing: DS.Space.sm) {
                     ForEach(CompanionListView.FilterType.allCases, id: \.self) { item in
                         TagChip(title: item.rawValue, isSelected: filter == item) {
                             filter = item
@@ -155,10 +159,10 @@ private struct FilterStrip: View {
                 }
             }
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
+                HStack(spacing: DS.Space.sm) {
                     Text("排序")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(Color.appMuted)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color.dsTextSecondary)
                     ForEach(CompanionListView.SortType.allCases, id: \.self) { item in
                         TagChip(title: item.rawValue, isSelected: sort == item) {
                             sort = item

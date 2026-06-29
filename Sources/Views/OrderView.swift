@@ -16,7 +16,7 @@ struct OrderView: View {
     }
 
     var body: some View {
-        AppScaffold(title: "确认订单", spacing: 18, bottomPadding: 44) {
+        AppScaffold(title: "确认订单", spacing: DS.Space.lg, bottomPadding: DS.Space.xl) {
             if let companion {
                 CompanionOrderHeader(companion: companion)
                 OrderTrustPoints()
@@ -25,10 +25,11 @@ struct OrderView: View {
                 DurationPicker(selectedDuration: $selectedDuration, durations: durations)
                 PricePanel(duration: selectedDuration, totalPrice: totalPrice)
                 RulesPanel(agreedToRules: $agreedToRules)
-                PrimaryActionButton(
+                DSPrimaryButton(
                     title: isPaying ? "模拟支付中..." : "确认并进入沟通",
                     systemImage: isPaying ? "hourglass" : "lock.fill",
-                    isEnabled: agreedToRules && !isPaying
+                    isEnabled: agreedToRules && !isPaying,
+                    isLoading: isPaying
                 ) {
                     submit()
                 }
@@ -60,27 +61,31 @@ struct OrderView: View {
 
 private struct OrderTrustPoints: View {
     private let items = [
-        ("线上沟通", "bubble.left.and.bubble.right", Color.appTeal),
-        ("18+", "18.circle", Color.appCoral),
-        ("平台担保", "lock.shield", Color.appLilac),
-        ("可举报", "exclamationmark.bubble", Color.appGold)
+        ("线上沟通", "bubble.left.and.bubble.right"),
+        ("18+", "18.circle"),
+        ("平台担保", "lock.shield"),
+        ("可举报", "exclamationmark.bubble")
     ]
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: DS.Space.sm) {
             ForEach(items, id: \.0) { item in
-                VStack(spacing: 6) {
+                VStack(spacing: DS.Space.sm) {
                     Image(systemName: item.1)
-                        .foregroundStyle(item.2)
+                        .foregroundStyle(Color.dsPrimary)
                     Text(item.0)
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(Color.appInk)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Color.dsTextPrimary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 10)
-                .background(.white.opacity(0.48), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .padding(.vertical, DS.Space.sm)
+                .background(Color.dsSurface, in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous)
+                        .stroke(Color.dsBorder, lineWidth: 1)
+                }
             }
         }
     }
@@ -90,19 +95,19 @@ struct CompanionOrderHeader: View {
     let companion: Companion
 
     var body: some View {
-        GlassPanel(cornerRadius: 26, tint: Color.appTeal.opacity(0.1)) {
-            HStack(spacing: 14) {
-                CompanionAvatar(companion: companion, size: 58)
-                VStack(alignment: .leading, spacing: 5) {
+        SoftCard {
+            HStack(spacing: DS.Space.md) {
+                CompanionAvatar(companion: companion, size: 48)
+                VStack(alignment: .leading, spacing: DS.Space.xxs) {
                     Text(companion.name)
-                        .font(.headline)
-                        .foregroundStyle(Color.appInk)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Color.dsTextPrimary)
                     Text(companion.role)
-                        .font(.subheadline)
-                        .foregroundStyle(Color.appMuted)
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color.dsTextSecondary)
                 }
                 Spacer()
-                StatusPill(text: "平台担保", symbol: "lock.shield", color: Color.appTeal)
+                StatusPill(text: "平台担保", symbol: "lock.shield", color: Color.dsPrimary)
             }
         }
     }
@@ -112,25 +117,25 @@ private struct VerificationGate: View {
     @EnvironmentObject private var store: AppStore
 
     var body: some View {
-        GlassPanel(cornerRadius: 22, tint: store.user.isVerified ? Color.appTeal.opacity(0.08) : Color.appCoral.opacity(0.08)) {
-            HStack(alignment: .top, spacing: 12) {
+        SoftCard {
+            HStack(alignment: .top, spacing: DS.Space.md) {
                 Image(systemName: store.user.isVerified ? "checkmark.seal.fill" : "person.badge.key")
-                    .foregroundStyle(store.user.isVerified ? Color.appTeal : Color.appCoral)
-                VStack(alignment: .leading, spacing: 5) {
+                    .foregroundStyle(store.user.isVerified ? Color.dsSuccess : Color.dsWarning)
+                VStack(alignment: .leading, spacing: DS.Space.xxs) {
                     Text(store.user.isVerified ? "18+ 实名已完成" : "下单前需完成 18+ 实名")
-                        .font(.headline)
-                        .foregroundStyle(Color.appInk)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Color.dsTextPrimary)
                     Text(store.user.isVerified ? "演示版已通过本地模拟实名与年龄核验。" : "不采集真实身份证，仅模拟姓名、年龄、人脸和手机号校验流程。")
-                        .font(.subheadline)
-                        .foregroundStyle(Color.appMuted)
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color.dsTextSecondary)
                 }
                 Spacer()
                 if !store.user.isVerified {
                     Button("去认证") {
                         store.navigate(.verify)
                     }
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(Color.appCoral)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.dsPrimary)
                 }
             }
         }
@@ -142,9 +147,9 @@ private struct ThemePicker: View {
     @Binding var selectedThemeId: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: DS.Space.md) {
             SectionHeader(title: "沟通主题")
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: DS.Space.sm) {
                 ForEach(store.themes) { theme in
                     SelectableTile(title: theme.name, symbol: theme.icon, isSelected: selectedThemeId == theme.id) {
                         selectedThemeId = theme.id
@@ -160,9 +165,9 @@ private struct DurationPicker: View {
     let durations: [Int]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: DS.Space.md) {
             SectionHeader(title: "沟通时长")
-            HStack(spacing: 8) {
+            HStack(spacing: DS.Space.sm) {
                 ForEach(durations, id: \.self) { duration in
                     SelectableTile(title: "\(duration) 分钟", symbol: "timer", isSelected: selectedDuration == duration) {
                         selectedDuration = duration
@@ -181,20 +186,25 @@ private struct SelectableTile: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 7) {
+            HStack(spacing: DS.Space.sm) {
                 Image(systemName: symbol)
                 Text(title)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
             }
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(isSelected ? .white : Color.appInk)
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(isSelected ? .white : Color.dsTextPrimary)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .background(isSelected ? Color.appInk : Color.white.opacity(0.5), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .padding(.vertical, DS.Space.md)
+            .background(isSelected ? Color.dsPrimary : Color.dsSurface, in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
+            .overlay {
+                if !isSelected {
+                    RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous)
+                        .stroke(Color.dsBorder, lineWidth: 1)
+                }
+            }
         }
         .buttonStyle(.plain)
-        .liquidGlass(cornerRadius: 16, tint: isSelected ? Color.appTeal.opacity(0.2) : .white.opacity(0.1), interactive: true)
     }
 }
 
@@ -203,8 +213,8 @@ private struct PricePanel: View {
     let totalPrice: Int
 
     var body: some View {
-        GlassPanel(cornerRadius: 24, tint: Color.appGold.opacity(0.09)) {
-            VStack(spacing: 12) {
+        SoftCard {
+            VStack(spacing: DS.Space.md) {
                 HStack {
                     Text("沟通时长")
                     Spacer()
@@ -218,15 +228,15 @@ private struct PricePanel: View {
                 Divider()
                 HStack {
                     Text("合计")
-                        .font(.headline)
+                        .font(.system(size: 15, weight: .semibold))
                     Spacer()
                     Text("¥\(totalPrice)")
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.appCoral)
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundStyle(Color.dsTextPrimary)
                 }
             }
-            .font(.subheadline)
-            .foregroundStyle(Color.appInk)
+            .font(.system(size: 13))
+            .foregroundStyle(Color.dsTextPrimary)
         }
     }
 }
@@ -236,17 +246,17 @@ private struct RulesPanel: View {
     private let rules = ["仅限平台内文字/语音沟通", "禁止线下邀约和私下转账", "不提供医疗诊断或治疗承诺", "不适可立即结束并举报"]
 
     var body: some View {
-        GlassPanel(cornerRadius: 24, tint: Color.appCoral.opacity(0.08)) {
-            VStack(alignment: .leading, spacing: 12) {
+        SoftCard {
+            VStack(alignment: .leading, spacing: DS.Space.md) {
                 SectionHeader(title: "安全规范", subtitle: "继续下单代表你理解服务边界")
                 ForEach(rules, id: \.self) { rule in
                     Label(rule, systemImage: "checkmark.circle.fill")
-                        .font(.subheadline)
-                        .foregroundStyle(Color.appInk)
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color.dsTextPrimary)
                 }
                 Toggle("我已阅读并同意平台安全规范", isOn: $agreedToRules)
-                    .font(.subheadline.weight(.semibold))
-                    .tint(Color.appTeal)
+                    .font(.system(size: 13, weight: .semibold))
+                    .tint(Color.dsPrimary)
             }
         }
     }

@@ -321,21 +321,9 @@ extension Companion {
 
     var availabilityColor: Color {
         switch availability {
-        case .online: Color.appTeal
-        case .available: Color(red: 0.22, green: 0.68, blue: 0.42)
-        case .busy: Color.appMuted
+        case .online: Color.dsPrimary
+        case .available: Color.dsSuccess
+        case .busy: Color.dsTextSecondary
         }
     }
-}
-
-extension Color {
-    static let appInk = Color(red: 0.07, green: 0.08, blue: 0.08)
-    static let appMuted = Color(red: 0.43, green: 0.45, blue: 0.45)
-    static let appMist = Color(red: 0.95, green: 0.97, blue: 0.96)
-    static let appWarm = Color(red: 1.00, green: 0.98, blue: 0.97)
-    static let appRose = Color(red: 0.88, green: 0.52, blue: 0.58)
-    static let appCoral = Color(red: 0.92, green: 0.36, blue: 0.28)
-    static let appTeal = Color(red: 0.05, green: 0.54, blue: 0.50)
-    static let appGold = Color(red: 0.85, green: 0.58, blue: 0.18)
-    static let appLilac = Color(red: 0.48, green: 0.45, blue: 0.78)
 }

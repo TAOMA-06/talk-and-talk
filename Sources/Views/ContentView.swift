@@ -4,49 +4,39 @@ struct ContentView: View {
     @EnvironmentObject private var store: AppStore
 
     var body: some View {
-        ZStack {
-            AppBackground()
-            TabView(selection: $store.selectedTab) {
-                NavigationStack(path: $store.discoverPath) {
-                    HomeView()
-                        .withRoutes()
-                }
-                .tabItem { Label(AppTab.discover.title, systemImage: AppTab.discover.symbol) }
-                .tag(AppTab.discover)
-
-                NavigationStack(path: $store.communityPath) {
-                    CommunityView()
-                        .withRoutes()
-                }
-                .tabItem { Label(AppTab.community.title, systemImage: AppTab.community.symbol) }
-                .tag(AppTab.community)
-
-                NavigationStack(path: $store.ordersPath) {
-                    OrdersView()
-                        .withRoutes()
-                }
-                .tabItem { Label(AppTab.orders.title, systemImage: AppTab.orders.symbol) }
-                .tag(AppTab.orders)
-
-                NavigationStack(path: $store.messagesPath) {
-                    MessagesView()
-                        .withRoutes()
-                }
-                .tabItem { Label(AppTab.messages.title, systemImage: AppTab.messages.symbol) }
-                .tag(AppTab.messages)
-
-                NavigationStack(path: $store.profilePath) {
-                    ProfileView()
-                        .withRoutes()
-                }
-                .tabItem { Label(AppTab.profile.title, systemImage: AppTab.profile.symbol) }
-                .tag(AppTab.profile)
+        TabView(selection: $store.selectedTab) {
+            NavigationStack(path: $store.discoverPath) {
+                HomeView().withRoutes()
             }
-            .tint(Color.appTeal)
-            .background(AppBackground())
-            .toolbarBackground(.ultraThinMaterial, for: .tabBar)
-            .toolbarBackground(.visible, for: .tabBar)
+            .tabItem { Label(AppTab.discover.title, systemImage: AppTab.discover.symbol) }
+            .tag(AppTab.discover)
+
+            NavigationStack(path: $store.communityPath) {
+                CommunityView().withRoutes()
+            }
+            .tabItem { Label(AppTab.community.title, systemImage: AppTab.community.symbol) }
+            .tag(AppTab.community)
+
+            NavigationStack(path: $store.ordersPath) {
+                OrdersView().withRoutes()
+            }
+            .tabItem { Label(AppTab.orders.title, systemImage: AppTab.orders.symbol) }
+            .tag(AppTab.orders)
+
+            NavigationStack(path: $store.messagesPath) {
+                MessagesView().withRoutes()
+            }
+            .tabItem { Label(AppTab.messages.title, systemImage: AppTab.messages.symbol) }
+            .tag(AppTab.messages)
+
+            NavigationStack(path: $store.profilePath) {
+                ProfileView().withRoutes()
+            }
+            .tabItem { Label(AppTab.profile.title, systemImage: AppTab.profile.symbol) }
+            .tag(AppTab.profile)
         }
+        .tint(Color.dsPrimary)
+        .background(Color.dsBackground)
         .sheet(item: $store.agreementPrompt) { prompt in
             UserAgreementSheet(prompt: prompt) {
                 store.dismissAgreementPrompt()

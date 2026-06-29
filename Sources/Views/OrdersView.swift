@@ -4,13 +4,15 @@ struct OrdersView: View {
     @EnvironmentObject private var store: AppStore
 
     var body: some View {
-        AppScaffold(title: "订单", spacing: 16) {
+        AppScaffold(title: "订单", spacing: DS.Space.lg) {
             SectionHeader(title: "我的订单", subtitle: "本地模拟订单状态")
             if store.orders.isEmpty {
                 EmptyStateView(symbol: "calendar.badge.clock", title: "暂无订单", subtitle: "从发现页选择一个陪伴者，完成一次演示下单。")
             } else {
-                ForEach(store.orders) { order in
-                    OrderCard(order: order)
+                LazyVStack(spacing: DS.Space.md) {
+                    ForEach(store.orders) { order in
+                        OrderCard(order: order)
+                    }
                 }
             }
         }
@@ -40,19 +42,19 @@ private struct OrderCard: View {
     }
 
     var body: some View {
-        GlassPanel(cornerRadius: 24, tint: .white.opacity(0.18)) {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(spacing: 12) {
+        SoftCard {
+            VStack(alignment: .leading, spacing: DS.Space.md) {
+                HStack(spacing: DS.Space.md) {
                     if let companion {
-                        CompanionAvatar(companion: companion, size: 54)
+                        CompanionAvatar(companion: companion, size: 48)
                     }
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: DS.Space.xxs) {
                         Text(companion?.name ?? "未知陪伴者")
-                            .font(.headline)
-                            .foregroundStyle(Color.appInk)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Color.dsTextPrimary)
                         Text(theme?.name ?? "线上沟通")
-                            .font(.subheadline)
-                            .foregroundStyle(Color.appMuted)
+                            .font(.system(size: 13))
+                            .foregroundStyle(Color.dsTextSecondary)
                     }
                     Spacer()
                     StatusPill(text: order.status.displayName, symbol: order.status.symbol, color: color(for: order.status))
@@ -63,15 +65,18 @@ private struct OrderCard: View {
                     Spacer()
                     Label("¥\(order.totalPrice)", systemImage: "creditcard")
                 }
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Color.appInk)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Color.dsTextPrimary)
 
                 Text(order.scheduledAt.formatted(date: .abbreviated, time: .shortened))
-                    .font(.caption)
-                    .foregroundStyle(Color.appMuted)
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color.dsTextSecondary)
 
                 if order.status == .confirmed || order.status == .inProgress, let companion {
-                    PrimaryActionButton(title: order.status == .inProgress ? "继续沟通" : "进入沟通", systemImage: "bubble.left.and.bubble.right") {
+                    DSPrimaryButton(
+                        title: order.status == .inProgress ? "继续沟通" : "进入沟通",
+                        systemImage: "bubble.left.and.bubble.right"
+                    ) {
                         store.navigate(.chat(companion.id))
                     }
                 }
@@ -81,10 +86,10 @@ private struct OrderCard: View {
 
     private func color(for status: OrderStatus) -> Color {
         switch status {
-        case .pending, .confirmed: Color.appGold
-        case .inProgress: Color.appTeal
-        case .completed: Color.appMuted
-        case .refunded: Color.appCoral
+        case .pending, .confirmed: Color.dsWarning
+        case .inProgress: Color.dsPrimary
+        case .completed: Color.dsTextSecondary
+        case .refunded: Color.dsDanger
         }
     }
 }

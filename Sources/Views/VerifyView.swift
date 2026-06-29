@@ -19,12 +19,12 @@ struct VerifyView: View {
     }
 
     var body: some View {
-        AppScaffold(title: "18+ 实名认证", spacing: 20, bottomPadding: 40) {
+        AppScaffold(title: "18+ 实名认证", spacing: DS.Space.lg, bottomPadding: DS.Space.xl) {
             VerifyProgress(step: step)
             currentStep
-            PrimaryActionButton(title: step == 2 ? "完成模拟认证" : "下一步", systemImage: "arrow.right", isEnabled: canContinue) {
+            DSPrimaryButton(title: step == 2 ? "完成模拟认证" : "下一步", systemImage: "arrow.right", isEnabled: canContinue) {
                 if step < 2 {
-                    withAnimation(.snappy) { step += 1 }
+                    withAnimation(.easeOut(duration: DS.Motion.fast)) { step += 1 }
                 } else {
                     store.verifyUser(name: name, phone: phone)
                     dismiss()
@@ -37,8 +37,8 @@ struct VerifyView: View {
                     Text("了解完整安全体系")
                     Image(systemName: "arrow.right")
                 }
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Color.appTeal)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Color.dsPrimary)
                 .frame(maxWidth: .infinity)
             }
             .buttonStyle(.plain)
@@ -62,12 +62,12 @@ private struct VerifyProgress: View {
     let step: Int
 
     var body: some View {
-        GlassPanel(cornerRadius: 22) {
-            HStack(spacing: 10) {
+        SoftCard {
+            HStack(spacing: DS.Space.sm) {
                 ForEach(0..<3, id: \.self) { item in
                     Capsule()
-                        .fill(item <= step ? Color.appTeal : Color.black.opacity(0.08))
-                        .frame(height: 8)
+                        .fill(item <= step ? Color.dsPrimary : Color.dsBorder)
+                        .frame(height: 4)
                 }
             }
         }
@@ -79,15 +79,16 @@ private struct IdentityStep: View {
     @Binding var age: String
 
     var body: some View {
-        GlassPanel(cornerRadius: 28, tint: Color.appTeal.opacity(0.1)) {
-            VStack(alignment: .leading, spacing: 18) {
+        SoftCard {
+            VStack(alignment: .leading, spacing: DS.Space.lg) {
                 StepTitle(symbol: "person.text.rectangle", title: "确认 18+ 身份", subtitle: "演示版只在本地修改状态，不会提交真实证件。")
-                TextField("姓名", text: $name)
-                    .textFieldStyle(.roundedBorder)
-                TextField("年龄", text: $age)
-                    .keyboardType(.numberPad)
-                    .textFieldStyle(.roundedBorder)
-                StatusPill(text: Int(age).map { $0 >= 18 } == true ? "年龄符合" : "需年满18岁", symbol: "18.circle", color: Int(age).map { $0 >= 18 } == true ? Color.appTeal : Color.appCoral)
+                DSInputField(placeholder: "姓名", text: $name)
+                DSInputField(placeholder: "年龄", text: $age, keyboardType: .numberPad)
+                StatusPill(
+                    text: Int(age).map { $0 >= 18 } == true ? "年龄符合" : "需年满18岁",
+                    symbol: "18.circle",
+                    color: Int(age).map { $0 >= 18 } == true ? Color.dsSuccess : Color.dsWarning
+                )
             }
         }
     }
@@ -97,24 +98,24 @@ private struct FaceStep: View {
     @Binding var isComplete: Bool
 
     var body: some View {
-        GlassPanel(cornerRadius: 28, tint: Color.appLilac.opacity(0.1)) {
-            VStack(spacing: 20) {
+        SoftCard {
+            VStack(spacing: DS.Space.lg) {
                 StepTitle(symbol: "faceid", title: "模拟人脸核验", subtitle: "点击下方区域即可完成模拟活体检测。")
                 Button {
-                    withAnimation(.snappy) { isComplete = true }
+                    withAnimation(.easeOut(duration: DS.Motion.fast)) { isComplete = true }
                 } label: {
                     ZStack {
-                        RoundedRectangle(cornerRadius: 28, style: .continuous)
-                            .stroke(style: StrokeStyle(lineWidth: 2, dash: [8]))
-                            .foregroundStyle(isComplete ? Color.appTeal : Color.appMuted)
-                            .frame(height: 220)
-                        VStack(spacing: 12) {
+                        RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous)
+                            .stroke(style: StrokeStyle(lineWidth: 1, dash: [6]))
+                            .foregroundStyle(isComplete ? Color.dsSuccess : Color.dsBorder)
+                            .frame(height: 200)
+                        VStack(spacing: DS.Space.md) {
                             Image(systemName: isComplete ? "checkmark.seal.fill" : "faceid")
-                                .font(.system(size: 58, weight: .semibold))
-                                .foregroundStyle(isComplete ? Color.appTeal : Color.appInk)
+                                .font(.system(size: 48, weight: .regular))
+                                .foregroundStyle(isComplete ? Color.dsSuccess : Color.dsTextPrimary)
                             Text(isComplete ? "活体检测已通过" : "点击开始模拟检测")
-                                .font(.headline)
-                                .foregroundStyle(Color.appInk)
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(Color.dsTextPrimary)
                         }
                     }
                 }
@@ -129,19 +130,15 @@ private struct PhoneStep: View {
     @Binding var code: String
 
     var body: some View {
-        GlassPanel(cornerRadius: 28, tint: Color.appGold.opacity(0.1)) {
-            VStack(alignment: .leading, spacing: 18) {
+        SoftCard {
+            VStack(alignment: .leading, spacing: DS.Space.lg) {
                 StepTitle(symbol: "iphone.gen3", title: "绑定手机号", subtitle: "验证码为演示值，可直接完成。")
-                TextField("手机号", text: $phone)
-                    .keyboardType(.phonePad)
-                    .textFieldStyle(.roundedBorder)
-                HStack {
-                    TextField("验证码", text: $code)
-                        .keyboardType(.numberPad)
-                        .textFieldStyle(.roundedBorder)
+                DSInputField(placeholder: "手机号", text: $phone, keyboardType: .phonePad)
+                HStack(spacing: DS.Space.sm) {
+                    DSInputField(placeholder: "验证码", text: $code, keyboardType: .numberPad)
                     Button("重新发送") {}
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Color.appTeal)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.dsPrimary)
                 }
             }
         }
@@ -154,16 +151,16 @@ private struct StepTitle: View {
     let subtitle: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: DS.Space.sm) {
             Image(systemName: symbol)
-                .font(.largeTitle)
-                .foregroundStyle(Color.appTeal)
+                .font(.system(size: 28))
+                .foregroundStyle(Color.dsPrimary)
             Text(title)
-                .font(.title2.bold())
-                .foregroundStyle(Color.appInk)
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(Color.dsTextPrimary)
             Text(subtitle)
-                .font(.subheadline)
-                .foregroundStyle(Color.appMuted)
+                .font(.system(size: 13))
+                .foregroundStyle(Color.dsTextSecondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

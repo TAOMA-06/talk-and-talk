@@ -4,7 +4,7 @@ struct ProfileView: View {
     @EnvironmentObject private var store: AppStore
 
     var body: some View {
-        AppScaffold(title: "我的", spacing: 18) {
+        AppScaffold(title: "我的", spacing: DS.Space.lg) {
             UserPanel()
             SafetyScorePanel()
             MenuPanel()
@@ -17,30 +17,34 @@ private struct UserPanel: View {
     @EnvironmentObject private var store: AppStore
 
     var body: some View {
-        GlassPanel(cornerRadius: 30, tint: Color.appTeal.opacity(0.12)) {
-            HStack(spacing: 16) {
+        SoftCard {
+            HStack(spacing: DS.Space.lg) {
                 ZStack {
-                    Circle()
-                        .fill(LinearGradient(colors: [Color.appTeal, Color.appLilac], startPoint: .topLeading, endPoint: .bottomTrailing))
+                    RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous)
+                        .fill(Color.dsPrimary.opacity(0.12))
                     Text("TT")
-                        .font(.title2.bold())
-                        .foregroundStyle(.white)
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(Color.dsPrimary)
                 }
-                .frame(width: 72, height: 72)
-                VStack(alignment: .leading, spacing: 6) {
+                .frame(width: 64, height: 64)
+                VStack(alignment: .leading, spacing: DS.Space.sm) {
                     HStack {
                         Text(store.user.name)
-                            .font(.title3.bold())
-                            .foregroundStyle(Color.appInk)
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(Color.dsTextPrimary)
                         if store.user.isVerified {
                             Image(systemName: "checkmark.seal.fill")
-                                .foregroundStyle(Color.appTeal)
+                                .foregroundStyle(Color.dsPrimary)
                         }
                     }
                     Text("\(store.user.phone) · \(store.user.age)+")
-                        .font(.subheadline)
-                        .foregroundStyle(Color.appMuted)
-                    StatusPill(text: store.user.isVerified ? "已完成 18+ 实名" : "未完成实名", symbol: store.user.isVerified ? "checkmark.shield" : "person.badge.key", color: store.user.isVerified ? Color.appTeal : Color.appCoral)
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color.dsTextSecondary)
+                    StatusPill(
+                        text: store.user.isVerified ? "已完成 18+ 实名" : "未完成实名",
+                        symbol: store.user.isVerified ? "checkmark.shield" : "person.badge.key",
+                        color: store.user.isVerified ? Color.dsPrimary : Color.dsWarning
+                    )
                 }
                 Spacer()
             }
@@ -53,53 +57,53 @@ private struct SafetyScorePanel: View {
     private let creditService = CreditService()
 
     var body: some View {
-        SoftCard(cornerRadius: 24, tint: Color.appGold, padding: 16) {
-            VStack(alignment: .leading, spacing: 12) {
+        SoftCard {
+            VStack(alignment: .leading, spacing: DS.Space.md) {
                 SectionHeader(
                     title: "安全分",
                     subtitle: "\(creditService.scoreLevel(for: store.user.safetyScore)) · \(store.user.accountStatus.displayName)"
                 )
                 if store.user.accountStatus != .active {
                     Text(store.accountRestrictions.summary)
-                        .font(.caption)
-                        .foregroundStyle(Color.appCoral)
-                        .padding(10)
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color.dsDanger)
+                        .padding(DS.Space.md)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color.appCoral.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .background(Color.dsDanger.opacity(0.08), in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
                 }
                 HStack(alignment: .lastTextBaseline) {
                     Text("\(store.user.safetyScore)")
-                        .font(.system(size: 46, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.appInk)
+                        .font(.system(size: 40, weight: .semibold))
+                        .foregroundStyle(Color.dsTextPrimary)
                     Text("/100")
-                        .font(.headline)
-                        .foregroundStyle(Color.appMuted)
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(Color.dsTextSecondary)
                     Spacer()
-                    VStack(alignment: .trailing, spacing: 4) {
+                    VStack(alignment: .trailing, spacing: DS.Space.xxs) {
                         Image(systemName: "shield.checkered")
-                            .font(.largeTitle)
-                            .foregroundStyle(Color.appTeal)
+                            .font(.system(size: 28))
+                            .foregroundStyle(Color.dsPrimary)
                         Text("违规 \(store.user.violationCount) 次")
-                            .font(.caption2)
-                            .foregroundStyle(Color.appMuted)
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color.dsTextSecondary)
                     }
                 }
                 ProgressView(value: Double(store.user.safetyScore), total: 100)
-                    .tint(Color.appTeal)
-                VStack(alignment: .leading, spacing: 8) {
+                    .tint(Color.dsPrimary)
+                VStack(alignment: .leading, spacing: DS.Space.sm) {
                     Text("最近信用变动")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(Color.appMuted)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color.dsTextSecondary)
                     ForEach(store.creditEvents.prefix(3)) { event in
                         HStack {
                             Text(event.reason)
-                                .font(.caption)
-                                .foregroundStyle(Color.appInk)
+                                .font(.system(size: 13))
+                                .foregroundStyle(Color.dsTextPrimary)
                                 .lineLimit(1)
                             Spacer()
                             Text(event.delta == 0 ? "—" : "\(event.delta > 0 ? "+" : "")\(event.delta)")
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(event.delta >= 0 ? Color.appTeal : Color.appCoral)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(event.delta >= 0 ? Color.dsSuccess : Color.dsDanger)
                         }
                     }
                 }
@@ -112,61 +116,47 @@ private struct MenuPanel: View {
     @EnvironmentObject private var store: AppStore
 
     var body: some View {
-        VStack(spacing: 10) {
-            ProfileMenuRow(symbol: "shield.checkered", title: "安全中心", detail: "信任体系") {
+        VStack(spacing: 0) {
+            DSListRow(title: "安全中心", subtitle: "信任体系", symbol: "shield.checkered") {
                 store.navigate(.safetyCenter)
             }
-            ProfileMenuRow(symbol: "person.badge.key", title: "18+ 实名认证", detail: store.user.isVerified ? "已完成" : "待完成") {
+            Divider().padding(.leading, 52)
+            DSListRow(
+                title: "18+ 实名认证",
+                subtitle: store.user.isVerified ? "已完成" : "待完成",
+                symbol: "person.badge.key"
+            ) {
                 store.navigate(.verify)
             }
-            ProfileMenuRow(symbol: "shield.lefthalf.filled", title: "演示后台", detail: "\(store.moderationCases.count) 条事件") {
+            Divider().padding(.leading, 52)
+            DSListRow(
+                title: "演示后台",
+                subtitle: "\(store.moderationCases.count) 条事件",
+                symbol: "shield.lefthalf.filled"
+            ) {
                 store.navigate(.admin)
             }
-            ProfileMenuRow(symbol: "doc.text", title: "平台规范", detail: "线上服务边界") {}
+            Divider().padding(.leading, 52)
+            DSListRow(title: "平台规范", subtitle: "线上服务边界", symbol: "doc.text")
         }
-    }
-}
-
-private struct ProfileMenuRow: View {
-    let symbol: String
-    let title: String
-    let detail: String
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            GlassPanel(cornerRadius: 20) {
-                HStack {
-                    Image(systemName: symbol)
-                        .foregroundStyle(Color.appTeal)
-                        .frame(width: 28)
-                    Text(title)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Color.appInk)
-                    Spacer()
-                    Text(detail)
-                        .font(.caption)
-                        .foregroundStyle(Color.appMuted)
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(Color.appMuted)
-                }
-            }
+        .background(Color.dsSurface, in: RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous)
+                .stroke(Color.dsBorder, lineWidth: 1)
         }
-        .buttonStyle(.plain)
     }
 }
 
 private struct OperatorNote: View {
     var body: some View {
-        GlassPanel(cornerRadius: 24, tint: Color.appCoral.opacity(0.08)) {
-            VStack(alignment: .leading, spacing: 8) {
+        SoftCard {
+            VStack(alignment: .leading, spacing: DS.Space.sm) {
                 Label("Demo 说明", systemImage: "info.circle")
-                    .font(.headline)
-                    .foregroundStyle(Color.appInk)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Color.dsTextPrimary)
                 Text("当前版本不接后端、不保存真实身份、不发起真实支付。内容审查默认使用本地规则引擎；配置 MODERATION_API_KEY 后可启用 AI 辅助审查。")
-                    .font(.subheadline)
-                    .foregroundStyle(Color.appMuted)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.dsTextSecondary)
                     .lineSpacing(3)
             }
         }

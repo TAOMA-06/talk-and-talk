@@ -11,61 +11,56 @@ struct CommunityView: View {
     private let topics = ["情绪倾听", "穿搭分享", "拍照技巧", "陪伴故事"]
 
     var body: some View {
-        AppScaffold(title: "社区", spacing: 20) {
+        AppScaffold(title: "社区", spacing: DS.Space.lg) {
             BelongingBanner()
             if !store.pendingCommunityPosts().isEmpty {
                 SectionHeader(title: "审核中", subtitle: "先审后发，保护社区氛围")
-                LazyVStack(spacing: 14) {
+                LazyVStack(spacing: DS.Space.md) {
                     ForEach(store.pendingCommunityPosts()) { post in
                         CommunityPostCard(post: post)
                     }
                 }
             }
             SectionHeader(title: "她的故事", subtitle: "分享、被理解、被尊重")
-            LazyVStack(spacing: 14) {
-                ForEach(store.approvedCommunityPosts()) { post in
-                    CommunityPostCard(post: post)
+            if store.approvedCommunityPosts().isEmpty && store.pendingCommunityPosts().isEmpty {
+                EmptyStateView(symbol: "text.bubble", title: "还没有故事", subtitle: "成为第一个分享的人。")
+            } else {
+                LazyVStack(spacing: DS.Space.md) {
+                    ForEach(store.approvedCommunityPosts()) { post in
+                        CommunityPostCard(post: post)
+                    }
                 }
             }
-            Button {
+            DSSecondaryButton(title: "分享你的故事") {
                 showingComposer = true
-            } label: {
-                Label("分享你的故事", systemImage: "square.and.pencil")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 15)
-                    .foregroundStyle(Color.appTeal)
-                    .background(Color.appTeal.opacity(0.08), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             }
-            .buttonStyle(.plain)
             .disabled(!store.accountRestrictions.canPostCommunity)
         }
         .sheet(isPresented: $showingComposer) {
             NavigationStack {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: DS.Space.lg) {
                     Picker("话题", selection: $topic) {
                         ForEach(topics, id: \.self) { Text($0).tag($0) }
                     }
                     .pickerStyle(.segmented)
-                    TextField("写下你的故事...", text: $content, axis: .vertical)
-                        .lineLimit(4...8)
-                        .padding(12)
-                        .background(Color.appMist, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    DSInputField(placeholder: "写下你的故事...", text: $content, axis: .vertical, lineLimit: 4...8)
                     if let feedbackMessage {
                         Text(feedbackMessage)
-                            .font(.caption)
-                            .foregroundStyle(Color.appCoral)
+                            .font(.system(size: 13))
+                            .foregroundStyle(Color.dsDanger)
                     }
-                    PrimaryActionButton(
+                    DSPrimaryButton(
                         title: isSubmitting ? "审核中..." : "发布",
                         systemImage: "paperplane",
-                        isEnabled: !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isSubmitting
+                        isEnabled: !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isSubmitting,
+                        isLoading: isSubmitting
                     ) {
                         submitPost()
                     }
                     Spacer()
                 }
-                .padding()
+                .padding(DS.Space.lg)
+                .background(Color.dsBackground)
                 .navigationTitle("发布故事")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
@@ -94,18 +89,18 @@ struct CommunityView: View {
 
 private struct BelongingBanner: View {
     var body: some View {
-        SoftCard(cornerRadius: 24, tint: Color.appRose, padding: 20) {
-            VStack(alignment: .leading, spacing: 10) {
+        SoftCard {
+            VStack(alignment: .leading, spacing: DS.Space.sm) {
                 Text("这是属于我们的地方")
-                    .font(.title3.weight(.bold))
-                    .foregroundStyle(Color.appInk)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Color.dsTextPrimary)
                 Text("从女性视角出发，尊重每一种情绪。骚扰、低俗、越界内容零容忍——在这里，你可以安心做自己。")
-                    .font(.subheadline)
-                    .foregroundStyle(Color.appMuted)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.dsTextSecondary)
                     .lineSpacing(4)
-                HStack(spacing: 8) {
-                    TrustMicroBadge(text: "女性主导", symbol: "heart.fill", color: Color.appRose)
-                    TrustMicroBadge(text: "严格审核", symbol: "checkmark.shield", color: Color.appTeal)
+                HStack(spacing: DS.Space.sm) {
+                    TrustMicroBadge(text: "女性主导", tone: .primary)
+                    TrustMicroBadge(text: "严格审核", tone: .success)
                 }
             }
         }
@@ -116,37 +111,37 @@ private struct CommunityPostCard: View {
     let post: CommunityPost
 
     var body: some View {
-        SoftCard(cornerRadius: 22, tint: Color.appRose, padding: 16) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 12) {
+        SoftCard {
+            VStack(alignment: .leading, spacing: DS.Space.md) {
+                HStack(spacing: DS.Space.md) {
                     ZStack {
-                        Circle()
-                            .fill(LinearGradient(colors: [Color.appRose, Color.appLilac], startPoint: .topLeading, endPoint: .bottomTrailing))
+                        RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous)
+                            .fill(Color.dsPrimary.opacity(0.12))
                         Text(post.authorInitials)
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(.white)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Color.dsPrimary)
                     }
                     .frame(width: 40, height: 40)
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: DS.Space.xxs) {
                         Text(post.authorName)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(Color.appInk)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Color.dsTextPrimary)
                         Text("#\(post.topic)")
-                            .font(.caption)
-                            .foregroundStyle(Color.appRose)
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color.dsTextSecondary)
                     }
                     Spacer()
                     statusBadge
                 }
                 Text(post.content)
-                    .font(.subheadline)
-                    .foregroundStyle(Color.appInk)
+                    .font(.system(size: 15))
+                    .foregroundStyle(Color.dsTextPrimary)
                     .lineSpacing(4)
                     .fixedSize(horizontal: false, vertical: true)
                 HStack {
                     Label("\(post.likeCount)", systemImage: "heart")
-                        .font(.caption)
-                        .foregroundStyle(Color.appMuted)
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.dsTextSecondary)
                     Spacer()
                 }
             }
@@ -157,11 +152,11 @@ private struct CommunityPostCard: View {
     private var statusBadge: some View {
         switch post.moderationStatus {
         case .approved:
-            TrustMicroBadge(text: "已审核", symbol: "checkmark.circle", color: Color.appTeal)
+            TrustMicroBadge(text: "已审核", tone: .success)
         case .pending:
-            TrustMicroBadge(text: "审核中", symbol: "clock", color: Color.appGold)
+            TrustMicroBadge(text: "审核中", tone: .warning)
         case .rejected:
-            TrustMicroBadge(text: "未通过", symbol: "xmark.circle", color: Color.appCoral)
+            TrustMicroBadge(text: "未通过", tone: .danger)
         }
     }
 }

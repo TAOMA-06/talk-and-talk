@@ -11,16 +11,16 @@ struct ReviewView: View {
     private var companion: Companion? { store.companion(by: companionId) }
 
     var body: some View {
-        AppScaffold(title: "评价", spacing: 20, bottomPadding: 40) {
+        AppScaffold(title: "评价", spacing: DS.Space.lg, bottomPadding: DS.Space.xl) {
             if submitted {
                 SuccessPanel()
             } else if let companion {
                 CompanionOrderHeader(companion: companion)
                 RatingPicker(rating: $rating)
                 ReviewEditor(content: $content)
-                PrimaryActionButton(title: "提交评价", systemImage: "star.fill") {
+                DSPrimaryButton(title: "提交评价", systemImage: "star.fill") {
                     store.submitReview(companionId: companionId, rating: rating, content: content)
-                    withAnimation(.snappy) { submitted = true }
+                    withAnimation(.easeOut(duration: DS.Motion.fast)) { submitted = true }
                 }
             } else {
                 EmptyStateView(symbol: "star.slash", title: "评价对象不存在", subtitle: "请返回订单页查看状态。")
@@ -33,26 +33,26 @@ private struct RatingPicker: View {
     @Binding var rating: Int
 
     var body: some View {
-        GlassPanel(cornerRadius: 28, tint: Color.appGold.opacity(0.12)) {
-            VStack(spacing: 18) {
+        SoftCard {
+            VStack(spacing: DS.Space.lg) {
                 Text("这次沟通体验怎么样？")
-                    .font(.title3.bold())
-                    .foregroundStyle(Color.appInk)
-                HStack(spacing: 12) {
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Color.dsTextPrimary)
+                HStack(spacing: DS.Space.md) {
                     ForEach(1...5, id: \.self) { star in
                         Button {
                             rating = star
                         } label: {
                             Image(systemName: star <= rating ? "star.fill" : "star")
-                                .font(.system(size: 30, weight: .semibold))
-                                .foregroundStyle(star <= rating ? Color.appGold : Color.appMuted.opacity(0.45))
+                                .font(.system(size: 28, weight: .regular))
+                                .foregroundStyle(star <= rating ? Color.dsWarning : Color.dsBorder)
                         }
                         .buttonStyle(.plain)
                     }
                 }
                 Text(ratingText)
-                    .font(.subheadline)
-                    .foregroundStyle(Color.appMuted)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.dsTextSecondary)
             }
             .frame(maxWidth: .infinity)
         }
@@ -72,14 +72,19 @@ private struct ReviewEditor: View {
     @Binding var content: String
 
     var body: some View {
-        GlassPanel(cornerRadius: 24) {
-            VStack(alignment: .leading, spacing: 12) {
+        SoftCard {
+            VStack(alignment: .leading, spacing: DS.Space.md) {
                 SectionHeader(title: "评价内容", subtitle: "帮助其他用户理解服务体验")
                 TextEditor(text: $content)
-                    .frame(minHeight: 130)
+                    .frame(minHeight: 120)
+                    .font(.system(size: 15))
                     .scrollContentBackground(.hidden)
-                    .padding(10)
-                    .background(.white.opacity(0.5), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .padding(DS.Space.sm)
+                    .background(Color.dsBackground, in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous)
+                            .stroke(Color.dsBorder, lineWidth: 1)
+                    }
             }
         }
     }
@@ -89,18 +94,18 @@ private struct SuccessPanel: View {
     @EnvironmentObject private var store: AppStore
 
     var body: some View {
-        GlassPanel(cornerRadius: 30, tint: Color.appTeal.opacity(0.14)) {
-            VStack(spacing: 18) {
+        SoftCard {
+            VStack(spacing: DS.Space.lg) {
                 Image(systemName: "checkmark.seal.fill")
-                    .font(.system(size: 58))
-                    .foregroundStyle(Color.appTeal)
+                    .font(.system(size: 48))
+                    .foregroundStyle(Color.dsSuccess)
                 Text("评价已提交")
-                    .font(.title2.bold())
-                    .foregroundStyle(Color.appInk)
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(Color.dsTextPrimary)
                 Text("订单已完成，评价已写入本地 mock 数据。")
-                    .font(.subheadline)
-                    .foregroundStyle(Color.appMuted)
-                PrimaryActionButton(title: "回到发现", systemImage: "sparkles") {
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.dsTextSecondary)
+                DSPrimaryButton(title: "回到发现", systemImage: "house") {
                     store.selectedTab = .discover
                     store.popToRoot()
                 }
