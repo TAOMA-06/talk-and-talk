@@ -1,0 +1,321 @@
+import Foundation
+import SwiftUI
+
+enum AppTab: Hashable, CaseIterable {
+    case discover
+    case community
+    case orders
+    case messages
+    case profile
+
+    var title: String {
+        switch self {
+        case .discover: "发现"
+        case .community: "社区"
+        case .orders: "订单"
+        case .messages: "消息"
+        case .profile: "我的"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .discover: "sparkles"
+        case .community: "heart.text.square"
+        case .orders: "calendar.badge.clock"
+        case .messages: "bubble.left.and.bubble.right"
+        case .profile: "person.crop.circle"
+        }
+    }
+}
+
+enum ListPreset: String, Hashable, Codable {
+    case nearby
+    case availableTonight
+    case budgetFriendly
+}
+
+enum AppRoute: Hashable {
+    case companionList(themeId: String?, preset: ListPreset?)
+    case companionDetail(String)
+    case order(String)
+    case chat(String)
+    case review(String)
+    case verify
+    case safetyCenter
+    case admin
+}
+
+enum AvailabilityStatus: String, Codable, Hashable {
+    case online
+    case available
+    case busy
+
+    var displayName: String {
+        switch self {
+        case .online: "在线"
+        case .available: "可约"
+        case .busy: "忙碌"
+        }
+    }
+}
+
+enum ModerationSource: String, Codable, Hashable {
+    case chat
+    case community
+    case report
+    case profile
+}
+
+enum ModerationDecision: String, Codable, Hashable {
+    case allow
+    case warn
+    case block
+    case review
+}
+
+enum ModerationCaseStatus: String, Codable, Hashable {
+    case pending
+    case autoReviewing
+    case humanReview
+    case resolved
+    case dismissed
+
+    var displayName: String {
+        switch self {
+        case .pending: "待处理"
+        case .autoReviewing: "机审中"
+        case .humanReview: "人工复核"
+        case .resolved: "已处理"
+        case .dismissed: "已驳回"
+        }
+    }
+}
+
+enum AccountStatus: String, Codable, Hashable {
+    case active
+    case restricted
+    case banned
+
+    var displayName: String {
+        switch self {
+        case .active: "正常"
+        case .restricted: "受限"
+        case .banned: "封禁"
+        }
+    }
+}
+
+enum CommunityModerationStatus: String, Codable, Hashable {
+    case pending
+    case approved
+    case rejected
+
+    var displayName: String {
+        switch self {
+        case .pending: "审核中"
+        case .approved: "已发布"
+        case .rejected: "未通过"
+        }
+    }
+}
+
+enum AdminAction: String, Codable, Hashable {
+    case confirmViolation
+    case dismiss
+    case escalate
+}
+
+struct ModerationResult: Hashable {
+    let decision: ModerationDecision
+    let riskLevel: RiskLevel
+    let score: Double
+    let reasons: [String]
+    let matchedRules: [String]
+    let usedAI: Bool
+}
+
+struct ModerationContext: Hashable {
+    var recentMessages: [String] = []
+    var safetyScore: Int = 72
+    var isVerified: Bool = false
+}
+
+struct AccountRestrictions: Hashable {
+    let canSendMessages: Bool
+    let canPostCommunity: Bool
+    let reducedMatchingWeight: Bool
+    let summary: String
+}
+
+struct CreditEvent: Identifiable, Codable, Hashable {
+    let id: String
+    let delta: Int
+    let reason: String
+    let createdAt: Date
+}
+
+struct User: Identifiable, Codable, Hashable {
+    let id: String
+    var name: String
+    var phone: String
+    var age: Int
+    var isVerified: Bool
+    var safetyScore: Int
+    var accountStatus: AccountStatus
+    var violationCount: Int
+    var lastViolationAt: Date?
+}
+
+struct Theme: Identifiable, Codable, Hashable {
+    let id: String
+    let name: String
+    let icon: String
+    let description: String
+    let tintName: String
+}
+
+struct Companion: Identifiable, Codable, Hashable {
+    let id: String
+    let name: String
+    let role: String
+    let initials: String
+    let tags: [String]
+    let rating: Double
+    let reviewCount: Int
+    let pricePerHalfHour: Int
+    let isOnline: Bool
+    let isVerified: Bool
+    let bio: String
+    let availableTimes: [String]
+    let languages: [String]
+    let specialties: [String]
+    let completedOrders: Int
+    let responseTime: String
+    let distanceKm: Double
+    let availability: AvailabilityStatus
+    let cityDistrict: String
+}
+
+struct CommunityPost: Identifiable, Codable, Hashable {
+    let id: String
+    let authorId: String
+    let authorName: String
+    let authorInitials: String
+    let topic: String
+    let content: String
+    let likeCount: Int
+    var moderationStatus: CommunityModerationStatus
+    let createdAt: Date
+
+    var isModerated: Bool { moderationStatus == .approved }
+}
+
+struct Order: Identifiable, Codable, Hashable {
+    let id: String
+    let companionId: String
+    let themeId: String
+    let durationMinutes: Int
+    let totalPrice: Int
+    var status: OrderStatus
+    let createdAt: Date
+    let scheduledAt: Date
+}
+
+enum OrderStatus: String, Codable, CaseIterable {
+    case pending
+    case confirmed
+    case inProgress
+    case completed
+    case refunded
+
+    var displayName: String {
+        switch self {
+        case .pending: "待确认"
+        case .confirmed: "待开始"
+        case .inProgress: "沟通中"
+        case .completed: "已完成"
+        case .refunded: "已退款"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .pending: "clock"
+        case .confirmed: "checkmark.seal"
+        case .inProgress: "waveform"
+        case .completed: "checkmark.circle"
+        case .refunded: "arrow.uturn.left.circle"
+        }
+    }
+}
+
+struct Review: Identifiable, Codable, Hashable {
+    let id: String
+    let companionId: String
+    let userName: String
+    let rating: Int
+    let content: String
+    let createdAt: Date
+}
+
+struct Message: Identifiable, Codable, Hashable {
+    let id: String
+    let senderId: String
+    let content: String
+    let type: MessageType
+    let timestamp: Date
+}
+
+enum MessageType: String, Codable {
+    case text
+    case system
+    case safety
+}
+
+struct ModerationCase: Identifiable, Codable, Hashable {
+    let id: String
+    let title: String
+    let category: String
+    let riskLevel: RiskLevel
+    var status: ModerationCaseStatus
+    var source: ModerationSource
+    var content: String
+    var targetId: String?
+    var aiScore: Double
+    var aiReason: String
+    var decision: ModerationDecision
+    var matchedRules: [String]
+    var usedAI: Bool
+    var resolvedAt: Date?
+}
+
+enum RiskLevel: String, Codable {
+    case low = "低"
+    case medium = "中"
+    case high = "高"
+}
+
+extension Companion {
+    var pricePerHour: Int { pricePerHalfHour * 2 }
+
+    var availabilityColor: Color {
+        switch availability {
+        case .online: Color.appTeal
+        case .available: Color(red: 0.22, green: 0.68, blue: 0.42)
+        case .busy: Color.appMuted
+        }
+    }
+}
+
+extension Color {
+    static let appInk = Color(red: 0.07, green: 0.08, blue: 0.08)
+    static let appMuted = Color(red: 0.43, green: 0.45, blue: 0.45)
+    static let appMist = Color(red: 0.95, green: 0.97, blue: 0.96)
+    static let appWarm = Color(red: 1.00, green: 0.98, blue: 0.97)
+    static let appRose = Color(red: 0.88, green: 0.52, blue: 0.58)
+    static let appCoral = Color(red: 0.92, green: 0.36, blue: 0.28)
+    static let appTeal = Color(red: 0.05, green: 0.54, blue: 0.50)
+    static let appGold = Color(red: 0.85, green: 0.58, blue: 0.18)
+    static let appLilac = Color(red: 0.48, green: 0.45, blue: 0.78)
+}

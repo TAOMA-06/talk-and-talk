@@ -1,0 +1,11 @@
+.DS_Store
+.codegraph/
+DerivedData/
+xcuserdata/
+*.xcuserstate
+TalkAndTalk.xcodeproj/project.xcworkspace/xcuserdata/
+TalkAndTalk.xcodeproj/xcuserdata/
+Archive/**/.build/
+Archive/**/node_modules/
+Archive/**/dist/
+Archive/root-build-cache/

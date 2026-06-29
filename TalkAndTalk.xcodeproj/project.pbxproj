@@ -1,0 +1,646 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		07394B0621E5F658C4C6DB2E /* SafetyCenterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E07FDAB6E5EA7A7DAC283DA /* SafetyCenterView.swift */; };
+		087EC489CE1B101551C549C7 /* ModerationConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56CEF36BA8E64619F4C61941 /* ModerationConfig.swift */; };
+		0DDF20FF6D7F7EC0BC62BB8F /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A50207E243AC01623C0AA43 /* HomeView.swift */; };
+		1BDA7B82C2D97AE2B0CDE6C7 /* ModerationConfig.example.plist in Resources */ = {isa = PBXBuildFile; fileRef = 5F2CEA87CEF6D8015A2B2E77 /* ModerationConfig.example.plist */; };
+		2204DFECB857911AB1BADDC1 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC767342944DF71582E369FA /* Models.swift */; };
+		437B452F5799C818AB35E4F7 /* RuleBasedModerationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4702B216F2A0E5725597BDF /* RuleBasedModerationEngine.swift */; };
+		82514F9E11D7E9E37696582D /* ReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DED52C2CFD5148D2DCF61F39 /* ReviewView.swift */; };
+		843CE6B4E2E139A886138E00 /* CreditService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97DE68CA2DA66EE9CB0A50FC /* CreditService.swift */; };
+		848E045E0E5C9CFD99CD3FE7 /* TalkAndTalkApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90CBE6422A8568EA8787D21F /* TalkAndTalkApp.swift */; };
+		88A5B1CEB0463D9968C6A664 /* VerifyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54BCBB623FE754381644828B /* VerifyView.swift */; };
+		8C2419CA5F855AC216E9EFB0 /* AdminView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 826A4146FCB6B8507839A02C /* AdminView.swift */; };
+		8C323D539C95C26FFEFDDCAF /* APIModerationClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 491105FE31EAC8C8B57C7BB2 /* APIModerationClient.swift */; };
+		90C312BA4D69BF74439F7BAA /* OrderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCA4AC0A1E771062D24152C4 /* OrderView.swift */; };
+		A299DEAEFB5EA9BCCBCB4E28 /* CompanionListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D2D38AC84C62182D2EBB4AA /* CompanionListView.swift */; };
+		A2E388377AC3A74900C1145D /* HybridModerationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92025B9C5BB8380DAE22BEC0 /* HybridModerationService.swift */; };
+		A567C16FB0FE89B75DEEDE43 /* MessagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34E34EA4EE873B224A7BBE51 /* MessagesView.swift */; };
+		B81503F26333913BA98EEA8D /* ModerationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FF03BAEB72A56CFE6283799 /* ModerationTests.swift */; };
+		BDB8E805C2B386526856D5D5 /* CommunityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 421AA5DA6E279ABE6FB0C45E /* CommunityView.swift */; };
+		C0D422015E81A1F5C8286FC3 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AA25EF78CDC0602C5063655 /* ContentView.swift */; };
+		C3AF9DA2605DFC904C2BED95 /* CompanionDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D5E41F6DBCAC0FD9CA4B310 /* CompanionDetailView.swift */; };
+		CD250698CCF52BBCA3A16040 /* SharedViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = E85AAFE02A07ACA025C04B43 /* SharedViews.swift */; };
+		CF021E97725F7069CE15767E /* TalkAndTalkUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51F1133260FDA37354A743ED /* TalkAndTalkUITests.swift */; };
+		D2AF19B691540D6E85198935 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A3F294CB61DCA25BB78FF04 /* ProfileView.swift */; };
+		D599013430F90775DAD86873 /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3E2F927720DBAAA1344C510 /* ChatView.swift */; };
+		D809E9C4011D7B34110FE210 /* ModerationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 123D7503109E87FE9D8366E2 /* ModerationService.swift */; };
+		FB1928E8D41C71CA65702B07 /* OrdersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDEBC9E34A0DA07CE296EF92 /* OrdersView.swift */; };
+		FC5AB03622300EEF41016B8E /* AppStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B56C9D1A54399C1AEBB70DE /* AppStore.swift */; };
+		FF9D7B1BADCE9B22E67CAA88 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = FCB553A9D165F3912587BB17 /* LaunchScreen.storyboard */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		32AA9089008DAFE88F9DF7A7 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 788E5DF5F57A9A612D79C7F3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = DD908ACE202C69466668F8CC;
+			remoteInfo = TalkAndTalk;
+		};
+		FA94E2DBDA1AD28D56A1197F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 788E5DF5F57A9A612D79C7F3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = DD908ACE202C69466668F8CC;
+			remoteInfo = TalkAndTalk;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		0D2D38AC84C62182D2EBB4AA /* CompanionListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionListView.swift; sourceTree = "<group>"; };
+		123D7503109E87FE9D8366E2 /* ModerationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModerationService.swift; sourceTree = "<group>"; };
+		1FF03BAEB72A56CFE6283799 /* ModerationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModerationTests.swift; sourceTree = "<group>"; };
+		32E80B2F111798E5AF4A8DC5 /* TalkAndTalk.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = TalkAndTalk.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		34E34EA4EE873B224A7BBE51 /* MessagesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagesView.swift; sourceTree = "<group>"; };
+		3A3F294CB61DCA25BB78FF04 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
+		421AA5DA6E279ABE6FB0C45E /* CommunityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommunityView.swift; sourceTree = "<group>"; };
+		491105FE31EAC8C8B57C7BB2 /* APIModerationClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIModerationClient.swift; sourceTree = "<group>"; };
+		4A50207E243AC01623C0AA43 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		4AA25EF78CDC0602C5063655 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		4D5E41F6DBCAC0FD9CA4B310 /* CompanionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionDetailView.swift; sourceTree = "<group>"; };
+		51F1133260FDA37354A743ED /* TalkAndTalkUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TalkAndTalkUITests.swift; sourceTree = "<group>"; };
+		54BCBB623FE754381644828B /* VerifyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifyView.swift; sourceTree = "<group>"; };
+		56CEF36BA8E64619F4C61941 /* ModerationConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModerationConfig.swift; sourceTree = "<group>"; };
+		5F2CEA87CEF6D8015A2B2E77 /* ModerationConfig.example.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = ModerationConfig.example.plist; sourceTree = "<group>"; };
+		6B56C9D1A54399C1AEBB70DE /* AppStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStore.swift; sourceTree = "<group>"; };
+		7A4A0A03B99D6635E239AD23 /* TalkAndTalkUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = TalkAndTalkUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		7E07FDAB6E5EA7A7DAC283DA /* SafetyCenterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafetyCenterView.swift; sourceTree = "<group>"; };
+		826A4146FCB6B8507839A02C /* AdminView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminView.swift; sourceTree = "<group>"; };
+		90CBE6422A8568EA8787D21F /* TalkAndTalkApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TalkAndTalkApp.swift; sourceTree = "<group>"; };
+		92025B9C5BB8380DAE22BEC0 /* HybridModerationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HybridModerationService.swift; sourceTree = "<group>"; };
+		974A93200144303A55EA9E59 /* TalkAndTalkTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = TalkAndTalkTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		97DE68CA2DA66EE9CB0A50FC /* CreditService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreditService.swift; sourceTree = "<group>"; };
+		B3E2F927720DBAAA1344C510 /* ChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatView.swift; sourceTree = "<group>"; };
+		BDEBC9E34A0DA07CE296EF92 /* OrdersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrdersView.swift; sourceTree = "<group>"; };
+		D4702B216F2A0E5725597BDF /* RuleBasedModerationEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuleBasedModerationEngine.swift; sourceTree = "<group>"; };
+		DED52C2CFD5148D2DCF61F39 /* ReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewView.swift; sourceTree = "<group>"; };
+		E85AAFE02A07ACA025C04B43 /* SharedViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedViews.swift; sourceTree = "<group>"; };
+		EC767342944DF71582E369FA /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		FCA4AC0A1E771062D24152C4 /* OrderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrderView.swift; sourceTree = "<group>"; };
+		FCB553A9D165F3912587BB17 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		0234AB4592A7537F3FE9226A = {
+			isa = PBXGroup;
+			children = (
+				071AA4C83EAA4CAD306C1181 /* Resources */,
+				DB6F7034086EBB8FDF3750ED /* Sources */,
+				46CCA859C30524C990A86B6C /* Tests */,
+				365CAADD2E92BDD3C864C45D /* UITests */,
+				C0F91BEE52CD29F4F81EF344 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		071AA4C83EAA4CAD306C1181 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				FCB553A9D165F3912587BB17 /* LaunchScreen.storyboard */,
+				5F2CEA87CEF6D8015A2B2E77 /* ModerationConfig.example.plist */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		23EFDE4F87556569A96B1F09 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				491105FE31EAC8C8B57C7BB2 /* APIModerationClient.swift */,
+				97DE68CA2DA66EE9CB0A50FC /* CreditService.swift */,
+				92025B9C5BB8380DAE22BEC0 /* HybridModerationService.swift */,
+				56CEF36BA8E64619F4C61941 /* ModerationConfig.swift */,
+				123D7503109E87FE9D8366E2 /* ModerationService.swift */,
+				D4702B216F2A0E5725597BDF /* RuleBasedModerationEngine.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		2D00EF85A2A414C093B75CC7 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				826A4146FCB6B8507839A02C /* AdminView.swift */,
+				B3E2F927720DBAAA1344C510 /* ChatView.swift */,
+				421AA5DA6E279ABE6FB0C45E /* CommunityView.swift */,
+				4D5E41F6DBCAC0FD9CA4B310 /* CompanionDetailView.swift */,
+				0D2D38AC84C62182D2EBB4AA /* CompanionListView.swift */,
+				4AA25EF78CDC0602C5063655 /* ContentView.swift */,
+				4A50207E243AC01623C0AA43 /* HomeView.swift */,
+				34E34EA4EE873B224A7BBE51 /* MessagesView.swift */,
+				BDEBC9E34A0DA07CE296EF92 /* OrdersView.swift */,
+				FCA4AC0A1E771062D24152C4 /* OrderView.swift */,
+				3A3F294CB61DCA25BB78FF04 /* ProfileView.swift */,
+				DED52C2CFD5148D2DCF61F39 /* ReviewView.swift */,
+				7E07FDAB6E5EA7A7DAC283DA /* SafetyCenterView.swift */,
+				E85AAFE02A07ACA025C04B43 /* SharedViews.swift */,
+				54BCBB623FE754381644828B /* VerifyView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		365CAADD2E92BDD3C864C45D /* UITests */ = {
+			isa = PBXGroup;
+			children = (
+				51F1133260FDA37354A743ED /* TalkAndTalkUITests.swift */,
+			);
+			path = UITests;
+			sourceTree = "<group>";
+		};
+		46CCA859C30524C990A86B6C /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				1FF03BAEB72A56CFE6283799 /* ModerationTests.swift */,
+			);
+			path = Tests;
+			sourceTree = "<group>";
+		};
+		5DBA891ACB6BCFC6B28869F1 /* Stores */ = {
+			isa = PBXGroup;
+			children = (
+				6B56C9D1A54399C1AEBB70DE /* AppStore.swift */,
+			);
+			path = Stores;
+			sourceTree = "<group>";
+		};
+		9D64359C17E29AF3EE1EB7B8 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				EC767342944DF71582E369FA /* Models.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		C0F91BEE52CD29F4F81EF344 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				32E80B2F111798E5AF4A8DC5 /* TalkAndTalk.app */,
+				974A93200144303A55EA9E59 /* TalkAndTalkTests.xctest */,
+				7A4A0A03B99D6635E239AD23 /* TalkAndTalkUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		DB6F7034086EBB8FDF3750ED /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				90CBE6422A8568EA8787D21F /* TalkAndTalkApp.swift */,
+				9D64359C17E29AF3EE1EB7B8 /* Models */,
+				23EFDE4F87556569A96B1F09 /* Services */,
+				5DBA891ACB6BCFC6B28869F1 /* Stores */,
+				2D00EF85A2A414C093B75CC7 /* Views */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		224CB030EF602D7C9F4732C8 /* TalkAndTalkTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3523A0C2047AF699C679CFAB /* Build configuration list for PBXNativeTarget "TalkAndTalkTests" */;
+			buildPhases = (
+				25FB0C25C63AE5A4B3E3E5A1 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				FAF7521032010B8253E04148 /* PBXTargetDependency */,
+			);
+			name = TalkAndTalkTests;
+			packageProductDependencies = (
+			);
+			productName = TalkAndTalkTests;
+			productReference = 974A93200144303A55EA9E59 /* TalkAndTalkTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		2361496658116D5FFC97A44B /* TalkAndTalkUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 6C7798C88055079FF66F5197 /* Build configuration list for PBXNativeTarget "TalkAndTalkUITests" */;
+			buildPhases = (
+				A9103F294B5E459834E2ACDD /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				7D95F15FECA1BFC07049787F /* PBXTargetDependency */,
+			);
+			name = TalkAndTalkUITests;
+			packageProductDependencies = (
+			);
+			productName = TalkAndTalkUITests;
+			productReference = 7A4A0A03B99D6635E239AD23 /* TalkAndTalkUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		DD908ACE202C69466668F8CC /* TalkAndTalk */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B30A31A1152EB88FCCB23A9B /* Build configuration list for PBXNativeTarget "TalkAndTalk" */;
+			buildPhases = (
+				DA388CC8F0CE74E458A104AC /* Sources */,
+				8D99AF591F4BBBCD930A1538 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = TalkAndTalk;
+			packageProductDependencies = (
+			);
+			productName = TalkAndTalk;
+			productReference = 32E80B2F111798E5AF4A8DC5 /* TalkAndTalk.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		788E5DF5F57A9A612D79C7F3 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					2361496658116D5FFC97A44B = {
+						TestTargetID = DD908ACE202C69466668F8CC;
+					};
+				};
+			};
+			buildConfigurationList = 1CA9C2EDF74F63972D90232D /* Build configuration list for PBXProject "TalkAndTalk" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 0234AB4592A7537F3FE9226A;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = C0F91BEE52CD29F4F81EF344 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				DD908ACE202C69466668F8CC /* TalkAndTalk */,
+				224CB030EF602D7C9F4732C8 /* TalkAndTalkTests */,
+				2361496658116D5FFC97A44B /* TalkAndTalkUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		8D99AF591F4BBBCD930A1538 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FF9D7B1BADCE9B22E67CAA88 /* LaunchScreen.storyboard in Resources */,
+				1BDA7B82C2D97AE2B0CDE6C7 /* ModerationConfig.example.plist in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		25FB0C25C63AE5A4B3E3E5A1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B81503F26333913BA98EEA8D /* ModerationTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A9103F294B5E459834E2ACDD /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CF021E97725F7069CE15767E /* TalkAndTalkUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DA388CC8F0CE74E458A104AC /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8C323D539C95C26FFEFDDCAF /* APIModerationClient.swift in Sources */,
+				8C2419CA5F855AC216E9EFB0 /* AdminView.swift in Sources */,
+				FC5AB03622300EEF41016B8E /* AppStore.swift in Sources */,
+				D599013430F90775DAD86873 /* ChatView.swift in Sources */,
+				BDB8E805C2B386526856D5D5 /* CommunityView.swift in Sources */,
+				C3AF9DA2605DFC904C2BED95 /* CompanionDetailView.swift in Sources */,
+				A299DEAEFB5EA9BCCBCB4E28 /* CompanionListView.swift in Sources */,
+				C0D422015E81A1F5C8286FC3 /* ContentView.swift in Sources */,
+				843CE6B4E2E139A886138E00 /* CreditService.swift in Sources */,
+				0DDF20FF6D7F7EC0BC62BB8F /* HomeView.swift in Sources */,
+				A2E388377AC3A74900C1145D /* HybridModerationService.swift in Sources */,
+				A567C16FB0FE89B75DEEDE43 /* MessagesView.swift in Sources */,
+				2204DFECB857911AB1BADDC1 /* Models.swift in Sources */,
+				087EC489CE1B101551C549C7 /* ModerationConfig.swift in Sources */,
+				D809E9C4011D7B34110FE210 /* ModerationService.swift in Sources */,
+				90C312BA4D69BF74439F7BAA /* OrderView.swift in Sources */,
+				FB1928E8D41C71CA65702B07 /* OrdersView.swift in Sources */,
+				D2AF19B691540D6E85198935 /* ProfileView.swift in Sources */,
+				82514F9E11D7E9E37696582D /* ReviewView.swift in Sources */,
+				437B452F5799C818AB35E4F7 /* RuleBasedModerationEngine.swift in Sources */,
+				07394B0621E5F658C4C6DB2E /* SafetyCenterView.swift in Sources */,
+				CD250698CCF52BBCA3A16040 /* SharedViews.swift in Sources */,
+				848E045E0E5C9CFD99CD3FE7 /* TalkAndTalkApp.swift in Sources */,
+				88A5B1CEB0463D9968C6A664 /* VerifyView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		7D95F15FECA1BFC07049787F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = DD908ACE202C69466668F8CC /* TalkAndTalk */;
+			targetProxy = 32AA9089008DAFE88F9DF7A7 /* PBXContainerItemProxy */;
+		};
+		FAF7521032010B8253E04148 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = DD908ACE202C69466668F8CC /* TalkAndTalk */;
+			targetProxy = FA94E2DBDA1AD28D56A1197F /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		4E6D2AABDAC5AF69076F2F08 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		591FEA690621175C53C08104 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = TalkAndTalk;
+			};
+			name = Debug;
+		};
+		6C785E28C9277EEF3414C14E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TalkAndTalk.app/TalkAndTalk";
+			};
+			name = Debug;
+		};
+		AF6A664D62D84AF205C08B27 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Talk&Talk";
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.talkandtalk.app;
+				PRODUCT_NAME = TalkAndTalk;
+				SDKROOT = iphoneos;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_STRICT_CONCURRENCY = minimal;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		C9283FFEC9E2BB37DE74DAD3 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = TalkAndTalk;
+			};
+			name = Release;
+		};
+		CEF8CFA97BAEFA2E26585629 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TalkAndTalk.app/TalkAndTalk";
+			};
+			name = Release;
+		};
+		CF86DB9EEFD46C752DE1A6E6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		F447FE37B6D96CCE9135C4D1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Talk&Talk";
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.talkandtalk.app;
+				PRODUCT_NAME = TalkAndTalk;
+				SDKROOT = iphoneos;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_STRICT_CONCURRENCY = minimal;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		1CA9C2EDF74F63972D90232D /* Build configuration list for PBXProject "TalkAndTalk" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4E6D2AABDAC5AF69076F2F08 /* Debug */,
+				CF86DB9EEFD46C752DE1A6E6 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		3523A0C2047AF699C679CFAB /* Build configuration list for PBXNativeTarget "TalkAndTalkTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6C785E28C9277EEF3414C14E /* Debug */,
+				CEF8CFA97BAEFA2E26585629 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		6C7798C88055079FF66F5197 /* Build configuration list for PBXNativeTarget "TalkAndTalkUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				591FEA690621175C53C08104 /* Debug */,
+				C9283FFEC9E2BB37DE74DAD3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		B30A31A1152EB88FCCB23A9B /* Build configuration list for PBXNativeTarget "TalkAndTalk" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F447FE37B6D96CCE9135C4D1 /* Debug */,
+				AF6A664D62D84AF205C08B27 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 788E5DF5F57A9A612D79C7F3 /* Project object */;
+}
