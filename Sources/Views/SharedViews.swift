@@ -500,6 +500,95 @@ struct FlowLayout: Layout {
     }
 }
 
+struct UserAgreementSheet: View {
+    let prompt: AgreementPrompt
+    var onAcknowledge: () -> Void
+
+    @State private var remainingSeconds: Int
+
+    init(prompt: AgreementPrompt, onAcknowledge: @escaping () -> Void) {
+        self.prompt = prompt
+        self.onAcknowledge = onAcknowledge
+        _remainingSeconds = State(initialValue: prompt.requiredReadSeconds)
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 18) {
+                        Text(prompt.message)
+                            .font(.subheadline)
+                            .foregroundStyle(Color.appCoral)
+                            .padding(12)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color.appCoral.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+                        Text(PlatformAgreement.title)
+                            .font(.title3.weight(.bold))
+                            .foregroundStyle(Color.appInk)
+
+                        ForEach(Array(PlatformAgreement.sections.enumerated()), id: \.offset) { _, section in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(section.0)
+                                    .font(.headline)
+                                    .foregroundStyle(Color.appInk)
+                                Text(section.1)
+                                    .font(.subheadline)
+                                    .foregroundStyle(Color.appMuted)
+                                    .lineSpacing(4)
+                            }
+                        }
+                    }
+                    .padding(20)
+                }
+
+                VStack(spacing: 10) {
+                    if prompt.requiredReadSeconds > 0, remainingSeconds > 0 {
+                        Text("请阅读协议 \(remainingSeconds) 秒后可确认")
+                            .font(.caption)
+                            .foregroundStyle(Color.appMuted)
+                    }
+                    Button(action: onAcknowledge) {
+                        Text(confirmTitle)
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Color.appTeal)
+                    .disabled(!canConfirm)
+                }
+                .padding(20)
+                .background(Color.appWarm)
+            }
+            .navigationTitle("用户协议")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+        .onAppear {
+            startCountdownIfNeeded()
+        }
+    }
+
+    private var canConfirm: Bool {
+        prompt.requiredReadSeconds == 0 || remainingSeconds <= 0
+    }
+
+    private var confirmTitle: String {
+        prompt.strikeNumber == 1 ? "我已知悉（首次提醒）" : "我已阅读并知悉"
+    }
+
+    private func startCountdownIfNeeded() {
+        guard prompt.requiredReadSeconds > 0 else { return }
+        Task {
+            while remainingSeconds > 0 {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                remainingSeconds -= 1
+            }
+        }
+    }
+}
+
 extension View {
     @ViewBuilder
     func liquidGlass(cornerRadius: CGFloat, tint: Color = .white.opacity(0.2), interactive: Bool) -> some View {

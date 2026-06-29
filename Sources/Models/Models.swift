@@ -155,6 +155,25 @@ struct CreditEvent: Identifiable, Codable, Hashable {
     let createdAt: Date
 }
 
+struct AgreementPrompt: Identifiable, Equatable {
+    let id: String
+    let title: String
+    let message: String
+    let requiredReadSeconds: Int
+    let strikeNumber: Int
+}
+
+enum PlatformAgreement {
+    static let title = "Talk&Talk 用户协议与安全规范"
+    static let sections: [(String, String)] = [
+        ("服务边界", "本平台仅提供线上文字与语音陪伴服务，不提供线下见面、私下交易或医疗诊断承诺。"),
+        ("沟通规范", "禁止诱导添加私人联系方式、转账、线下邀约，以及骚扰、低俗、PUA 等越界表达。"),
+        ("社区氛围", "社区内容需尊重他人，禁止广告引流、引战辱骂；违规内容将被审核拦截。"),
+        ("信用与处置", "首次与再次轻度违规将收到协议提醒；累计违规将扣减安全分并限制发帖或沟通权限。"),
+        ("申诉与举报", "如遇不适可立即结束沟通并举报；误报经核实后可恢复信用分。")
+    ]
+}
+
 struct User: Identifiable, Codable, Hashable {
     let id: String
     var name: String
@@ -165,6 +184,7 @@ struct User: Identifiable, Codable, Hashable {
     var accountStatus: AccountStatus
     var violationCount: Int
     var lastViolationAt: Date?
+    var warnGraceStrikeCount: Int
 }
 
 struct Theme: Identifiable, Codable, Hashable {

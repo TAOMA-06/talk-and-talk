@@ -135,7 +135,7 @@ private struct SafetySectionCard: View {
                     .font(.subheadline)
                     .foregroundStyle(Color.appMuted)
                 CreditRuleRow(title: "完成实名", detail: "基础信任分 85")
-                CreditRuleRow(title: "warn 违规", detail: "-8 分，累计 3 次进入受限")
+                CreditRuleRow(title: "warn 违规", detail: "-8 分；前 2 次仅协议提醒不扣分")
                 CreditRuleRow(title: "block 违规", detail: "-20 分，累计 5 次或低于 20 分封禁")
                 CreditRuleRow(title: "误报驳回", detail: "+5 分恢复")
                 Text("受限账号无法在社区发帖；封禁账号无法发送消息。")

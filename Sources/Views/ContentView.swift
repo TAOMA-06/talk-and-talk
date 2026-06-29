@@ -47,6 +47,12 @@ struct ContentView: View {
             .toolbarBackground(.ultraThinMaterial, for: .tabBar)
             .toolbarBackground(.visible, for: .tabBar)
         }
+        .sheet(item: $store.agreementPrompt) { prompt in
+            UserAgreementSheet(prompt: prompt) {
+                store.dismissAgreementPrompt()
+            }
+            .interactiveDismissDisabled(prompt.requiredReadSeconds > 0)
+        }
     }
 }
 

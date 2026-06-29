@@ -20,6 +20,7 @@ final class AppStore: ObservableObject {
     @Published var creditEvents: [CreditEvent] = MockData.initialCreditEvents
     @Published var activeOrderId: String?
     @Published var lastModerationFeedback: String?
+    @Published var agreementPrompt: AgreementPrompt?
 
     private let moderationService: ModerationService = HybridModerationService()
     private let creditService = CreditService()
@@ -174,13 +175,19 @@ final class AppStore: ObservableObject {
                 creditEvents.insert(event, at: 0)
             }
         case .warn:
-            appendUserMessage(trimmed, companionId: companionId)
-            insertSystemMessage("安全提醒：请保持在平台内沟通，避免交换私人联系方式。", companionId: companionId, type: .safety)
-            insertModerationCase(from: result, title: "聊天预警：\(trimmed)", source: .chat, content: trimmed, targetId: companionId, status: .humanReview)
-            if let event = creditService.applyModerationResult(result, to: &user) {
-                creditEvents.insert(event, at: 0)
+            if applyWarnGraceIfNeeded(result: result) {
+                appendUserMessage(trimmed, companionId: companionId)
+                insertSystemMessage("友善提醒：你的表达可能接近边界，请阅读用户协议并保持平台内沟通。", companionId: companionId, type: .safety)
+                lastModerationFeedback = "已记录第 \(user.warnGraceStrikeCount) 次提醒，请阅读用户协议"
+            } else {
+                appendUserMessage(trimmed, companionId: companionId)
+                insertSystemMessage("安全提醒：请保持在平台内沟通，避免交换私人联系方式。", companionId: companionId, type: .safety)
+                insertModerationCase(from: result, title: "聊天预警：\(trimmed)", source: .chat, content: trimmed, targetId: companionId, status: .humanReview)
+                if let event = creditService.applyModerationResult(result, to: &user) {
+                    creditEvents.insert(event, at: 0)
+                }
+                lastModerationFeedback = nil
             }
-            lastModerationFeedback = nil
         case .review:
             appendUserMessage(trimmed, companionId: companionId)
             insertModerationCase(from: result, title: "聊天待复核：\(trimmed)", source: .chat, content: trimmed, targetId: companionId, status: .pending)
@@ -257,6 +264,11 @@ final class AppStore: ObservableObject {
             lastModerationFeedback = result.decision == .block ? "帖子未通过审核" : "帖子已转人工复核"
             return .rejected
         case .warn, .allow:
+            if result.decision == .warn, applyWarnGraceIfNeeded(result: result) {
+                communityPosts[index].moderationStatus = .approved
+                lastModerationFeedback = "帖子已发布，但请阅读用户协议（第 \(user.warnGraceStrikeCount) 次提醒）"
+                return .approved
+            }
             communityPosts[index].moderationStatus = .approved
             if result.decision == .warn {
                 insertModerationCase(
@@ -267,6 +279,9 @@ final class AppStore: ObservableObject {
                     targetId: post.id,
                     status: .pending
                 )
+                if let event = creditService.applyModerationResult(result, to: &user) {
+                    creditEvents.insert(event, at: 0)
+                }
             }
             lastModerationFeedback = "帖子已通过审核"
             return .approved
@@ -329,6 +344,38 @@ final class AppStore: ObservableObject {
         }
 
         moderationCases[index] = item
+    }
+
+    func dismissAgreementPrompt() {
+        agreementPrompt = nil
+    }
+
+    /// 在正式 warn 扣分前给予两次协议提醒。返回 true 表示本次走了提醒流程。
+    @discardableResult
+    private func applyWarnGraceIfNeeded(result: ModerationResult) -> Bool {
+        guard result.decision == .warn, user.warnGraceStrikeCount < 2 else { return false }
+
+        user.warnGraceStrikeCount += 1
+        let requiredReadSeconds = user.warnGraceStrikeCount == 2 ? 15 : 0
+        agreementPrompt = AgreementPrompt(
+            id: UUID().uuidString,
+            title: PlatformAgreement.title,
+            message: user.warnGraceStrikeCount == 1
+                ? "这是你的第 1 次友善提醒。请阅读用户协议，了解平台沟通边界。"
+                : "这是你的第 2 次提醒。请认真阅读用户协议至少 15 秒，后续违规将扣减安全分。",
+            requiredReadSeconds: requiredReadSeconds,
+            strikeNumber: user.warnGraceStrikeCount
+        )
+        creditEvents.insert(
+            CreditEvent(
+                id: UUID().uuidString,
+                delta: 0,
+                reason: "第 \(user.warnGraceStrikeCount) 次协议提醒（暂未扣分）",
+                createdAt: Date()
+            ),
+            at: 0
+        )
+        return true
     }
 
     private func appendUserMessage(_ content: String, companionId: String) {
@@ -411,7 +458,8 @@ enum MockData {
         safetyScore: 72,
         accountStatus: .active,
         violationCount: 0,
-        lastViolationAt: nil
+        lastViolationAt: nil,
+        warnGraceStrikeCount: 0
     )
 
     static let initialCreditEvents: [CreditEvent] = [

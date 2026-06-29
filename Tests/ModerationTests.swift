@@ -72,4 +72,8 @@ final class ModerationTests: XCTestCase {
         _ = service.applyModerationResult(result, to: &user)
         XCTAssertEqual(user.accountStatus, .restricted)
     }
+
+    func testWarnGraceStrikeCountDefaultsToZero() {
+        XCTAssertEqual(MockData.user.warnGraceStrikeCount, 0)
+    }
 }
