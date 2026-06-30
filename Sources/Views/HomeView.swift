@@ -104,7 +104,7 @@ private struct SmartMatchBar: View {
                         TagChip(title: "情绪倾听") {
                             store.navigate(.companionList(themeId: "t1", preset: nil))
                         }
-                        TagChip(title: "今晚可约") {
+                        TagChip(title: "今晚可聊") {
                             store.navigate(.companionList(themeId: nil, preset: .availableTonight))
                         }
                         TagChip(title: "预算友好") {

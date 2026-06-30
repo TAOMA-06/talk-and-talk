@@ -20,7 +20,6 @@ export default function Verify() {
 
   return (
     <div className="p-4 space-y-6">
-      {/* Progress */}
       <div className="flex items-center gap-2">
         {[1, 2, 3].map((s) => (
           <div
@@ -32,7 +31,6 @@ export default function Verify() {
         ))}
       </div>
 
-      {/* Step Content */}
       {step === 1 && (
         <div className="space-y-4">
           <div className="text-center space-y-2">
@@ -120,7 +118,6 @@ export default function Verify() {
         </div>
       )}
 
-      {/* Submit */}
       <button
         onClick={handleSubmit}
         className="w-full py-3 bg-ink text-white rounded-lg font-medium hover:bg-ink/90 transition-colors"

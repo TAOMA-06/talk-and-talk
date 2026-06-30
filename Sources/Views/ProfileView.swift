@@ -22,7 +22,7 @@ private struct UserPanel: View {
                 ZStack {
                     RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous)
                         .fill(Color.dsPrimary.opacity(0.12))
-                    Text("TT")
+                    Text(String(store.user.name.prefix(2)))
                         .font(.system(size: 22, weight: .semibold))
                         .foregroundStyle(Color.dsPrimary)
                 }

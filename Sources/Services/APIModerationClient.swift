@@ -12,6 +12,7 @@ struct APIModerationClient: Sendable {
 
         let body = ["input": text]
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        request.timeoutInterval = 8
 
         do {
             let (data, response) = try await URLSession.shared.data(for: request)

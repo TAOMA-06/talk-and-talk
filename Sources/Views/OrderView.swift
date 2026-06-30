@@ -225,6 +225,13 @@ private struct PricePanel: View {
                     Spacer()
                     Text("模拟冻结资金")
                 }
+                HStack(alignment: .top, spacing: DS.Space.sm) {
+                    Image(systemName: "bubble.left.and.bubble.right.fill")
+                        .foregroundStyle(Color.dsPrimary)
+                    Text("下单后可继续当前聊天，已发送的试聊内容会保留。")
+                        .foregroundStyle(Color.dsTextSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
                 Divider()
                 HStack {
                     Text("合计")

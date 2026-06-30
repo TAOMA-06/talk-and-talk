@@ -22,7 +22,6 @@ export default function CompanionDetail() {
 
   return (
     <div className="pb-20">
-      {/* Profile Header */}
       <div className="relative">
         <div className="h-32 bg-gradient-to-br from-teal/20 to-coral/20" />
         <div className="px-4 -mt-12">
@@ -47,9 +46,7 @@ export default function CompanionDetail() {
         </div>
       </div>
 
-      {/* Info */}
       <div className="px-4 mt-4 space-y-4">
-        {/* Tags */}
         <div className="flex flex-wrap gap-2">
           {companion.tags.map((tag) => (
             <span key={tag} className="px-2.5 py-1 text-sm bg-secondary rounded-full">
@@ -58,10 +55,8 @@ export default function CompanionDetail() {
           ))}
         </div>
 
-        {/* Bio */}
         <p className="text-sm text-muted-foreground leading-relaxed">{companion.bio}</p>
 
-        {/* Details */}
         <div className="grid grid-cols-2 gap-3">
           <div className="flex items-center gap-2 p-3 bg-card rounded-lg">
             <Clock className="w-4 h-4 text-teal" />
@@ -79,7 +74,6 @@ export default function CompanionDetail() {
           </div>
         </div>
 
-        {/* Specialties */}
         <div>
           <h3 className="text-sm font-medium text-ink mb-2">擅长领域</h3>
           <div className="flex flex-wrap gap-2">
@@ -91,7 +85,6 @@ export default function CompanionDetail() {
           </div>
         </div>
 
-        {/* Reviews */}
         <div>
           <h3 className="text-sm font-medium text-ink mb-2">用户评价</h3>
           <div className="space-y-3">
@@ -111,7 +104,6 @@ export default function CompanionDetail() {
         </div>
       </div>
 
-      {/* Bottom Action */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-paper border-t border-border">
         <div className="max-w-md mx-auto flex items-center gap-3">
           <div className="text-lg font-semibold text-coral">

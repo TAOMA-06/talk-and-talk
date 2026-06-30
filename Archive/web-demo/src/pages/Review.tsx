@@ -43,7 +43,6 @@ export default function Review() {
 
   return (
     <div className="p-4 space-y-6">
-      {/* Companion Info */}
       <div className="flex items-center gap-3 p-3 bg-card rounded-lg border border-border">
         <img src={companion.avatar} alt={companion.name} className="w-12 h-12 rounded-lg" />
         <div>
@@ -52,7 +51,6 @@ export default function Review() {
         </div>
       </div>
 
-      {/* Rating */}
       <div className="text-center space-y-3">
         <p className="text-lg font-medium text-ink">为这次沟通打分</p>
         <div className="flex justify-center gap-2">
@@ -79,7 +77,6 @@ export default function Review() {
         </p>
       </div>
 
-      {/* Review Content */}
       <div>
         <label className="text-sm font-medium text-ink mb-2 block">评价内容（可选）</label>
         <textarea
@@ -91,7 +88,6 @@ export default function Review() {
         />
       </div>
 
-      {/* Submit */}
       <button
         onClick={handleSubmit}
         disabled={rating === 0}

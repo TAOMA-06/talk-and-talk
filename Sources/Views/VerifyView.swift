@@ -1,12 +1,18 @@
 import SwiftUI
 
+private enum VerifyField: Hashable {
+    case name, age, phone, code
+}
+
 struct VerifyView: View {
     @EnvironmentObject private var store: AppStore
     @Environment(\.dismiss) private var dismiss
+    @FocusState private var focusedField: VerifyField?
+
     @State private var step = 0
-    @State private var name = "小桃"
+    @State private var name = "小楷"
     @State private var age = "22"
-    @State private var phone = "13888888826"
+    @State private var phone = "18300000012"
     @State private var code = "0626"
     @State private var faceScanComplete = false
 
@@ -19,29 +25,46 @@ struct VerifyView: View {
     }
 
     var body: some View {
-        AppScaffold(title: "18+ 实名认证", spacing: DS.Space.lg, bottomPadding: DS.Space.xl) {
-            VerifyProgress(step: step)
-            currentStep
-            DSPrimaryButton(title: step == 2 ? "完成模拟认证" : "下一步", systemImage: "arrow.right", isEnabled: canContinue) {
-                if step < 2 {
-                    withAnimation(.easeOut(duration: DS.Motion.fast)) { step += 1 }
-                } else {
-                    store.verifyUser(name: name, phone: phone)
-                    dismiss()
+        ScrollView {
+            VStack(alignment: .leading, spacing: DS.Space.lg) {
+                VerifyProgress(step: step)
+                currentStep
+                DSPrimaryButton(
+                    title: step == 2 ? "完成模拟认证" : "下一步",
+                    systemImage: "arrow.right",
+                    isEnabled: canContinue,
+                    action: advance
+                )
+                if step > 0 {
+                    DSSecondaryButton(title: "上一步", action: goBack)
                 }
-            }
-            Button {
-                store.navigate(.safetyCenter)
-            } label: {
-                HStack {
-                    Text("了解完整安全体系")
-                    Image(systemName: "arrow.right")
+                Button(action: openSafetyCenter) {
+                    HStack {
+                        Text("了解完整安全体系")
+                        Image(systemName: "arrow.right")
+                    }
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.dsPrimary)
+                    .frame(maxWidth: .infinity)
                 }
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Color.dsPrimary)
-                .frame(maxWidth: .infinity)
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, DS.Space.lg)
+            .padding(.top, DS.Space.md)
+            .padding(.bottom, DS.Space.xxxl)
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .background(Color.dsBackground)
+        .navigationTitle("18+ 实名认证")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(Color.dsBackground, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbar(.visible, for: .tabBar)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button("关闭") { dismiss() }
+            }
         }
     }
 
@@ -49,12 +72,34 @@ struct VerifyView: View {
     private var currentStep: some View {
         switch step {
         case 0:
-            IdentityStep(name: $name, age: $age)
+            IdentityStep(name: $name, age: $age, focusedField: $focusedField)
         case 1:
             FaceStep(isComplete: $faceScanComplete)
         default:
-            PhoneStep(phone: $phone, code: $code)
+            PhoneStep(phone: $phone, code: $code, focusedField: $focusedField)
         }
+    }
+
+    private func advance() {
+        focusedField = nil
+        if step < 2 {
+            withAnimation(.easeOut(duration: DS.Motion.fast)) { step += 1 }
+        } else {
+            store.verifyUser(name: name, phone: phone)
+            dismiss()
+        }
+    }
+
+    private func goBack() {
+        focusedField = nil
+        withAnimation(.easeOut(duration: DS.Motion.fast)) {
+            step = max(0, step - 1)
+        }
+    }
+
+    private func openSafetyCenter() {
+        focusedField = nil
+        store.navigate(.safetyCenter)
     }
 }
 
@@ -77,13 +122,14 @@ private struct VerifyProgress: View {
 private struct IdentityStep: View {
     @Binding var name: String
     @Binding var age: String
+    var focusedField: FocusState<VerifyField?>.Binding
 
     var body: some View {
         SoftCard {
             VStack(alignment: .leading, spacing: DS.Space.lg) {
                 StepTitle(symbol: "person.text.rectangle", title: "确认 18+ 身份", subtitle: "演示版只在本地修改状态，不会提交真实证件。")
-                DSInputField(placeholder: "姓名", text: $name)
-                DSInputField(placeholder: "年龄", text: $age, keyboardType: .numberPad)
+                verifyTextField(placeholder: "姓名", text: $name, field: .name)
+                verifyTextField(placeholder: "年龄", text: $age, field: .age, keyboard: .numberPad)
                 StatusPill(
                     text: Int(age).map { $0 >= 18 } == true ? "年龄符合" : "需年满18岁",
                     symbol: "18.circle",
@@ -91,6 +137,27 @@ private struct IdentityStep: View {
                 )
             }
         }
+    }
+
+    private func verifyTextField(
+        placeholder: String,
+        text: Binding<String>,
+        field: VerifyField,
+        keyboard: UIKeyboardType = .default
+    ) -> some View {
+        TextField(placeholder, text: text)
+            .keyboardType(keyboard)
+            .textInputAutocapitalization(field == .name ? .words : .never)
+            .autocorrectionDisabled()
+            .focused(focusedField, equals: field)
+            .font(.system(size: 15))
+            .padding(.horizontal, DS.Space.md)
+            .padding(.vertical, DS.Space.md)
+            .background(Color.dsBackground, in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous)
+                    .stroke(Color.dsBorder, lineWidth: 1)
+            }
     }
 }
 
@@ -118,6 +185,7 @@ private struct FaceStep: View {
                                 .foregroundStyle(Color.dsTextPrimary)
                         }
                     }
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
@@ -128,20 +196,42 @@ private struct FaceStep: View {
 private struct PhoneStep: View {
     @Binding var phone: String
     @Binding var code: String
+    var focusedField: FocusState<VerifyField?>.Binding
 
     var body: some View {
         SoftCard {
             VStack(alignment: .leading, spacing: DS.Space.lg) {
                 StepTitle(symbol: "iphone.gen3", title: "绑定手机号", subtitle: "验证码为演示值，可直接完成。")
-                DSInputField(placeholder: "手机号", text: $phone, keyboardType: .phonePad)
+                verifyTextField(placeholder: "手机号", text: $phone, field: .phone, keyboard: .phonePad)
                 HStack(spacing: DS.Space.sm) {
-                    DSInputField(placeholder: "验证码", text: $code, keyboardType: .numberPad)
+                    verifyTextField(placeholder: "验证码", text: $code, field: .code, keyboard: .numberPad)
                     Button("重新发送") {}
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(Color.dsPrimary)
+                        .frame(minWidth: 72)
                 }
             }
         }
+    }
+
+    private func verifyTextField(
+        placeholder: String,
+        text: Binding<String>,
+        field: VerifyField,
+        keyboard: UIKeyboardType
+    ) -> some View {
+        TextField(placeholder, text: text)
+            .keyboardType(keyboard)
+            .autocorrectionDisabled()
+            .focused(focusedField, equals: field)
+            .font(.system(size: 15))
+            .padding(.horizontal, DS.Space.md)
+            .padding(.vertical, DS.Space.md)
+            .background(Color.dsBackground, in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous)
+                    .stroke(Color.dsBorder, lineWidth: 1)
+            }
     }
 }
 

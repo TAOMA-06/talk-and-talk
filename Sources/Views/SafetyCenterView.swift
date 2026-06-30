@@ -115,7 +115,7 @@ private struct SafetySectionCard: View {
         case .emergency:
             VStack(alignment: .leading, spacing: DS.Space.sm) {
                 EmergencyItem(symbol: "phone.fill", title: "一键报警", detail: "紧急情况下快速求助")
-                EmergencyItem(symbol: "location.fill", title: "行程分享", detail: "向紧急联系人同步状态")
+                EmergencyItem(symbol: "exclamationmark.bubble.fill", title: "越界内容预警", detail: "检测到不当表达时自动提醒并支持一键结束")
                 EmergencyItem(symbol: "person.2.fill", title: "紧急联系人", detail: "预设可信赖的人")
                 EmergencyItem(symbol: "clock.badge.exclamationmark", title: "超时自动提醒", detail: "异常时长自动触发安全流程")
             }

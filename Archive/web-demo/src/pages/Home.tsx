@@ -17,7 +17,6 @@ export default function Home() {
 
   return (
     <div className="p-4 space-y-6">
-      {/* Safety Banner */}
       <div className="flex items-center gap-3 p-3 bg-teal/5 rounded-lg border border-teal/20">
         <Shield className="w-5 h-5 text-teal shrink-0" />
         <div className="flex-1">
@@ -26,7 +25,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Themes Section */}
       <section>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-semibold text-ink">选择沟通主题</h2>
@@ -45,7 +43,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Recommended Companions */}
       <section>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-semibold text-ink">推荐陪伴者</h2>

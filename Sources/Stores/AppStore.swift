@@ -19,8 +19,11 @@ final class AppStore: ObservableObject {
     @Published var communityPosts = MockData.communityPosts
     @Published var creditEvents: [CreditEvent] = MockData.initialCreditEvents
     @Published var activeOrderId: String?
+    @Published var trialMessageCountsByCompanionId: [String: Int] = [:]
     @Published var lastModerationFeedback: String?
     @Published var agreementPrompt: AgreementPrompt?
+
+    let freeTrialMessageLimit = 5
 
     private let moderationService: ModerationService = HybridModerationService()
     private let creditService = CreditService()
@@ -99,6 +102,20 @@ final class AppStore: ObservableObject {
         messages(for: companionId).last
     }
 
+    func remainingTrialMessages(for companionId: String) -> Int {
+        max(0, freeTrialMessageLimit - (trialMessageCountsByCompanionId[companionId] ?? 0))
+    }
+
+    func hasActivePaidChat(with companionId: String) -> Bool {
+        orders.contains { order in
+            order.companionId == companionId && (order.status == .confirmed || order.status == .inProgress)
+        }
+    }
+
+    func canSendTrialMessage(to companionId: String) -> Bool {
+        remainingTrialMessages(for: companionId) > 0
+    }
+
     func approvedCommunityPosts() -> [CommunityPost] {
         communityPosts.filter { $0.moderationStatus == .approved }
     }
@@ -141,11 +158,19 @@ final class AppStore: ObservableObject {
 
     func verifyUser(name: String, phone: String) {
         user.name = name.isEmpty ? user.name : name
-        user.phone = phone.isEmpty ? user.phone : phone
+        user.phone = phone.isEmpty ? user.phone : Self.maskedPhone(phone)
         user.age = max(user.age, 18)
         user.isVerified = true
         let event = creditService.applyVerification(to: &user)
         creditEvents.insert(event, at: 0)
+    }
+
+    private static func maskedPhone(_ phone: String) -> String {
+        let digits = phone.filter(\.isNumber)
+        guard digits.count == 11 else { return phone }
+        let prefix = digits.prefix(3)
+        let suffix = digits.suffix(4)
+        return "\(prefix)****\(suffix)"
     }
 
     @discardableResult
@@ -215,7 +240,26 @@ final class AppStore: ObservableObject {
     }
 
     @discardableResult
-    func submitCommunityPost(topic: String, content: String) async -> CommunityModerationStatus {
+    func sendTrialMessage(_ content: String, to companionId: String) async -> ModerationDecision {
+        guard canSendTrialMessage(to: companionId) else {
+            lastModerationFeedback = "免费试聊已用完，请下单后继续沟通。"
+            return .block
+        }
+
+        let decision = await sendMessage(content, to: companionId)
+        if decision != .block {
+            trialMessageCountsByCompanionId[companionId, default: 0] += 1
+        }
+        return decision
+    }
+
+    @discardableResult
+    func submitCommunityPost(
+        topic: String,
+        content: String,
+        coverImageData: Data?,
+        coverAspectRatio: Double?
+    ) async -> CommunityModerationStatus {
         let trimmedTopic = topic.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedTopic.isEmpty, !trimmedContent.isEmpty else { return .rejected }
@@ -232,6 +276,8 @@ final class AppStore: ObservableObject {
             authorInitials: String(user.name.prefix(2)),
             topic: trimmedTopic,
             content: trimmedContent,
+            coverImageData: coverImageData,
+            coverAspectRatio: coverAspectRatio,
             likeCount: 0,
             moderationStatus: .pending,
             createdAt: Date()
@@ -451,8 +497,8 @@ final class AppStore: ObservableObject {
 enum MockData {
     static let user = User(
         id: "u1",
-        name: "小桃",
-        phone: "138****8826",
+        name: "小楷",
+        phone: "183****0012",
         age: 18,
         isVerified: false,
         safetyScore: 72,
@@ -476,10 +522,10 @@ enum MockData {
     ]
 
     static let companions: [Companion] = [
-        Companion(id: "c1", name: "林屿", role: "温柔倾听者", initials: "LY", tags: ["心理学背景", "深夜在线", "边界清晰"], rating: 4.9, reviewCount: 168, pricePerHalfHour: 39, isOnline: true, isVerified: true, bio: "擅长把复杂情绪慢慢梳理清楚，提供稳定、尊重边界的线上陪伴。不做诊断，不替你做决定，只陪你把问题说亮。", availableTimes: ["20:00", "21:30", "23:00"], languages: ["中文", "英语"], specialties: ["情绪倾听", "睡前语音"], completedOrders: 426, responseTime: "约30秒", distanceKm: 1.2, availability: .online, cityDistrict: "朝阳区"),
-        Companion(id: "c2", name: "许澈", role: "职场复盘教练", initials: "XC", tags: ["产品经理", "沟通复盘", "高效"], rating: 4.8, reviewCount: 116, pricePerHalfHour: 49, isOnline: true, isVerified: true, bio: "适合聊职场压力、向上沟通、面试准备。用结构化问题帮你把混乱变成可执行的小动作。", availableTimes: ["12:30", "19:00", "22:00"], languages: ["中文"], specialties: ["职场减压", "学习陪伴"], completedOrders: 318, responseTime: "约1分钟", distanceKm: 2.8, availability: .available, cityDistrict: "海淀区"),
-        Companion(id: "c3", name: "周映", role: "睡前声音陪伴", initials: "ZY", tags: ["声音稳定", "慢节奏", "不催促"], rating: 4.9, reviewCount: 204, pricePerHalfHour: 45, isOnline: false, isVerified: true, bio: "晚间低刺激陪伴，适合想找人轻声聊聊、整理一天、从高压状态里慢慢下来。", availableTimes: ["22:30", "23:30", "00:30"], languages: ["中文", "粤语"], specialties: ["睡前语音", "情绪倾听"], completedOrders: 512, responseTime: "约5分钟", distanceKm: 4.5, availability: .busy, cityDistrict: "东城区"),
-        Companion(id: "c4", name: "沈一", role: "专注陪跑伙伴", initials: "SY", tags: ["番茄钟", "备考", "轻监督"], rating: 4.7, reviewCount: 92, pricePerHalfHour: 29, isOnline: true, isVerified: true, bio: "不鸡血、不PUA，陪你设定一个真实可完成的小目标，开始、暂停、复盘都有人在。", availableTimes: ["08:00", "14:00", "20:00"], languages: ["中文"], specialties: ["学习陪伴", "运动鼓励"], completedOrders: 180, responseTime: "约45秒", distanceKm: 0.8, availability: .online, cityDistrict: "朝阳区"),
+        Companion(id: "c1", name: "林屿", role: "温柔倾听者", initials: "LY", tags: ["心理学背景", "深夜在线", ], rating: 4.9, reviewCount: 168, pricePerHalfHour: 39, isOnline: true, isVerified: true, bio: "擅长把复杂情绪慢慢梳理清楚，提供稳定、尊重边界的线上陪伴。不做诊断，不替你做决定，只陪你把问题说亮。", availableTimes: ["20:00", "21:30", "23:00"], languages: ["中文", "英语"], specialties: ["情绪倾听", "睡前语音"], completedOrders: 426, responseTime: "约30秒", distanceKm: 1.2, availability: .online, cityDistrict: "南山区"),
+        Companion(id: "c2", name: "许澈", role: "职场沟通陪伴", initials: "XC", tags: ["职业沟通", "疏解压力", "高效"], rating: 4.8, reviewCount: 116, pricePerHalfHour: 49, isOnline: true, isVerified: true, bio: "适合聊职场压力、向上沟通、面试准备。用结构化问题帮你把混乱变成可执行的小动作。", availableTimes: ["12:30", "19:00", "22:00"], languages: ["中文"], specialties: ["职场减压", "学习陪伴"], completedOrders: 318, responseTime: "约1分钟", distanceKm: 2.8, availability: .available, cityDistrict: "宝安区"),
+        Companion(id: "c3", name: "周映", role: "睡前声音陪伴", initials: "ZY", tags: ["情绪稳定", "慢节奏", ], rating: 4.9, reviewCount: 204, pricePerHalfHour: 45, isOnline: false, isVerified: true, bio: "晚间低刺激陪伴，适合想找人轻声聊聊、整理一天、从高压状态里慢慢下来。", availableTimes: ["22:30", "23:30", "00:30"], languages: ["中文", "粤语"], specialties: ["睡前语音", "情绪倾听"], completedOrders: 512, responseTime: "约5分钟", distanceKm: 4.5, availability: .busy, cityDistrict: "前海"),
+        Companion(id: "c4", name: "沈一", role: "专注陪跑伙伴", initials: "SY", tags: ["互相监督", "考研陪伴", ], rating: 4.7, reviewCount: 92, pricePerHalfHour: 29, isOnline: true, isVerified: true, bio: "不鸡血、不PUA，陪你设定一个真实可完成的小目标，开始、暂停、复盘都有人在。", availableTimes: ["08:00", "14:00", "20:00"], languages: ["中文"], specialties: ["学习陪伴", "运动鼓励"], completedOrders: 180, responseTime: "约45秒", distanceKm: 0.8, availability: .online, cityDistrict: "南山区"),
         Companion(id: "c5", name: "闻舟", role: "兴趣聊天搭子", initials: "WZ", tags: ["电影", "旅行", "摄影"], rating: 4.6, reviewCount: 74, pricePerHalfHour: 35, isOnline: true, isVerified: false, bio: "适合轻松聊天、灵感交换、旅行和影像话题。不提供任何线下见面服务，所有沟通都在平台内完成。", availableTimes: ["10:00", "16:00", "21:00"], languages: ["中文", "日语"], specialties: ["兴趣聊天", "情绪倾听"], completedOrders: 139, responseTime: "约2分钟", distanceKm: 3.1, availability: .available, cityDistrict: "西城区")
     ]
 
@@ -489,9 +535,9 @@ enum MockData {
     ]
 
     static let reviews: [Review] = [
-        Review(id: "r1", companionId: "c1", userName: "匿名用户", rating: 5, content: "没有被催着变好，只是被认真听见了。", createdAt: .now.addingTimeInterval(-7200)),
-        Review(id: "r2", companionId: "c1", userName: "Mia", rating: 5, content: "流程很安心，提醒也清楚，适合晚上情绪很满的时候。", createdAt: .now.addingTimeInterval(-172800)),
-        Review(id: "r3", companionId: "c2", userName: "Cici", rating: 5, content: "把职场沟通拆得很具体，聊完知道下一步怎么做。", createdAt: .now.addingTimeInterval(-54000))
+        Review(id: "r1", companionId: "c1", userName: "张三", rating: 5, content: "没有被催着变好，只是被认真听见了。", createdAt: .now.addingTimeInterval(-7200)),
+        Review(id: "r2", companionId: "c1", userName: "李四", rating: 5, content: "流程很安心，提醒也清楚，适合晚上情绪很满的时候。", createdAt: .now.addingTimeInterval(-172800)),
+        Review(id: "r3", companionId: "c2", userName: "王五", rating: 5, content: "把职场沟通拆得很具体，聊完知道下一步怎么做。", createdAt: .now.addingTimeInterval(-54000))
     ]
 
     static let messages: [Message] = [
@@ -525,10 +571,9 @@ enum MockData {
     static let peakHourHint = "今晚 21:00 倾诉需求较高，已为你优先排序"
 
     static let communityPosts: [CommunityPost] = [
-        CommunityPost(id: "p1", authorId: "u2", authorName: "小满", authorInitials: "XM", topic: "情绪倾听", content: "第一次在这里找人聊完一整晚的委屈，没有被说教，也没有被催着变好。原来被认真听见，本身就是一种治愈。", likeCount: 128, moderationStatus: .approved, createdAt: .now.addingTimeInterval(-7200)),
-        CommunityPost(id: "p2", authorId: "u3", authorName: "阿梨", authorInitials: "AL", topic: "穿搭分享", content: "分享一套适合视频聊天的温柔系穿搭：浅杏色针织 + 珍珠耳钉，让自己看起来也更有安全感。", likeCount: 86, moderationStatus: .approved, createdAt: .now.addingTimeInterval(-14400)),
-        CommunityPost(id: "p3", authorId: "u4", authorName: "晚风", authorInitials: "WF", topic: "拍照技巧", content: "平台内视频前先调好柔光，把背景收拾干净——这些小细节会让你更放松，也更有被尊重的感觉。", likeCount: 54, moderationStatus: .approved, createdAt: .now.addingTimeInterval(-21600)),
-        CommunityPost(id: "p4", authorId: "u5", authorName: "柚子", authorInitials: "YZ", topic: "情绪倾听", content: "从微信群转战到这里最大的感受：没有人突然@全体，也没有莫名其妙的私信。这里真的安静很多。", likeCount: 203, moderationStatus: .approved, createdAt: .now.addingTimeInterval(-28800)),
-        CommunityPost(id: "p5", authorId: "u6", authorName: "南栀", authorInitials: "NZ", topic: "陪伴故事", content: "加班到深夜的时候，有人愿意陪你把压力拆成一小块一小块，比一个人对着天花板发呆好多了。", likeCount: 97, moderationStatus: .approved, createdAt: .now.addingTimeInterval(-36000))
+        CommunityPost(id: "p1", authorId: "u2", authorName: "张三", authorInitials: "张三", topic: "情绪倾听", content: "第一次在这里找人聊完一整晚的委屈，没有被说教，也没有被催着变好。原来被认真听见，本身就是一种治愈。", coverImageData: nil, coverAspectRatio: 0.82, likeCount: 128, moderationStatus: .approved, createdAt: .now.addingTimeInterval(-7200)),
+        CommunityPost(id: "p2", authorId: "u3", authorName: "李四", authorInitials: "李四", topic: "睡前聊天", content: "睡前把灯光调暗，放一段轻音乐，给自己一个不被打扰的十分钟。安静的夜晚有人陪着说说话，真的会安心很多。", coverImageData: nil, coverAspectRatio: 1.0, likeCount: 86, moderationStatus: .approved, createdAt: .now.addingTimeInterval(-14400)),
+        CommunityPost(id: "p4", authorId: "u5", authorName: "赵六", authorInitials: "赵六", topic: "情绪倾听", content: "从微信群转战到这里最大的感受：没有人突然@全体，也没有莫名其妙的私信。这里真的安静很多。", coverImageData: nil, coverAspectRatio: 0.72, likeCount: 203, moderationStatus: .approved, createdAt: .now.addingTimeInterval(-28800)),
+        CommunityPost(id: "p5", authorId: "u6", authorName: "钱七", authorInitials: "钱七", topic: "陪伴故事", content: "加班到深夜的时候，有人愿意陪你把压力拆成一小块一小块，比一个人对着天花板发呆好多了。", coverImageData: nil, coverAspectRatio: 1.18, likeCount: 97, moderationStatus: .approved, createdAt: .now.addingTimeInterval(-36000))
     ]
 }

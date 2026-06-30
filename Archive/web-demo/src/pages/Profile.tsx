@@ -13,7 +13,6 @@ export default function Profile() {
 
   return (
     <div className="p-4 space-y-6">
-      {/* User Card */}
       <div className="flex items-center gap-4 p-4 bg-card rounded-lg border border-border">
         <img
           src={mockUser.avatar}
@@ -37,7 +36,6 @@ export default function Profile() {
         </div>
       </div>
 
-      {/* Menu */}
       <div className="space-y-2">
         {menuItems.map((item) => (
           <button
@@ -59,7 +57,6 @@ export default function Profile() {
         ))}
       </div>
 
-      {/* Safety Info */}
       <div className="p-4 bg-teal/5 rounded-lg border border-teal/20">
         <div className="flex items-center gap-2 mb-2">
           <Shield className="w-5 h-5 text-teal" />

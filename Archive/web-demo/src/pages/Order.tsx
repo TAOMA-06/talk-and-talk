@@ -37,7 +37,6 @@ export default function Order() {
 
   return (
     <div className="p-4 space-y-6">
-      {/* Companion Info */}
       <div className="flex items-center gap-3 p-3 bg-card rounded-lg border border-border">
         <img src={companion.avatar} alt={companion.name} className="w-12 h-12 rounded-lg" />
         <div>
@@ -46,7 +45,6 @@ export default function Order() {
         </div>
       </div>
 
-      {/* Theme Selection */}
       <div>
         <h3 className="text-sm font-medium text-ink mb-2">选择沟通主题</h3>
         <div className="grid grid-cols-3 gap-2">
@@ -66,7 +64,6 @@ export default function Order() {
         </div>
       </div>
 
-      {/* Duration Selection */}
       <div>
         <h3 className="text-sm font-medium text-ink mb-2">选择时长</h3>
         <div className="grid grid-cols-5 gap-2">
@@ -86,7 +83,6 @@ export default function Order() {
         </div>
       </div>
 
-      {/* Price Summary */}
       <div className="p-4 bg-card rounded-lg border border-border space-y-2">
         <div className="flex justify-between text-sm">
           <span className="text-muted-foreground">单价</span>
@@ -102,7 +98,6 @@ export default function Order() {
         </div>
       </div>
 
-      {/* Safety Rules */}
       <div className="p-4 bg-teal/5 rounded-lg border border-teal/20 space-y-3">
         <div className="flex items-center gap-2">
           <Shield className="w-5 h-5 text-teal" />
@@ -125,7 +120,6 @@ export default function Order() {
         </label>
       </div>
 
-      {/* Submit Button */}
       <button
         onClick={handleSubmit}
         disabled={!agreedToRules}

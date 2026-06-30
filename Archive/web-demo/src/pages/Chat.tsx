@@ -44,7 +44,6 @@ export default function Chat() {
     setMessages((prev) => [...prev, newMessage]);
     setInputText('');
 
-    // Simulate companion reply
     setTimeout(() => {
       const reply: Message = {
         id: `m${Date.now() + 1}`,
@@ -63,7 +62,6 @@ export default function Chat() {
 
   return (
     <div className="flex flex-col h-screen">
-      {/* Chat Header */}
       <div className="flex items-center justify-between p-3 bg-paper border-b border-border">
         <div className="flex items-center gap-2">
           <button onClick={() => navigate(-1)} className="p-1">
@@ -88,7 +86,6 @@ export default function Chat() {
         </div>
       </div>
 
-      {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((message) => (
           <div
@@ -113,7 +110,6 @@ export default function Chat() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Voice Call Overlay */}
       {isCallActive && (
         <div className="absolute inset-0 bg-ink/90 flex flex-col items-center justify-center text-white z-50">
           <img src={companion.avatar} alt={companion.name} className="w-24 h-24 rounded-full mb-4" />
@@ -128,7 +124,6 @@ export default function Chat() {
         </div>
       )}
 
-      {/* Input Area */}
       <div className="p-3 bg-paper border-t border-border">
         <div className="flex items-center gap-2">
           <button

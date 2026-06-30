@@ -20,7 +20,7 @@ export const themes: Theme[] = [
 export const companions: Companion[] = [
   {
     id: 'c1',
-    name: '林悦',
+    name: '张三',
     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=linyue',
     tags: ['温柔倾听', '心理学背景', '深夜在线'],
     rating: 4.9,
@@ -35,7 +35,7 @@ export const companions: Companion[] = [
   },
   {
     id: 'c2',
-    name: '苏晴',
+    name: '李四',
     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=suqing',
     tags: ['阳光活力', '健身教练', '早起型'],
     rating: 4.8,
@@ -50,7 +50,7 @@ export const companions: Companion[] = [
   },
   {
     id: 'c3',
-    name: '陈墨',
+    name: '王五',
     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=chenmo',
     tags: ['知性优雅', '旅行达人', '摄影师'],
     rating: 4.7,
@@ -65,7 +65,7 @@ export const companions: Companion[] = [
   },
   {
     id: 'c4',
-    name: '周暖',
+    name: '赵六',
     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=zhounuan',
     tags: ['治愈系', '手绘爱好者', '慢生活'],
     rating: 4.9,
@@ -80,7 +80,7 @@ export const companions: Companion[] = [
   },
   {
     id: 'c5',
-    name: '赵朗',
+    name: '孙七',
     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=zhaolang',
     tags: ['幽默风趣', '程序员', '夜猫子'],
     rating: 4.6,
@@ -95,7 +95,7 @@ export const companions: Companion[] = [
   },
   {
     id: 'c6',
-    name: '吴悠',
+    name: '周八',
     avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=wuyou',
     tags: ['美食家', '烘焙达人', '生活家'],
     rating: 4.8,
@@ -129,7 +129,7 @@ export const mockReviews: Review[] = [
     companionId: 'c1',
     userName: '匿名用户',
     rating: 5,
-    content: '林悦老师非常温柔专业，倾听了我工作上的困扰，给了很多实用的建议。聊完之后感觉轻松多了！',
+    content: '张三老师非常温柔专业，倾听了我工作上的困扰，给了很多实用的建议。聊完之后感觉轻松多了！',
     createdAt: '2024-01-16T08:00:00Z',
   },
   {
@@ -161,7 +161,7 @@ export const mockMessages: Message[] = [
   {
     id: 'm2',
     senderId: 'c1',
-    content: '你好呀，我是林悦。很高兴能陪伴你度过这段时间。有什么想聊的吗？',
+    content: '你好呀，我是张三。很高兴能陪伴你度过这段时间。有什么想聊的吗？',
     type: 'text',
     timestamp: '2024-01-15T20:00:00Z',
   },

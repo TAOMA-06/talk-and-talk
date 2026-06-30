@@ -5,7 +5,6 @@ import { companions, mockMessages } from '../data/mock';
 export default function Messages() {
   const navigate = useNavigate();
 
-  // Get unique conversations
   const conversations = companions.filter((c) =>
     mockMessages.some((m) => m.senderId === c.id || m.senderId === 'u1')
   );

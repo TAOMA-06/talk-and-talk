@@ -224,6 +224,8 @@ struct CommunityPost: Identifiable, Codable, Hashable {
     let authorInitials: String
     let topic: String
     let content: String
+    let coverImageData: Data?
+    let coverAspectRatio: Double?
     let likeCount: Int
     var moderationStatus: CommunityModerationStatus
     let createdAt: Date

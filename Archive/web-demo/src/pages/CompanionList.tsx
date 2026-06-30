@@ -43,7 +43,6 @@ export default function CompanionList() {
 
   return (
     <div className="p-4 space-y-4">
-      {/* Filter Bar */}
       <div className="flex items-center gap-2">
         <button
           onClick={() => setShowFilters(!showFilters)}
@@ -67,7 +66,6 @@ export default function CompanionList() {
         ))}
       </div>
 
-      {/* Sort Options */}
       {showFilters && (
         <div className="flex items-center gap-2 p-3 bg-card rounded-lg border border-border">
           <span className="text-sm text-muted-foreground">排序：</span>
@@ -95,7 +93,6 @@ export default function CompanionList() {
         </div>
       )}
 
-      {/* Results */}
       {filteredCompanions.length > 0 ? (
         <div className="space-y-3">
           {filteredCompanions.map((companion) => (

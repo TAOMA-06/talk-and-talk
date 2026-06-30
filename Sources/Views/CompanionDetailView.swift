@@ -255,10 +255,10 @@ private struct BottomActionBar: View {
         ActionDock {
             HStack(spacing: DS.Space.md) {
                 VStack(alignment: .leading, spacing: DS.Space.xxs) {
-                    Text("¥\(companion.pricePerHalfHour)")
+                    Text("免费试聊 \(store.freeTrialMessageLimit) 条")
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(Color.dsTextPrimary)
-                    Text("30分钟起 · 平台担保")
+                    Text("继续聊 ¥\(companion.pricePerHalfHour)/30m")
                         .font(.system(size: 11))
                         .foregroundStyle(Color.dsTextSecondary)
                 }
@@ -275,10 +275,30 @@ private struct BottomActionBar: View {
                     RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous)
                         .stroke(Color.dsBorder, lineWidth: 1)
                 }
-                DSPrimaryButton(title: "发起沟通", systemImage: "waveform") {
+
+                Button {
                     store.navigate(.order(companion.id))
+                } label: {
+                    Text("直接下单")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.dsPrimary)
+                        .frame(width: 76, height: 40)
+                        .background(Color.dsBackground, in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous)
+                                .stroke(Color.dsBorder, lineWidth: 1)
+                        }
                 }
-                .frame(maxWidth: 160)
+                .buttonStyle(DSPressButtonStyle())
+
+                DSPrimaryButton(title: "免费试聊", systemImage: "bubble.left.and.bubble.right") {
+                    guard store.user.isVerified else {
+                        store.navigate(.verify)
+                        return
+                    }
+                    store.navigate(.chat(companion.id))
+                }
+                .frame(maxWidth: 148)
             }
         }
     }

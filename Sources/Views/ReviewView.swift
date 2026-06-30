@@ -11,21 +11,52 @@ struct ReviewView: View {
     private var companion: Companion? { store.companion(by: companionId) }
 
     var body: some View {
-        AppScaffold(title: "评价", spacing: DS.Space.lg, bottomPadding: DS.Space.xl) {
-            if submitted {
-                SuccessPanel()
-            } else if let companion {
-                CompanionOrderHeader(companion: companion)
-                RatingPicker(rating: $rating)
-                ReviewEditor(content: $content)
-                DSPrimaryButton(title: "提交评价", systemImage: "star.fill") {
-                    store.submitReview(companionId: companionId, rating: rating, content: content)
-                    withAnimation(.easeOut(duration: DS.Motion.fast)) { submitted = true }
+        ScrollView {
+            VStack(alignment: .leading, spacing: DS.Space.lg) {
+                if submitted {
+                    SuccessPanel(onFinish: finishAndGoHome)
+                } else if let companion {
+                    CompanionOrderHeader(companion: companion)
+                    RatingPicker(rating: $rating)
+                    ReviewEditor(content: $content)
+                    DSPrimaryButton(title: "提交评价", systemImage: "star.fill", action: submitReview)
+                    DSSecondaryButton(title: "稍后评价", action: { dismiss() })
+                } else {
+                    EmptyStateView(symbol: "star.slash", title: "评价对象不存在", subtitle: "请返回订单页查看状态。")
+                    DSSecondaryButton(title: "返回", action: { dismiss() })
                 }
-            } else {
-                EmptyStateView(symbol: "star.slash", title: "评价对象不存在", subtitle: "请返回订单页查看状态。")
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, DS.Space.lg)
+            .padding(.top, DS.Space.md)
+            .padding(.bottom, DS.Space.xxxl)
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .background(Color.dsBackground)
+        .navigationTitle("评价")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(Color.dsBackground, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbar(.visible, for: .tabBar)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                if !submitted {
+                    Button("返回") { dismiss() }
+                }
             }
         }
+    }
+
+    private func submitReview() {
+        store.submitReview(companionId: companionId, rating: rating, content: content)
+        withAnimation(.easeOut(duration: DS.Motion.fast)) {
+            submitted = true
+        }
+    }
+
+    private func finishAndGoHome() {
+        store.selectedTab = .discover
+        store.popToRoot()
     }
 }
 
@@ -75,23 +106,33 @@ private struct ReviewEditor: View {
         SoftCard {
             VStack(alignment: .leading, spacing: DS.Space.md) {
                 SectionHeader(title: "评价内容", subtitle: "帮助其他用户理解服务体验")
-                TextEditor(text: $content)
-                    .frame(minHeight: 120)
-                    .font(.system(size: 15))
-                    .scrollContentBackground(.hidden)
-                    .padding(DS.Space.sm)
-                    .background(Color.dsBackground, in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous)
-                            .stroke(Color.dsBorder, lineWidth: 1)
+                ZStack(alignment: .topLeading) {
+                    if content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        Text("写下你的感受...")
+                            .font(.system(size: 15))
+                            .foregroundStyle(Color.dsTextSecondary)
+                            .padding(.horizontal, DS.Space.sm)
+                            .padding(.vertical, DS.Space.md)
                     }
+                    TextEditor(text: $content)
+                        .font(.system(size: 15))
+                        .frame(minHeight: 120, maxHeight: 160)
+                        .scrollContentBackground(.hidden)
+                        .padding(.horizontal, DS.Space.xxs)
+                        .padding(.vertical, DS.Space.sm)
+                }
+                .background(Color.dsBackground, in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous)
+                        .stroke(Color.dsBorder, lineWidth: 1)
+                }
             }
         }
     }
 }
 
 private struct SuccessPanel: View {
-    @EnvironmentObject private var store: AppStore
+    let onFinish: () -> Void
 
     var body: some View {
         SoftCard {
@@ -105,10 +146,7 @@ private struct SuccessPanel: View {
                 Text("订单已完成，评价已写入本地 mock 数据。")
                     .font(.system(size: 13))
                     .foregroundStyle(Color.dsTextSecondary)
-                DSPrimaryButton(title: "回到发现", systemImage: "house") {
-                    store.selectedTab = .discover
-                    store.popToRoot()
-                }
+                DSPrimaryButton(title: "回到发现", systemImage: "house", action: onFinish)
             }
             .frame(maxWidth: .infinity)
         }
