@@ -156,6 +156,10 @@ final class AppStore: ObservableObject {
         }
     }
 
+    func setUserGender(_ gender: UserGender) {
+        user.gender = gender
+    }
+
     func verifyUser(name: String, phone: String) {
         user.name = name.isEmpty ? user.name : name
         user.phone = phone.isEmpty ? user.phone : Self.maskedPhone(phone)
@@ -255,6 +259,7 @@ final class AppStore: ObservableObject {
 
     @discardableResult
     func submitCommunityPost(
+        kind: CommunityPostKind,
         topic: String,
         content: String,
         coverImageData: Data?,
@@ -269,15 +274,24 @@ final class AppStore: ObservableObject {
             return .rejected
         }
 
+        if kind == .malePromotion && !(user.gender == .male && user.isVerified) {
+            lastModerationFeedback = "男生发布自荐需先完成实名认证。"
+            return .rejected
+        }
+
+        let effectiveCoverImageData = kind == .femaleRequest ? nil : coverImageData
+        let effectiveCoverAspectRatio = kind == .femaleRequest ? nil : coverAspectRatio
+
         let post = CommunityPost(
             id: UUID().uuidString,
             authorId: user.id,
             authorName: user.name,
             authorInitials: String(user.name.prefix(2)),
+            kind: kind,
             topic: trimmedTopic,
             content: trimmedContent,
-            coverImageData: coverImageData,
-            coverAspectRatio: coverAspectRatio,
+            coverImageData: effectiveCoverImageData,
+            coverAspectRatio: effectiveCoverAspectRatio,
             likeCount: 0,
             moderationStatus: .pending,
             createdAt: Date()
@@ -500,6 +514,7 @@ enum MockData {
         name: "小楷",
         phone: "183****0012",
         age: 18,
+        gender: nil,
         isVerified: false,
         safetyScore: 72,
         accountStatus: .active,
@@ -571,9 +586,9 @@ enum MockData {
     static let peakHourHint = "今晚 21:00 倾诉需求较高，已为你优先排序"
 
     static let communityPosts: [CommunityPost] = [
-        CommunityPost(id: "p1", authorId: "u2", authorName: "张三", authorInitials: "张三", topic: "情绪倾听", content: "第一次在这里找人聊完一整晚的委屈，没有被说教，也没有被催着变好。原来被认真听见，本身就是一种治愈。", coverImageData: nil, coverAspectRatio: 0.82, likeCount: 128, moderationStatus: .approved, createdAt: .now.addingTimeInterval(-7200)),
-        CommunityPost(id: "p2", authorId: "u3", authorName: "李四", authorInitials: "李四", topic: "睡前聊天", content: "睡前把灯光调暗，放一段轻音乐，给自己一个不被打扰的十分钟。安静的夜晚有人陪着说说话，真的会安心很多。", coverImageData: nil, coverAspectRatio: 1.0, likeCount: 86, moderationStatus: .approved, createdAt: .now.addingTimeInterval(-14400)),
-        CommunityPost(id: "p4", authorId: "u5", authorName: "赵六", authorInitials: "赵六", topic: "情绪倾听", content: "从微信群转战到这里最大的感受：没有人突然@全体，也没有莫名其妙的私信。这里真的安静很多。", coverImageData: nil, coverAspectRatio: 0.72, likeCount: 203, moderationStatus: .approved, createdAt: .now.addingTimeInterval(-28800)),
-        CommunityPost(id: "p5", authorId: "u6", authorName: "钱七", authorInitials: "钱七", topic: "陪伴故事", content: "加班到深夜的时候，有人愿意陪你把压力拆成一小块一小块，比一个人对着天花板发呆好多了。", coverImageData: nil, coverAspectRatio: 1.18, likeCount: 97, moderationStatus: .approved, createdAt: .now.addingTimeInterval(-36000))
+        CommunityPost(id: "p1", authorId: "u2", authorName: "张三", authorInitials: "张三", kind: .femaleRequest, topic: "情绪倾听", content: "第一次在这里找人聊完一整晚的委屈，没有被说教，也没有被催着变好。原来被认真听见，本身就是一种治愈。", coverImageData: nil, coverAspectRatio: 0.82, likeCount: 128, moderationStatus: .approved, createdAt: .now.addingTimeInterval(-7200)),
+        CommunityPost(id: "p2", authorId: "u3", authorName: "李四", authorInitials: "李四", kind: .femaleRequest, topic: "睡前聊天", content: "睡前把灯光调暗，放一段轻音乐，给自己一个不被打扰的十分钟。安静的夜晚有人陪着说说话，真的会安心很多。", coverImageData: nil, coverAspectRatio: 1.0, likeCount: 86, moderationStatus: .approved, createdAt: .now.addingTimeInterval(-14400)),
+        CommunityPost(id: "p4", authorId: "u5", authorName: "赵六", authorInitials: "赵六", kind: .malePromotion, topic: "职场减压", content: "已实名，擅长稳定倾听和边界清晰的文字陪伴。希望匹配需要安静沟通的人。", coverImageData: nil, coverAspectRatio: 0.72, likeCount: 203, moderationStatus: .approved, createdAt: .now.addingTimeInterval(-28800)),
+        CommunityPost(id: "p5", authorId: "u6", authorName: "钱七", authorInitials: "钱七", kind: .malePromotion, topic: "陪伴故事", content: "喜欢电影和旅行话题，沟通节奏轻松，不线下、不私联，只在平台内交流。", coverImageData: nil, coverAspectRatio: 1.18, likeCount: 97, moderationStatus: .approved, createdAt: .now.addingTimeInterval(-36000))
     ]
 }

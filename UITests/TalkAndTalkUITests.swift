@@ -8,6 +8,8 @@ final class TalkAndTalkUITests: XCTestCase {
         app.launch()
         defer { app.terminate() }
 
+        XCTAssertTrue(app.staticTexts["选择你的身份"].waitForExistence(timeout: 5))
+        app.buttons["女生"].tap()
         XCTAssertTrue(app.staticTexts["Talk&Talk"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["今晚，有人愿意听你说"].exists)
         XCTAssertTrue(app.buttons["先完成 18+ 认证"].exists || app.buttons["看看谁在线"].exists)
@@ -25,13 +27,112 @@ final class TalkAndTalkUITests: XCTestCase {
         app.launch()
         defer { app.terminate() }
 
+        chooseInitialGender(in: app)
         app.tabBars.buttons["社区"].tap()
         XCTAssertTrue(app.staticTexts["这是属于我们的地方"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.staticTexts["她的故事"].exists)
+        XCTAssertTrue(app.staticTexts["推荐内容"].exists)
+        XCTAssertFalse(app.staticTexts["女生需求"].exists)
+        XCTAssertFalse(app.buttons["男生自荐"].exists)
         XCTAssertTrue(app.buttons["全部"].exists)
         XCTAssertTrue(app.buttons["情绪倾听"].exists)
-        XCTAssertTrue(app.buttons["发布笔记"].exists)
-        XCTAssertTrue(app.staticTexts["第一次在这里找人聊完一整晚的委屈，没有被说教，也没有被催着变好。原来被认真听见，本身就是一种治愈。"].exists)
+        XCTAssertTrue(app.buttons["发布"].exists)
+        XCTAssertTrue(app.staticTexts["已实名，擅长稳定倾听和边界清晰的文字陪伴。希望匹配需要安静沟通的人。"].exists)
+        XCTAssertFalse(app.staticTexts["第一次在这里找人聊完一整晚的委屈，没有被说教，也没有被催着变好。原来被认真听见，本身就是一种治愈。"].exists)
+    }
+
+    @MainActor
+    func testFemaleCommunityPublishingUsesDemandComposerWithoutCover() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launch()
+        defer { app.terminate() }
+
+        chooseInitialGender(in: app)
+        app.tabBars.buttons["社区"].tap()
+        XCTAssertTrue(app.buttons["发布"].waitForExistence(timeout: 3))
+        app.buttons["发布"].tap()
+
+        XCTAssertTrue(app.staticTexts["发布"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["内容"].exists)
+        XCTAssertFalse(app.staticTexts["选择封面"].exists)
+        XCTAssertFalse(app.staticTexts["发布需求"].exists)
+        XCTAssertFalse(app.staticTexts["发布自荐"].exists)
+    }
+
+    @MainActor
+    func testUnverifiedMaleCommunityPromotionRoutesToVerification() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launch()
+        defer { app.terminate() }
+
+        chooseInitialGender(in: app, gender: "男生")
+        app.tabBars.buttons["社区"].tap()
+        app.buttons["发布"].tap()
+
+        XCTAssertTrue(app.staticTexts["确认 18+ 身份"].waitForExistence(timeout: 3))
+    }
+
+    @MainActor
+    func testVerifiedMaleCommunityPromotionShowsOptionalCover() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launch()
+        defer { app.terminate() }
+
+        chooseInitialGender(in: app, gender: "男生")
+        completeVerification(in: app)
+        app.tabBars.buttons["社区"].tap()
+        app.buttons["发布"].tap()
+
+        XCTAssertTrue(app.staticTexts["发布"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["内容"].exists)
+        XCTAssertTrue(app.staticTexts["选择封面"].exists)
+        XCTAssertTrue(app.buttons["发布"].exists)
+    }
+
+    @MainActor
+    func testCommunityFeedShowsOppositeGenderPosts() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launch()
+        defer { app.terminate() }
+
+        chooseInitialGender(in: app)
+        app.tabBars.buttons["社区"].tap()
+        XCTAssertTrue(app.staticTexts["已实名，擅长稳定倾听和边界清晰的文字陪伴。希望匹配需要安静沟通的人。"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.staticTexts["第一次在这里找人聊完一整晚的委屈，没有被说教，也没有被催着变好。原来被认真听见，本身就是一种治愈。"].exists)
+    }
+
+    @MainActor
+    func testMaleCommunityFeedShowsFemalePosts() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launch()
+        defer { app.terminate() }
+
+        chooseInitialGender(in: app, gender: "男生")
+        app.tabBars.buttons["社区"].tap()
+        XCTAssertTrue(app.staticTexts["第一次在这里找人聊完一整晚的委屈，没有被说教，也没有被催着变好。原来被认真听见，本身就是一种治愈。"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.staticTexts["已实名，擅长稳定倾听和边界清晰的文字陪伴。希望匹配需要安静沟通的人。"].exists)
+    }
+
+    @MainActor
+    func testProfileGenderSettingsCanChangeIdentity() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launch()
+        defer { app.terminate() }
+
+        chooseInitialGender(in: app)
+        app.tabBars.buttons["我的"].tap()
+        XCTAssertTrue(app.buttons["genderSettingsRow"].waitForExistence(timeout: 3))
+        app.buttons["genderSettingsRow"].tap()
+
+        XCTAssertTrue(app.staticTexts["身份设置"].waitForExistence(timeout: 3))
+        app.buttons["男生"].tap()
+        app.buttons["完成"].tap()
+        XCTAssertTrue(app.staticTexts["男生"].waitForExistence(timeout: 3))
     }
 
     @MainActor
@@ -41,6 +142,7 @@ final class TalkAndTalkUITests: XCTestCase {
         app.launch()
         defer { app.terminate() }
 
+        chooseInitialGender(in: app)
         app.tabBars.buttons["消息"].tap()
         XCTAssertTrue(app.textFields["搜索"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.staticTexts["平台内安全沟通"].exists)
@@ -60,6 +162,7 @@ final class TalkAndTalkUITests: XCTestCase {
         app.launch()
         defer { app.terminate() }
 
+        chooseInitialGender(in: app)
         completeVerification(in: app)
         app.buttons["看看谁在线"].tap()
 
@@ -102,6 +205,7 @@ final class TalkAndTalkUITests: XCTestCase {
         app.launch()
         defer { app.terminate() }
 
+        chooseInitialGender(in: app)
         let companion = app.buttons.containing(.staticText, identifier: "林屿").firstMatch
         XCTAssertTrue(companion.waitForExistence(timeout: 3))
         if !companion.isHittable {
@@ -122,6 +226,7 @@ final class TalkAndTalkUITests: XCTestCase {
         app.launch()
         defer { app.terminate() }
 
+        chooseInitialGender(in: app)
         completeVerification(in: app)
         app.buttons["看看谁在线"].tap()
 
@@ -157,6 +262,7 @@ final class TalkAndTalkUITests: XCTestCase {
         app.launch()
         defer { app.terminate() }
 
+        chooseInitialGender(in: app)
         completeVerification(in: app)
         app.buttons["看看谁在线"].tap()
 
@@ -176,6 +282,13 @@ final class TalkAndTalkUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["这次沟通体验怎么样？"].waitForExistence(timeout: 3))
         app.buttons["提交评价"].tap()
         XCTAssertTrue(app.staticTexts["评价已提交"].waitForExistence(timeout: 3))
+    }
+
+    @MainActor
+    private func chooseInitialGender(in app: XCUIApplication, gender: String = "女生") {
+        XCTAssertTrue(app.staticTexts["选择你的身份"].waitForExistence(timeout: 5))
+        app.buttons[gender].tap()
+        XCTAssertTrue(app.staticTexts["今晚，有人愿意听你说"].waitForExistence(timeout: 3))
     }
 
     @MainActor

@@ -76,4 +76,73 @@ final class ModerationTests: XCTestCase {
     func testWarnGraceStrikeCountDefaultsToZero() {
         XCTAssertEqual(MockData.user.warnGraceStrikeCount, 0)
     }
+
+    @MainActor
+    func testFemaleCommunityPostClearsCoverAndUsesRequestKind() async {
+        let store = AppStore()
+        store.setUserGender(.female)
+
+        let status = await store.submitCommunityPost(
+            kind: .femaleRequest,
+            topic: "情绪倾听",
+            content: "希望有人今晚认真听我说一会儿工作压力。",
+            coverImageData: Data([0x01, 0x02]),
+            coverAspectRatio: 1.0
+        )
+
+        XCTAssertEqual(status, .approved)
+        let post = store.communityPosts.first
+        XCTAssertEqual(post?.kind, .femaleRequest)
+        XCTAssertNil(post?.coverImageData)
+        XCTAssertNil(post?.coverAspectRatio)
+    }
+
+    @MainActor
+    func testUnverifiedMaleCommunityPromotionIsRejected() async {
+        let store = AppStore()
+        store.setUserGender(.male)
+
+        let status = await store.submitCommunityPost(
+            kind: .malePromotion,
+            topic: "情绪倾听",
+            content: "我可以稳定倾听，只在平台内沟通。",
+            coverImageData: nil,
+            coverAspectRatio: nil
+        )
+
+        XCTAssertEqual(status, .rejected)
+        XCTAssertEqual(store.lastModerationFeedback, "男生发布自荐需先完成实名认证。")
+        XCTAssertFalse(store.communityPosts.contains { $0.authorId == store.user.id })
+    }
+
+    @MainActor
+    func testVerifiedMaleCommunityPromotionAllowsOptionalCover() async {
+        let store = AppStore()
+        store.setUserGender(.male)
+        store.verifyUser(name: "小楷", phone: "18300000012")
+
+        let status = await store.submitCommunityPost(
+            kind: .malePromotion,
+            topic: "情绪倾听",
+            content: "已实名，擅长耐心倾听和清晰边界沟通。",
+            coverImageData: nil,
+            coverAspectRatio: nil
+        )
+
+        XCTAssertEqual(status, .approved)
+        let post = store.communityPosts.first
+        XCTAssertEqual(post?.kind, .malePromotion)
+        XCTAssertNil(post?.coverImageData)
+    }
+
+    @MainActor
+    func testVerificationDoesNotChangeExistingGender() {
+        let store = AppStore()
+        store.setUserGender(.male)
+
+        store.verifyUser(name: "小楷", phone: "18300000012")
+
+        XCTAssertEqual(store.user.gender, .male)
+        XCTAssertTrue(store.user.isVerified)
+    }
 }

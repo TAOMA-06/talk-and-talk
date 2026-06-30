@@ -43,6 +43,70 @@ struct ContentView: View {
             }
             .interactiveDismissDisabled(prompt.requiredReadSeconds > 0)
         }
+        .fullScreenCover(
+            isPresented: Binding(
+                get: { store.user.gender == nil },
+                set: { _ in }
+            )
+        ) {
+            InitialGenderSelectionView()
+                .interactiveDismissDisabled()
+        }
+    }
+}
+
+struct InitialGenderSelectionView: View {
+    @EnvironmentObject private var store: AppStore
+
+    var body: some View {
+        ZStack {
+            Color.dsBackground.ignoresSafeArea()
+            VStack(alignment: .leading, spacing: DS.Space.lg) {
+                Spacer()
+                StepTitle(symbol: "person.2", title: "选择你的身份", subtitle: "用于匹配社区发布规则：女生发需求，男生实名后发自荐。")
+                HStack(spacing: DS.Space.sm) {
+                    GenderChoiceButton(gender: .female, isSelected: false, symbol: "heart.text.square") {
+                        store.setUserGender(.female)
+                    }
+                    GenderChoiceButton(gender: .male, isSelected: false, symbol: "checkmark.shield") {
+                        store.setUserGender(.male)
+                    }
+                }
+                Text("选择后可在“我的”里调整。")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.dsTextSecondary)
+                Spacer()
+            }
+            .padding(DS.Space.lg)
+        }
+    }
+}
+
+struct GenderChoiceButton: View {
+    let gender: UserGender
+    var isSelected: Bool
+    let symbol: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: DS.Space.sm) {
+                Image(systemName: symbol)
+                    .font(.system(size: 24, weight: .semibold))
+                Text(gender.displayName)
+                    .font(.system(size: 16, weight: .semibold))
+            }
+            .foregroundStyle(isSelected ? Color.dsSurface : Color.dsTextPrimary)
+            .frame(maxWidth: .infinity)
+            .frame(height: 104)
+            .background(isSelected ? Color.dsPrimary : Color.dsSurface, in: RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous)
+                    .stroke(isSelected ? Color.dsPrimary : Color.dsBorder, lineWidth: 1)
+            }
+        }
+        .buttonStyle(DSPressButtonStyle())
+        .accessibilityIdentifier("gender-\(gender.rawValue)")
     }
 }
 

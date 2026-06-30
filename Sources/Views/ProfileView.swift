@@ -40,11 +40,20 @@ private struct UserPanel: View {
                     Text("\(store.user.phone) · \(store.user.age)+")
                         .font(.system(size: 13))
                         .foregroundStyle(Color.dsTextSecondary)
-                    StatusPill(
-                        text: store.user.isVerified ? "已完成 18+ 实名" : "未完成实名",
-                        symbol: store.user.isVerified ? "checkmark.shield" : "person.badge.key",
-                        color: store.user.isVerified ? Color.dsPrimary : Color.dsWarning
-                    )
+                    HStack(spacing: DS.Space.sm) {
+                        StatusPill(
+                            text: store.user.isVerified ? "已完成 18+ 实名" : "未完成实名",
+                            symbol: store.user.isVerified ? "checkmark.shield" : "person.badge.key",
+                            color: store.user.isVerified ? Color.dsPrimary : Color.dsWarning
+                        )
+                        if let gender = store.user.gender {
+                            StatusPill(
+                                text: gender.displayName,
+                                symbol: gender == .female ? "heart.text.square" : "checkmark.shield",
+                                color: Color.dsPrimary
+                            )
+                        }
+                    }
                 }
                 Spacer()
             }
@@ -114,12 +123,22 @@ private struct SafetyScorePanel: View {
 
 private struct MenuPanel: View {
     @EnvironmentObject private var store: AppStore
+    @State private var showingGenderSettings = false
 
     var body: some View {
         VStack(spacing: 0) {
             DSListRow(title: "安全中心", subtitle: "信任体系", symbol: "shield.checkered") {
                 store.navigate(.safetyCenter)
             }
+            Divider().padding(.leading, 52)
+            DSListRow(
+                title: "身份设置",
+                subtitle: store.user.gender?.displayName ?? "待选择",
+                symbol: "person.2"
+            ) {
+                showingGenderSettings = true
+            }
+            .accessibilityIdentifier("genderSettingsRow")
             Divider().padding(.leading, 52)
             DSListRow(
                 title: "18+ 实名认证",
@@ -143,6 +162,51 @@ private struct MenuPanel: View {
         .overlay {
             RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous)
                 .stroke(Color.dsBorder, lineWidth: 1)
+        }
+        .sheet(isPresented: $showingGenderSettings) {
+            GenderSettingsSheet()
+                .presentationDetents([.height(300)])
+                .presentationDragIndicator(.visible)
+        }
+    }
+}
+
+private struct GenderSettingsSheet: View {
+    @EnvironmentObject private var store: AppStore
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: DS.Space.lg) {
+                Text("身份设置")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(Color.dsTextPrimary)
+                Text("当前身份会影响社区浏览和发布规则。")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.dsTextSecondary)
+                HStack(spacing: DS.Space.sm) {
+                    genderButton(.female, symbol: "heart.text.square")
+                    genderButton(.male, symbol: "checkmark.shield")
+                }
+                Spacer()
+            }
+            .padding(DS.Space.lg)
+            .background(Color.dsBackground)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("完成") { dismiss() }
+                }
+            }
+        }
+    }
+
+    private func genderButton(_ gender: UserGender, symbol: String) -> some View {
+        GenderChoiceButton(
+            gender: gender,
+            isSelected: store.user.gender == gender,
+            symbol: symbol
+        ) {
+            store.setUserGender(gender)
         }
     }
 }

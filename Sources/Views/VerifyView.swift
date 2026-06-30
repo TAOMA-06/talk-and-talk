@@ -235,7 +235,7 @@ private struct PhoneStep: View {
     }
 }
 
-private struct StepTitle: View {
+struct StepTitle: View {
     let symbol: String
     let title: String
     let subtitle: String

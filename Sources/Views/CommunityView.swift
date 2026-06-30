@@ -4,15 +4,37 @@ import UIKit
 
 struct CommunityView: View {
     @EnvironmentObject private var store: AppStore
-    @State private var showingComposer = false
+    @State private var composingKind: CommunityPostKind?
     @State private var topic = "情绪倾听"
     @State private var selectedTopic = "全部"
     @State private var content = ""
 
-    private let topicFilters = ["全部", "情绪倾听", "陪伴故事", "职场减压", "睡前聊天"]
+    private var topicFilters: [String] {
+        ["全部", "情绪倾听", "陪伴故事", "职场减压", "睡前聊天"]
+    }
+
+    private var browsingKind: CommunityPostKind {
+        switch store.user.gender {
+        case .female: .malePromotion
+        case .male: .femaleRequest
+        case nil: .malePromotion
+        }
+    }
+
+    private var publishingKind: CommunityPostKind? {
+        switch store.user.gender {
+        case .female: .femaleRequest
+        case .male: .malePromotion
+        case nil: nil
+        }
+    }
 
     private var approvedPosts: [CommunityPost] {
-        store.approvedCommunityPosts()
+        store.approvedCommunityPosts().filter { $0.kind == browsingKind }
+    }
+
+    private var pendingPosts: [CommunityPost] {
+        store.pendingCommunityPosts().filter { $0.kind == browsingKind }
     }
 
     private var filteredApprovedPosts: [CommunityPost] {
@@ -24,39 +46,65 @@ struct CommunityView: View {
         AppScaffold(title: "社区", spacing: DS.Space.lg) {
             BelongingBanner()
 
-            if !store.pendingCommunityPosts().isEmpty {
+            if !pendingPosts.isEmpty {
                 SectionHeader(title: "审核中", subtitle: "先审后发，保护社区氛围")
-                CommunityMasonryGrid(posts: store.pendingCommunityPosts())
+                CommunityMasonryGrid(posts: pendingPosts)
             }
 
             CommunityFeedHeader(canPublish: store.accountRestrictions.canPostCommunity) {
-                showingComposer = true
+                startPublishing()
             }
             CommunityTopicFilterBar(topics: topicFilters, selection: $selectedTopic)
 
-            if approvedPosts.isEmpty && store.pendingCommunityPosts().isEmpty {
-                EmptyStateView(symbol: "text.bubble", title: "还没有故事", subtitle: "成为第一个分享的人。")
+            if approvedPosts.isEmpty && pendingPosts.isEmpty {
+                EmptyStateView(symbol: "text.bubble", title: "还没有内容", subtitle: "成为第一个发布的人。")
             } else if filteredApprovedPosts.isEmpty {
-                EmptyStateView(symbol: "text.bubble", title: "这个话题还没有笔记", subtitle: "换个频道看看，或者发布你的第一篇。")
+                EmptyStateView(symbol: "text.bubble", title: "这个话题还没有内容", subtitle: "换个话题看看，或者发布第一篇。")
             } else {
                 CommunityMasonryGrid(posts: filteredApprovedPosts)
             }
         }
-        .sheet(isPresented: $showingComposer) {
+        .sheet(item: $composingKind) { kind in
             ComposeStorySheet(
+                kind: kind,
                 topic: $topic,
-                content: $content,
-                isPresented: $showingComposer
+                content: $content
             )
+        }
+    }
+
+    private func startPublishing() {
+        guard store.accountRestrictions.canPostCommunity else { return }
+
+        guard let publishingKind else { return }
+        topic = defaultTopic(for: publishingKind)
+
+        switch publishingKind {
+        case .femaleRequest:
+            composingKind = .femaleRequest
+        case .malePromotion:
+            if store.user.isVerified {
+                composingKind = .malePromotion
+            } else {
+                store.navigate(.verify)
+            }
+        }
+    }
+
+    private func defaultTopic(for kind: CommunityPostKind) -> String {
+        switch kind {
+        case .femaleRequest: "情绪倾听"
+        case .malePromotion: "情绪倾听"
         }
     }
 }
 
 private struct ComposeStorySheet: View {
     @EnvironmentObject private var store: AppStore
+    @Environment(\.dismiss) private var dismiss
+    let kind: CommunityPostKind
     @Binding var topic: String
     @Binding var content: String
-    @Binding var isPresented: Bool
 
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var coverImageData: Data?
@@ -64,13 +112,17 @@ private struct ComposeStorySheet: View {
     @State private var isSubmitting = false
     @State private var feedbackMessage: String?
 
-    private let topics = ["情绪倾听", "陪伴故事", "职场减压", "睡前聊天"]
+    private var topics: [String] {
+        ["情绪倾听", "陪伴故事", "职场减压", "睡前聊天"]
+    }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: DS.Space.lg) {
-                    coverPicker
+                    if kind == .malePromotion {
+                        coverPicker
+                    }
                     topicPicker
                     storyEditor
                     if let feedbackMessage {
@@ -79,7 +131,7 @@ private struct ComposeStorySheet: View {
                             .foregroundStyle(Color.dsDanger)
                     }
                     DSPrimaryButton(
-                        title: isSubmitting ? "审核中..." : "发布笔记",
+                        title: isSubmitting ? "审核中..." : submitTitle,
                         systemImage: "paperplane",
                         isEnabled: !trimmedContent.isEmpty && !isSubmitting,
                         isLoading: isSubmitting,
@@ -90,11 +142,11 @@ private struct ComposeStorySheet: View {
             }
             .scrollDismissesKeyboard(.interactively)
             .background(Color.dsBackground)
-            .navigationTitle("发布笔记")
+            .navigationTitle(navigationTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("关闭") { isPresented = false }
+                    Button("关闭") { dismiss() }
                 }
             }
         }
@@ -107,6 +159,25 @@ private struct ComposeStorySheet: View {
 
     private var trimmedContent: String {
         content.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var navigationTitle: String {
+        "发布"
+    }
+
+    private var submitTitle: String {
+        "发布"
+    }
+
+    private var contentLabel: String {
+        "内容"
+    }
+
+    private var contentPlaceholder: String {
+        switch kind {
+        case .femaleRequest: "写下你想被怎样陪伴、沟通节奏和边界..."
+        case .malePromotion: "介绍你的陪伴风格、可聊话题和平台内沟通边界..."
+        }
     }
 
     private var coverPicker: some View {
@@ -176,12 +247,12 @@ private struct ComposeStorySheet: View {
 
     private var storyEditor: some View {
         VStack(alignment: .leading, spacing: DS.Space.sm) {
-            Text("笔记内容")
+            Text(contentLabel)
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(Color.dsTextSecondary)
             ZStack(alignment: .topLeading) {
                 if trimmedContent.isEmpty {
-                    Text("写下你的故事...")
+                    Text(contentPlaceholder)
                         .font(.system(size: 15))
                         .foregroundStyle(Color.dsTextSecondary)
                         .padding(.horizontal, DS.Space.md)
@@ -227,6 +298,7 @@ private struct ComposeStorySheet: View {
 
         Task { @MainActor in
             let status = await store.submitCommunityPost(
+                kind: kind,
                 topic: topic,
                 content: draft,
                 coverImageData: draftCoverImageData,
@@ -237,7 +309,7 @@ private struct ComposeStorySheet: View {
             if status == .approved {
                 content = ""
                 removeCover()
-                isPresented = false
+                dismiss()
             }
         }
     }
@@ -276,16 +348,16 @@ private struct CommunityFeedHeader: View {
     var body: some View {
         HStack(alignment: .center) {
             VStack(alignment: .leading, spacing: DS.Space.xxs) {
-                Text("她的故事")
+                Text("推荐内容")
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(Color.dsTextPrimary)
-                Text("分享、被理解、被尊重")
+                Text("按你的身份展示更合适的内容")
                     .font(.system(size: 13))
                     .foregroundStyle(Color.dsTextSecondary)
             }
             Spacer()
             Button(action: action) {
-                Label("发布笔记", systemImage: "square.and.pencil")
+                Label("发布", systemImage: "square.and.pencil")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(canPublish ? Color.dsPrimary : Color.dsTextSecondary)
                     .padding(.horizontal, DS.Space.md)

@@ -120,6 +120,27 @@ enum CommunityModerationStatus: String, Codable, Hashable {
     }
 }
 
+enum UserGender: String, Codable, Hashable, CaseIterable {
+    case female
+    case male
+
+    var displayName: String {
+        switch self {
+        case .female: "女生"
+        case .male: "男生"
+        }
+    }
+}
+
+enum CommunityPostKind: String, Codable, Hashable, CaseIterable {
+    case femaleRequest
+    case malePromotion
+}
+
+extension CommunityPostKind: Identifiable {
+    var id: String { rawValue }
+}
+
 enum AdminAction: String, Codable, Hashable {
     case confirmViolation
     case dismiss
@@ -179,6 +200,7 @@ struct User: Identifiable, Codable, Hashable {
     var name: String
     var phone: String
     var age: Int
+    var gender: UserGender?
     var isVerified: Bool
     var safetyScore: Int
     var accountStatus: AccountStatus
@@ -222,6 +244,7 @@ struct CommunityPost: Identifiable, Codable, Hashable {
     let authorId: String
     let authorName: String
     let authorInitials: String
+    let kind: CommunityPostKind
     let topic: String
     let content: String
     let coverImageData: Data?
