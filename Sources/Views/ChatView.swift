@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ChatView: View {
-    let companionId: String
+    let target: ContactTarget
     @EnvironmentObject private var store: AppStore
     @State private var inputText = ""
     @State private var isCallActive = false
@@ -10,10 +10,30 @@ struct ChatView: View {
     @State private var showingTrialPaywall = false
     @State private var isSending = false
 
-    private var companion: Companion? { store.companion(by: companionId) }
-    private var messages: [Message] { store.messages(for: companionId) }
-    private var hasPaidChat: Bool { store.hasActivePaidChat(with: companionId) }
-    private var remainingTrialMessages: Int { store.remainingTrialMessages(for: companionId) }
+    private var companionId: String? {
+        if case .companion(let id) = target { return id }
+        return nil
+    }
+
+    private var companion: Companion? {
+        guard let companionId else { return nil }
+        return store.companion(by: companionId)
+    }
+
+    private var messages: [Message] { store.messages(for: target) }
+    private var hasPaidChat: Bool {
+        guard let companionId else { return false }
+        return store.hasActivePaidChat(with: companionId)
+    }
+    private var remainingTrialMessages: Int {
+        guard let companionId else { return 0 }
+        return store.remainingTrialMessages(for: companionId)
+    }
+    private var canSendRecommendationCard: Bool {
+        guard store.user.gender == .male, store.user.isVerified else { return false }
+        if case .communityUser = target { return true }
+        return false
+    }
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
@@ -25,6 +45,7 @@ struct ChatView: View {
                     companion: companion,
                     isCallActive: isCallActive,
                     seconds: seconds,
+                    canStartCall: companion != nil,
                     toggleCall: toggleCall,
                     onReport: { showingReport = true }
                 )
@@ -37,17 +58,22 @@ struct ChatView: View {
                     RestrictionBanner(text: store.accountRestrictions.summary)
                 }
 
-                TrialChatStatusRow(
-                    hasPaidChat: hasPaidChat,
-                    remaining: remainingTrialMessages,
-                    limit: store.freeTrialMessageLimit
-                )
+                if target.allowsPaidActions {
+                    TrialChatStatusRow(
+                        hasPaidChat: hasPaidChat,
+                        remaining: remainingTrialMessages,
+                        limit: store.freeTrialMessageLimit
+                    )
+                }
 
                 WeChatMessageList(
                     messages: messages,
                     currentUser: store.user,
-                    companion: companion
-                )
+                    companion: companion,
+                    otherInitials: target.communityInitials ?? "TA"
+                ) { companionId in
+                    store.navigate(.companionDetail(companionId))
+                }
             }
 
             if isCallActive, let companion {
@@ -57,7 +83,7 @@ struct ChatView: View {
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
-        .navigationTitle(companion?.name ?? "沟通")
+        .navigationTitle(store.displayName(for: target))
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Color.dsBackground, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
@@ -68,14 +94,19 @@ struct ChatView: View {
                 isSending: isSending,
                 isDisabled: !store.accountRestrictions.canSendMessages,
                 hasPaidChat: hasPaidChat,
+                showsPaidControls: target.allowsPaidActions,
+                canSendRecommendationCard: canSendRecommendationCard,
                 send: sendMessage,
                 finish: finish,
-                continuePaid: { showingTrialPaywall = true }
+                continuePaid: { showingTrialPaywall = true },
+                sendRecommendationCard: { store.sendRecommendationCard(to: target) }
             )
         }
         .alert("免费试聊已用完", isPresented: $showingTrialPaywall) {
             Button("继续沟通") {
-                store.navigate(.order(companionId))
+                if let companionId {
+                    store.navigate(.order(companionId))
+                }
             }
             Button("稍后再说", role: .cancel) {}
         } message: {
@@ -85,12 +116,13 @@ struct ChatView: View {
             if isCallActive { seconds += 1 }
         }
         .sheet(isPresented: $showingReport) {
-            ReportSheetForChat(companionId: companionId)
+            ReportSheetForChat(target: target)
                 .presentationDetents([.medium])
         }
     }
 
     private func toggleCall() {
+        guard let companionId else { return }
         withAnimation(.easeOut(duration: DS.Motion.fast)) {
             isCallActive.toggle()
             if isCallActive {
@@ -104,24 +136,31 @@ struct ChatView: View {
         let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
 
-        guard hasPaidChat || store.canSendTrialMessage(to: companionId) else {
-            showingTrialPaywall = true
-            return
+        if let companionId {
+            guard hasPaidChat || store.canSendTrialMessage(to: companionId) else {
+                showingTrialPaywall = true
+                return
+            }
         }
 
         isSending = true
         inputText = ""
         Task {
-            if hasPaidChat {
-                _ = await store.sendMessage(text, to: companionId)
+            if let companionId {
+                if hasPaidChat {
+                    _ = await store.sendMessage(text, to: companionId)
+                } else {
+                    _ = await store.sendTrialMessage(text, to: companionId)
+                }
             } else {
-                _ = await store.sendTrialMessage(text, to: companionId)
+                _ = await store.sendMessage(text, to: target)
             }
             isSending = false
         }
     }
 
     private func finish() {
+        guard let companionId else { return }
         guard hasPaidChat else {
             showingTrialPaywall = true
             return
@@ -136,6 +175,7 @@ private struct WeChatChatHeader: View {
     let companion: Companion?
     let isCallActive: Bool
     let seconds: Int
+    let canStartCall: Bool
     let toggleCall: () -> Void
     let onReport: () -> Void
 
@@ -153,14 +193,16 @@ private struct WeChatChatHeader: View {
 
                 Spacer(minLength: DS.Space.sm)
 
-                Button(action: toggleCall) {
-                    Image(systemName: isCallActive ? "phone.down.fill" : "phone.fill")
-                        .font(.system(size: 14, weight: .semibold))
-                        .frame(width: 32, height: 32)
-                        .foregroundStyle(isCallActive ? .white : Color.dsTextPrimary)
-                        .background(isCallActive ? Color.dsDanger : Color.dsSurface, in: Circle())
+                if canStartCall {
+                    Button(action: toggleCall) {
+                        Image(systemName: isCallActive ? "phone.down.fill" : "phone.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                            .frame(width: 32, height: 32)
+                            .foregroundStyle(isCallActive ? .white : Color.dsTextPrimary)
+                            .background(isCallActive ? Color.dsDanger : Color.dsSurface, in: Circle())
+                    }
+                    .accessibilityLabel(isCallActive ? "结束语音" : "开始语音")
                 }
-                .accessibilityLabel(isCallActive ? "结束语音" : "开始语音")
 
                 Button(action: onReport) {
                     Image(systemName: "exclamationmark.bubble")
@@ -259,6 +301,9 @@ private struct WeChatMessageList: View {
     let messages: [Message]
     let currentUser: User
     let companion: Companion?
+    let otherInitials: String
+    let openCompanion: (String) -> Void
+    @EnvironmentObject private var store: AppStore
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -267,12 +312,25 @@ private struct WeChatMessageList: View {
                     ForEach(messages) { message in
                         if message.type == .system || message.type == .safety {
                             CenteredSystemMessage(message: message)
+                        } else if message.type == .recommendationCard,
+                                  let companionId = message.companionCardId,
+                                  let cardCompanion = store.companion(by: companionId) {
+                            RecommendationCardRow(
+                                message: message,
+                                isCurrentUser: message.senderId == currentUser.id,
+                                currentUser: currentUser,
+                                chatCompanion: companion,
+                                otherInitials: otherInitials,
+                                cardCompanion: cardCompanion,
+                                open: { openCompanion(companionId) }
+                            )
                         } else {
                             WeChatMessageBubble(
                                 message: message,
                                 isCurrentUser: message.senderId == currentUser.id,
                                 currentUser: currentUser,
-                                companion: companion
+                                companion: companion,
+                                otherInitials: otherInitials
                             )
                         }
                     }
@@ -296,6 +354,7 @@ private struct WeChatMessageBubble: View {
     let isCurrentUser: Bool
     let currentUser: User
     let companion: Companion?
+    let otherInitials: String
 
     var body: some View {
         HStack(alignment: .top, spacing: DS.Space.sm) {
@@ -307,7 +366,7 @@ private struct WeChatMessageBubble: View {
                 if let companion {
                     CompanionAvatar(companion: companion, size: 36)
                 } else {
-                    UserInitialsAvatar(initials: "TA", color: Color.dsTextSecondary)
+                    UserInitialsAvatar(initials: String(otherInitials.prefix(1)), color: Color.dsTextSecondary)
                 }
                 bubble
                 Spacer(minLength: 56)
@@ -331,6 +390,78 @@ private struct WeChatMessageBubble: View {
                 }
             }
             .frame(maxWidth: 260, alignment: isCurrentUser ? .trailing : .leading)
+    }
+}
+
+private struct RecommendationCardRow: View {
+    let message: Message
+    let isCurrentUser: Bool
+    let currentUser: User
+    let chatCompanion: Companion?
+    let otherInitials: String
+    let cardCompanion: Companion
+    let open: () -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: DS.Space.sm) {
+            if isCurrentUser {
+                Spacer(minLength: 56)
+                card
+                UserInitialsAvatar(initials: String(currentUser.name.prefix(1)), color: Color.dsPrimary)
+            } else {
+                if let chatCompanion {
+                    CompanionAvatar(companion: chatCompanion, size: 36)
+                } else {
+                    UserInitialsAvatar(initials: String(otherInitials.prefix(1)), color: Color.dsTextSecondary)
+                }
+                card
+                Spacer(minLength: 56)
+            }
+        }
+        .id(message.id)
+    }
+
+    private var card: some View {
+        Button(action: open) {
+            VStack(alignment: .leading, spacing: DS.Space.sm) {
+                HStack(spacing: DS.Space.sm) {
+                    CompanionAvatar(companion: cardCompanion, size: 40)
+                    VStack(alignment: .leading, spacing: DS.Space.xxs) {
+                        Text("推荐卡片")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(Color.dsPrimary)
+                        Text(cardCompanion.name)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Color.dsTextPrimary)
+                            .lineLimit(1)
+                    }
+                    Spacer()
+                }
+
+                Text(cardCompanion.role)
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.dsTextSecondary)
+                    .lineLimit(1)
+
+                HStack(spacing: DS.Space.sm) {
+                    Label("¥\(cardCompanion.pricePerHalfHour)/30m", systemImage: "creditcard")
+                    Spacer()
+                    Label("查看详情", systemImage: "chevron.right")
+                }
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Color.dsTextPrimary)
+            }
+            .padding(DS.Space.md)
+            .frame(maxWidth: 260, alignment: .leading)
+            .background(Color.dsSurface, in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous)
+                    .stroke(Color.dsBorder, lineWidth: 1)
+            }
+        }
+        .buttonStyle(DSPressButtonStyle())
+        .accessibilityLabel("推荐卡片 \(cardCompanion.name)")
+        .accessibilityIdentifier("recommendationCard-\(cardCompanion.id)")
     }
 }
 
@@ -372,9 +503,12 @@ private struct WeChatComposerBar: View {
     var isSending: Bool
     var isDisabled: Bool
     var hasPaidChat: Bool
+    var showsPaidControls: Bool
+    var canSendRecommendationCard: Bool
     let send: () -> Void
     let finish: () -> Void
     let continuePaid: () -> Void
+    let sendRecommendationCard: () -> Void
 
     private var trimmedText: String {
         text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -383,7 +517,16 @@ private struct WeChatComposerBar: View {
     var body: some View {
         VStack(spacing: DS.Space.sm) {
             HStack(spacing: DS.Space.sm) {
-                Button {} label: {
+                Menu {
+                    if canSendRecommendationCard {
+                        Button(action: sendRecommendationCard) {
+                            Label("发送推荐卡片", systemImage: "person.crop.rectangle.stack")
+                        }
+                    } else {
+                        Button("暂无可用操作") {}
+                            .disabled(true)
+                    }
+                } label: {
                     Image(systemName: "plus.circle")
                         .font(.system(size: 24, weight: .regular))
                         .foregroundStyle(Color.dsTextSecondary)
@@ -417,20 +560,22 @@ private struct WeChatComposerBar: View {
                 .accessibilityLabel("发送")
             }
 
-            Button(action: hasPaidChat ? finish : continuePaid) {
-                Label(hasPaidChat ? "结束沟通并评价" : "继续沟通", systemImage: hasPaidChat ? "checkmark.circle" : "lock.open")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Color.dsPrimary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, DS.Space.sm)
-                    .background(Color.dsSurface, in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous)
-                            .stroke(Color.dsBorder, lineWidth: 1)
-                    }
+            if showsPaidControls {
+                Button(action: hasPaidChat ? finish : continuePaid) {
+                    Label(hasPaidChat ? "结束沟通并评价" : "继续沟通", systemImage: hasPaidChat ? "checkmark.circle" : "lock.open")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.dsPrimary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, DS.Space.sm)
+                        .background(Color.dsSurface, in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous)
+                                .stroke(Color.dsBorder, lineWidth: 1)
+                        }
+                }
+                .buttonStyle(DSPressButtonStyle())
+                .accessibilityIdentifier("finishChatButton")
             }
-            .buttonStyle(DSPressButtonStyle())
-            .accessibilityIdentifier("finishChatButton")
         }
         .padding(.horizontal, DS.Space.lg)
         .padding(.top, DS.Space.sm)
@@ -476,7 +621,7 @@ private struct VoiceCallFloatingPanel: View {
 }
 
 private struct ReportSheetForChat: View {
-    let companionId: String
+    let target: ContactTarget
     @EnvironmentObject private var store: AppStore
     @Environment(\.dismiss) private var dismiss
     @State private var reason = "聊天内容不适"
@@ -494,7 +639,7 @@ private struct ReportSheetForChat: View {
                 }
                 .pickerStyle(.inline)
                 DSPrimaryButton(title: "提交", systemImage: "paperplane") {
-                    store.report(companionId: companionId, reason: reason)
+                    store.report(target: target, reason: reason)
                     dismiss()
                 }
                 Spacer()

@@ -120,8 +120,8 @@ private extension View {
                 CompanionDetailView(companionId: id)
             case .order(let id):
                 OrderView(companionId: id)
-            case .chat(let id):
-                ChatView(companionId: id)
+            case .chat(let target):
+                ChatView(target: target)
             case .review(let id):
                 ReviewView(companionId: id)
             case .verify:

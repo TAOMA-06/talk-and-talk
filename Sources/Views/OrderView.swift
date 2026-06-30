@@ -54,7 +54,7 @@ struct OrderView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
             _ = store.createOrder(companionId: companionId, themeId: selectedThemeId, durationMinutes: selectedDuration)
             isPaying = false
-            store.navigate(.chat(companionId))
+            store.navigate(.chat(.companion(id: companionId)))
         }
     }
 }

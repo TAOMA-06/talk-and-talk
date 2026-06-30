@@ -38,7 +38,7 @@ enum AppRoute: Hashable {
     case companionList(themeId: String?, preset: ListPreset?)
     case companionDetail(String)
     case order(String)
-    case chat(String)
+    case chat(ContactTarget)
     case review(String)
     case verify
     case safetyCenter
@@ -138,6 +138,37 @@ enum CommunityPostKind: String, Codable, Hashable, CaseIterable {
 
 extension CommunityPostKind: Identifiable {
     var id: String { rawValue }
+}
+
+enum ContactTarget: Codable, Hashable {
+    case companion(id: String)
+    case communityUser(id: String, name: String, initials: String)
+
+    var conversationId: String {
+        switch self {
+        case .companion(let id):
+            id
+        case .communityUser(let id, _, _):
+            "community-\(id)"
+        }
+    }
+
+    var participantId: String {
+        switch self {
+        case .companion(let id), .communityUser(let id, _, _):
+            id
+        }
+    }
+
+    var allowsPaidActions: Bool {
+        if case .companion = self { return true }
+        return false
+    }
+
+    var communityInitials: String? {
+        if case .communityUser(_, _, let initials) = self { return initials }
+        return nil
+    }
 }
 
 enum AdminAction: String, Codable, Hashable {
@@ -243,6 +274,7 @@ struct CommunityPost: Identifiable, Codable, Hashable {
     let authorId: String
     let authorName: String
     let authorInitials: String
+    let contactTarget: ContactTarget?
     let kind: CommunityPostKind
     let topic: String
     let content: String
@@ -305,16 +337,37 @@ struct Review: Identifiable, Codable, Hashable {
 
 struct Message: Identifiable, Codable, Hashable {
     let id: String
+    let conversationId: String
     let senderId: String
     let content: String
     let type: MessageType
     let timestamp: Date
+    let companionCardId: String?
+
+    init(
+        id: String,
+        conversationId: String,
+        senderId: String,
+        content: String,
+        type: MessageType,
+        timestamp: Date,
+        companionCardId: String? = nil
+    ) {
+        self.id = id
+        self.conversationId = conversationId
+        self.senderId = senderId
+        self.content = content
+        self.type = type
+        self.timestamp = timestamp
+        self.companionCardId = companionCardId
+    }
 }
 
 enum MessageType: String, Codable {
     case text
     case system
     case safety
+    case recommendationCard
 }
 
 struct ModerationCase: Identifiable, Codable, Hashable {

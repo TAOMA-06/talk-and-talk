@@ -88,9 +88,22 @@ final class AppStore: ObservableObject {
         reviews.filter { $0.companionId == companionId }
     }
 
+    func displayName(for target: ContactTarget) -> String {
+        switch target {
+        case .companion(let id):
+            companion(by: id)?.name ?? "沟通"
+        case .communityUser(_, let name, _):
+            name
+        }
+    }
+
     func messages(for companionId: String) -> [Message] {
+        messages(for: .companion(id: companionId))
+    }
+
+    func messages(for target: ContactTarget) -> [Message] {
         messages
-            .filter { $0.senderId == companionId || $0.senderId == user.id || $0.senderId == "system" }
+            .filter { $0.conversationId == target.conversationId }
             .sorted { $0.timestamp < $1.timestamp }
     }
 
@@ -135,7 +148,7 @@ final class AppStore: ObservableObject {
         )
         orders.insert(order, at: 0)
         activeOrderId = order.id
-        insertSystemMessage("订单已由平台担保，沟通开始前请勿交换私人联系方式。", companionId: companionId, type: .system)
+        insertSystemMessage("订单已由平台担保，沟通开始前请勿交换私人联系方式。", target: .companion(id: companionId), type: .system)
         return order
     }
 
@@ -175,6 +188,11 @@ final class AppStore: ObservableObject {
 
     @discardableResult
     func sendMessage(_ content: String, to companionId: String) async -> ModerationDecision {
+        await sendMessage(content, to: .companion(id: companionId))
+    }
+
+    @discardableResult
+    func sendMessage(_ content: String, to target: ContactTarget) async -> ModerationDecision {
         let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return .allow }
 
@@ -184,7 +202,7 @@ final class AppStore: ObservableObject {
         }
 
         let context = ModerationContext(
-            recentMessages: messages(for: companionId).suffix(4).map(\.content),
+            recentMessages: messages(for: target).suffix(4).map(\.content),
             safetyScore: user.safetyScore,
             isVerified: user.isVerified
         )
@@ -194,41 +212,42 @@ final class AppStore: ObservableObject {
         switch result.decision {
         case .block:
             lastModerationFeedback = "消息未发送：疑似违规内容"
-            insertSystemMessage("安全提醒：平台不支持线下邀约、私下转账或敏感交易，请在平台内完成沟通。", companionId: companionId, type: .safety)
-            insertModerationCase(from: result, title: "聊天拦截：\(trimmed)", source: .chat, content: trimmed, targetId: companionId, status: .humanReview)
+            insertSystemMessage("安全提醒：平台不支持线下邀约、私下转账或敏感交易，请在平台内完成沟通。", target: target, type: .safety)
+            insertModerationCase(from: result, title: "聊天拦截：\(trimmed)", source: .chat, content: trimmed, targetId: target.conversationId, status: .humanReview)
             if let event = creditService.applyModerationResult(result, to: &user) {
                 creditEvents.insert(event, at: 0)
             }
         case .warn:
             if applyWarnGraceIfNeeded(result: result) {
-                appendUserMessage(trimmed, companionId: companionId)
-                insertSystemMessage("友善提醒：你的表达可能接近边界，请阅读用户协议并保持平台内沟通。", companionId: companionId, type: .safety)
+                appendUserMessage(trimmed, target: target)
+                insertSystemMessage("友善提醒：你的表达可能接近边界，请阅读用户协议并保持平台内沟通。", target: target, type: .safety)
                 lastModerationFeedback = "已记录第 \(user.warnGraceStrikeCount) 次提醒，请阅读用户协议"
             } else {
-                appendUserMessage(trimmed, companionId: companionId)
-                insertSystemMessage("安全提醒：请保持在平台内沟通，避免交换私人联系方式。", companionId: companionId, type: .safety)
-                insertModerationCase(from: result, title: "聊天预警：\(trimmed)", source: .chat, content: trimmed, targetId: companionId, status: .humanReview)
+                appendUserMessage(trimmed, target: target)
+                insertSystemMessage("安全提醒：请保持在平台内沟通，避免交换私人联系方式。", target: target, type: .safety)
+                insertModerationCase(from: result, title: "聊天预警：\(trimmed)", source: .chat, content: trimmed, targetId: target.conversationId, status: .humanReview)
                 if let event = creditService.applyModerationResult(result, to: &user) {
                     creditEvents.insert(event, at: 0)
                 }
                 lastModerationFeedback = nil
             }
         case .review:
-            appendUserMessage(trimmed, companionId: companionId)
-            insertModerationCase(from: result, title: "聊天待复核：\(trimmed)", source: .chat, content: trimmed, targetId: companionId, status: .pending)
+            appendUserMessage(trimmed, target: target)
+            insertModerationCase(from: result, title: "聊天待复核：\(trimmed)", source: .chat, content: trimmed, targetId: target.conversationId, status: .pending)
             lastModerationFeedback = nil
         case .allow:
-            appendUserMessage(trimmed, companionId: companionId)
+            appendUserMessage(trimmed, target: target)
             lastModerationFeedback = nil
         }
 
         if result.decision != .block {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
                 guard let self else { return }
-                let reply = self.reply(for: companionId)
+                let reply = self.reply(for: target)
                 self.messages.append(Message(
                     id: UUID().uuidString,
-                    senderId: companionId,
+                    conversationId: target.conversationId,
+                    senderId: target.participantId,
                     content: reply,
                     type: .text,
                     timestamp: Date()
@@ -251,6 +270,22 @@ final class AppStore: ObservableObject {
             trialMessageCountsByCompanionId[companionId, default: 0] += 1
         }
         return decision
+    }
+
+    func sendRecommendationCard(to target: ContactTarget) {
+        guard user.gender == .male, user.isVerified else { return }
+        guard case .communityUser = target else { return }
+
+        let companion = ensureCurrentUserCompanion()
+        messages.append(Message(
+            id: UUID().uuidString,
+            conversationId: target.conversationId,
+            senderId: user.id,
+            content: "推荐卡片",
+            type: .recommendationCard,
+            timestamp: Date(),
+            companionCardId: companion.id
+        ))
     }
 
     @discardableResult
@@ -277,12 +312,20 @@ final class AppStore: ObservableObject {
 
         let effectiveCoverImageData = kind == .femaleRequest ? nil : coverImageData
         let effectiveCoverAspectRatio = kind == .femaleRequest ? nil : coverAspectRatio
+        let contactTarget: ContactTarget
+        switch kind {
+        case .femaleRequest:
+            contactTarget = .communityUser(id: user.id, name: user.name, initials: String(user.name.prefix(2)))
+        case .malePromotion:
+            contactTarget = .companion(id: ensureCurrentUserCompanion(promotionContent: trimmedContent).id)
+        }
 
         let post = CommunityPost(
             id: UUID().uuidString,
             authorId: user.id,
             authorName: user.name,
             authorInitials: String(user.name.prefix(2)),
+            contactTarget: contactTarget,
             kind: kind,
             topic: trimmedTopic,
             content: trimmedContent,
@@ -356,8 +399,12 @@ final class AppStore: ObservableObject {
     }
 
     func report(companionId: String, reason: String) {
-        let companionName = companion(by: companionId)?.name ?? "未知用户"
-        let recent = messages(for: companionId).suffix(4).map(\.content).joined(separator: " ")
+        report(target: .companion(id: companionId), reason: reason)
+    }
+
+    func report(target: ContactTarget, reason: String) {
+        let targetName = displayName(for: target)
+        let recent = messages(for: target).suffix(4).map(\.content).joined(separator: " ")
         let reportText = "\(reason) \(recent)"
 
         Task { [moderationService] in
@@ -369,10 +416,10 @@ final class AppStore: ObservableObject {
             let status: ModerationCaseStatus = result.score >= 0.55 ? .humanReview : .pending
             insertModerationCase(
                 from: result,
-                title: "\(companionName)：\(reason)",
+                title: "\(targetName)：\(reason)",
                 source: .report,
                 content: reportText,
-                targetId: companionId,
+                targetId: target.conversationId,
                 status: status
             )
         }
@@ -434,9 +481,10 @@ final class AppStore: ObservableObject {
         return true
     }
 
-    private func appendUserMessage(_ content: String, companionId: String) {
+    private func appendUserMessage(_ content: String, target: ContactTarget) {
         messages.append(Message(
             id: UUID().uuidString,
+            conversationId: target.conversationId,
             senderId: user.id,
             content: content,
             type: .text,
@@ -444,9 +492,10 @@ final class AppStore: ObservableObject {
         ))
     }
 
-    private func insertSystemMessage(_ content: String, companionId: String, type: MessageType = .safety) {
+    private func insertSystemMessage(_ content: String, target: ContactTarget, type: MessageType = .safety) {
         messages.append(Message(
             id: UUID().uuidString,
+            conversationId: target.conversationId,
             senderId: "system",
             content: content,
             type: type,
@@ -492,8 +541,8 @@ final class AppStore: ObservableObject {
         }
     }
 
-    private func reply(for companionId: String) -> String {
-        let companion = companion(by: companionId)?.name ?? "我"
+    private func reply(for target: ContactTarget) -> String {
+        let companion = displayName(for: target)
         let replies = [
             "我在，先慢慢说。我们可以把现在最困扰你的点拆成一小步一小步看。",
             "听起来你今天消耗很大。要不要先做一个30秒呼吸放松，再继续聊？",
@@ -501,6 +550,39 @@ final class AppStore: ObservableObject {
             "我会保持边界和尊重，如果有任何不舒服，可以随时结束或举报。"
         ]
         return replies.randomElement() ?? replies[0]
+    }
+
+    @discardableResult
+    private func ensureCurrentUserCompanion(promotionContent: String? = nil) -> Companion {
+        let companionId = "self-\(user.id)"
+        if let existing = companion(by: companionId) {
+            return existing
+        }
+
+        let specialty = themes.first?.name ?? "情绪倾听"
+        let companion = Companion(
+            id: companionId,
+            name: user.name,
+            role: "认证陪伴者",
+            initials: String(user.name.prefix(2)),
+            tags: ["已实名", "平台内沟通", "边界清晰"],
+            rating: 4.8,
+            reviewCount: 0,
+            pricePerHalfHour: 39,
+            isOnline: true,
+            isVerified: true,
+            bio: promotionContent.flatMap { $0.isEmpty ? nil : $0 } ?? "已完成实名认证，支持平台内文字与语音陪伴。沟通过程遵守平台边界，不线下、不私联。",
+            availableTimes: ["20:00", "21:30", "23:00"],
+            languages: ["中文"],
+            specialties: [specialty],
+            completedOrders: 0,
+            responseTime: "约1分钟",
+            distanceKm: 0,
+            availability: .online,
+            cityDistrict: "平台内"
+        )
+        companions.insert(companion, at: 0)
+        return companion
     }
 }
 
@@ -552,10 +634,10 @@ enum MockData {
     ]
 
     static let messages: [Message] = [
-        Message(id: "m1", senderId: "system", content: "平台已开启安全提醒：请勿交换私人联系方式或进行线下邀约。", type: .system, timestamp: .now.addingTimeInterval(-720)),
-        Message(id: "m2", senderId: "c1", content: "晚上好，我是林屿。你可以从任何一个小片段开始说。", type: .text, timestamp: .now.addingTimeInterval(-680)),
-        Message(id: "m3", senderId: "u1", content: "今天有点累，感觉脑子里都是工作的事。", type: .text, timestamp: .now.addingTimeInterval(-610)),
-        Message(id: "m4", senderId: "c1", content: "那我们先不急着解决。你觉得最压着你的，是事情多，还是没人理解？", type: .text, timestamp: .now.addingTimeInterval(-560))
+        Message(id: "m1", conversationId: "c1", senderId: "system", content: "平台已开启安全提醒：请勿交换私人联系方式或进行线下邀约。", type: .system, timestamp: .now.addingTimeInterval(-720)),
+        Message(id: "m2", conversationId: "c1", senderId: "c1", content: "晚上好，我是林屿。你可以从任何一个小片段开始说。", type: .text, timestamp: .now.addingTimeInterval(-680)),
+        Message(id: "m3", conversationId: "c1", senderId: "u1", content: "今天有点累，感觉脑子里都是工作的事。", type: .text, timestamp: .now.addingTimeInterval(-610)),
+        Message(id: "m4", conversationId: "c1", senderId: "c1", content: "那我们先不急着解决。你觉得最压着你的，是事情多，还是没人理解？", type: .text, timestamp: .now.addingTimeInterval(-560))
     ]
 
     static let moderationCases: [ModerationCase] = [
@@ -580,9 +662,9 @@ enum MockData {
     ]
 
     static let communityPosts: [CommunityPost] = [
-        CommunityPost(id: "p1", authorId: "u2", authorName: "张三", authorInitials: "张三", kind: .femaleRequest, topic: "情绪倾听", content: "第一次在这里找人聊完一整晚的委屈，没有被说教，也没有被催着变好。原来被认真听见，本身就是一种治愈。", coverImageData: nil, coverAspectRatio: 0.82, likeCount: 128, moderationStatus: .approved, createdAt: .now.addingTimeInterval(-7200)),
-        CommunityPost(id: "p2", authorId: "u3", authorName: "李四", authorInitials: "李四", kind: .femaleRequest, topic: "睡前聊天", content: "睡前把灯光调暗，放一段轻音乐，给自己一个不被打扰的十分钟。安静的夜晚有人陪着说说话，真的会安心很多。", coverImageData: nil, coverAspectRatio: 1.0, likeCount: 86, moderationStatus: .approved, createdAt: .now.addingTimeInterval(-14400)),
-        CommunityPost(id: "p4", authorId: "u5", authorName: "赵六", authorInitials: "赵六", kind: .malePromotion, topic: "职场减压", content: "已实名，擅长稳定倾听和边界清晰的文字陪伴。希望匹配需要安静沟通的人。", coverImageData: nil, coverAspectRatio: 0.72, likeCount: 203, moderationStatus: .approved, createdAt: .now.addingTimeInterval(-28800)),
-        CommunityPost(id: "p5", authorId: "u6", authorName: "钱七", authorInitials: "钱七", kind: .malePromotion, topic: "陪伴故事", content: "喜欢电影和旅行话题，沟通节奏轻松，不线下、不私联，只在平台内交流。", coverImageData: nil, coverAspectRatio: 1.18, likeCount: 97, moderationStatus: .approved, createdAt: .now.addingTimeInterval(-36000))
+        CommunityPost(id: "p1", authorId: "u2", authorName: "张三", authorInitials: "张三", contactTarget: .communityUser(id: "u2", name: "张三", initials: "张三"), kind: .femaleRequest, topic: "情绪倾听", content: "第一次在这里找人聊完一整晚的委屈，没有被说教，也没有被催着变好。原来被认真听见，本身就是一种治愈。", coverImageData: nil, coverAspectRatio: 0.82, likeCount: 128, moderationStatus: .approved, createdAt: .now.addingTimeInterval(-7200)),
+        CommunityPost(id: "p2", authorId: "u3", authorName: "李四", authorInitials: "李四", contactTarget: .communityUser(id: "u3", name: "李四", initials: "李四"), kind: .femaleRequest, topic: "睡前聊天", content: "睡前把灯光调暗，放一段轻音乐，给自己一个不被打扰的十分钟。安静的夜晚有人陪着说说话，真的会安心很多。", coverImageData: nil, coverAspectRatio: 1.0, likeCount: 86, moderationStatus: .approved, createdAt: .now.addingTimeInterval(-14400)),
+        CommunityPost(id: "p4", authorId: "c1", authorName: "林屿", authorInitials: "LY", contactTarget: .companion(id: "c1"), kind: .malePromotion, topic: "职场减压", content: "已实名，擅长稳定倾听和边界清晰的文字陪伴。希望匹配需要安静沟通的人。", coverImageData: nil, coverAspectRatio: 0.72, likeCount: 203, moderationStatus: .approved, createdAt: .now.addingTimeInterval(-28800)),
+        CommunityPost(id: "p5", authorId: "c2", authorName: "许澈", authorInitials: "XC", contactTarget: .companion(id: "c2"), kind: .malePromotion, topic: "陪伴故事", content: "喜欢电影和旅行话题，沟通节奏轻松，不线下、不私联，只在平台内交流。", coverImageData: nil, coverAspectRatio: 1.18, likeCount: 97, moderationStatus: .approved, createdAt: .now.addingTimeInterval(-36000))
     ]
 }

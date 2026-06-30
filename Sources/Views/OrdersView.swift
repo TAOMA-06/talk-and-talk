@@ -77,7 +77,7 @@ private struct OrderCard: View {
                         title: order.status == .inProgress ? "继续沟通" : "进入沟通",
                         systemImage: "bubble.left.and.bubble.right"
                     ) {
-                        store.navigate(.chat(companion.id))
+                        store.navigate(.chat(.companion(id: companion.id)))
                     }
                 }
             }

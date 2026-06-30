@@ -118,6 +118,72 @@ final class TalkAndTalkUITests: XCTestCase {
     }
 
     @MainActor
+    func testFemaleCanChatOrOrderFromVerifiedMaleCommunityPost() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launch()
+        defer { app.terminate() }
+
+        chooseInitialGender(in: app)
+        app.tabBars.buttons["社区"].tap()
+
+        let chatButton = app.buttons["communityPostChat-p4"]
+        XCTAssertTrue(chatButton.waitForExistence(timeout: 3))
+        chatButton.tap()
+        XCTAssertTrue(app.textFields["messageInput"].waitForExistence(timeout: 4))
+        XCTAssertTrue(app.buttons["finishChatButton"].exists)
+
+        app.navigationBars.buttons.firstMatch.tap()
+        let orderButton = app.buttons["communityPostOrder-p4"]
+        XCTAssertTrue(orderButton.waitForExistence(timeout: 3))
+        orderButton.tap()
+        XCTAssertTrue(app.staticTexts["确认订单"].waitForExistence(timeout: 3))
+    }
+
+    @MainActor
+    func testMaleCanOpenFemaleCommunityPostAsSafetyChatOnly() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launch()
+        defer { app.terminate() }
+
+        chooseInitialGender(in: app, gender: "男生")
+        app.tabBars.buttons["社区"].tap()
+
+        let chatButton = app.buttons["communityPostChat-p1"]
+        XCTAssertTrue(chatButton.waitForExistence(timeout: 3))
+        chatButton.tap()
+        XCTAssertTrue(app.textFields["messageInput"].waitForExistence(timeout: 4))
+        XCTAssertFalse(app.buttons["finishChatButton"].exists)
+    }
+
+    @MainActor
+    func testVerifiedMaleCanSendRecommendationCardInFemaleRequestChat() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launch()
+        defer { app.terminate() }
+
+        chooseInitialGender(in: app, gender: "男生")
+        completeVerification(in: app)
+        app.tabBars.buttons["社区"].tap()
+
+        let chatButton = app.buttons["communityPostChat-p1"]
+        XCTAssertTrue(chatButton.waitForExistence(timeout: 3))
+        chatButton.tap()
+
+        XCTAssertTrue(app.buttons["更多"].waitForExistence(timeout: 3))
+        app.buttons["更多"].tap()
+        app.buttons["发送推荐卡片"].tap()
+
+        let card = app.buttons["recommendationCard-self-u1"]
+        XCTAssertTrue(card.waitForExistence(timeout: 3))
+        card.tap()
+        XCTAssertTrue(app.staticTexts["陪伴者详情"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["小楷"].exists)
+    }
+
+    @MainActor
     func testProfileGenderSettingsCanChangeIdentity() throws {
         continueAfterFailure = false
         let app = XCUIApplication()

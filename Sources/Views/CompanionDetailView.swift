@@ -296,7 +296,7 @@ private struct BottomActionBar: View {
                         store.navigate(.verify)
                         return
                     }
-                    store.navigate(.chat(companion.id))
+                    store.navigate(.chat(.companion(id: companion.id)))
                 }
                 .frame(maxWidth: 148)
             }

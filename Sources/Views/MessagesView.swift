@@ -32,7 +32,7 @@ struct MessagesView: View {
                     LazyVStack(spacing: 0) {
                         ForEach(conversations) { companion in
                             Button {
-                                store.navigate(.chat(companion.id))
+                                store.navigate(.chat(.companion(id: companion.id)))
                             } label: {
                                 WeChatConversationRow(companion: companion)
                             }
@@ -158,6 +158,8 @@ private struct WeChatConversationRow: View {
             return "[系统] \(lastMessage.content)"
         case .safety:
             return "[安全提醒] \(lastMessage.content)"
+        case .recommendationCard:
+            return "[推荐卡片]"
         case .text:
             return lastMessage.content
         }

@@ -448,16 +448,22 @@ private struct CommunityMasonryGrid: View {
         let ratio = max(0.65, min(1.35, post.coverAspectRatio ?? CommunityPostCoverView.placeholderAspectRatio(for: post.topic)))
         let coverHeight = 160 / ratio
         let textHeight = post.content.count > 36 ? 58.0 : 38.0
-        return coverHeight + textHeight + 52
+        let actionHeight = post.contactTarget == nil || post.moderationStatus != .approved ? 0 : 42.0
+        return coverHeight + textHeight + 52 + actionHeight
     }
 }
 
 private struct CommunityPostCard: View {
     let post: CommunityPost
+    @EnvironmentObject private var store: AppStore
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             CommunityPostCoverView(post: post)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    openDetailIfAvailable()
+                }
 
             VStack(alignment: .leading, spacing: DS.Space.sm) {
                 Text(post.content)
@@ -466,6 +472,10 @@ private struct CommunityPostCard: View {
                     .lineSpacing(2)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        openDetailIfAvailable()
+                    }
 
                 HStack(spacing: DS.Space.xxs) {
                     authorBadge
@@ -478,6 +488,10 @@ private struct CommunityPostCard: View {
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(Color.dsTextSecondary)
                         .labelStyle(.titleAndIcon)
+                }
+
+                if shouldShowContactActions {
+                    contactActions
                 }
             }
             .padding(DS.Space.sm)
@@ -499,6 +513,52 @@ private struct CommunityPostCard: View {
                 .foregroundStyle(Color.dsPrimary)
         }
         .frame(width: 20, height: 20)
+    }
+
+    private var shouldShowContactActions: Bool {
+        post.moderationStatus == .approved && post.contactTarget != nil
+    }
+
+    @ViewBuilder
+    private var contactActions: some View {
+        if let target = post.contactTarget {
+            HStack(spacing: DS.Space.xxs) {
+                Button {
+                    store.navigate(.chat(target))
+                } label: {
+                    Label("聊天", systemImage: "bubble.left.and.bubble.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 32)
+                        .foregroundStyle(Color.dsPrimary)
+                        .background(Color.dsBackground, in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
+                }
+                .buttonStyle(DSPressButtonStyle())
+                .accessibilityIdentifier("communityPostChat-\(post.id)")
+
+                if case .companion(let id) = target {
+                    Button {
+                        store.navigate(.order(id))
+                    } label: {
+                        Label("下单", systemImage: "creditcard")
+                            .font(.system(size: 12, weight: .semibold))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 32)
+                            .foregroundStyle(Color.dsSurface)
+                            .background(Color.dsPrimary, in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
+                    }
+                    .buttonStyle(DSPressButtonStyle())
+                    .accessibilityIdentifier("communityPostOrder-\(post.id)")
+                }
+            }
+        }
+    }
+
+    private func openDetailIfAvailable() {
+        guard let target = post.contactTarget else { return }
+        if case .companion(let id) = target {
+            store.navigate(.companionDetail(id))
+        }
     }
 }
 
