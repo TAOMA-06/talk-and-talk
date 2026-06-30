@@ -40,10 +40,6 @@ final class AppStore: ObservableObject {
         companions.filter { $0.availability != .busy }.count
     }
 
-    var nearbyOnlineCount: Int {
-        companions.filter { $0.distanceKm <= 3 && $0.isOnline }.count
-    }
-
     var pendingModerationCount: Int {
         moderationCases.filter { $0.status == .pending || $0.status == .humanReview || $0.status == .autoReviewing }.count
     }
@@ -582,8 +578,6 @@ enum MockData {
             usedAI: false, resolvedAt: nil
         )
     ]
-
-    static let peakHourHint = "今晚 21:00 倾诉需求较高，已为你优先排序"
 
     static let communityPosts: [CommunityPost] = [
         CommunityPost(id: "p1", authorId: "u2", authorName: "张三", authorInitials: "张三", kind: .femaleRequest, topic: "情绪倾听", content: "第一次在这里找人聊完一整晚的委屈，没有被说教，也没有被催着变好。原来被认真听见，本身就是一种治愈。", coverImageData: nil, coverAspectRatio: 0.82, likeCount: 128, moderationStatus: .approved, createdAt: .now.addingTimeInterval(-7200)),

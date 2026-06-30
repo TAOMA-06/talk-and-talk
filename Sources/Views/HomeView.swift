@@ -87,14 +87,14 @@ private struct SmartMatchBar: View {
         SoftCard {
             VStack(alignment: .leading, spacing: DS.Space.md) {
                 HStack(spacing: DS.Space.sm) {
-                    Image(systemName: "location.fill")
+                    Image(systemName: "bolt.heart")
                         .foregroundStyle(Color.dsPrimary)
                         .font(.system(size: 12, weight: .semibold))
-                    Text("距你最近 · \(store.nearbyOnlineCount) 位在线")
+                    Text("\(store.onlineCompanionCount) 人在线，\(store.availableCompanionCount) 位可约")
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(Color.dsTextPrimary)
                     Spacer()
-                    Text("\(store.onlineCompanionCount) 人在线，\(store.availableCompanionCount) 位可约")
+                    Text("按状态和评价推荐")
                         .font(.system(size: 11))
                         .foregroundStyle(Color.dsTextSecondary)
                 }
@@ -110,15 +110,8 @@ private struct SmartMatchBar: View {
                         TagChip(title: "预算友好") {
                             store.navigate(.companionList(themeId: nil, preset: .budgetFriendly))
                         }
-                        TagChip(title: "附近优先") {
-                            store.navigate(.companionList(themeId: nil, preset: .nearby))
-                        }
                     }
                 }
-
-                Text(MockData.peakHourHint)
-                    .font(.system(size: 11))
-                    .foregroundStyle(Color.dsTextSecondary)
             }
         }
     }
@@ -181,7 +174,7 @@ private struct RecommendedCompanions: View {
 
     var body: some View {
         VStack(spacing: DS.Space.md) {
-            SectionHeader(title: "推荐陪伴者", subtitle: "在线、距离、评价综合排序", actionTitle: "更多") {
+            SectionHeader(title: "推荐陪伴者", subtitle: "在线、认证、评价综合排序", actionTitle: "更多") {
                 store.navigate(.companionList(themeId: nil, preset: nil))
             }
             LazyVStack(spacing: DS.Space.md) {

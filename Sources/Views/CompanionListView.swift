@@ -11,14 +11,12 @@ struct CompanionListView: View {
         case all = "全部"
         case online = "在线"
         case verified = "已认证"
-        case nearby = "附近"
         case availableTonight = "今晚可约"
         case budgetFriendly = "预算内"
     }
 
     enum SortType: String, CaseIterable {
         case recommended = "推荐"
-        case distance = "距离最近"
         case rating = "评分"
         case price = "价格"
     }
@@ -27,9 +25,6 @@ struct CompanionListView: View {
         self.themeId = themeId
         self.preset = preset
         switch preset {
-        case .nearby:
-            _filter = State(initialValue: .nearby)
-            _sort = State(initialValue: .distance)
         case .availableTonight:
             _filter = State(initialValue: .availableTonight)
             _sort = State(initialValue: .recommended)
@@ -52,7 +47,6 @@ struct CompanionListView: View {
         case .all: break
         case .online: result = result.filter { $0.availability == .online }
         case .verified: result = result.filter(\.isVerified)
-        case .nearby: result = result.filter { $0.distanceKm <= 3 }
         case .availableTonight: result = result.filter { $0.availability != .busy }
         case .budgetFriendly: result = result.filter { $0.pricePerHalfHour <= 35 }
         }
@@ -70,8 +64,6 @@ struct CompanionListView: View {
                     rhs.rating
                 )
             }
-        case .distance:
-            result.sort { $0.distanceKm < $1.distanceKm }
         case .rating:
             result.sort { $0.rating > $1.rating }
         case .price:
@@ -83,7 +75,6 @@ struct CompanionListView: View {
     var body: some View {
         AppScaffold(title: title, spacing: DS.Space.lg) {
             ListHeader(title: title, count: filteredCompanions.count)
-            PeakHourBanner()
             FilterStrip(filter: $filter, sort: $sort)
             if filteredCompanions.isEmpty {
                 EmptyStateView(symbol: "person.2.slash", title: "暂无匹配陪伴者", subtitle: "可以切换主题或重置筛选条件。")
@@ -119,26 +110,6 @@ private struct ListHeader: View {
             }
             Spacer()
             StatusPill(text: "\(count)人", symbol: "person.2", color: Color.dsPrimary)
-        }
-    }
-}
-
-private struct PeakHourBanner: View {
-    var body: some View {
-        HStack(spacing: DS.Space.sm) {
-            Image(systemName: "chart.line.uptrend.xyaxis")
-                .foregroundStyle(Color.dsTextSecondary)
-            Text(MockData.peakHourHint)
-                .font(.system(size: 11))
-                .foregroundStyle(Color.dsTextSecondary)
-        }
-        .padding(.horizontal, DS.Space.md)
-        .padding(.vertical, DS.Space.sm)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.dsBackground, in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous)
-                .stroke(Color.dsBorder, lineWidth: 1)
         }
     }
 }

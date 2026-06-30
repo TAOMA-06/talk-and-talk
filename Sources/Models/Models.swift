@@ -30,7 +30,6 @@ enum AppTab: Hashable, CaseIterable {
 }
 
 enum ListPreset: String, Hashable, Codable {
-    case nearby
     case availableTonight
     case budgetFriendly
 }
