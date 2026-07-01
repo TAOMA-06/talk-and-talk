@@ -113,24 +113,29 @@ struct GenderChoiceButton: View {
 private extension View {
     func withRoutes() -> some View {
         navigationDestination(for: AppRoute.self) { route in
-            switch route {
-            case .companionList(let themeId, let preset):
-                CompanionListView(themeId: themeId, preset: preset)
-            case .companionDetail(let id):
-                CompanionDetailView(companionId: id)
-            case .order(let id):
-                OrderView(companionId: id)
-            case .chat(let target):
-                ChatView(target: target)
-            case .review(let id):
-                ReviewView(companionId: id)
-            case .verify:
-                VerifyView()
-            case .safetyCenter:
-                SafetyCenterView()
-            case .admin:
-                AdminView()
+            Group {
+                switch route {
+                case .companionList(let themeId, let preset):
+                    CompanionListView(themeId: themeId, preset: preset)
+                case .companionDetail(let id):
+                    CompanionDetailView(companionId: id)
+                case .companionHomepage(let id):
+                    CompanionHomepageView(companionId: id)
+                case .order(let id):
+                    OrderView(companionId: id)
+                case .chat(let target):
+                    ChatView(target: target)
+                case .review(let id):
+                    ReviewView(companionId: id)
+                case .verify:
+                    VerifyView()
+                case .safetyCenter:
+                    SafetyCenterView()
+                case .admin:
+                    AdminView()
+                }
             }
+            .toolbar(.hidden, for: .tabBar)
         }
     }
 }

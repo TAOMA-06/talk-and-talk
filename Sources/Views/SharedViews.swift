@@ -2,7 +2,12 @@ import SwiftUI
 
 struct AppBackground: View {
     var body: some View {
-        Color.dsBackground.ignoresSafeArea()
+        LinearGradient(
+            colors: [Color.dsBackground, Color.dsHeroBottom.opacity(0.52)],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .ignoresSafeArea()
     }
 }
 
@@ -25,10 +30,10 @@ struct AppScaffold<Content: View>: View {
             .padding(.top, topPadding)
             .padding(.bottom, bottomPadding)
         }
-        .background(Color.dsBackground)
+        .background(AppBackground())
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(Color.dsBackground, for: .navigationBar)
+        .toolbarBackground(Color.dsBackground.opacity(0.96), for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
     }
 }
@@ -54,7 +59,8 @@ struct GlassCapsule<Content: View>: View {
             .padding(.horizontal, DS.Space.md)
             .padding(.vertical, DS.Space.sm)
             .background(Color.dsSurface, in: Capsule())
-            .overlay(Capsule().stroke(Color.dsBorder, lineWidth: 1))
+            .overlay(Capsule().stroke(Color.dsBorder.opacity(0.7), lineWidth: 1))
+            .shadow(color: Color.dsTextPrimary.opacity(0.05), radius: 8, x: 0, y: 4)
     }
 }
 
@@ -127,9 +133,14 @@ struct ActionDock<Content: View>: View {
     var body: some View {
         content
             .padding(DS.Space.lg)
-            .background(Color.dsSurface)
-            .overlay(alignment: .top) { Divider() }
-            .padding(.horizontal, DS.Space.lg)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DS.Radius.xl, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: DS.Radius.xl, style: .continuous)
+                    .stroke(Color.white.opacity(0.86), lineWidth: 1)
+            }
+            .shadow(color: Color.dsTextPrimary.opacity(0.12), radius: 20, x: 0, y: 8)
+            .padding(.horizontal, DS.Space.md)
+            .padding(.bottom, DS.Space.sm)
     }
 }
 

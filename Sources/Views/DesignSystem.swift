@@ -14,6 +14,7 @@ enum DS {
     enum Radius {
         static let sm: CGFloat = 8
         static let md: CGFloat = 12
+        static let xl: CGFloat = 24
     }
 
     enum Motion {
@@ -45,15 +46,16 @@ enum DSTypography {
 }
 
 extension Color {
-    static let dsBackground = Color(red: 0.95, green: 0.95, blue: 0.97)
-    static let dsSurface = Color.white
-    static let dsBorder = Color(red: 0.90, green: 0.90, blue: 0.92)
-    static let dsTextPrimary = Color(red: 0.11, green: 0.11, blue: 0.12)
-    static let dsTextSecondary = Color(red: 0.56, green: 0.56, blue: 0.58)
-    static let dsPrimary = Color(red: 0.05, green: 0.54, blue: 0.50)
-    static let dsSuccess = Color(red: 0.20, green: 0.78, blue: 0.35)
-    static let dsWarning = Color(red: 1.00, green: 0.58, blue: 0.00)
-    static let dsDanger = Color(red: 1.00, green: 0.23, blue: 0.19)
+    static let dsBackground = Color(red: 0.96, green: 0.97, blue: 0.96)
+    static let dsSurface = Color(red: 1.00, green: 1.00, blue: 0.99)
+    static let dsBorder = Color(red: 0.86, green: 0.88, blue: 0.86)
+    static let dsTextPrimary = Color(red: 0.08, green: 0.10, blue: 0.10)
+    static let dsTextSecondary = Color(red: 0.43, green: 0.47, blue: 0.46)
+    static let dsPrimary = Color(red: 0.00, green: 0.40, blue: 0.36)
+    static let dsSuccess = Color(red: 0.16, green: 0.62, blue: 0.34)
+    static let dsWarning = Color(red: 0.80, green: 0.49, blue: 0.09)
+    static let dsDanger = Color(red: 0.82, green: 0.18, blue: 0.17)
+    static let dsHeroBottom = Color(red: 1.00, green: 0.98, blue: 0.94)
 
     static var appInk: Color { dsTextPrimary }
     static var appMuted: Color { dsTextSecondary }
@@ -77,8 +79,9 @@ struct DSCard<Content: View>: View {
             .background(Color.dsSurface, in: RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous)
-                    .stroke(Color.dsBorder, lineWidth: 1)
+                    .stroke(Color.dsBorder.opacity(0.78), lineWidth: 1)
             }
+            .shadow(color: Color.dsTextPrimary.opacity(0.045), radius: 10, x: 0, y: 5)
     }
 }
 
@@ -103,7 +106,8 @@ struct DSPrimaryButton: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, DS.Space.md)
             .foregroundStyle(.white)
-            .background(isEnabled ? Color.dsPrimary : Color.dsTextSecondary.opacity(0.4), in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
+            .background(isEnabled ? Color.dsPrimary : Color.dsTextSecondary.opacity(0.4), in: RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous))
+            .shadow(color: isEnabled ? Color.dsPrimary.opacity(0.22) : Color.clear, radius: 12, x: 0, y: 6)
         }
         .disabled(!isEnabled || isLoading)
         .buttonStyle(DSPressButtonStyle())
@@ -121,9 +125,9 @@ struct DSSecondaryButton: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, DS.Space.md)
                 .foregroundStyle(Color.dsPrimary)
-                .background(Color.dsSurface, in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
+                .background(Color.dsSurface, in: RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous))
                 .overlay {
-                    RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous)
+                    RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous)
                         .stroke(Color.dsBorder, lineWidth: 1)
                 }
         }
@@ -135,6 +139,7 @@ struct DSPressButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .opacity(configuration.isPressed ? 0.86 : 1)
+            .scaleEffect(configuration.isPressed ? 0.985 : 1)
             .animation(.easeOut(duration: DS.Motion.fast), value: configuration.isPressed)
     }
 }

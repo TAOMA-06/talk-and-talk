@@ -18,6 +18,7 @@
 		843CE6B4E2E139A886138E00 /* CreditService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97DE68CA2DA66EE9CB0A50FC /* CreditService.swift */; };
 		848E045E0E5C9CFD99CD3FE7 /* TalkAndTalkApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90CBE6422A8568EA8787D21F /* TalkAndTalkApp.swift */; };
 		88A5B1CEB0463D9968C6A664 /* VerifyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54BCBB623FE754381644828B /* VerifyView.swift */; };
+		8A5AC57D88E544B2909E4F41 /* CompanionHomepageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F8F35B8B14F4B5696433972 /* CompanionHomepageView.swift */; };
 		8C2419CA5F855AC216E9EFB0 /* AdminView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 826A4146FCB6B8507839A02C /* AdminView.swift */; };
 		8C323D539C95C26FFEFDDCAF /* APIModerationClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 491105FE31EAC8C8B57C7BB2 /* APIModerationClient.swift */; };
 		90C312BA4D69BF74439F7BAA /* OrderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCA4AC0A1E771062D24152C4 /* OrderView.swift */; };
@@ -62,6 +63,7 @@
 		32E80B2F111798E5AF4A8DC5 /* TalkAndTalk.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TalkAndTalk.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		34E34EA4EE873B224A7BBE51 /* MessagesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagesView.swift; sourceTree = "<group>"; };
 		3A3F294CB61DCA25BB78FF04 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
+		3F8F35B8B14F4B5696433972 /* CompanionHomepageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionHomepageView.swift; sourceTree = "<group>"; };
 		421AA5DA6E279ABE6FB0C45E /* CommunityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommunityView.swift; sourceTree = "<group>"; };
 		491105FE31EAC8C8B57C7BB2 /* APIModerationClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIModerationClient.swift; sourceTree = "<group>"; };
 		49A809B6386B75A6D5EE0261 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
@@ -131,6 +133,7 @@
 				B3E2F927720DBAAA1344C510 /* ChatView.swift */,
 				421AA5DA6E279ABE6FB0C45E /* CommunityView.swift */,
 				4D5E41F6DBCAC0FD9CA4B310 /* CompanionDetailView.swift */,
+				3F8F35B8B14F4B5696433972 /* CompanionHomepageView.swift */,
 				0D2D38AC84C62182D2EBB4AA /* CompanionListView.swift */,
 				4AA25EF78CDC0602C5063655 /* ContentView.swift */,
 				49A809B6386B75A6D5EE0261 /* DesignSystem.swift */,
@@ -332,6 +335,7 @@
 				D599013430F90775DAD86873 /* ChatView.swift in Sources */,
 				BDB8E805C2B386526856D5D5 /* CommunityView.swift in Sources */,
 				C3AF9DA2605DFC904C2BED95 /* CompanionDetailView.swift in Sources */,
+				8A5AC57D88E544B2909E4F41 /* CompanionHomepageView.swift in Sources */,
 				A299DEAEFB5EA9BCCBCB4E28 /* CompanionListView.swift in Sources */,
 				C0D422015E81A1F5C8286FC3 /* ContentView.swift in Sources */,
 				843CE6B4E2E139A886138E00 /* CreditService.swift in Sources */,

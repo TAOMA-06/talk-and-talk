@@ -17,17 +17,17 @@ struct CompanionDetailView: View {
             if let companion {
                 ScrollView {
                     VStack(spacing: DS.Space.lg) {
-                        ProfileHero(companion: companion)
+                        ProfileHero(companion: companion, showingReport: $showingReport)
                         TrustFoldSection(isExpanded: $trustExpanded, companion: companion)
                         BoundaryNotice()
                         BioPanel(companion: companion)
                         ReviewPreview(companion: companion)
                     }
                     .padding(DS.Space.lg)
-                    .padding(.bottom, 112)
+                    .padding(.bottom, DS.Space.xl)
                 }
                 .safeAreaInset(edge: .bottom) {
-                    BottomActionBar(companion: companion, showingReport: $showingReport)
+                    BottomActionBar(companion: companion)
                 }
             } else {
                 EmptyStateView(symbol: "person.crop.circle.badge.questionmark", title: "陪伴者不存在", subtitle: "这可能是演示数据已被刷新。")
@@ -35,7 +35,7 @@ struct CompanionDetailView: View {
         }
         .navigationTitle("陪伴者详情")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(Color.dsBackground, for: .navigationBar)
+        .toolbarBackground(Color.dsBackground.opacity(0.96), for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .sheet(isPresented: $showingReport) {
             ReportSheet(companionId: companionId, reason: $reportReason)
@@ -46,6 +46,8 @@ struct CompanionDetailView: View {
 
 private struct ProfileHero: View {
     let companion: Companion
+    @Binding var showingReport: Bool
+    @EnvironmentObject private var store: AppStore
 
     var body: some View {
         SoftCard {
@@ -53,18 +55,57 @@ private struct ProfileHero: View {
                 HStack(alignment: .top, spacing: DS.Space.lg) {
                     CompanionAvatar(companion: companion, size: 72)
                     VStack(alignment: .leading, spacing: DS.Space.sm) {
-                        HStack(spacing: DS.Space.sm) {
-                            Text(companion.name)
-                                .font(.system(size: 22, weight: .semibold))
-                                .foregroundStyle(Color.dsTextPrimary)
-                            if companion.isVerified {
-                                Image(systemName: "checkmark.seal.fill")
-                                    .foregroundStyle(Color.dsPrimary)
+                        HStack(alignment: .top, spacing: DS.Space.sm) {
+                            VStack(alignment: .leading, spacing: DS.Space.sm) {
+                                HStack(spacing: DS.Space.sm) {
+                                    Text(companion.name)
+                                        .font(.system(size: 22, weight: .semibold))
+                                        .foregroundStyle(Color.dsTextPrimary)
+                                    if companion.isVerified {
+                                        Image(systemName: "checkmark.seal.fill")
+                                            .foregroundStyle(Color.dsPrimary)
+                                    }
+                                }
+                                Text(companion.role)
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(Color.dsTextSecondary)
+                            }
+                            Spacer(minLength: DS.Space.sm)
+                            HStack(spacing: DS.Space.xxs) {
+                                Button {
+                                    store.navigate(.companionHomepage(companion.id))
+                                } label: {
+                                    Label("主页", systemImage: "person.crop.square")
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .labelStyle(.titleAndIcon)
+                                        .foregroundStyle(Color.dsPrimary)
+                                        .frame(width: 72, height: 36)
+                                        .background(Color.dsBackground.opacity(0.86), in: RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous))
+                                        .overlay {
+                                            RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous)
+                                                .stroke(Color.dsBorder, lineWidth: 1)
+                                        }
+                                }
+                                .buttonStyle(DSPressButtonStyle())
+                                .accessibilityLabel("进入主页")
+
+                                Button {
+                                    showingReport = true
+                                } label: {
+                                    Image(systemName: "exclamationmark.bubble")
+                                        .font(.system(size: 15, weight: .semibold))
+                                        .foregroundStyle(Color.dsTextPrimary)
+                                        .frame(width: 36, height: 36)
+                                        .background(Color.dsBackground.opacity(0.86), in: RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous))
+                                        .overlay {
+                                            RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous)
+                                                .stroke(Color.dsBorder, lineWidth: 1)
+                                        }
+                                }
+                                .buttonStyle(DSPressButtonStyle())
+                                .accessibilityLabel("举报")
                             }
                         }
-                        Text(companion.role)
-                            .font(.system(size: 13))
-                            .foregroundStyle(Color.dsTextSecondary)
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: DS.Space.sm) {
                                 AvailabilityBadge(status: companion.availability)
@@ -248,33 +289,23 @@ private struct ReviewPreview: View {
 
 private struct BottomActionBar: View {
     let companion: Companion
-    @Binding var showingReport: Bool
     @EnvironmentObject private var store: AppStore
 
     var body: some View {
         ActionDock {
-            HStack(spacing: DS.Space.md) {
+            HStack(spacing: DS.Space.sm) {
                 VStack(alignment: .leading, spacing: DS.Space.xxs) {
                     Text("免费试聊 \(store.freeTrialMessageLimit) 条")
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(Color.dsTextPrimary)
-                    Text("继续聊 ¥\(companion.pricePerHalfHour)/30m")
+                        .lineLimit(1)
+                    Text("后续 ¥\(companion.pricePerHalfHour)/30m")
                         .font(.system(size: 11))
                         .foregroundStyle(Color.dsTextSecondary)
+                        .lineLimit(1)
                 }
-                Spacer()
-                Button {
-                    showingReport = true
-                } label: {
-                    Image(systemName: "exclamationmark.bubble")
-                        .frame(width: 40, height: 40)
-                        .foregroundStyle(Color.dsTextPrimary)
-                }
-                .background(Color.dsBackground, in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous)
-                        .stroke(Color.dsBorder, lineWidth: 1)
-                }
+                .layoutPriority(1)
+                Spacer(minLength: DS.Space.sm)
 
                 Button {
                     store.navigate(.order(companion.id))
@@ -282,23 +313,24 @@ private struct BottomActionBar: View {
                     Text("直接下单")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(Color.dsPrimary)
-                        .frame(width: 76, height: 40)
-                        .background(Color.dsBackground, in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
+                        .lineLimit(1)
+                        .frame(width: 78, height: 44)
+                        .background(Color.dsBackground.opacity(0.86), in: RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous))
                         .overlay {
-                            RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous)
+                            RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous)
                                 .stroke(Color.dsBorder, lineWidth: 1)
                         }
                 }
                 .buttonStyle(DSPressButtonStyle())
 
-                DSPrimaryButton(title: "免费试聊", systemImage: "bubble.left.and.bubble.right") {
+                DSPrimaryButton(title: "开始试聊", systemImage: "bubble.left.and.bubble.right") {
                     guard store.user.isVerified else {
                         store.navigate(.verify)
                         return
                     }
                     store.navigate(.chat(.companion(id: companion.id)))
                 }
-                .frame(maxWidth: 148)
+                .frame(width: 122)
             }
         }
     }

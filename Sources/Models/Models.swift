@@ -37,6 +37,7 @@ enum ListPreset: String, Hashable, Codable {
 enum AppRoute: Hashable {
     case companionList(themeId: String?, preset: ListPreset?)
     case companionDetail(String)
+    case companionHomepage(String)
     case order(String)
     case chat(ContactTarget)
     case review(String)
