@@ -46,7 +46,8 @@ final class AppStore: ObservableObject {
 
     var blockedTodayCount: Int {
         moderationCases.filter {
-            $0.decision == .block && Calendar.current.isDateInToday($0.resolvedAt ?? Date())
+            guard $0.decision == .block, let resolvedAt = $0.resolvedAt else { return false }
+            return Calendar.current.isDateInToday(resolvedAt)
         }.count
     }
 
@@ -107,8 +108,12 @@ final class AppStore: ObservableObject {
             .sorted { $0.timestamp < $1.timestamp }
     }
 
+    func latestMessage(for target: ContactTarget) -> Message? {
+        messages(for: target).last
+    }
+
     func latestMessage(for companionId: String) -> Message? {
-        messages(for: companionId).last
+        latestMessage(for: .companion(id: companionId))
     }
 
     func remainingTrialMessages(for companionId: String) -> Int {
@@ -135,7 +140,7 @@ final class AppStore: ObservableObject {
 
     func createOrder(companionId: String, themeId: String, durationMinutes: Int) -> Order? {
         guard let companion = companion(by: companionId) else { return nil }
-        let totalPrice = companion.pricePerHalfHour * max(1, durationMinutes / 30)
+        let totalPrice = companion.pricePerHalfHour * max(1, (durationMinutes + 29) / 30)
         let order = Order(
             id: "o-\(Int(Date().timeIntervalSince1970))",
             companionId: companionId,
@@ -153,26 +158,36 @@ final class AppStore: ObservableObject {
     }
 
     func startActiveOrder(with companionId: String) {
-        guard let index = orders.firstIndex(where: { $0.id == activeOrderId || $0.companionId == companionId }) else { return }
+        guard let index = orderIndex(for: companionId, allowedStatuses: [.confirmed]) else { return }
         orders[index].status = .inProgress
+        activeOrderId = orders[index].id
     }
 
     func completeActiveOrder(with companionId: String) {
-        guard let index = orders.firstIndex(where: { $0.id == activeOrderId || $0.companionId == companionId }) else { return }
+        guard let index = orderIndex(for: companionId, allowedStatuses: [.inProgress]) else { return }
         orders[index].status = .completed
+        activeOrderId = nil
         if let event = creditService.applyOrderCompletion(to: &user) {
             creditEvents.insert(event, at: 0)
         }
+    }
+
+    private func orderIndex(for companionId: String, allowedStatuses: [OrderStatus]) -> Int? {
+        if let activeId = activeOrderId,
+           let index = orders.firstIndex(where: { $0.id == activeId && $0.companionId == companionId && allowedStatuses.contains($0.status) }) {
+            return index
+        }
+        return orders.firstIndex { $0.companionId == companionId && allowedStatuses.contains($0.status) }
     }
 
     func setUserGender(_ gender: UserGender) {
         user.gender = gender
     }
 
-    func verifyUser(name: String, phone: String) {
+    func verifyUser(name: String, phone: String, age: Int) {
         user.name = name.isEmpty ? user.name : name
         user.phone = phone.isEmpty ? user.phone : Self.maskedPhone(phone)
-        user.age = max(user.age, 18)
+        user.age = max(age, 18)
         user.isVerified = true
         let event = creditService.applyVerification(to: &user)
         creditEvents.insert(event, at: 0)
@@ -188,7 +203,11 @@ final class AppStore: ObservableObject {
 
     @discardableResult
     func sendMessage(_ content: String, to companionId: String) async -> ModerationDecision {
-        await sendMessage(content, to: .companion(id: companionId))
+        guard hasActivePaidChat(with: companionId) || canSendTrialMessage(to: companionId) else {
+            lastModerationFeedback = "免费试聊已用完，请下单后继续沟通。"
+            return .block
+        }
+        return await sendMessage(content, to: .companion(id: companionId))
     }
 
     @discardableResult
@@ -201,8 +220,12 @@ final class AppStore: ObservableObject {
             return .block
         }
 
+        let recentMessages = messages(for: target)
+            .filter { $0.senderId == user.id && $0.type == .text }
+            .suffix(4)
+            .map(\.content)
         let context = ModerationContext(
-            recentMessages: messages(for: target).suffix(4).map(\.content),
+            recentMessages: recentMessages,
             safetyScore: user.safetyScore,
             isVerified: user.isVerified
         )

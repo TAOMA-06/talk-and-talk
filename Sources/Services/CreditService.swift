@@ -92,7 +92,6 @@ struct CreditService {
         case .confirmViolation:
             let delta = caseDecision == .block ? -15 : -10
             user.safetyScore = max(0, user.safetyScore + delta)
-            user.violationCount += 1
             user.lastViolationAt = Date()
             refreshAccountStatus(for: &user)
             return CreditEvent(

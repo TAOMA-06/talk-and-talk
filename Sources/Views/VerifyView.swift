@@ -10,10 +10,10 @@ struct VerifyView: View {
     @FocusState private var focusedField: VerifyField?
 
     @State private var step = 0
-    @State private var name = "小楷"
-    @State private var age = "22"
-    @State private var phone = "18300000012"
-    @State private var code = "0626"
+    @State private var name = ""
+    @State private var age = ""
+    @State private var phone = ""
+    @State private var code = ""
     @State private var faceScanComplete = false
 
     private var canContinue: Bool {
@@ -85,7 +85,7 @@ struct VerifyView: View {
         if step < 2 {
             withAnimation(.easeOut(duration: DS.Motion.fast)) { step += 1 }
         } else {
-            store.verifyUser(name: name, phone: phone)
+            store.verifyUser(name: name, phone: phone, age: Int(age) ?? 18)
             dismiss()
         }
     }

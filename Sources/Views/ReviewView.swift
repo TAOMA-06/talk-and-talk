@@ -48,6 +48,7 @@ struct ReviewView: View {
     }
 
     private func submitReview() {
+        guard store.orders.contains(where: { $0.companionId == companionId && $0.status == .completed }) else { return }
         store.submitReview(companionId: companionId, rating: rating, content: content)
         withAnimation(.easeOut(duration: DS.Motion.fast)) {
             submitted = true

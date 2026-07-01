@@ -123,6 +123,10 @@ struct ChatView: View {
 
     private func toggleCall() {
         guard let companionId else { return }
+        if !isCallActive, !hasPaidChat {
+            showingTrialPaywall = true
+            return
+        }
         withAnimation(.easeOut(duration: DS.Motion.fast)) {
             isCallActive.toggle()
             if isCallActive {
@@ -144,16 +148,19 @@ struct ChatView: View {
         }
 
         isSending = true
-        inputText = ""
         Task {
+            let decision: ModerationDecision
             if let companionId {
                 if hasPaidChat {
-                    _ = await store.sendMessage(text, to: companionId)
+                    decision = await store.sendMessage(text, to: companionId)
                 } else {
-                    _ = await store.sendTrialMessage(text, to: companionId)
+                    decision = await store.sendTrialMessage(text, to: companionId)
                 }
             } else {
-                _ = await store.sendMessage(text, to: target)
+                decision = await store.sendMessage(text, to: target)
+            }
+            if decision != .block {
+                inputText = ""
             }
             isSending = false
         }

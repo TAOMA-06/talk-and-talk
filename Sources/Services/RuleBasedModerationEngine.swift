@@ -89,15 +89,18 @@ struct RuleBasedModerationEngine: Sendable {
         value = value.replacingOccurrences(of: " ", with: "")
         value = value.replacingOccurrences(of: "　", with: "")
         value = value.replacingOccurrences(of: "＋", with: "+")
-        let homoglyphs = [
-            "薇": "微", "v": "微", "V": "微", "vx": "微信", "wx": "微信",
-            "线": "线", "下": "下"
+
+        value = value.replacingOccurrences(of: "vx", with: "微信")
+        value = value.replacingOccurrences(of: "wx", with: "微信")
+        value = value.replacingOccurrences(of: "加v", with: "加微")
+
+        let homoglyphs: [String: String] = [
+            "薇": "微", "v": "微", "V": "微"
         ]
-        for (from, to) in homoglyphs where from.count == 1 {
+        for (from, to) in homoglyphs {
             value = value.replacingOccurrences(of: from, with: to)
         }
-        value = value.replacingOccurrences(of: "vx", with: "微信")
-        value = value.replacingOccurrences(of: "加v", with: "加微")
+
         return value
     }
 }

@@ -4,14 +4,29 @@ struct MessagesView: View {
     @EnvironmentObject private var store: AppStore
     @State private var searchText = ""
 
-    private var conversations: [Companion] {
-        let items = store.companions.filter { store.latestMessage(for: $0.id) != nil }
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return items }
+    private var conversations: [ContactTarget] {
+        let companionTargets = store.companions
+            .filter { store.latestMessage(for: $0.id) != nil }
+            .map { ContactTarget.companion(id: $0.id) }
 
-        return items.filter { companion in
-            companion.name.localizedStandardContains(query)
-                || (store.latestMessage(for: companion.id)?.content.localizedStandardContains(query) ?? false)
+        let communityAuthorIds = Set(store.messages.compactMap { message -> String? in
+            let id = message.conversationId
+            guard id.hasPrefix("community-") else { return nil }
+            return String(id.dropFirst("community-".count))
+        })
+
+        let communityTargets: [ContactTarget] = communityAuthorIds.compactMap { id in
+            guard let post = store.communityPosts.first(where: { $0.authorId == id }) else { return nil }
+            return .communityUser(id: id, name: post.authorName, initials: post.authorInitials)
+        }
+
+        let allTargets = companionTargets + communityTargets
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return allTargets }
+
+        return allTargets.filter { target in
+            store.displayName(for: target).localizedStandardContains(query)
+                || (store.latestMessage(for: target)?.content.localizedStandardContains(query) ?? false)
         }
     }
 
@@ -30,11 +45,11 @@ struct MessagesView: View {
                         .padding(.top, DS.Space.xl)
                 } else {
                     LazyVStack(spacing: 0) {
-                        ForEach(conversations) { companion in
+                        ForEach(conversations) { target in
                             Button {
-                                store.navigate(.chat(.companion(id: companion.id)))
+                                store.navigate(.chat(target))
                             } label: {
-                                WeChatConversationRow(companion: companion)
+                                WeChatConversationRow(target: target)
                             }
                             .buttonStyle(.plain)
 
@@ -110,20 +125,20 @@ private struct MessagesSafetyLoginRow: View {
 }
 
 private struct WeChatConversationRow: View {
-    let companion: Companion
+    let target: ContactTarget
     @EnvironmentObject private var store: AppStore
 
     private var lastMessage: Message? {
-        store.latestMessage(for: companion.id)
+        store.latestMessage(for: target)
     }
 
     var body: some View {
         HStack(alignment: .center, spacing: DS.Space.md) {
-            CompanionAvatar(companion: companion, size: 52)
+            conversationAvatar
 
             VStack(alignment: .leading, spacing: DS.Space.xxs) {
                 HStack(alignment: .firstTextBaseline, spacing: DS.Space.sm) {
-                    Text(companion.name)
+                    Text(store.displayName(for: target))
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(Color.dsTextPrimary)
                         .lineLimit(1)
@@ -151,6 +166,17 @@ private struct WeChatConversationRow: View {
         .contentShape(Rectangle())
     }
 
+    @ViewBuilder
+    private var conversationAvatar: some View {
+        if case .companion(let id) = target, let companion = store.companion(by: id) {
+            CompanionAvatar(companion: companion, size: 52)
+        } else if let initials = target.communityInitials {
+            ConversationInitialsAvatar(initials: String(initials.prefix(1)))
+        } else {
+            ConversationInitialsAvatar(initials: "TA")
+        }
+    }
+
     private var lastMessagePreview: String {
         guard let lastMessage else { return "暂无消息" }
         switch lastMessage.type {
@@ -163,5 +189,20 @@ private struct WeChatConversationRow: View {
         case .text:
             return lastMessage.content
         }
+    }
+}
+
+private struct ConversationInitialsAvatar: View {
+    let initials: String
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous)
+                .fill(Color.dsTextSecondary.opacity(0.14))
+            Text(initials)
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(Color.dsTextSecondary)
+        }
+        .frame(width: 52, height: 52)
     }
 }

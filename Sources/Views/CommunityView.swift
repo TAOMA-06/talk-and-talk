@@ -34,7 +34,7 @@ struct CommunityView: View {
     }
 
     private var pendingPosts: [CommunityPost] {
-        store.pendingCommunityPosts().filter { $0.kind == browsingKind }
+        store.pendingCommunityPosts()
     }
 
     private var filteredApprovedPosts: [CommunityPost] {

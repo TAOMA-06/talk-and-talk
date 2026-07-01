@@ -141,7 +141,7 @@ extension CommunityPostKind: Identifiable {
     var id: String { rawValue }
 }
 
-enum ContactTarget: Codable, Hashable {
+enum ContactTarget: Codable, Hashable, Identifiable {
     case companion(id: String)
     case communityUser(id: String, name: String, initials: String)
 
@@ -153,6 +153,8 @@ enum ContactTarget: Codable, Hashable {
             "community-\(id)"
         }
     }
+
+    var id: String { conversationId }
 
     var participantId: String {
         switch self {
