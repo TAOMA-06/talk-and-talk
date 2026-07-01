@@ -19,6 +19,11 @@ struct CompanionHomepageView: View {
             .sorted { $0.createdAt > $1.createdAt }
     }
 
+    private var companionReviews: [Review] {
+        store.reviews(for: companionId)
+            .sorted { $0.createdAt > $1.createdAt }
+    }
+
     var body: some View {
         ZStack {
             AppBackground()
@@ -26,6 +31,7 @@ struct CompanionHomepageView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: DS.Space.lg) {
                         CompanionHomepageHero(companion: companion)
+                        CompanionHomepageReviewsSection(reviews: companionReviews, reviewCount: companionReviews.count)
                         CompanionPromotionSection(posts: promotionPosts)
                     }
                     .padding(DS.Space.lg)
@@ -258,5 +264,69 @@ private struct HomepageMetricTile: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, DS.Space.md)
         .background(Color.dsBackground, in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
+    }
+}
+
+private struct CompanionHomepageReviewsSection: View {
+    let reviews: [Review]
+    let reviewCount: Int
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: DS.Space.md) {
+            SectionHeader(title: "用户评价", subtitle: "\(reviewCount) 条历史评价")
+            if reviews.isEmpty {
+                SoftCard {
+                    EmptyStateView(
+                        symbol: "text.bubble",
+                        title: "还没有用户评价",
+                        subtitle: "成为第一个预约并评价的人吧"
+                    )
+                }
+            } else {
+                LazyVStack(spacing: DS.Space.md) {
+                    ForEach(reviews) { review in
+                        CompanionHomepageReviewCard(review: review)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct CompanionHomepageReviewCard: View {
+    let review: Review
+
+    var body: some View {
+        SoftCard(padding: DS.Space.md) {
+            VStack(alignment: .leading, spacing: DS.Space.sm) {
+                HStack {
+                    Text(review.userName)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Color.dsTextPrimary)
+                    Spacer()
+                    StarRatingRow(rating: review.rating)
+                }
+
+                Text(review.content)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.dsTextSecondary)
+                    .lineSpacing(3)
+                    .lineLimit(3)
+            }
+        }
+    }
+}
+
+private struct StarRatingRow: View {
+    let rating: Int
+
+    var body: some View {
+        HStack(spacing: DS.Space.xxs) {
+            ForEach(1...5, id: \.self) { star in
+                Image(systemName: star <= rating ? "star.fill" : "star")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(star <= rating ? Color.dsWarning : Color.dsBorder)
+            }
+        }
     }
 }
