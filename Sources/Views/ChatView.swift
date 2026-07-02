@@ -46,6 +46,11 @@ struct ChatView: View {
                     isCallActive: isCallActive,
                     seconds: seconds,
                     canStartCall: companion != nil,
+                    openCompanion: {
+                        if let companionId {
+                            store.navigate(.companionHomepage(companionId))
+                        }
+                    },
                     toggleCall: toggleCall,
                     onReport: { showingReport = true }
                 )
@@ -183,20 +188,41 @@ private struct WeChatChatHeader: View {
     let isCallActive: Bool
     let seconds: Int
     let canStartCall: Bool
+    let openCompanion: () -> Void
     let toggleCall: () -> Void
     let onReport: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: DS.Space.sm) {
-                Image(systemName: "lock.fill")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Color.dsPrimary)
+                if let companion {
+                    Button(action: openCompanion) {
+                        HStack(spacing: DS.Space.sm) {
+                            CompanionAvatar(companion: companion, size: 32)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(companion.name)
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(Color.dsTextPrimary)
+                                    .lineLimit(1)
+                                Text(isCallActive ? "语音沟通中 \(format(seconds))" : "点击进入主页")
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundStyle(Color.dsTextSecondary)
+                                    .lineLimit(1)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("进入\(companion.name)主页")
+                } else {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.dsPrimary)
 
-                Text(isCallActive ? "语音沟通中 \(format(seconds))" : "平台内安全沟通")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(Color.dsTextPrimary)
-                    .lineLimit(1)
+                    Text(isCallActive ? "语音沟通中 \(format(seconds))" : "平台内安全沟通")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Color.dsTextPrimary)
+                        .lineLimit(1)
+                }
 
                 Spacer(minLength: DS.Space.sm)
 

@@ -299,6 +299,29 @@ struct Order: Identifiable, Codable, Hashable {
     var status: OrderStatus
     let createdAt: Date
     let scheduledAt: Date
+    let customerTarget: ContactTarget?
+
+    init(
+        id: String,
+        companionId: String,
+        themeId: String,
+        durationMinutes: Int,
+        totalPrice: Int,
+        status: OrderStatus,
+        createdAt: Date,
+        scheduledAt: Date,
+        customerTarget: ContactTarget? = nil
+    ) {
+        self.id = id
+        self.companionId = companionId
+        self.themeId = themeId
+        self.durationMinutes = durationMinutes
+        self.totalPrice = totalPrice
+        self.status = status
+        self.createdAt = createdAt
+        self.scheduledAt = scheduledAt
+        self.customerTarget = customerTarget
+    }
 }
 
 enum OrderStatus: String, Codable, CaseIterable {

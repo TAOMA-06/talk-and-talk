@@ -5,7 +5,6 @@ struct CompanionDetailView: View {
     @EnvironmentObject private var store: AppStore
     @State private var showingReport = false
     @State private var reportReason = "资料不实"
-    @State private var trustExpanded = false
 
     private var companion: Companion? {
         store.companion(by: companionId)
@@ -18,7 +17,7 @@ struct CompanionDetailView: View {
                 ScrollView {
                     VStack(spacing: DS.Space.lg) {
                         ProfileHero(companion: companion, showingReport: $showingReport)
-                        TrustFoldSection(isExpanded: $trustExpanded, companion: companion)
+                        CertificationStatusCard(companion: companion)
                         BoundaryNotice()
                         BioPanel(companion: companion)
                         ReviewPreview(companion: companion)
@@ -111,7 +110,7 @@ private struct ProfileHero: View {
                                 AvailabilityBadge(status: companion.availability)
                                 DistanceLabel(distanceKm: companion.distanceKm, district: companion.cityDistrict)
                                 StatusPill(text: String(format: "%.1f", companion.rating), symbol: "star.fill", color: Color.dsWarning)
-                                TrustMicroBadge(text: "平台担保", tone: .primary)
+                                TrustMicroBadge(text: companion.isVerified ? "已认证" : "未认证", tone: companion.isVerified ? .success : .warning)
                             }
                         }
                     }
@@ -133,63 +132,33 @@ private struct ProfileHero: View {
     }
 }
 
-private struct TrustFoldSection: View {
-    @Binding var isExpanded: Bool
+private struct CertificationStatusCard: View {
     let companion: Companion
 
     var body: some View {
-        SoftCard(padding: 0) {
-            VStack(spacing: 0) {
-                Button {
-                    withAnimation(.easeOut(duration: DS.Motion.fast)) { isExpanded.toggle() }
-                } label: {
-                    HStack {
-                        Text("为什么信任她")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(Color.dsTextPrimary)
-                        Spacer()
-                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(Color.dsTextSecondary)
-                    }
-                    .padding(DS.Space.lg)
-                }
-                .buttonStyle(.plain)
+        SoftCard(padding: DS.Space.md) {
+            HStack(spacing: DS.Space.md) {
+                Image(systemName: companion.isVerified ? "checkmark.seal.fill" : "person.badge.key")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(companion.isVerified ? Color.dsSuccess : Color.dsWarning)
+                    .frame(width: 28, height: 28)
 
-                if isExpanded {
-                    Divider().padding(.horizontal, DS.Space.lg)
-                    VStack(alignment: .leading, spacing: DS.Space.md) {
-                        TrustReasonRow(symbol: "person.text.rectangle", title: "三层实名认证", detail: companion.isVerified ? "身份证 + 人脸 + 手机号已核验" : "待完成全部认证")
-                        TrustReasonRow(symbol: "lock.shield", title: "平台担保交易", detail: "先付平台，服务完成后结算")
-                        TrustReasonRow(symbol: "star.bubble", title: "真实评价", detail: "\(companion.reviewCount) 条历史评价，均分 \(String(format: "%.1f", companion.rating))")
-                    }
-                    .padding(DS.Space.lg)
-                    .padding(.top, DS.Space.xxs)
+                VStack(alignment: .leading, spacing: DS.Space.xxs) {
+                    Text("认证状态")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Color.dsTextSecondary)
+                    Text(companion.isVerified ? "已完成平台认证" : "暂未完成平台认证")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Color.dsTextPrimary)
                 }
+
+                Spacer()
+
+                DSBadge(text: companion.isVerified ? "已认证" : "未认证", tone: companion.isVerified ? .success : .warning)
             }
         }
-    }
-}
-
-private struct TrustReasonRow: View {
-    let symbol: String
-    let title: String
-    let detail: String
-
-    var body: some View {
-        HStack(spacing: DS.Space.md) {
-            Image(systemName: symbol)
-                .foregroundStyle(Color.dsPrimary)
-                .frame(width: 24)
-            VStack(alignment: .leading, spacing: DS.Space.xxs) {
-                Text(title)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Color.dsTextPrimary)
-                Text(detail)
-                    .font(.system(size: 11))
-                    .foregroundStyle(Color.dsTextSecondary)
-            }
-        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(companion.isVerified ? "已完成平台认证" : "暂未完成平台认证")
     }
 }
 

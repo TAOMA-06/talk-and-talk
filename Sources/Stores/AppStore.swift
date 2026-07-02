@@ -28,6 +28,10 @@ final class AppStore: ObservableObject {
     private let moderationService: ModerationService = HybridModerationService()
     private let creditService = CreditService()
 
+    var currentUserCompanionId: String {
+        "self-\(user.id)"
+    }
+
     var accountRestrictions: AccountRestrictions {
         creditService.restrictions(for: user)
     }
@@ -138,6 +142,17 @@ final class AppStore: ObservableObject {
         communityPosts.filter { $0.authorId == user.id && $0.moderationStatus == .pending }
     }
 
+    func pendingServiceOrdersForCurrentCompanion() -> [Order] {
+        guard user.gender == .male else { return [] }
+        return orders
+            .filter { order in
+                order.companionId == currentUserCompanionId
+                    && order.status != .completed
+                    && order.status != .refunded
+            }
+            .sorted { $0.scheduledAt < $1.scheduledAt }
+    }
+
     func createOrder(companionId: String, themeId: String, durationMinutes: Int) -> Order? {
         guard let companion = companion(by: companionId) else { return nil }
         let totalPrice = companion.pricePerHalfHour * max(1, (durationMinutes + 29) / 30)
@@ -149,7 +164,8 @@ final class AppStore: ObservableObject {
             totalPrice: totalPrice,
             status: .confirmed,
             createdAt: Date(),
-            scheduledAt: Date().addingTimeInterval(60)
+            scheduledAt: Date().addingTimeInterval(60),
+            customerTarget: .communityUser(id: user.id, name: user.name, initials: String(user.name.prefix(2)))
         )
         orders.insert(order, at: 0)
         activeOrderId = order.id
@@ -169,6 +185,14 @@ final class AppStore: ObservableObject {
         activeOrderId = nil
         if let event = creditService.applyOrderCompletion(to: &user) {
             creditEvents.insert(event, at: 0)
+        }
+    }
+
+    func completeOrder(id: String) {
+        guard let index = orders.firstIndex(where: { $0.id == id }) else { return }
+        orders[index].status = .completed
+        if activeOrderId == id {
+            activeOrderId = nil
         }
     }
 
@@ -577,7 +601,7 @@ final class AppStore: ObservableObject {
 
     @discardableResult
     private func ensureCurrentUserCompanion(promotionContent: String? = nil) -> Companion {
-        let companionId = "self-\(user.id)"
+        let companionId = currentUserCompanionId
         if let existing = companion(by: companionId) {
             return existing
         }
@@ -647,7 +671,8 @@ enum MockData {
 
     static let orders: [Order] = [
         Order(id: "o1", companionId: "c1", themeId: "t1", durationMinutes: 30, totalPrice: 39, status: .completed, createdAt: .now.addingTimeInterval(-86400), scheduledAt: .now.addingTimeInterval(-82800)),
-        Order(id: "o2", companionId: "c3", themeId: "t4", durationMinutes: 60, totalPrice: 90, status: .confirmed, createdAt: .now.addingTimeInterval(-3600), scheduledAt: .now.addingTimeInterval(1800))
+        Order(id: "o2", companionId: "c3", themeId: "t4", durationMinutes: 60, totalPrice: 90, status: .confirmed, createdAt: .now.addingTimeInterval(-3600), scheduledAt: .now.addingTimeInterval(1800)),
+        Order(id: "o3", companionId: "self-u1", themeId: "t2", durationMinutes: 30, totalPrice: 39, status: .confirmed, createdAt: .now.addingTimeInterval(-1800), scheduledAt: .now.addingTimeInterval(2400), customerTarget: .communityUser(id: "u3", name: "李四", initials: "李四"))
     ]
 
     static let reviews: [Review] = [
