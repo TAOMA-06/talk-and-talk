@@ -67,16 +67,30 @@ private struct AdminMetric: View {
 
 private struct ModerationQueue: View {
     @EnvironmentObject private var store: AppStore
+    @State private var feedback: String?
 
     var body: some View {
         SoftCard {
             VStack(alignment: .leading, spacing: DS.Space.md) {
                 SectionHeader(title: "审核队列", subtitle: "资料、聊天、举报统一处理")
+                if let feedback {
+                    Text(feedback)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Color.dsPrimary)
+                        .padding(.horizontal, DS.Space.sm)
+                        .padding(.vertical, DS.Space.xxs)
+                        .background(Color.dsPrimary.opacity(0.10), in: Capsule())
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
                 if store.moderationCases.isEmpty {
                     EmptyStateView(symbol: "tray", title: "暂无工单", subtitle: "触发风控或举报后会出现在这里。")
                 } else {
                     ForEach(store.moderationCases) { item in
-                        ModerationCaseRow(item: item)
+                        ModerationCaseRow(item: item) { message in
+                            withAnimation(.easeOut(duration: DS.Motion.fast)) {
+                                feedback = message
+                            }
+                        }
                     }
                 }
             }
@@ -86,6 +100,7 @@ private struct ModerationQueue: View {
 
 private struct ModerationCaseRow: View {
     let item: ModerationCase
+    let onAction: (String) -> Void
     @EnvironmentObject private var store: AppStore
 
     var body: some View {
@@ -115,15 +130,18 @@ private struct ModerationCaseRow: View {
                 HStack(spacing: DS.Space.sm) {
                     Button("确认违规") {
                         store.resolveModerationCase(id: item.id, action: .confirmViolation)
+                        onAction("已确认违规，信用分与账号状态已同步更新。")
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(Color.dsDanger)
                     Button("误报驳回") {
                         store.resolveModerationCase(id: item.id, action: .dismiss)
+                        onAction("已驳回误报，演示信用分已恢复。")
                     }
                     .buttonStyle(.bordered)
                     Button("升级人工") {
                         store.resolveModerationCase(id: item.id, action: .escalate)
+                        onAction("已升级人工复核，工单保留在审核队列中。")
                     }
                     .buttonStyle(.bordered)
                 }

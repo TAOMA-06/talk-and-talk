@@ -10,10 +10,10 @@ struct VerifyView: View {
     @FocusState private var focusedField: VerifyField?
 
     @State private var step = 0
-    @State private var name = ""
-    @State private var age = ""
-    @State private var phone = ""
-    @State private var code = ""
+    @State private var name = "小楷"
+    @State private var age = "24"
+    @State private var phone = "18300000012"
+    @State private var code = "1234"
     @State private var faceScanComplete = false
 
     private var canContinue: Bool {
@@ -188,6 +188,8 @@ private struct FaceStep: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(isComplete ? "活体检测已通过" : "点击开始模拟检测")
+                .accessibilityIdentifier(isComplete ? "活体检测已通过" : "点击开始模拟检测")
             }
         }
     }

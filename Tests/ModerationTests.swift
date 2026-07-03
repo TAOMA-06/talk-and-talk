@@ -119,7 +119,7 @@ final class ModerationTests: XCTestCase {
     func testVerifiedMaleCommunityPromotionAllowsOptionalCover() async {
         let store = AppStore()
         store.setUserGender(.male)
-        store.verifyUser(name: "小楷", phone: "18300000012")
+        store.verifyUser(name: "小楷", phone: "18300000012", age: 24)
 
         let status = await store.submitCommunityPost(
             kind: .malePromotion,
@@ -140,7 +140,7 @@ final class ModerationTests: XCTestCase {
         let store = AppStore()
         store.setUserGender(.male)
 
-        store.verifyUser(name: "小楷", phone: "18300000012")
+        store.verifyUser(name: "小楷", phone: "18300000012", age: 24)
 
         XCTAssertEqual(store.user.gender, .male)
         XCTAssertTrue(store.user.isVerified)

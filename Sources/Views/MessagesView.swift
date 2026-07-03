@@ -3,6 +3,7 @@ import SwiftUI
 struct MessagesView: View {
     @EnvironmentObject private var store: AppStore
     @State private var searchText = ""
+    @State private var showingNewConversation = false
 
     private var conversations: [ContactTarget] {
         let companionTargets = store.companions
@@ -69,13 +70,92 @@ struct MessagesView: View {
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button {} label: {
+                Button {
+                    showingNewConversation = true
+                } label: {
                     Image(systemName: "plus.circle")
                         .font(.system(size: 20, weight: .medium))
                 }
                 .foregroundStyle(Color.dsTextPrimary)
                 .accessibilityLabel("新建沟通")
             }
+        }
+        .sheet(isPresented: $showingNewConversation) {
+            NewConversationSheet()
+                .presentationDetents([.medium, .large])
+        }
+    }
+}
+
+private struct NewConversationSheet: View {
+    @EnvironmentObject private var store: AppStore
+    @Environment(\.dismiss) private var dismiss
+
+    private var candidates: [Companion] {
+        store.companions
+            .filter { $0.availability != .busy }
+            .sorted {
+                if $0.isOnline != $1.isOnline { return $0.isOnline && !$1.isOnline }
+                return $0.rating > $1.rating
+            }
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: DS.Space.md) {
+                    Text("选择一位在线或可约的陪伴者，进入平台内安全沟通房间。")
+                        .font(.system(size: 14))
+                        .foregroundStyle(Color.dsTextSecondary)
+                        .lineSpacing(3)
+
+                    ForEach(candidates) { companion in
+                        Button {
+                            dismiss()
+                            store.navigate(.chat(.companion(id: companion.id)))
+                        } label: {
+                            NewConversationRow(companion: companion)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(DS.Space.lg)
+            }
+            .background(Color.dsBackground)
+            .navigationTitle("新建沟通")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("关闭") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
+private struct NewConversationRow: View {
+    let companion: Companion
+
+    var body: some View {
+        HStack(spacing: DS.Space.md) {
+            CompanionAvatar(companion: companion, size: 52)
+            VStack(alignment: .leading, spacing: DS.Space.xxs) {
+                Text(companion.name)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Color.dsTextPrimary)
+                Text("\(companion.role) · \(companion.responseTime)")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.dsTextSecondary)
+                    .lineLimit(1)
+            }
+            Spacer()
+            StatusPill(text: companion.availability.displayName, symbol: "circle.fill", color: companion.availabilityColor)
+        }
+        .padding(DS.Space.md)
+        .background(Color.dsSurface, in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous)
+                .stroke(Color.dsBorder, lineWidth: 1)
         }
     }
 }

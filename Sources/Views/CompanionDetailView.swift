@@ -292,7 +292,7 @@ private struct BottomActionBar: View {
                 }
                 .buttonStyle(DSPressButtonStyle())
 
-                DSPrimaryButton(title: "开始试聊", systemImage: "bubble.left.and.bubble.right") {
+                DSPrimaryButton(title: "免费试聊", systemImage: "bubble.left.and.bubble.right") {
                     guard store.user.isVerified else {
                         store.navigate(.verify)
                         return

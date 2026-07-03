@@ -135,7 +135,6 @@ private extension View {
                     AdminView()
                 }
             }
-            .toolbar(.hidden, for: .tabBar)
         }
     }
 }

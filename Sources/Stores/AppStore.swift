@@ -453,6 +453,7 @@ final class AppStore: ObservableObject {
         let targetName = displayName(for: target)
         let recent = messages(for: target).suffix(4).map(\.content).joined(separator: " ")
         let reportText = "\(reason) \(recent)"
+        lastModerationFeedback = "举报已提交，演示后台会生成复核工单。"
 
         Task { [moderationService] in
             let result = await moderationService.moderate(
