@@ -1,0 +1,185 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { createServer } from "../src/server.js";
+
+async function withServer(fn) {
+  const server = createServer({
+    disableOllama: true
+  });
+
+  await new Promise((resolve) => {
+    server.listen(0, "127.0.0.1", resolve);
+  });
+
+  const address = server.address();
+  const baseUrl = `http://127.0.0.1:${address.port}`;
+
+  try {
+    return await fn(baseUrl);
+  } finally {
+    await new Promise((resolve, reject) => {
+      server.close((error) => {
+        if (error) reject(error);
+        else resolve();
+      });
+    });
+  }
+}
+
+async function request(baseUrl, path, options = {}) {
+  const response = await fetch(`${baseUrl}${path}`, {
+    headers: {
+      "content-type": "application/json",
+      ...(options.headers ?? {})
+    },
+    ...options
+  });
+  const body = await response.json();
+  assert.ok(body.meta?.requestId);
+  assert.ok(body.meta?.timestamp);
+  if (!response.ok) {
+    throw new Error(body.error?.message ?? `HTTP ${response.status}`);
+  }
+  return body.data;
+}
+
+test("health reports rule fallback when Ollama is disabled", async () => {
+  await withServer(async (baseUrl) => {
+    const data = await request(baseUrl, "/api/health");
+
+    assert.equal(data.status, "ok");
+    assert.equal(data.ollama.connected, false);
+    assert.equal(data.ollama.reason, "disabled");
+    assert.equal(data.ollama.model, "jia:latest");
+  });
+});
+
+test("lists conversations with message summaries", async () => {
+  await withServer(async (baseUrl) => {
+    const data = await request(baseUrl, "/api/conversations");
+
+    assert.ok(data.conversations.length >= 2);
+    assert.equal(data.conversations[0].id, "c1");
+    assert.ok(data.conversations[0].lastMessage);
+    assert.ok(data.conversations[0].messageCount > 0);
+  });
+});
+
+test("sends a normal chat message and appends a companion reply", async () => {
+  await withServer(async (baseUrl) => {
+    const before = await request(baseUrl, "/api/conversations/c1/messages");
+
+    const sent = await request(baseUrl, "/api/conversations/c1/messages", {
+      method: "POST",
+      body: JSON.stringify({
+        content: "今天有点累，想有人认真听我说完。"
+      })
+    });
+
+    assert.equal(sent.moderation.decision, "allow");
+    assert.equal(sent.moderation.usedAI, false);
+    assert.ok(sent.message);
+    assert.ok(sent.companionReply);
+    assert.equal(sent.moderationCase, null);
+
+    const after = await request(baseUrl, "/api/conversations/c1/messages");
+    assert.equal(after.messages.length, before.messages.length + 2);
+    assert.ok(after.messages.some((message) => message.content === "今天有点累，想有人认真听我说完。"));
+  });
+});
+
+test("blocks high-risk contact, offline, and transfer messages", async () => {
+  await withServer(async (baseUrl) => {
+    const riskyTexts = [
+      "我们加微信聊吧",
+      "今晚线下见个面",
+      "我给你私下转账"
+    ];
+
+    for (const content of riskyTexts) {
+      const sent = await request(baseUrl, "/api/conversations/c1/messages", {
+        method: "POST",
+        body: JSON.stringify({ content })
+      });
+
+      assert.equal(sent.moderation.decision, "block");
+      assert.equal(sent.message, null);
+      assert.ok(sent.safetyMessage);
+      assert.equal(sent.moderationCase.decision, "block");
+      assert.equal(sent.moderationCase.status, "humanReview");
+    }
+
+    const messages = await request(baseUrl, "/api/conversations/c1/messages");
+    for (const content of riskyTexts) {
+      assert.equal(messages.messages.some((message) => message.content === content), false);
+    }
+
+    const cases = await request(baseUrl, "/api/moderation-cases");
+    assert.ok(cases.cases.filter((item) => item.decision === "block").length >= riskyTexts.length);
+  });
+});
+
+test("moderates standalone text without writing chat history", async () => {
+  await withServer(async (baseUrl) => {
+    const before = await request(baseUrl, "/api/conversations/c1/messages");
+    const data = await request(baseUrl, "/api/moderate", {
+      method: "POST",
+      body: JSON.stringify({
+        text: "你在哪，告诉我真实姓名",
+        source: "chat",
+        conversationId: "c1"
+      })
+    });
+    const after = await request(baseUrl, "/api/conversations/c1/messages");
+
+    assert.equal(data.moderation.decision, "warn");
+    assert.ok(data.moderation.matchedRules.includes("privacy.request"));
+    assert.equal(after.messages.length, before.messages.length);
+  });
+});
+
+test("stores labels and exports training samples", async () => {
+  await withServer(async (baseUrl) => {
+    const created = await request(baseUrl, "/api/labels", {
+      method: "POST",
+      body: JSON.stringify({
+        text: "代理兼职赚钱，加我了解",
+        expectedDecision: "review",
+        actualDecision: "review",
+        note: "广告引流边界样本"
+      })
+    });
+
+    assert.equal(created.count, 1);
+    assert.equal(created.label.expectedDecision, "review");
+
+    const exported = await request(baseUrl, "/api/labels/export");
+    assert.equal(exported.schemaVersion, 1);
+    assert.equal(exported.count, 1);
+    assert.equal(exported.samples[0].text, "代理兼职赚钱，加我了解");
+  });
+});
+
+test("reset restores initial in-memory state", async () => {
+  await withServer(async (baseUrl) => {
+    await request(baseUrl, "/api/labels", {
+      method: "POST",
+      body: JSON.stringify({
+        text: "我们加微信聊吧",
+        expectedDecision: "block",
+        actualDecision: "block",
+        note: "私联"
+      })
+    });
+
+    const reset = await request(baseUrl, "/api/reset", {
+      method: "POST",
+      body: "{}"
+    });
+    const exported = await request(baseUrl, "/api/labels/export");
+
+    assert.equal(reset.ok, true);
+    assert.equal(reset.labels, 0);
+    assert.equal(exported.count, 0);
+  });
+});

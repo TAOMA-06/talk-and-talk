@@ -1,0 +1,1124 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Talk&Talk BackendDemo</title>
+    <style>
+      :root {
+        --bg: #f5f7f5;
+        --surface: #fffffc;
+        --surface-soft: #fbfcfa;
+        --surface-strong: #eef3f0;
+        --ink: #141a1a;
+        --muted: #6e7875;
+        --line: #dce1dc;
+        --primary: #00665c;
+        --primary-soft: rgba(0, 102, 92, 0.12);
+        --success: #299e57;
+        --success-soft: rgba(41, 158, 87, 0.12);
+        --warning: #cc7d17;
+        --warning-soft: rgba(204, 125, 23, 0.12);
+        --danger: #d12e2b;
+        --danger-soft: rgba(209, 46, 43, 0.12);
+        --hero: #fffaf0;
+        --shadow: 0 5px 18px rgba(20, 26, 26, 0.045);
+        --radius-sm: 8px;
+        --radius-md: 12px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
+      button,
+      input,
+      select,
+      textarea {
+        font: inherit;
+      }
+
+      button {
+        border: 0;
+      }
+
+      .app {
+        min-height: 100vh;
+        display: grid;
+        grid-template-rows: auto 1fr;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 14px max(18px, calc((100vw - 1380px) / 2 + 18px));
+        background: rgba(245, 247, 245, 0.92);
+        border-bottom: 1px solid var(--line);
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        backdrop-filter: blur(12px);
+      }
+
+      .brand {
+        display: grid;
+        gap: 3px;
+        min-width: 0;
+      }
+
+      .brand h1 {
+        margin: 0;
+        font-size: 22px;
+        font-weight: 650;
+        line-height: 1.12;
+        letter-spacing: 0;
+        text-wrap: balance;
+      }
+
+      .brand span {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.35;
+      }
+
+      .main-shell {
+        width: min(1380px, 100%);
+        margin: 0 auto;
+        padding: 16px 14px 18px;
+        display: grid;
+        gap: 14px;
+      }
+
+      .hero-card {
+        display: grid;
+        grid-template-columns: minmax(280px, 1fr) auto;
+        gap: 16px;
+        align-items: end;
+        background: linear-gradient(180deg, var(--surface), var(--hero));
+        border: 1px solid rgba(220, 225, 220, 0.78);
+        border-radius: var(--radius-md);
+        box-shadow: var(--shadow);
+        padding: 16px;
+      }
+
+      .hero-copy {
+        display: grid;
+        gap: 8px;
+      }
+
+      .eyebrow {
+        color: var(--primary);
+        font-size: 11px;
+        font-weight: 650;
+      }
+
+      .hero-copy h2 {
+        margin: 0;
+        color: var(--ink);
+        font-size: 17px;
+        font-weight: 650;
+        letter-spacing: 0;
+      }
+
+      .hero-copy p {
+        max-width: 720px;
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.55;
+        text-wrap: pretty;
+      }
+
+      .metric-strip {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(110px, 1fr));
+        gap: 8px;
+        min-width: min(410px, 100%);
+      }
+
+      .metric {
+        padding: 12px;
+        border-radius: var(--radius-sm);
+        background: rgba(255, 255, 252, 0.82);
+        border: 1px solid rgba(220, 225, 220, 0.78);
+      }
+
+      .metric strong {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 22px;
+        font-weight: 650;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .metric span {
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .toolbar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: minmax(230px, 0.8fr) minmax(360px, 1.5fr) minmax(320px, 1fr);
+        gap: 14px;
+        min-height: 0;
+      }
+
+      .panel {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        box-shadow: var(--shadow);
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      .panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        min-height: 54px;
+        padding: 16px 16px 12px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .panel-title {
+        margin: 0;
+        font-size: 17px;
+        font-weight: 650;
+        letter-spacing: 0;
+      }
+
+      .section-subtitle {
+        display: block;
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.35;
+      }
+
+      .panel-body {
+        padding: 16px;
+      }
+
+      .stack {
+        display: grid;
+        gap: 12px;
+      }
+
+      .status-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        min-height: 22px;
+        padding: 3px 8px;
+        border-radius: 999px;
+        border: 0;
+        color: var(--muted);
+        background: rgba(110, 120, 117, 0.12);
+        font-size: 11px;
+        font-weight: 500;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .badge.allow,
+      .badge.low {
+        color: var(--success);
+        background: var(--success-soft);
+      }
+
+      .badge.review {
+        color: var(--warning);
+        background: var(--warning-soft);
+      }
+
+      .badge.warn,
+      .badge.medium {
+        color: var(--warning);
+        background: var(--warning-soft);
+      }
+
+      .badge.block,
+      .badge.high {
+        color: var(--danger);
+        background: var(--danger-soft);
+      }
+
+      .badge.ai {
+        color: var(--primary);
+        background: var(--primary-soft);
+      }
+
+      .button {
+        min-height: 36px;
+        padding: 0 12px;
+        border-radius: var(--radius-md);
+        color: var(--primary);
+        background: var(--surface);
+        border: 1px solid var(--line);
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 650;
+        transition: transform 150ms ease, opacity 150ms ease, box-shadow 150ms ease;
+      }
+
+      .button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 7px 16px rgba(20, 26, 26, 0.07);
+      }
+
+      .button.primary {
+        background: var(--primary);
+        color: white;
+        border-color: var(--primary);
+        box-shadow: 0 6px 14px rgba(0, 102, 92, 0.22);
+      }
+
+      .button.danger {
+        background: var(--danger-soft);
+        color: var(--danger);
+        border-color: transparent;
+      }
+
+      .conversation-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .conversation {
+        width: 100%;
+        text-align: left;
+        padding: 12px;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--line);
+        background: transparent;
+        color: var(--ink);
+        cursor: pointer;
+        transition: background 150ms ease, border-color 150ms ease, transform 150ms ease;
+      }
+
+      .conversation:hover,
+      .conversation.active {
+        background: var(--surface-strong);
+        border-color: rgba(0, 102, 92, 0.24);
+      }
+
+      .conversation:hover {
+        transform: translateY(-1px);
+      }
+
+      .conversation strong,
+      .case-item strong {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 15px;
+        font-weight: 650;
+      }
+
+      .conversation small,
+      .case-item small {
+        display: block;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      .chat-panel {
+        display: grid;
+        grid-template-rows: auto minmax(280px, 1fr) auto;
+      }
+
+      .messages {
+        display: grid;
+        align-content: start;
+        gap: 10px;
+        padding: 16px;
+        min-height: 0;
+        max-height: calc(100vh - 250px);
+        overflow: auto;
+      }
+
+      .message {
+        max-width: min(78%, 560px);
+        padding: 12px;
+        border-radius: var(--radius-md);
+        background: var(--surface-strong);
+        border: 1px solid var(--line);
+      }
+
+      .message.user {
+        justify-self: end;
+        background: rgba(0, 102, 92, 0.10);
+        border-color: rgba(0, 102, 92, 0.18);
+      }
+
+      .message.system,
+      .message.safety {
+        max-width: 100%;
+        justify-self: stretch;
+        background: var(--hero);
+        border-color: rgba(204, 125, 23, 0.22);
+      }
+
+      .message-name {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 6px;
+        color: var(--muted);
+        font-size: 11px;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .message p {
+        margin: 0;
+        line-height: 1.55;
+        overflow-wrap: anywhere;
+      }
+
+      .composer {
+        display: grid;
+        gap: 10px;
+        padding: 16px;
+        border-top: 1px solid var(--line);
+        background: var(--surface-soft);
+      }
+
+      textarea,
+      input,
+      select {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-sm);
+        background: var(--surface);
+        color: var(--ink);
+        outline: none;
+        transition: border-color 150ms ease, box-shadow 150ms ease;
+      }
+
+      textarea {
+        min-height: 86px;
+        padding: 10px;
+        resize: vertical;
+        line-height: 1.5;
+        font-size: 15px;
+      }
+
+      input,
+      select {
+        min-height: 36px;
+        padding: 0 10px;
+      }
+
+      textarea:focus,
+      input:focus,
+      select:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(0, 102, 92, 0.12);
+      }
+
+      label {
+        display: grid;
+        gap: 6px;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 500;
+      }
+
+      .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+
+      .result {
+        display: grid;
+        gap: 10px;
+        padding: 12px;
+        background: var(--surface-soft);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-sm);
+      }
+
+      .score {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 8px;
+        align-items: center;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .meter {
+        height: 8px;
+        border-radius: 999px;
+        background: var(--surface-strong);
+        overflow: hidden;
+      }
+
+      .meter span {
+        display: block;
+        height: 100%;
+        width: 0;
+        background: linear-gradient(90deg, var(--success), var(--warning), var(--danger));
+        transition: width 200ms ease;
+      }
+
+      .case-list {
+        display: grid;
+        gap: 8px;
+        max-height: 300px;
+        overflow: auto;
+      }
+
+      .case-item {
+        padding: 10px;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--line);
+        background: var(--surface-soft);
+      }
+
+      .case-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 8px;
+      }
+
+      .export-box {
+        min-height: 160px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px;
+        white-space: pre;
+      }
+
+      .empty {
+        color: var(--muted);
+        padding: 12px;
+        border: 1px dashed var(--line);
+        border-radius: var(--radius-sm);
+        background: var(--surface-soft);
+        line-height: 1.5;
+      }
+
+      .toast {
+        color: var(--primary);
+        font-size: 12px;
+        min-height: 18px;
+      }
+
+      @media (max-width: 1100px) {
+        .layout {
+          grid-template-columns: 280px 1fr;
+        }
+
+        .hero-card {
+          grid-template-columns: 1fr;
+        }
+
+        .side-right {
+          grid-column: 1 / -1;
+        }
+      }
+
+      @media (max-width: 760px) {
+        .topbar {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .toolbar {
+          justify-content: flex-start;
+        }
+
+        .main-shell {
+          padding-inline: 10px;
+        }
+
+        .layout {
+          grid-template-columns: 1fr;
+        }
+
+        .metric-strip {
+          grid-template-columns: 1fr;
+        }
+
+        .messages {
+          max-height: 58vh;
+        }
+
+        .form-row {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div class="brand">
+          <h1>演示后台</h1>
+          <span>聊天记录、规则引擎、本地 AI 审查和标注样本统一在这里验证。</span>
+        </div>
+        <div class="toolbar">
+          <span id="healthBadge" class="badge">health</span>
+          <span id="modelBadge" class="badge ai">model</span>
+          <button id="refreshButton" class="button" type="button">刷新</button>
+          <button id="resetButton" class="button danger" type="button">重置</button>
+        </div>
+      </header>
+
+      <main class="main-shell">
+        <section class="hero-card">
+          <div class="hero-copy">
+            <span class="eyebrow">规则引擎 + 本地模型审查</span>
+            <h2>用和 app 相同的安全逻辑，验证每一条聊天消息。</h2>
+            <p>后台测试板沿用 Talk&Talk 的 SoftCard、信任徽章和安全中心语气：先看会话，再发送消息，最后把误判样本沉淀为后续训练数据。</p>
+          </div>
+          <div class="metric-strip">
+            <div class="metric">
+              <strong id="metricConversations">0</strong>
+              <span>活跃会话</span>
+            </div>
+            <div class="metric">
+              <strong id="metricCases">0</strong>
+              <span>审核工单</span>
+            </div>
+            <div class="metric">
+              <strong id="metricLabels">0</strong>
+              <span>标注样本</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="layout">
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <h2 class="panel-title">会话队列</h2>
+                <span class="section-subtitle">按最近消息查看聊天状态</span>
+              </div>
+              <span id="conversationCount" class="badge">0</span>
+            </div>
+            <div class="panel-body">
+              <div id="conversationList" class="conversation-list"></div>
+            </div>
+          </div>
+
+          <div class="panel chat-panel">
+            <div class="panel-header">
+              <div>
+                <h2 id="chatTitle" class="panel-title">聊天记录</h2>
+                <span class="section-subtitle">发送后立即触发风控审查</span>
+              </div>
+              <div class="status-row">
+                <span id="messageCount" class="badge">0 messages</span>
+              </div>
+            </div>
+            <div id="messageList" class="messages"></div>
+            <form id="sendForm" class="composer">
+              <label>
+                发送测试消息
+                <textarea id="messageInput" name="content" placeholder="例如：今天有点累，想有人认真听我说完"></textarea>
+              </label>
+              <div class="toolbar">
+                <button class="button primary" type="submit">发送消息</button>
+                <button id="sampleSafe" class="button" type="button">正常样本</button>
+                <button id="sampleRisk" class="button" type="button">违规样本</button>
+              </div>
+              <div id="sendToast" class="toast"></div>
+            </form>
+          </div>
+
+          <div class="side-right stack">
+            <div class="panel">
+              <div class="panel-header">
+                <div>
+                  <h2 class="panel-title">审查结果</h2>
+                  <span class="section-subtitle">显示分数、原因和命中规则</span>
+                </div>
+                <span id="decisionBadge" class="badge">pending</span>
+              </div>
+              <div class="panel-body stack">
+                <form id="moderateForm" class="stack">
+                  <label>
+                    单独审查文本
+                    <textarea id="moderateInput" name="text" placeholder="输入一句话，只跑审查，不写入聊天"></textarea>
+                  </label>
+                  <div class="form-row">
+                    <label>
+                      来源
+                      <select id="sourceSelect" name="source">
+                        <option value="chat">chat</option>
+                        <option value="community">community</option>
+                        <option value="report">report</option>
+                        <option value="profile">profile</option>
+                      </select>
+                    </label>
+                    <label>
+                      会话
+                      <select id="conversationSelect" name="conversationId"></select>
+                    </label>
+                  </div>
+                  <button class="button primary" type="submit">立即审查</button>
+                </form>
+                <div id="resultBox" class="result"></div>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-header">
+                <div>
+                  <h2 class="panel-title">审核工单</h2>
+                  <span class="section-subtitle">聊天、资料、举报统一处理</span>
+                </div>
+                <span id="caseCount" class="badge">0</span>
+              </div>
+              <div class="panel-body">
+                <div id="caseList" class="case-list"></div>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-header">
+                <div>
+                  <h2 class="panel-title">样本标注</h2>
+                  <span class="section-subtitle">把边界样本导出给后续训练</span>
+                </div>
+                <span id="labelCount" class="badge">0</span>
+              </div>
+              <div class="panel-body stack">
+                <form id="labelForm" class="stack">
+                  <label>
+                    样本文本
+                    <textarea id="labelText" name="text" placeholder="发送或审查后会自动带入最近文本"></textarea>
+                  </label>
+                  <div class="form-row">
+                    <label>
+                      期望决策
+                      <select id="expectedDecision" name="expectedDecision">
+                        <option value="allow">allow</option>
+                        <option value="review">review</option>
+                        <option value="warn">warn</option>
+                        <option value="block">block</option>
+                      </select>
+                    </label>
+                    <label>
+                      实际决策
+                      <select id="actualDecision" name="actualDecision">
+                        <option value="allow">allow</option>
+                        <option value="review">review</option>
+                        <option value="warn">warn</option>
+                        <option value="block">block</option>
+                      </select>
+                    </label>
+                  </div>
+                  <label>
+                    备注
+                    <input id="labelNote" name="note" placeholder="误判原因、边界情况或建议">
+                  </label>
+                  <div class="toolbar">
+                    <button class="button primary" type="submit">保存标注</button>
+                    <button id="exportButton" class="button" type="button">导出 JSON</button>
+                  </div>
+                </form>
+                <textarea id="exportBox" class="export-box" readonly></textarea>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script>
+      const state = {
+        conversations: [],
+        selectedConversationId: null,
+        messages: [],
+        cases: [],
+        labels: [],
+        lastModeration: null,
+        lastText: ""
+      };
+
+      const el = {
+        healthBadge: document.querySelector("#healthBadge"),
+        modelBadge: document.querySelector("#modelBadge"),
+        refreshButton: document.querySelector("#refreshButton"),
+        resetButton: document.querySelector("#resetButton"),
+        conversationCount: document.querySelector("#conversationCount"),
+        conversationList: document.querySelector("#conversationList"),
+        chatTitle: document.querySelector("#chatTitle"),
+        messageCount: document.querySelector("#messageCount"),
+        messageList: document.querySelector("#messageList"),
+        sendForm: document.querySelector("#sendForm"),
+        messageInput: document.querySelector("#messageInput"),
+        sampleSafe: document.querySelector("#sampleSafe"),
+        sampleRisk: document.querySelector("#sampleRisk"),
+        sendToast: document.querySelector("#sendToast"),
+        moderateForm: document.querySelector("#moderateForm"),
+        moderateInput: document.querySelector("#moderateInput"),
+        sourceSelect: document.querySelector("#sourceSelect"),
+        conversationSelect: document.querySelector("#conversationSelect"),
+        resultBox: document.querySelector("#resultBox"),
+        decisionBadge: document.querySelector("#decisionBadge"),
+        caseCount: document.querySelector("#caseCount"),
+        caseList: document.querySelector("#caseList"),
+        labelCount: document.querySelector("#labelCount"),
+        labelForm: document.querySelector("#labelForm"),
+        labelText: document.querySelector("#labelText"),
+        expectedDecision: document.querySelector("#expectedDecision"),
+        actualDecision: document.querySelector("#actualDecision"),
+        labelNote: document.querySelector("#labelNote"),
+        exportButton: document.querySelector("#exportButton"),
+        exportBox: document.querySelector("#exportBox"),
+        metricConversations: document.querySelector("#metricConversations"),
+        metricCases: document.querySelector("#metricCases"),
+        metricLabels: document.querySelector("#metricLabels")
+      };
+
+      async function api(path, options = {}) {
+        const response = await fetch(path, {
+          headers: {
+            "content-type": "application/json",
+            ...(options.headers || {})
+          },
+          ...options
+        });
+        const body = await response.json();
+        if (!response.ok) {
+          throw new Error(body.error?.message || `HTTP ${response.status}`);
+        }
+        return body.data;
+      }
+
+      function formatTime(value) {
+        return new Intl.DateTimeFormat("zh-CN", {
+          hour: "2-digit",
+          minute: "2-digit"
+        }).format(new Date(value));
+      }
+
+      function escapeHtml(value) {
+        return String(value)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      function decisionClass(decision) {
+        return ["allow", "review", "warn", "block"].includes(decision) ? decision : "";
+      }
+
+      function renderHealth(data) {
+        const ollama = data.ollama;
+        el.healthBadge.textContent = ollama.connected ? "AI 模式开启" : "规则引擎兜底";
+        el.healthBadge.className = `badge ${ollama.connected ? "allow" : "review"}`;
+        el.modelBadge.textContent = `${ollama.model}${ollama.modelAvailable === false ? " 未列出" : ""}`;
+      }
+
+      function renderConversations() {
+        el.conversationCount.textContent = `${state.conversations.length}`;
+        el.metricConversations.textContent = `${state.conversations.length}`;
+        el.conversationSelect.innerHTML = state.conversations.map((conversation) => {
+          return `<option value="${escapeHtml(conversation.id)}">${escapeHtml(conversation.title)}</option>`;
+        }).join("");
+        if (state.selectedConversationId) {
+          el.conversationSelect.value = state.selectedConversationId;
+        }
+
+        el.conversationList.innerHTML = state.conversations.map((conversation) => {
+          const last = conversation.lastMessage?.content || "暂无消息";
+          const active = conversation.id === state.selectedConversationId ? "active" : "";
+          const cases = conversation.moderationCaseCount > 0
+            ? `<span class="badge review">${conversation.moderationCaseCount} 工单</span>`
+            : `<span class="badge allow">正常</span>`;
+          return `
+            <button class="conversation ${active}" type="button" data-conversation="${escapeHtml(conversation.id)}">
+              <strong>${escapeHtml(conversation.title)}</strong>
+              <small>${escapeHtml(conversation.participantRole)} · ${escapeHtml(last)}</small>
+              <div class="case-meta">${cases}<span class="badge">${conversation.messageCount} 条</span></div>
+            </button>
+          `;
+        }).join("");
+
+        for (const button of el.conversationList.querySelectorAll("[data-conversation]")) {
+          button.addEventListener("click", () => selectConversation(button.dataset.conversation));
+        }
+      }
+
+      function renderMessages() {
+        const conversation = state.conversations.find((item) => item.id === state.selectedConversationId);
+        el.chatTitle.textContent = conversation ? `聊天记录 · ${conversation.title}` : "聊天记录";
+        el.messageCount.textContent = `${state.messages.length} messages`;
+
+        if (state.messages.length === 0) {
+          el.messageList.innerHTML = `<div class="empty">暂无消息</div>`;
+          return;
+        }
+
+        el.messageList.innerHTML = state.messages.map((message) => {
+          const kind = message.senderId === "u1" ? "user" : message.type;
+          const moderation = message.moderation
+            ? `<span class="badge ${decisionClass(message.moderation.decision)}">${message.moderation.decision} ${message.moderation.score.toFixed(2)}</span>`
+            : "";
+          return `
+            <article class="message ${kind}">
+              <div class="message-name">
+                <span>${escapeHtml(message.senderName)} · ${formatTime(message.timestamp)}</span>
+                ${moderation}
+              </div>
+              <p>${escapeHtml(message.content)}</p>
+            </article>
+          `;
+        }).join("");
+        el.messageList.scrollTop = el.messageList.scrollHeight;
+      }
+
+      function renderModeration(result) {
+        if (!result) {
+          el.decisionBadge.textContent = "pending";
+          el.decisionBadge.className = "badge";
+          el.resultBox.innerHTML = `<div class="empty">还没有审查结果</div>`;
+          return;
+        }
+
+        el.decisionBadge.textContent = result.decision;
+        el.decisionBadge.className = `badge ${decisionClass(result.decision)}`;
+        const percent = Math.round(result.score * 100);
+        const reasons = result.reasons.map((reason) => `<span class="badge">${escapeHtml(reason)}</span>`).join("");
+        const rules = result.matchedRules.length
+          ? result.matchedRules.map((rule) => `<span class="badge">${escapeHtml(rule)}</span>`).join("")
+          : `<span class="badge">no-rule</span>`;
+        const ai = result.usedAI
+          ? `<span class="badge ai">AI ${escapeHtml(result.model || "local")}</span>`
+          : `<span class="badge review">${escapeHtml(result.aiStatus || "rules")}</span>`;
+
+        el.resultBox.innerHTML = `
+          <div class="status-row">
+            <span class="badge ${decisionClass(result.decision)}">${escapeHtml(result.decision)}</span>
+            <span class="badge ${escapeHtml(result.riskLevel)}">risk ${escapeHtml(result.riskLevel)}</span>
+            ${ai}
+          </div>
+          <div class="score">
+            <div class="meter"><span style="width: ${percent}%"></span></div>
+            <strong>${result.score.toFixed(2)}</strong>
+          </div>
+          <div class="status-row">${reasons}</div>
+          <div class="status-row">${rules}</div>
+        `;
+      }
+
+      function renderCases() {
+        el.caseCount.textContent = `${state.cases.length}`;
+        el.metricCases.textContent = `${state.cases.length}`;
+        if (state.cases.length === 0) {
+          el.caseList.innerHTML = `<div class="empty">暂无工单</div>`;
+          return;
+        }
+
+        el.caseList.innerHTML = state.cases.map((item) => {
+          return `
+            <article class="case-item">
+              <strong>${escapeHtml(item.title)}</strong>
+              <small>${escapeHtml(item.category)} · ${escapeHtml(item.aiReason)}</small>
+              <div class="case-meta">
+                <span class="badge ${escapeHtml(item.riskLevel)}">${escapeHtml(item.riskLevel)}</span>
+                <span class="badge ${decisionClass(item.decision)}">${escapeHtml(item.decision)}</span>
+                <span class="badge">${escapeHtml(item.status)}</span>
+                ${item.usedAI ? `<span class="badge ai">AI</span>` : `<span class="badge">rules</span>`}
+              </div>
+            </article>
+          `;
+        }).join("");
+      }
+
+      function renderLabelsExport(data) {
+        const count = data?.count ?? state.labels.length;
+        el.labelCount.textContent = `${count}`;
+        el.metricLabels.textContent = `${count}`;
+        if (data) {
+          el.exportBox.value = JSON.stringify(data, null, 2);
+        }
+      }
+
+      async function loadHealth() {
+        const data = await api("/api/health");
+        renderHealth(data);
+      }
+
+      async function loadConversations() {
+        const data = await api("/api/conversations");
+        state.conversations = data.conversations;
+        if (!state.selectedConversationId && state.conversations.length) {
+          state.selectedConversationId = state.conversations[0].id;
+        }
+        renderConversations();
+      }
+
+      async function loadMessages() {
+        if (!state.selectedConversationId) return;
+        const data = await api(`/api/conversations/${encodeURIComponent(state.selectedConversationId)}/messages`);
+        state.messages = data.messages;
+        renderMessages();
+      }
+
+      async function loadCases() {
+        const data = await api("/api/moderation-cases");
+        state.cases = data.cases;
+        renderCases();
+      }
+
+      async function loadLabels() {
+        const data = await api("/api/labels/export");
+        state.labels = data.samples;
+        renderLabelsExport(data);
+      }
+
+      async function loadAll() {
+        try {
+          await loadHealth();
+          await loadConversations();
+          await loadMessages();
+          await loadCases();
+          await loadLabels();
+          renderModeration(state.lastModeration);
+        } catch (error) {
+          el.sendToast.textContent = error.message;
+        }
+      }
+
+      async function selectConversation(conversationId) {
+        state.selectedConversationId = conversationId;
+        renderConversations();
+        await loadMessages();
+      }
+
+      function rememberModeration(text, moderation) {
+        state.lastText = text;
+        state.lastModeration = moderation;
+        el.labelText.value = text;
+        el.actualDecision.value = moderation.decision;
+        el.expectedDecision.value = moderation.decision;
+        renderModeration(moderation);
+      }
+
+      el.sendForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const content = el.messageInput.value.trim();
+        if (!content || !state.selectedConversationId) return;
+
+        el.sendToast.textContent = "发送中...";
+        try {
+          const data = await api(`/api/conversations/${encodeURIComponent(state.selectedConversationId)}/messages`, {
+            method: "POST",
+            body: JSON.stringify({ content })
+          });
+          rememberModeration(content, data.moderation);
+          el.messageInput.value = "";
+          el.sendToast.textContent = data.moderation.decision === "block" ? "已拦截并生成工单" : "已写入聊天";
+          await loadConversations();
+          await loadMessages();
+          await loadCases();
+        } catch (error) {
+          el.sendToast.textContent = error.message;
+        }
+      });
+
+      el.moderateForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const text = el.moderateInput.value.trim();
+        if (!text) return;
+
+        try {
+          const data = await api("/api/moderate", {
+            method: "POST",
+            body: JSON.stringify({
+              text,
+              source: el.sourceSelect.value,
+              conversationId: el.conversationSelect.value
+            })
+          });
+          rememberModeration(text, data.moderation);
+        } catch (error) {
+          el.sendToast.textContent = error.message;
+        }
+      });
+
+      el.labelForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const text = el.labelText.value.trim();
+        if (!text) return;
+
+        try {
+          const data = await api("/api/labels", {
+            method: "POST",
+            body: JSON.stringify({
+              text,
+              expectedDecision: el.expectedDecision.value,
+              actualDecision: el.actualDecision.value,
+              note: el.labelNote.value
+            })
+          });
+          el.labelNote.value = "";
+          el.labelCount.textContent = `${data.count}`;
+          await loadLabels();
+        } catch (error) {
+          el.sendToast.textContent = error.message;
+        }
+      });
+
+      el.exportButton.addEventListener("click", loadLabels);
+      el.refreshButton.addEventListener("click", loadAll);
+      el.resetButton.addEventListener("click", async () => {
+        await api("/api/reset", { method: "POST", body: "{}" });
+        state.selectedConversationId = null;
+        state.lastModeration = null;
+        state.lastText = "";
+        el.exportBox.value = "";
+        el.messageInput.value = "";
+        el.moderateInput.value = "";
+        el.labelText.value = "";
+        await loadAll();
+      });
+
+      el.sampleSafe.addEventListener("click", () => {
+        el.messageInput.value = "今天有点累，想有人认真听我说完。";
+        el.messageInput.focus();
+      });
+
+      el.sampleRisk.addEventListener("click", () => {
+        el.messageInput.value = "我们加微信聊吧，或者线下见面我给你转账。";
+        el.messageInput.focus();
+      });
+
+      loadAll();
+    </script>
+  </body>
+</html>
