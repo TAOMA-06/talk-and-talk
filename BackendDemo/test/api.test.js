@@ -58,10 +58,24 @@ test("lists conversations with message summaries", async () => {
   await withServer(async (baseUrl) => {
     const data = await request(baseUrl, "/api/conversations");
 
-    assert.ok(data.conversations.length >= 2);
+    assert.ok(data.conversations.length >= 3);
     assert.equal(data.conversations[0].id, "c1");
     assert.ok(data.conversations[0].lastMessage);
     assert.ok(data.conversations[0].messageCount > 0);
+  });
+});
+
+test("returns admin overview and violation examples", async () => {
+  await withServer(async (baseUrl) => {
+    const overview = await request(baseUrl, "/api/admin/overview");
+    const examples = await request(baseUrl, "/api/violation-examples");
+
+    assert.ok(overview.overview.pendingCases >= 1);
+    assert.ok(overview.overview.blocked >= 1);
+    assert.ok(overview.queue.length >= 1);
+    assert.ok(examples.examples.length >= 6);
+    assert.ok(examples.examples.some((item) => item.expectedDecision === "block"));
+    assert.ok(examples.examples.some((item) => item.expectedDecision === "allow"));
   });
 });
 
@@ -157,6 +171,39 @@ test("stores labels and exports training samples", async () => {
     assert.equal(exported.schemaVersion, 1);
     assert.equal(exported.count, 1);
     assert.equal(exported.samples[0].text, "代理兼职赚钱，加我了解");
+  });
+});
+
+test("admin can resolve and dismiss moderation cases", async () => {
+  await withServer(async (baseUrl) => {
+    const cases = await request(baseUrl, "/api/moderation-cases");
+    const target = cases.cases.find((item) => item.status !== "resolved" && item.status !== "dismissed");
+    assert.ok(target);
+
+    const resolved = await request(baseUrl, `/api/moderation-cases/${target.id}/actions`, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "confirmViolation",
+        note: "确认线下邀约违规"
+      })
+    });
+
+    assert.equal(resolved.case.status, "resolved");
+    assert.ok(resolved.case.resolvedAt);
+    assert.equal(resolved.case.actionLog[0].action, "confirmViolation");
+    assert.ok(resolved.overview.resolved >= 1);
+
+    const profile = cases.cases.find((item) => item.id !== target.id);
+    const dismissed = await request(baseUrl, `/api/moderation-cases/${profile.id}/actions`, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "dismiss",
+        note: "演示误报驳回"
+      })
+    });
+
+    assert.equal(dismissed.case.status, "dismissed");
+    assert.equal(dismissed.case.actionLog[0].action, "dismiss");
   });
 });
 

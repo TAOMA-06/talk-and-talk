@@ -13,6 +13,70 @@ const DEFAULT_OLLAMA_URL = "http://127.0.0.1:11434";
 const DEFAULT_OLLAMA_MODEL = "jia:latest";
 const VALID_DECISIONS = new Set(["allow", "review", "warn", "block"]);
 const VALID_SOURCES = new Set(["chat", "community", "report", "profile"]);
+const VALID_ADMIN_ACTIONS = new Set(["confirmViolation", "dismiss", "escalate"]);
+
+const violationExamples = [
+  {
+    id: "ex-contact",
+    title: "引导私下联系",
+    source: "chat",
+    sampleText: "我们加微信聊吧，平台里说话太麻烦了。",
+    expectedDecision: "block",
+    riskLevel: "high",
+    matchedRules: ["contact.wechat"],
+    reviewerHint: "明确要求脱离平台，直接拦截并提醒用户保持平台内沟通。"
+  },
+  {
+    id: "ex-offline",
+    title: "线下邀约",
+    source: "chat",
+    sampleText: "今晚线下见个面吧，我订个酒店。",
+    expectedDecision: "block",
+    riskLevel: "high",
+    matchedRules: ["contact.offline", "sexual.explicit"],
+    reviewerHint: "陪伴服务只允许线上沟通，线下邀约和酒店暗示需要确认违规。"
+  },
+  {
+    id: "ex-transfer",
+    title: "私下交易",
+    source: "chat",
+    sampleText: "你把收款码发我，我私下给你转账。",
+    expectedDecision: "block",
+    riskLevel: "high",
+    matchedRules: ["finance.transfer"],
+    reviewerHint: "涉及私下资金往来，需拦截并保留工单记录。"
+  },
+  {
+    id: "ex-privacy",
+    title: "索要隐私",
+    source: "chat",
+    sampleText: "告诉我你的真实姓名和住址，我去找你。",
+    expectedDecision: "warn",
+    riskLevel: "medium",
+    matchedRules: ["privacy.request"],
+    reviewerHint: "涉及隐私索取，通常先提醒；若叠加线下意图可升级人工。"
+  },
+  {
+    id: "ex-ad",
+    title: "广告引流",
+    source: "community",
+    sampleText: "兼职赚钱，代理推广，加我了解详情。",
+    expectedDecision: "review",
+    riskLevel: "low",
+    matchedRules: ["ads.promo"],
+    reviewerHint: "社区内容疑似广告，默认进入复核，不直接发布。"
+  },
+  {
+    id: "ex-normal",
+    title: "正常倾诉",
+    source: "chat",
+    sampleText: "今天工作压力很大，想找人认真听我说完。",
+    expectedDecision: "allow",
+    riskLevel: "low",
+    matchedRules: [],
+    reviewerHint: "正常情绪支持场景，应放行。"
+  }
+];
 
 class AppError extends Error {
   constructor(code, message, statusCode = 400, details) {
@@ -119,6 +183,7 @@ function initialState() {
         participantId: "c1",
         participantName: "林屿",
         participantRole: "温柔倾听者",
+        customerName: "小楷",
         status: "active",
         createdAt: new Date(baseTime - 86_400_000).toISOString()
       },
@@ -128,8 +193,19 @@ function initialState() {
         participantId: "c2",
         participantName: "许澈",
         participantRole: "职场沟通陪伴",
+        customerName: "李四",
         status: "active",
         createdAt: new Date(baseTime - 3_600_000).toISOString()
+      },
+      {
+        id: "c3",
+        title: "周映",
+        participantId: "c3",
+        participantName: "周映",
+        participantRole: "睡前声音陪伴",
+        customerName: "王五",
+        status: "flagged",
+        createdAt: new Date(baseTime - 7_200_000).toISOString()
       }
     ],
     messages: [
@@ -177,42 +253,112 @@ function initialState() {
         content: "订单已由平台担保，沟通开始前请勿交换私人联系方式。",
         type: "system",
         timestamp: new Date(baseTime - 3_200_000).toISOString()
+      },
+      {
+        id: "m6",
+        conversationId: "c3",
+        senderId: "u3",
+        senderName: "王五",
+        content: "今晚线下见个面吧，我订个酒店。",
+        type: "text",
+        timestamp: new Date(baseTime - 1_800_000).toISOString(),
+        moderation: {
+          decision: "block",
+          score: 0.95,
+          reasons: ["疑似线下邀约", "疑似低俗或越界内容"],
+          usedAI: false
+        }
+      },
+      {
+        id: "m7",
+        conversationId: "c3",
+        senderId: "system",
+        senderName: "系统",
+        content: "安全提醒：平台不支持线下邀约、私下转账或交换私人联系方式，请在平台内完成沟通。",
+        type: "safety",
+        timestamp: new Date(baseTime - 1_799_000).toISOString()
       }
     ],
     moderationCases: [
       {
         id: "mc1",
-        title: "头像审核：闻舟",
+        title: "聊天拦截：线下见面 + 酒店暗示",
+        category: "内容风控",
+        riskLevel: "high",
+        status: "humanReview",
+        source: "chat",
+        content: "今晚线下见个面吧，我订个酒店。",
+        targetId: "c3",
+        reporter: "system",
+        userName: "王五",
+        aiScore: 0.95,
+        aiReason: "疑似线下邀约；疑似低俗或越界内容",
+        decision: "block",
+        matchedRules: ["contact.offline", "sexual.explicit"],
+        usedAI: false,
+        createdAt: new Date(baseTime - 1_790_000).toISOString(),
+        resolvedAt: null,
+        actionLog: []
+      },
+      {
+        id: "mc2",
+        title: "聊天预警：索要真实姓名和住址",
+        category: "实时风控",
+        riskLevel: "medium",
+        status: "pending",
+        source: "chat",
+        content: "你在哪，告诉我真实姓名和住址。",
+        targetId: "c1",
+        reporter: "system",
+        userName: "小楷",
+        aiScore: 0.58,
+        aiReason: "疑似索要隐私信息",
+        decision: "warn",
+        matchedRules: ["privacy.request"],
+        usedAI: false,
+        createdAt: new Date(baseTime - 4_200_000).toISOString(),
+        resolvedAt: null,
+        actionLog: []
+      },
+      {
+        id: "mc3",
+        title: "社区内容：兼职代理推广",
+        category: "社区审核",
+        riskLevel: "low",
+        status: "autoReviewing",
+        source: "community",
+        content: "兼职赚钱，代理推广，加我了解详情。",
+        targetId: "p-demo-1",
+        reporter: "system",
+        userName: "陈墨",
+        aiScore: 0.42,
+        aiReason: "疑似广告或引流",
+        decision: "review",
+        matchedRules: ["ads.promo"],
+        usedAI: false,
+        createdAt: new Date(baseTime - 3_900_000).toISOString(),
+        resolvedAt: null,
+        actionLog: []
+      },
+      {
+        id: "mc4",
+        title: "资料审核：头像人脸核验缺失",
         category: "资料审核",
         riskLevel: "low",
         status: "pending",
         source: "profile",
-        content: "待补充人脸核验",
+        content: "头像与实名资料不一致，需补充活体核验。",
         targetId: "c5",
+        reporter: "profile.audit",
+        userName: "闻舟",
         aiScore: 0.2,
         aiReason: "资料待补充",
         decision: "review",
         matchedRules: ["profile.pending"],
         usedAI: false,
         createdAt: new Date(baseTime - 5_400_000).toISOString(),
-        resolvedAt: null
-      },
-      {
-        id: "mc2",
-        title: "敏感词库：线下交易规则",
-        category: "内容风控",
-        riskLevel: "medium",
-        status: "autoReviewing",
-        source: "chat",
-        content: "规则引擎自动拦截中",
-        targetId: null,
-        aiScore: 0.45,
-        aiReason: "规则引擎运行中",
-        decision: "review",
-        matchedRules: ["rules.offline"],
-        usedAI: false,
-        createdAt: new Date(baseTime - 4_200_000).toISOString(),
-        resolvedAt: null
+        resolvedAt: null,
+        actionLog: []
       }
     ],
     labels: []
@@ -423,6 +569,42 @@ function publicConversation(conversation) {
   };
 }
 
+function pendingCaseCount() {
+  return state.moderationCases.filter((item) => {
+    return item.status === "pending" || item.status === "autoReviewing" || item.status === "humanReview";
+  }).length;
+}
+
+function overviewStats() {
+  const cases = state.moderationCases;
+  const blocked = cases.filter((item) => item.decision === "block").length;
+  const warned = cases.filter((item) => item.decision === "warn").length;
+  const reviewed = cases.filter((item) => item.decision === "review").length;
+  const resolved = cases.filter((item) => item.status === "resolved" || item.status === "dismissed").length;
+  const bySource = Object.fromEntries([...VALID_SOURCES].map((source) => [
+    source,
+    cases.filter((item) => item.source === source).length
+  ]));
+  const byRisk = {
+    high: cases.filter((item) => item.riskLevel === "high").length,
+    medium: cases.filter((item) => item.riskLevel === "medium").length,
+    low: cases.filter((item) => item.riskLevel === "low").length
+  };
+
+  return {
+    pendingCases: pendingCaseCount(),
+    totalCases: cases.length,
+    blocked,
+    warned,
+    reviewed,
+    resolved,
+    activeConversations: state.conversations.length,
+    labels: state.labels.length,
+    bySource,
+    byRisk
+  };
+}
+
 function createModerationCase({ result, title, source, content, targetId, status }) {
   const item = {
     id: `mc-${crypto.randomUUID()}`,
@@ -439,10 +621,58 @@ function createModerationCase({ result, title, source, content, targetId, status
     matchedRules: result.matchedRules,
     usedAI: result.usedAI,
     createdAt: nowIso(),
-    resolvedAt: null
+    resolvedAt: null,
+    actionLog: []
   };
   state.moderationCases.unshift(item);
   return item;
+}
+
+function findModerationCase(caseId) {
+  const item = state.moderationCases.find((entry) => entry.id === caseId);
+  if (!item) {
+    throw new AppError("NOT_FOUND", `Moderation case ${caseId} was not found`, 404);
+  }
+  return item;
+}
+
+function applyAdminAction(caseId, action, note = "") {
+  if (!VALID_ADMIN_ACTIONS.has(action)) {
+    throw new AppError("VALIDATION_ERROR", "action is invalid", 422, {
+      allowed: [...VALID_ADMIN_ACTIONS]
+    });
+  }
+
+  const item = findModerationCase(caseId);
+  const logEntry = {
+    id: `action-${crypto.randomUUID()}`,
+    action,
+    note,
+    operator: "demo-admin",
+    createdAt: nowIso()
+  };
+
+  if (action === "confirmViolation") {
+    item.status = "resolved";
+    item.resolvedAt = nowIso();
+  }
+  if (action === "dismiss") {
+    item.status = "dismissed";
+    item.resolvedAt = nowIso();
+  }
+  if (action === "escalate") {
+    item.status = "humanReview";
+    item.resolvedAt = null;
+  }
+
+  item.actionLog = Array.isArray(item.actionLog) ? item.actionLog : [];
+  item.actionLog.unshift(logEntry);
+
+  return {
+    case: item,
+    action: logEntry,
+    overview: overviewStats()
+  };
 }
 
 function systemMessage(conversationId, content, type = "safety") {
@@ -703,6 +933,9 @@ function route(method, pathname) {
   if (method === "GET" && pathname === "/api/health") {
     return { name: "health", params: {} };
   }
+  if (method === "GET" && pathname === "/api/admin/overview") {
+    return { name: "adminOverview", params: {} };
+  }
   if (method === "GET" && pathname === "/api/conversations") {
     return { name: "listConversations", params: {} };
   }
@@ -719,6 +952,13 @@ function route(method, pathname) {
   }
   if (method === "GET" && pathname === "/api/moderation-cases") {
     return { name: "listModerationCases", params: {} };
+  }
+  if (method === "POST") {
+    const match = pathname.match(/^\/api\/moderation-cases\/([^/]+)\/actions$/);
+    if (match) return { name: "caseAction", params: { caseId: decodeURIComponent(match[1]) } };
+  }
+  if (method === "GET" && pathname === "/api/violation-examples") {
+    return { name: "listViolationExamples", params: {} };
   }
   if (method === "POST" && pathname === "/api/labels") {
     return { name: "createLabel", params: {} };
@@ -773,6 +1013,13 @@ async function handleApi({ req, res, routeMatch, requestIdValue, config }) {
         service: "Talk&Talk BackendDemo",
         uptimeSeconds: Math.round(process.uptime()),
         ollama
+      });
+      return;
+    }
+    case "adminOverview": {
+      sendData(res, 200, requestIdValue, {
+        overview: overviewStats(),
+        queue: state.moderationCases.slice(0, 8)
       });
       return;
     }
@@ -885,6 +1132,19 @@ async function handleApi({ req, res, routeMatch, requestIdValue, config }) {
     case "listModerationCases": {
       sendData(res, 200, requestIdValue, {
         cases: state.moderationCases
+      });
+      return;
+    }
+    case "caseAction": {
+      const body = await readJson(req);
+      const action = String(body.action ?? "");
+      const note = String(body.note ?? "").trim();
+      sendData(res, 200, requestIdValue, applyAdminAction(routeMatch.params.caseId, action, note));
+      return;
+    }
+    case "listViolationExamples": {
+      sendData(res, 200, requestIdValue, {
+        examples: violationExamples
       });
       return;
     }
