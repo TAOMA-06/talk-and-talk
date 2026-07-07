@@ -1,4 +1,4 @@
-import { createReadStream, existsSync } from "node:fs";
+import { createReadStream, existsSync, readFileSync } from "node:fs";
 import { createServer as createHttpServer } from "node:http";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -9,8 +9,8 @@ const rootDir = join(__dirname, "..");
 const publicDir = join(rootDir, "public");
 
 const DEFAULT_PORT = 8787;
-const DEFAULT_OLLAMA_URL = "http://127.0.0.1:11434";
-const DEFAULT_OLLAMA_MODEL = "jia:latest";
+const DEFAULT_DEEPSEEK_URL = "https://api.deepseek.com";
+const DEFAULT_DEEPSEEK_MODEL = "deepseek-chat";
 const VALID_DECISIONS = new Set(["allow", "review", "warn", "block"]);
 const VALID_SOURCES = new Set(["chat", "community", "report", "profile"]);
 const VALID_ADMIN_ACTIONS = new Set(["confirmViolation", "dismiss", "escalate"]);
@@ -731,7 +731,31 @@ function companionReply(conversation) {
   return message;
 }
 
-function parseOllamaJson(raw) {
+function loadEnvFile() {
+  const envPath = join(rootDir, ".env");
+  if (!existsSync(envPath)) return;
+
+  const lines = readFileSync(envPath, "utf8").split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const separator = trimmed.indexOf("=");
+    if (separator === -1) continue;
+    const key = trimmed.slice(0, separator).trim();
+    let value = trimmed.slice(separator + 1).trim();
+    if (
+      (value.startsWith("\"") && value.endsWith("\"")) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    if (key && process.env[key] === undefined) {
+      process.env[key] = value;
+    }
+  }
+}
+
+function parseModerationJson(raw) {
   const trimmed = String(raw ?? "").trim();
   if (!trimmed) return null;
 
@@ -750,79 +774,39 @@ function parseOllamaJson(raw) {
   }
 }
 
-async function checkOllama({ ollamaUrl, model, disableOllama }) {
-  if (disableOllama) {
+async function checkDeepSeek({ deepseekApiKey, deepseekUrl, deepseekModel, disableDeepSeek }) {
+  if (disableDeepSeek) {
     return {
+      provider: "deepseek",
       connected: false,
-      model,
+      model: deepseekModel,
       reason: "disabled"
+    };
+  }
+
+  if (!deepseekApiKey) {
+    return {
+      provider: "deepseek",
+      connected: false,
+      model: deepseekModel,
+      reason: "missing_api_key"
     };
   }
 
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 1200);
-    const response = await fetch(`${ollamaUrl}/api/tags`, {
-      signal: controller.signal
-    });
-    clearTimeout(timer);
-
-    if (!response.ok) {
-      return {
-        connected: false,
-        model,
-        reason: `http_${response.status}`
-      };
-    }
-
-    const body = await response.json();
-    const models = Array.isArray(body.models) ? body.models.map((item) => item.name) : [];
-    return {
-      connected: true,
-      model,
-      modelAvailable: models.includes(model),
-      availableModels: models
-    };
-  } catch (error) {
-    return {
-      connected: false,
-      model,
-      reason: error.name === "AbortError" ? "timeout" : "unavailable"
-    };
-  }
-}
-
-async function ollamaModeration({ text, source, ruleResult, ollamaUrl, model, disableOllama }) {
-  if (disableOllama || ruleResult.decision === "block") {
-    return null;
-  }
-
-  const prompt = [
-    "你是 Talk&Talk 本地内容安全审查模型，只输出 JSON。",
-    "平台只允许线上陪伴沟通，禁止私联、线下邀约、私下交易、骚扰、低俗内容、广告引流。",
-    "请按 0 到 1 输出 riskScore，并给出 1 到 3 条中文 reasons。",
-    "阈值参考：0.85 block，0.55 warn，0.35 review，低于 0.35 allow。",
-    "JSON schema: {\"riskScore\": number, \"reasons\": string[], \"matchedRules\": string[]}",
-    `source: ${source}`,
-    `text: ${text}`
-  ].join("\n");
-
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 3500);
-    const response = await fetch(`${ollamaUrl}/api/generate`, {
+    const response = await fetch(`${deepseekUrl}/chat/completions`, {
       method: "POST",
       headers: {
-        "content-type": "application/json"
+        "content-type": "application/json",
+        authorization: `Bearer ${deepseekApiKey}`
       },
       body: JSON.stringify({
-        model,
-        prompt,
-        stream: false,
-        options: {
-          temperature: 0,
-          num_ctx: 2048
-        }
+        model: deepseekModel,
+        messages: [{ role: "user", content: "ping" }],
+        max_tokens: 1,
+        temperature: 0
       }),
       signal: controller.signal
     });
@@ -830,33 +814,103 @@ async function ollamaModeration({ text, source, ruleResult, ollamaUrl, model, di
 
     if (!response.ok) {
       return {
-        error: `ollama_http_${response.status}`
+        provider: "deepseek",
+        connected: false,
+        model: deepseekModel,
+        reason: `http_${response.status}`
+      };
+    }
+
+    return {
+      provider: "deepseek",
+      connected: true,
+      model: deepseekModel,
+      reason: null
+    };
+  } catch (error) {
+    return {
+      provider: "deepseek",
+      connected: false,
+      model: deepseekModel,
+      reason: error.name === "AbortError" ? "timeout" : "unavailable"
+    };
+  }
+}
+
+async function deepseekModeration({
+  text,
+  source,
+  deepseekApiKey,
+  deepseekUrl,
+  deepseekModel,
+  disableDeepSeek
+}) {
+  if (disableDeepSeek || !deepseekApiKey) {
+    return null;
+  }
+
+  const systemPrompt = [
+    "你是 Talk&Talk 云端内容安全审查模型，只输出 JSON。",
+    "平台只允许线上陪伴沟通，禁止私联、线下邀约、私下交易、骚扰、低俗内容、广告引流。",
+    "请按 0 到 1 输出 riskScore，并给出 1 到 3 条中文 reasons。",
+    "阈值参考：0.85 block，0.55 warn，0.35 review，低于 0.35 allow。",
+    "JSON schema: {\"riskScore\": number, \"reasons\": string[], \"matchedRules\": string[]}"
+  ].join("\n");
+
+  const userPrompt = [`source: ${source}`, `text: ${text}`].join("\n");
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    const response = await fetch(`${deepseekUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${deepseekApiKey}`
+      },
+      body: JSON.stringify({
+        model: deepseekModel,
+        temperature: 0,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ]
+      }),
+      signal: controller.signal
+    });
+    clearTimeout(timer);
+
+    if (!response.ok) {
+      return {
+        error: `deepseek_http_${response.status}`
       };
     }
 
     const body = await response.json();
-    const parsed = parseOllamaJson(body.response);
+    const content = body.choices?.[0]?.message?.content;
+    const parsed = parseModerationJson(content);
     if (!parsed || typeof parsed.riskScore !== "number") {
       return {
-        error: "ollama_invalid_json"
+        error: "deepseek_invalid_json"
       };
     }
 
     const aiScore = Math.max(0, Math.min(1, parsed.riskScore));
     const reasons = Array.isArray(parsed.reasons) && parsed.reasons.length > 0
       ? parsed.reasons.map(String).slice(0, 3)
-      : ["本地模型识别到潜在风险"];
+      : ["云端模型识别到潜在风险"];
     const matchedRules = Array.isArray(parsed.matchedRules)
       ? parsed.matchedRules.map(String).slice(0, 5)
       : [];
 
-    return moderationResult(aiScore, reasons, [`ollama.${model}`, ...matchedRules], true, {
-      engine: "ollama",
-      model
+    return moderationResult(aiScore, reasons, [`deepseek.${deepseekModel}`, ...matchedRules], true, {
+      engine: "deepseek",
+      model: deepseekModel
     });
   } catch (error) {
     return {
-      error: error.name === "AbortError" ? "ollama_timeout" : "ollama_unavailable"
+      error: error.name === "AbortError" ? "deepseek_timeout" : "deepseek_unavailable"
     };
   }
 }
@@ -864,9 +918,10 @@ async function ollamaModeration({ text, source, ruleResult, ollamaUrl, model, di
 async function moderateText(text, {
   source = "chat",
   conversationId = null,
-  ollamaUrl = DEFAULT_OLLAMA_URL,
-  model = DEFAULT_OLLAMA_MODEL,
-  disableOllama = false
+  deepseekApiKey = "",
+  deepseekUrl = DEFAULT_DEEPSEEK_URL,
+  deepseekModel = DEFAULT_DEEPSEEK_MODEL,
+  disableDeepSeek = false
 } = {}) {
   if (typeof text !== "string" || text.trim().length === 0) {
     throw new AppError("VALIDATION_ERROR", "text is required", 422, {
@@ -884,19 +939,27 @@ async function moderateText(text, {
     recentMessages: conversationId ? recentUserText(conversationId) : []
   };
   const ruleResult = ruleBasedModeration(text.trim(), source, context);
-  const aiResult = await ollamaModeration({
+
+  if (ruleResult.decision === "block") {
+    return {
+      ...ruleResult,
+      aiStatus: "skipped_rule_block"
+    };
+  }
+
+  const aiResult = await deepseekModeration({
     text: text.trim(),
     source,
-    ruleResult,
-    ollamaUrl,
-    model,
-    disableOllama
+    deepseekApiKey,
+    deepseekUrl,
+    deepseekModel,
+    disableDeepSeek
   });
 
   if (!aiResult || aiResult.error) {
     return {
       ...ruleResult,
-      aiStatus: aiResult?.error ?? (disableOllama ? "disabled" : "skipped")
+      aiStatus: aiResult?.error ?? (disableDeepSeek ? "disabled" : "missing_api_key")
     };
   }
 
@@ -908,7 +971,7 @@ async function moderateText(text, {
     true,
     {
       engine: "hybrid",
-      model,
+      model: deepseekModel,
       ruleScore: ruleResult.score,
       aiScore: aiResult.score
     }
@@ -1007,12 +1070,12 @@ async function serveStatic(req, res, pathname) {
 async function handleApi({ req, res, routeMatch, requestIdValue, config }) {
   switch (routeMatch.name) {
     case "health": {
-      const ollama = await checkOllama(config);
+      const moderation = await checkDeepSeek(config);
       sendData(res, 200, requestIdValue, {
         status: "ok",
         service: "Talk&Talk BackendDemo",
         uptimeSeconds: Math.round(process.uptime()),
-        ollama
+        moderation
       });
       return;
     }
@@ -1208,9 +1271,10 @@ async function handleApi({ req, res, routeMatch, requestIdValue, config }) {
 
 function createServer(options = {}) {
   const config = {
-    ollamaUrl: options.ollamaUrl ?? process.env.OLLAMA_URL ?? DEFAULT_OLLAMA_URL,
-    model: options.model ?? process.env.OLLAMA_MODEL ?? DEFAULT_OLLAMA_MODEL,
-    disableOllama: options.disableOllama ?? process.env.DISABLE_OLLAMA === "1"
+    deepseekApiKey: options.deepseekApiKey ?? process.env.DEEPSEEK_API_KEY ?? "",
+    deepseekUrl: options.deepseekUrl ?? process.env.DEEPSEEK_API_URL ?? DEFAULT_DEEPSEEK_URL,
+    deepseekModel: options.deepseekModel ?? process.env.DEEPSEEK_MODEL ?? DEFAULT_DEEPSEEK_MODEL,
+    disableDeepSeek: options.disableDeepSeek ?? process.env.DISABLE_DEEPSEEK === "1"
   };
 
   if (options.reset !== false) {
@@ -1246,13 +1310,22 @@ function createServer(options = {}) {
 }
 
 async function main() {
+  loadEnvFile();
   const port = Number(process.env.PORT || DEFAULT_PORT);
   const server = createServer();
+  const model = process.env.DEEPSEEK_MODEL ?? DEFAULT_DEEPSEEK_MODEL;
+  const hasKey = Boolean(process.env.DEEPSEEK_API_KEY);
+  const disabled = process.env.DISABLE_DEEPSEEK === "1";
 
   server.listen(port, () => {
-    const model = process.env.OLLAMA_MODEL ?? DEFAULT_OLLAMA_MODEL;
     console.log(`Talk&Talk BackendDemo listening on http://localhost:${port}`);
-    console.log(`Ollama model: ${model}. If health shows unavailable, run: ollama serve`);
+    if (disabled) {
+      console.log("Moderation: rules only (DISABLE_DEEPSEEK=1)");
+    } else if (hasKey) {
+      console.log(`Moderation: ${model} (hybrid rules + AI)`);
+    } else {
+      console.log("Moderation: rules only (set DEEPSEEK_API_KEY in .env for AI)");
+    }
   });
 }
 

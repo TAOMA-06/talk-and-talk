@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node src/server.js",
-    "test": "node --test"
+    "test": "DISABLE_DEEPSEEK=1 node --test"
   },
   "engines": {
     "node": ">=22"

@@ -9,3 +9,4 @@ Archive/**/.build/
 Archive/**/node_modules/
 Archive/**/dist/
 Archive/root-build-cache/
+BackendDemo/.env

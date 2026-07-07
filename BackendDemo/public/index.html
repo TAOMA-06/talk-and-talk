@@ -99,16 +99,31 @@
         display: flex;
         align-items: center;
         gap: 10px;
+        width: 100%;
         min-height: 40px;
         padding: 0 12px;
+        border: none;
         border-radius: var(--radius-md);
         color: var(--muted);
         background: transparent;
         font-size: 14px;
         font-weight: 600;
+        text-align: left;
+        cursor: pointer;
+        transition: background 0.15s ease, color 0.15s ease;
+      }
+
+      .nav-item:hover {
+        color: var(--ink);
+        background: var(--mist);
       }
 
       .nav-item.active {
+        color: var(--primary);
+        background: var(--primary-soft);
+      }
+
+      .nav-item.active:hover {
         color: var(--primary);
         background: var(--primary-soft);
       }
@@ -170,6 +185,10 @@
         padding: 16px;
         display: grid;
         gap: 14px;
+      }
+
+      .section-anchor {
+        scroll-margin-top: 88px;
       }
 
       .hero {
@@ -673,10 +692,10 @@
           <p>围绕聊天、社区、举报和资料审核的管理员工作台。</p>
         </div>
         <nav class="nav" aria-label="审核模块">
-          <span class="nav-item active"><span class="nav-dot"></span>工单队列</span>
-          <span class="nav-item"><span class="nav-dot"></span>违规示例</span>
-          <span class="nav-item"><span class="nav-dot"></span>会话证据</span>
-          <span class="nav-item"><span class="nav-dot"></span>样本标注</span>
+          <button class="nav-item active" type="button" data-target="section-queue"><span class="nav-dot"></span>工单队列</button>
+          <button class="nav-item" type="button" data-target="section-examples"><span class="nav-dot"></span>违规示例</button>
+          <button class="nav-item" type="button" data-target="section-evidence"><span class="nav-dot"></span>会话证据</button>
+          <button class="nav-item" type="button" data-target="section-labeling"><span class="nav-dot"></span>样本标注</button>
         </nav>
         <div class="sidebar-foot">
           <span id="healthBadge" class="badge">health</span>
@@ -738,7 +757,7 @@
             </section>
           </div>
 
-          <section class="workbench">
+          <section id="section-queue" class="workbench section-anchor">
             <div class="panel">
               <div class="section-head">
                 <div>
@@ -762,7 +781,7 @@
             </div>
           </section>
 
-          <section class="panel">
+          <section id="section-examples" class="panel section-anchor">
             <div class="section-head">
               <div>
                 <h3>违规示例库</h3>
@@ -774,7 +793,7 @@
           </section>
 
           <section class="lower-grid">
-            <div class="panel">
+            <div id="section-evidence" class="panel section-anchor">
               <div class="section-head">
                 <div>
                   <h3 id="conversationTitle">会话证据</h3>
@@ -785,7 +804,7 @@
               <div id="messageList" class="message-list"></div>
             </div>
 
-            <div class="panel">
+            <div id="section-labeling" class="panel section-anchor">
               <div class="section-head">
                 <div>
                   <h3>复核与标注</h3>
@@ -920,10 +939,10 @@
       }
 
       function renderHealth(data) {
-        const ollama = data.ollama;
-        el.healthBadge.textContent = ollama.connected ? "AI 模式开启" : "规则引擎兜底";
-        el.healthBadge.className = `badge ${ollama.connected ? "allow" : "review"}`;
-        el.modelBadge.textContent = `${ollama.model}${ollama.modelAvailable === false ? " 未列出" : ""}`;
+        const moderation = data.moderation || {};
+        el.healthBadge.textContent = moderation.connected ? "AI 模式开启" : "规则引擎兜底";
+        el.healthBadge.className = `badge ${moderation.connected ? "allow" : "review"}`;
+        el.modelBadge.textContent = moderation.model || "deepseek-chat";
       }
 
       function renderOverview() {
@@ -1304,6 +1323,21 @@
       el.saveLabelButton.addEventListener("click", saveLabel);
       el.exportButton.addEventListener("click", loadLabels);
 
+      function setupNav() {
+        const buttons = document.querySelectorAll(".nav-item[data-target]");
+        for (const button of buttons) {
+          button.addEventListener("click", () => {
+            const target = document.getElementById(button.dataset.target);
+            if (!target) return;
+            for (const item of buttons) {
+              item.classList.toggle("active", item === button);
+            }
+            target.scrollIntoView({ behavior: "smooth", block: "start" });
+          });
+        }
+      }
+
+      setupNav();
       loadAll();
     </script>
   </body>

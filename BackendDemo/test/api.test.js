@@ -4,7 +4,7 @@ import { createServer } from "../src/server.js";
 
 async function withServer(fn) {
   const server = createServer({
-    disableOllama: true
+    disableDeepSeek: true
   });
 
   await new Promise((resolve) => {
@@ -43,14 +43,15 @@ async function request(baseUrl, path, options = {}) {
   return body.data;
 }
 
-test("health reports rule fallback when Ollama is disabled", async () => {
+test("health reports rule fallback when DeepSeek is disabled", async () => {
   await withServer(async (baseUrl) => {
     const data = await request(baseUrl, "/api/health");
 
     assert.equal(data.status, "ok");
-    assert.equal(data.ollama.connected, false);
-    assert.equal(data.ollama.reason, "disabled");
-    assert.equal(data.ollama.model, "jia:latest");
+    assert.equal(data.moderation.provider, "deepseek");
+    assert.equal(data.moderation.connected, false);
+    assert.equal(data.moderation.reason, "disabled");
+    assert.equal(data.moderation.model, "deepseek-chat");
   });
 });
 
@@ -229,4 +230,44 @@ test("reset restores initial in-memory state", async () => {
     assert.equal(reset.labels, 0);
     assert.equal(exported.count, 0);
   });
+});
+
+const deepseekKey = process.env.DEEPSEEK_API_KEY;
+const deepseekTest = deepseekKey ? test : test.skip;
+
+deepseekTest("DeepSeek moderation connects when API key is configured", async () => {
+  const server = createServer({
+    deepseekApiKey: deepseekKey,
+    disableDeepSeek: false
+  });
+
+  await new Promise((resolve) => {
+    server.listen(0, "127.0.0.1", resolve);
+  });
+
+  const address = server.address();
+  const baseUrl = `http://127.0.0.1:${address.port}`;
+
+  try {
+    const health = await request(baseUrl, "/api/health");
+    assert.equal(health.moderation.connected, true);
+
+    const data = await request(baseUrl, "/api/moderate", {
+      method: "POST",
+      body: JSON.stringify({
+        text: "代理兼职赚钱，加我了解详情",
+        source: "community"
+      })
+    });
+
+    assert.ok(data.moderation);
+    assert.equal(data.moderation.usedAI, true);
+  } finally {
+    await new Promise((resolve, reject) => {
+      server.close((error) => {
+        if (error) reject(error);
+        else resolve();
+      });
+    });
+  }
 });
