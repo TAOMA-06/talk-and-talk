@@ -34,6 +34,10 @@ struct ChatView: View {
         if case .communityUser = target { return true }
         return false
     }
+    private var usesBackendChat: Bool {
+        guard let companionId else { return false }
+        return BackendConfig.supportsChat(for: companionId)
+    }
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
@@ -68,6 +72,13 @@ struct ChatView: View {
                         hasPaidChat: hasPaidChat,
                         remaining: remainingTrialMessages,
                         limit: store.freeTrialMessageLimit
+                    )
+                }
+
+                if usesBackendChat {
+                    BackendChatStatusRow(
+                        connected: store.isBackendConnected,
+                        model: store.backendModerationModel
                     )
                 }
 
@@ -123,6 +134,12 @@ struct ChatView: View {
         .sheet(isPresented: $showingReport) {
             ReportSheetForChat(target: target)
                 .presentationDetents([.medium])
+        }
+        .task {
+            if let companionId, BackendConfig.supportsChat(for: companionId) {
+                await store.refreshBackendConnection()
+                await store.syncMessagesFromBackend(for: companionId)
+            }
         }
     }
 
@@ -682,5 +699,25 @@ private struct ReportSheetForChat: View {
             .navigationTitle("举报")
             .navigationBarTitleDisplayMode(.inline)
         }
+    }
+}
+
+private struct BackendChatStatusRow: View {
+    let connected: Bool
+    let model: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(connected ? Color.dsSuccess : Color.dsWarning)
+                .frame(width: 8, height: 8)
+            Text(connected ? "后端已连接 · \(model.isEmpty ? "deepseek-chat" : model)" : "仅本地模式（后端未连接）")
+                .font(.caption)
+                .foregroundStyle(Color.dsTextSecondary)
+            Spacer()
+        }
+        .padding(.horizontal, DS.Space.lg)
+        .padding(.vertical, DS.Space.sm)
+        .background(Color.dsSurface)
     }
 }

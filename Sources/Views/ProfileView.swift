@@ -218,7 +218,7 @@ private struct OperatorNote: View {
                 Label("Demo 说明", systemImage: "info.circle")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(Color.dsTextPrimary)
-                Text("当前版本不接后端、不保存真实身份、不发起真实支付。内容审查默认使用本地规则引擎；配置 MODERATION_API_KEY 后可启用 AI 辅助审查。")
+                Text("陪伴者聊天（林屿/许澈/周映）可接本机 BackendDemo；订单、社区等仍为本地演示。不保存真实身份、不发起真实支付。")
                     .font(.system(size: 13))
                     .foregroundStyle(Color.dsTextSecondary)
                     .lineSpacing(3)

@@ -37,6 +37,9 @@ struct ContentView: View {
         }
         .tint(Color.dsPrimary)
         .background(Color.dsBackground)
+        .task {
+            await store.refreshBackendConnection()
+        }
         .sheet(item: $store.agreementPrompt) { prompt in
             UserAgreementSheet(prompt: prompt) {
                 store.dismissAgreementPrompt()

@@ -177,6 +177,22 @@ DISABLE_DEEPSEEK=1 npm start
 
 ---
 
+### 第 8 步（可选加分）：iOS App 发消息 → Web 后台同步（1 分钟）
+
+**操作：**
+
+1. 确认 BackendDemo 已启动
+2. Xcode 运行 iOS App（模拟器），进入与 **林屿** 的聊天
+3. 确认聊天页显示 **「后端已连接 · deepseek-chat」**
+4. 在 App 里发送：`我们加微信聊吧`
+5. 回到 Web 审核后台，点 **「刷新」**，查看新工单和会话证据
+
+**讲解：**
+
+> 手机端和审核后台已经打通——用户在 App 里发的消息走后端审查，管理员在同一套后台看到拦截结果和证据链。
+
+---
+
 ## 推荐演示文案速查
 
 | 场景 | 文案 | 预期决策 |
@@ -197,6 +213,7 @@ DISABLE_DEEPSEEK=1 npm start
 | 端口被占用 | `PORT=8788 npm start`，浏览器改访问 `http://localhost:8788` |
 | DeepSeek 连不上 / 现场无网 | `DISABLE_DEEPSEEK=1 npm start`，改演示规则引擎兜底 |
 | 左下角显示「规则引擎兜底」 | 检查 `.env` 中 `DEEPSEEK_API_KEY` 是否配置 |
+| iOS 显示「仅本地模式」 | 确认 BackendDemo 已启动；模拟器默认 `http://127.0.0.1:8787` |
 
 ---
 

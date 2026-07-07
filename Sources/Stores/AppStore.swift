@@ -22,6 +22,8 @@ final class AppStore: ObservableObject {
     @Published var trialMessageCountsByCompanionId: [String: Int] = [:]
     @Published var lastModerationFeedback: String?
     @Published var agreementPrompt: AgreementPrompt?
+    @Published var isBackendConnected = false
+    @Published var backendModerationModel = ""
 
     let freeTrialMessageLimit = 5
 
@@ -134,6 +136,36 @@ final class AppStore: ObservableObject {
         remainingTrialMessages(for: companionId) > 0
     }
 
+    func refreshBackendConnection() async {
+        guard BackendConfig.isEnabled, let client = backendClient() else {
+            isBackendConnected = false
+            backendModerationModel = ""
+            return
+        }
+
+        do {
+            let status = try await client.health()
+            isBackendConnected = status.connected
+            backendModerationModel = status.model ?? ""
+        } catch {
+            isBackendConnected = false
+            backendModerationModel = ""
+        }
+    }
+
+    func syncMessagesFromBackend(for companionId: String) async {
+        guard BackendConfig.supportsChat(for: companionId), let client = backendClient() else { return }
+
+        do {
+            let fetched = try await client.fetchMessages(conversationId: companionId)
+            messages.removeAll { $0.conversationId == companionId }
+            messages.append(contentsOf: fetched)
+            isBackendConnected = true
+        } catch {
+            isBackendConnected = false
+        }
+    }
+
     func approvedCommunityPosts() -> [CommunityPost] {
         communityPosts.filter { $0.moderationStatus == .approved }
     }
@@ -244,6 +276,15 @@ final class AppStore: ObservableObject {
             return .block
         }
 
+        if BackendConfig.supportsChat(for: target), BackendConfig.isEnabled, let client = backendClient() {
+            do {
+                return try await sendMessageViaBackend(trimmed, to: target, client: client)
+            } catch {
+                isBackendConnected = false
+                lastModerationFeedback = "后端暂不可用，已切换本地审查"
+            }
+        }
+
         let recentMessages = messages(for: target)
             .filter { $0.senderId == user.id && $0.type == .text }
             .suffix(4)
@@ -290,6 +331,7 @@ final class AppStore: ObservableObject {
         if result.decision != .block {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
                 guard let self else { return }
+                guard !BackendConfig.supportsChat(for: target) else { return }
                 let reply = self.reply(for: target)
                 self.messages.append(Message(
                     id: UUID().uuidString,
@@ -538,6 +580,66 @@ final class AppStore: ObservableObject {
             type: .text,
             timestamp: Date()
         ))
+    }
+
+    private func appendMessage(_ message: Message) {
+        guard !messages.contains(where: { $0.id == message.id }) else { return }
+        messages.append(message)
+    }
+
+    private func backendClient() -> BackendDemoClient? {
+        guard let baseURL = BackendConfig.baseURL else { return nil }
+        return BackendDemoClient(baseURL: baseURL)
+    }
+
+    private func sendMessageViaBackend(
+        _ content: String,
+        to target: ContactTarget,
+        client: BackendDemoClient
+    ) async throws -> ModerationDecision {
+        let response = try await client.sendMessage(
+            conversationId: target.conversationId,
+            content: content,
+            senderId: user.id
+        )
+
+        isBackendConnected = true
+
+        for message in response.messages {
+            appendMessage(message)
+        }
+
+        if let moderationCase = response.moderationCase {
+            insertBackendModerationCase(moderationCase)
+        }
+
+        let result = response.moderation
+
+        switch result.decision {
+        case .block:
+            lastModerationFeedback = "消息未发送：疑似违规内容"
+            if let event = creditService.applyModerationResult(result, to: &user) {
+                creditEvents.insert(event, at: 0)
+            }
+        case .warn:
+            if applyWarnGraceIfNeeded(result: result) {
+                lastModerationFeedback = "已记录第 \(user.warnGraceStrikeCount) 次提醒，请阅读用户协议"
+            } else {
+                if let event = creditService.applyModerationResult(result, to: &user) {
+                    creditEvents.insert(event, at: 0)
+                }
+                lastModerationFeedback = nil
+            }
+        case .review, .allow:
+            lastModerationFeedback = nil
+        }
+
+        return result.decision
+    }
+
+    private func insertBackendModerationCase(_ item: ModerationCase) {
+        moderationCases.removeAll { $0.id == item.id }
+        moderationCases.insert(item, at: 0)
     }
 
     private func insertSystemMessage(_ content: String, target: ContactTarget, type: MessageType = .safety) {
