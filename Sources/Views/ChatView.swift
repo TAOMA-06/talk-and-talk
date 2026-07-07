@@ -82,13 +82,18 @@ struct ChatView: View {
                     )
                 }
 
-                WeChatMessageList(
-                    messages: messages,
-                    currentUser: store.user,
-                    companion: companion,
-                    otherInitials: target.communityInitials ?? "TA"
-                ) { companionId in
-                    store.navigate(.companionDetail(companionId))
+                if usesBackendChat, store.backendChatSyncingCompanionId == companionId {
+                    ProgressView("同步会话…")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    WeChatMessageList(
+                        messages: messages,
+                        currentUser: store.user,
+                        companion: companion,
+                        otherInitials: target.communityInitials ?? "TA"
+                    ) { companionId in
+                        store.navigate(.companionDetail(companionId))
+                    }
                 }
             }
 
@@ -137,8 +142,7 @@ struct ChatView: View {
         }
         .task {
             if let companionId, BackendConfig.supportsChat(for: companionId) {
-                await store.refreshBackendConnection()
-                await store.syncMessagesFromBackend(for: companionId)
+                await store.syncBackendChat(for: companionId)
             }
         }
     }
@@ -583,9 +587,12 @@ private struct WeChatComposerBar: View {
                 }
                 .accessibilityLabel("更多")
 
-                TextField("输入消息", text: $text, axis: .vertical)
-                    .lineLimit(1...3)
+                TextField("输入消息", text: $text)
                     .font(.system(size: 16))
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled(false)
+                    .submitLabel(.send)
+                    .onSubmit(send)
                     .padding(.horizontal, DS.Space.md)
                     .padding(.vertical, DS.Space.sm)
                     .background(Color.dsSurface, in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))

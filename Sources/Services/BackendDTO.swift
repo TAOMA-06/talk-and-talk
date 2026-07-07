@@ -20,6 +20,10 @@ struct BackendMessagesData: Decodable {
     let messages: [BackendMessageDTO]
 }
 
+struct BackendModerationCasesData: Decodable {
+    let cases: [BackendModerationCaseDTO]
+}
+
 struct BackendMessageDTO: Decodable {
     let id: String
     let conversationId: String

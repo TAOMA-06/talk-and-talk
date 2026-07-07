@@ -255,21 +255,6 @@ function initialState() {
         timestamp: new Date(baseTime - 3_200_000).toISOString()
       },
       {
-        id: "m6",
-        conversationId: "c3",
-        senderId: "u3",
-        senderName: "王五",
-        content: "今晚线下见个面吧，我订个酒店。",
-        type: "text",
-        timestamp: new Date(baseTime - 1_800_000).toISOString(),
-        moderation: {
-          decision: "block",
-          score: 0.95,
-          reasons: ["疑似线下邀约", "疑似低俗或越界内容"],
-          usedAI: false
-        }
-      },
-      {
         id: "m7",
         conversationId: "c3",
         senderId: "system",
@@ -375,7 +360,7 @@ function resetState() {
 const blockRules = [
   {
     id: "contact.wechat",
-    patterns: ["加微信", "加v", "加V", "vx", "wx", "v信", "薇信", "微信号", "私加"],
+    patterns: ["加微信", "加个微", "加微", "加威信", "加v", "加V", "vx", "wx", "v信", "薇信", "微信号", "私加"],
     score: 0.92,
     reason: "疑似引导私下联系"
   },
@@ -436,17 +421,40 @@ const reviewRules = [
 ];
 
 function normalizeText(text) {
-  return String(text)
+  const base = String(text)
     .toLowerCase()
     .replaceAll(" ", "")
     .replaceAll("　", "")
+    .replace(/[^\p{L}\p{N}]/gu, "");
+
+  const hasPinyinContact = pinyinContactPatterns.some((pattern) => base.includes(pattern));
+
+  const normalized = base
     .replaceAll("＋", "+")
     .replaceAll("vx", "微信")
     .replaceAll("wx", "微信")
     .replaceAll("加v", "加微")
     .replaceAll("薇", "微")
     .replaceAll("v", "微");
+
+  if (hasPinyinContact) {
+    return `${normalized}加微信`;
+  }
+
+  return normalized;
 }
+
+const pinyinContactPatterns = [
+  "jiagewei",
+  "jiaweixin",
+  "jiageweixin",
+  "jiagewx",
+  "jiawx",
+  "jiagevx",
+  "jiawechat",
+  "addwechat",
+  "jiawei"
+];
 
 function decisionForScore(score) {
   if (score >= 0.85) return "block";
@@ -852,6 +860,7 @@ async function deepseekModeration({
   const systemPrompt = [
     "你是 Talk&Talk 云端内容安全审查模型，只输出 JSON。",
     "平台只允许线上陪伴沟通，禁止私联、线下邀约、私下交易、骚扰、低俗内容、广告引流。",
+    "注意识别拼音、谐音、拆字、英文变体等绕过方式，例如 jia ge wei、add wechat、加个微。",
     "请按 0 到 1 输出 riskScore，并给出 1 到 3 条中文 reasons。",
     "阈值参考：0.85 block，0.55 warn，0.35 review，低于 0.35 allow。",
     "JSON schema: {\"riskScore\": number, \"reasons\": string[], \"matchedRules\": string[]}"

@@ -180,6 +180,12 @@
         flex-wrap: wrap;
       }
 
+      .auto-refresh-status {
+        font-size: 12px;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+
       .content {
         width: min(1320px, 100%);
         padding: 16px;
@@ -692,7 +698,8 @@
           <p>围绕聊天、社区、举报和资料审核的管理员工作台。</p>
         </div>
         <nav class="nav" aria-label="审核模块">
-          <button class="nav-item active" type="button" data-target="section-queue"><span class="nav-dot"></span>工单队列</button>
+          <button class="nav-item active" type="button" data-target="section-queue"><span class="nav-dot"></span>审核队列</button>
+          <button class="nav-item" type="button" data-target="section-quick-review"><span class="nav-dot"></span>即时审查</button>
           <button class="nav-item" type="button" data-target="section-examples"><span class="nav-dot"></span>违规示例</button>
           <button class="nav-item" type="button" data-target="section-evidence"><span class="nav-dot"></span>会话证据</button>
           <button class="nav-item" type="button" data-target="section-labeling"><span class="nav-dot"></span>样本标注</button>
@@ -710,7 +717,8 @@
             <p>处理违规、查看证据、复核误报，并沉淀训练样本。</p>
           </div>
           <div class="toolbar">
-            <button id="refreshButton" class="button" type="button">刷新</button>
+            <span id="autoRefreshStatus" class="auto-refresh-status" aria-live="polite">自动刷新中</span>
+            <button id="refreshButton" class="button" type="button">立即刷新</button>
             <button id="resetButton" class="button danger" type="button">重置演示数据</button>
           </div>
         </header>
@@ -756,6 +764,32 @@
               </div>
             </section>
           </div>
+
+          <section id="section-quick-review" class="panel pad section-anchor quick-review">
+            <div class="section-head">
+              <div>
+                <h3>即时审查测试</h3>
+                <p>在这里输入任意文本，测试规则引擎 + DeepSeek，无需发到聊天会话。iOS 端发消息走的是同一套 <code>/api/moderate</code> 逻辑。</p>
+              </div>
+              <span id="quickDecisionBadge" class="badge">待测试</span>
+            </div>
+            <div class="review-lab">
+              <label>
+                审查文本
+                <textarea id="quickReviewInput" placeholder="例如：我们加微信聊吧 / Jia ge Wei? / 今晚线下见个面"></textarea>
+              </label>
+              <div class="toolbar">
+                <select id="quickSourceSelect" aria-label="来源">
+                  <option value="chat">chat</option>
+                  <option value="community">community</option>
+                  <option value="report">report</option>
+                  <option value="profile">profile</option>
+                </select>
+                <button id="quickReviewButton" class="button primary" type="button">立即审查</button>
+              </div>
+              <div id="quickReviewResult" class="result-box">输入文本后点击「立即审查」查看 block / warn / review / allow 结果</div>
+            </div>
+          </section>
 
           <section id="section-queue" class="workbench section-anchor">
             <div class="panel">
@@ -865,11 +899,15 @@
         labels: []
       };
 
+      const AUTO_REFRESH_MS = 3000;
+      let autoRefreshTimer = null;
+
       const el = {
         healthBadge: document.querySelector("#healthBadge"),
         modelBadge: document.querySelector("#modelBadge"),
         refreshButton: document.querySelector("#refreshButton"),
         resetButton: document.querySelector("#resetButton"),
+        autoRefreshStatus: document.querySelector("#autoRefreshStatus"),
         pendingBadge: document.querySelector("#pendingBadge"),
         resolvedBadge: document.querySelector("#resolvedBadge"),
         statPending: document.querySelector("#statPending"),
@@ -898,7 +936,12 @@
         saveLabelButton: document.querySelector("#saveLabelButton"),
         exportButton: document.querySelector("#exportButton"),
         exportBox: document.querySelector("#exportBox"),
-        toast: document.querySelector("#toast")
+        toast: document.querySelector("#toast"),
+        quickDecisionBadge: document.querySelector("#quickDecisionBadge"),
+        quickReviewInput: document.querySelector("#quickReviewInput"),
+        quickSourceSelect: document.querySelector("#quickSourceSelect"),
+        quickReviewButton: document.querySelector("#quickReviewButton"),
+        quickReviewResult: document.querySelector("#quickReviewResult")
       };
 
       async function api(path, options = {}) {
@@ -1167,15 +1210,30 @@
         }
         el.decisionBadge.textContent = result.decision;
         el.decisionBadge.className = `badge ${escapeHtml(result.decision)}`;
-        const lines = [
+        el.resultBox.textContent = moderationSummary(result);
+      }
+
+      function moderationSummary(result) {
+        return [
           `决策：${result.decision}`,
           `风险：${result.riskLevel}`,
           `分数：${Number(result.score).toFixed(2)}`,
           `原因：${result.reasons.join("；")}`,
           `规则：${result.matchedRules.length ? result.matchedRules.join(", ") : "no-rule"}`,
           `模式：${result.usedAI ? `AI ${result.model || "local"}` : result.aiStatus || "rules"}`
-        ];
-        el.resultBox.textContent = lines.join("\n");
+        ].join("\n");
+      }
+
+      function renderQuickModeration(result) {
+        if (!result) {
+          el.quickDecisionBadge.textContent = "待测试";
+          el.quickDecisionBadge.className = "badge";
+          el.quickReviewResult.textContent = "输入文本后点击「立即审查」查看 block / warn / review / allow 结果";
+          return;
+        }
+        el.quickDecisionBadge.textContent = result.decision;
+        el.quickDecisionBadge.className = `badge ${escapeHtml(result.decision)}`;
+        el.quickReviewResult.textContent = moderationSummary(result);
       }
 
       function renderLabelsExport(data) {
@@ -1223,19 +1281,50 @@
         renderLabelsExport(await api("/api/labels/export"));
       }
 
+      function updateAutoRefreshStatus() {
+        const time = new Date().toLocaleTimeString("zh-CN", { hour12: false });
+        el.autoRefreshStatus.textContent = `自动刷新 · 已更新 ${time}`;
+      }
+
+      async function loadLiveData() {
+        await loadHealth();
+        await loadOverview();
+        await loadConversations();
+        await loadCases();
+        selectConversationForCase();
+        await loadMessages();
+        updateAutoRefreshStatus();
+      }
+
       async function loadAll() {
         try {
-          await loadHealth();
-          await loadOverview();
-          await loadConversations();
-          await loadCases();
+          await loadLiveData();
           await loadExamples();
-          selectConversationForCase();
-          await loadMessages();
           await loadLabels();
           renderModeration(state.lastModeration);
         } catch (error) {
           el.toast.textContent = error.message;
+        }
+      }
+
+      async function pollLiveData() {
+        if (document.hidden) return;
+        try {
+          await loadLiveData();
+        } catch (error) {
+          el.autoRefreshStatus.textContent = `自动刷新失败 · ${error.message}`;
+        }
+      }
+
+      function startAutoRefresh() {
+        stopAutoRefresh();
+        autoRefreshTimer = window.setInterval(pollLiveData, AUTO_REFRESH_MS);
+      }
+
+      function stopAutoRefresh() {
+        if (autoRefreshTimer !== null) {
+          window.clearInterval(autoRefreshTimer);
+          autoRefreshTimer = null;
         }
       }
 
@@ -1255,8 +1344,33 @@
           state.lastReviewText = text;
           el.expectedDecision.value = data.moderation.decision;
           renderModeration(data.moderation);
+          renderQuickModeration(data.moderation);
         } catch (error) {
           el.toast.textContent = error.message;
+        }
+      }
+
+      async function runQuickReview() {
+        const text = el.quickReviewInput.value.trim();
+        if (!text) return;
+        try {
+          const data = await api("/api/moderate", {
+            method: "POST",
+            body: JSON.stringify({
+              text,
+              source: el.quickSourceSelect.value,
+              conversationId: state.selectedConversationId || "c1"
+            })
+          });
+          state.lastModeration = data.moderation;
+          state.lastReviewText = text;
+          el.reviewInput.value = text;
+          el.sourceSelect.value = el.quickSourceSelect.value;
+          el.expectedDecision.value = data.moderation.decision;
+          renderQuickModeration(data.moderation);
+          renderModeration(data.moderation);
+        } catch (error) {
+          el.quickReviewResult.textContent = error.message;
         }
       }
 
@@ -1319,6 +1433,7 @@
         await loadMessages();
       });
       el.reviewButton.addEventListener("click", runReview);
+      el.quickReviewButton.addEventListener("click", runQuickReview);
       el.sendExampleButton.addEventListener("click", sendReviewTextToConversation);
       el.saveLabelButton.addEventListener("click", saveLabel);
       el.exportButton.addEventListener("click", loadLabels);
@@ -1339,6 +1454,17 @@
 
       setupNav();
       loadAll();
+      startAutoRefresh();
+
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) {
+          stopAutoRefresh();
+          el.autoRefreshStatus.textContent = "页面隐藏，已暂停自动刷新";
+          return;
+        }
+        pollLiveData();
+        startAutoRefresh();
+      });
     </script>
   </body>
 </html>

@@ -34,6 +34,11 @@ struct BackendDemoClient: Sendable {
         return data.messages.compactMap(BackendDTOMapper.message(from:))
     }
 
+    func fetchModerationCases() async throws -> [ModerationCase] {
+        let data: BackendModerationCasesData = try await request(path: "/api/moderation-cases")
+        return data.cases.compactMap(BackendDTOMapper.moderationCase(from:))
+    }
+
     func sendMessage(
         conversationId: String,
         content: String,

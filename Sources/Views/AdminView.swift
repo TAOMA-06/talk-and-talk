@@ -19,7 +19,7 @@ private struct AdminHero: View {
                 Text("审核与风控控制台")
                     .font(.system(size: 22, weight: .semibold))
                     .foregroundStyle(Color.dsTextPrimary)
-                Text("规则引擎 + 可选 AI 审查，聊天、社区、举报统一进入工单台。")
+                Text("规则引擎 + DeepSeek 审查，聊天、社区、举报统一进入工单台。")
                     .font(.system(size: 13))
                     .foregroundStyle(Color.dsTextSecondary)
                     .lineSpacing(3)
@@ -33,12 +33,20 @@ private struct AdminMetricGrid: View {
     @EnvironmentObject private var store: AppStore
     private let columns = [GridItem(.flexible()), GridItem(.flexible())]
 
+    private var aiModeValue: String {
+        guard BackendConfig.isEnabled else { return "未启用" }
+        if store.isBackendConnected {
+            return store.backendModerationModel.isEmpty ? "DeepSeek" : store.backendModerationModel
+        }
+        return "未连接"
+    }
+
     var body: some View {
         LazyVGrid(columns: columns, spacing: DS.Space.md) {
             AdminMetric(title: "待审工单", value: "\(store.pendingModerationCount)", symbol: "shield.checkered")
             AdminMetric(title: "今日拦截", value: "\(store.blockedTodayCount)", symbol: "hand.raised")
             AdminMetric(title: "受限用户", value: store.user.accountStatus == .restricted ? "1" : "0", symbol: "person.crop.circle.badge.exclamationmark")
-            AdminMetric(title: "AI 模式", value: ModerationConfig.isAPIEnabled ? "开启" : "规则", symbol: "brain")
+            AdminMetric(title: "AI 模式", value: aiModeValue, symbol: "brain")
         }
     }
 }

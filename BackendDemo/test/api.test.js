@@ -108,7 +108,9 @@ test("blocks high-risk contact, offline, and transfer messages", async () => {
     const riskyTexts = [
       "我们加微信聊吧",
       "今晚线下见个面",
-      "我给你私下转账"
+      "我给你私下转账",
+      "Jia ge Wei?",
+      "加个微"
     ];
 
     for (const content of riskyTexts) {

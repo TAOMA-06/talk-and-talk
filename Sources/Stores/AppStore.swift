@@ -24,6 +24,7 @@ final class AppStore: ObservableObject {
     @Published var agreementPrompt: AgreementPrompt?
     @Published var isBackendConnected = false
     @Published var backendModerationModel = ""
+    @Published var backendChatSyncingCompanionId: String?
 
     let freeTrialMessageLimit = 5
 
@@ -147,22 +148,48 @@ final class AppStore: ObservableObject {
             let status = try await client.health()
             isBackendConnected = status.connected
             backendModerationModel = status.model ?? ""
+            if isBackendConnected {
+                await syncModerationCasesFromBackend(client: client)
+            }
         } catch {
             isBackendConnected = false
             backendModerationModel = ""
         }
     }
 
-    func syncMessagesFromBackend(for companionId: String) async {
+    func syncBackendChat(for companionId: String) async {
         guard BackendConfig.supportsChat(for: companionId), let client = backendClient() else { return }
+
+        backendChatSyncingCompanionId = companionId
+        messages.removeAll { $0.conversationId == companionId }
+        defer { backendChatSyncingCompanionId = nil }
+
+        await refreshBackendConnection()
+
+        guard isBackendConnected else {
+            lastModerationFeedback = "后端暂不可用，请确认 BackendDemo 已启动"
+            return
+        }
 
         do {
             let fetched = try await client.fetchMessages(conversationId: companionId)
-            messages.removeAll { $0.conversationId == companionId }
             messages.append(contentsOf: fetched)
-            isBackendConnected = true
         } catch {
             isBackendConnected = false
+            lastModerationFeedback = "会话同步失败，请检查 BackendDemo 是否在运行"
+        }
+    }
+
+    func syncMessagesFromBackend(for companionId: String) async {
+        await syncBackendChat(for: companionId)
+    }
+
+    private func syncModerationCasesFromBackend(client: BackendDemoClient) async {
+        do {
+            let cases = try await client.fetchModerationCases()
+            moderationCases = cases
+        } catch {
+            // Keep existing cases if the queue sync fails; chat may still work.
         }
     }
 
@@ -281,7 +308,8 @@ final class AppStore: ObservableObject {
                 return try await sendMessageViaBackend(trimmed, to: target, client: client)
             } catch {
                 isBackendConnected = false
-                lastModerationFeedback = "后端暂不可用，已切换本地审查"
+                lastModerationFeedback = "后端暂不可用，请确认 BackendDemo 已启动"
+                return .block
             }
         }
 
@@ -784,12 +812,7 @@ enum MockData {
         Review(id: "r3", companionId: "c2", userName: "王五", rating: 5, content: "把职场沟通拆得很具体，聊完知道下一步怎么做。", createdAt: .now.addingTimeInterval(-54000))
     ]
 
-    static let messages: [Message] = [
-        Message(id: "m1", conversationId: "c1", senderId: "system", content: "平台已开启安全提醒：请勿交换私人联系方式或进行线下邀约。", type: .system, timestamp: .now.addingTimeInterval(-720)),
-        Message(id: "m2", conversationId: "c1", senderId: "c1", content: "晚上好，我是林屿。你可以从任何一个小片段开始说。", type: .text, timestamp: .now.addingTimeInterval(-680)),
-        Message(id: "m3", conversationId: "c1", senderId: "u1", content: "今天有点累，感觉脑子里都是工作的事。", type: .text, timestamp: .now.addingTimeInterval(-610)),
-        Message(id: "m4", conversationId: "c1", senderId: "c1", content: "那我们先不急着解决。你觉得最压着你的，是事情多，还是没人理解？", type: .text, timestamp: .now.addingTimeInterval(-560))
-    ]
+    static let messages: [Message] = []
 
     static let moderationCases: [ModerationCase] = [
         ModerationCase(
