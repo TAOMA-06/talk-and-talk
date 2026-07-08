@@ -287,7 +287,7 @@ final class AppStore: ObservableObject {
     @discardableResult
     func sendMessage(_ content: String, to companionId: String) async -> ModerationDecision {
         guard hasActivePaidChat(with: companionId) || canSendTrialMessage(to: companionId) else {
-            lastModerationFeedback = "免费试聊已用完，请下单后继续沟通。"
+            lastModerationFeedback = "试聊额度已用完，请确认订单后继续沟通。"
             return .block
         }
         return await sendMessage(content, to: .companion(id: companionId))
@@ -373,7 +373,7 @@ final class AppStore: ObservableObject {
     @discardableResult
     func sendTrialMessage(_ content: String, to companionId: String) async -> ModerationDecision {
         guard canSendTrialMessage(to: companionId) else {
-            lastModerationFeedback = "免费试聊已用完，请下单后继续沟通。"
+            lastModerationFeedback = "试聊额度已用完，请确认订单后继续沟通。"
             return .block
         }
 

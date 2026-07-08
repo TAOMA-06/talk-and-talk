@@ -453,10 +453,11 @@ private struct TrialChatStatusRow: View {
                 .background((hasPaidChat ? Color.dsSuccess : Color.dsPrimary).opacity(0.10), in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
 
             VStack(alignment: .leading, spacing: DS.Space.xxs) {
-                Text(hasPaidChat ? "已开通付费沟通" : "试聊额度")
+                Text(hasPaidChat ? "已开通付费沟通" : "试聊额度剩余 \(remaining)/\(limit) 条")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Color.dsTextPrimary)
-                Text(hasPaidChat ? "可继续文字与语音沟通" : "剩余 \(remaining)/\(limit) 条，确认合适后可预约\(priceSuffix)")
+                    .accessibilityIdentifier(hasPaidChat ? "paidChatStatus" : "trialRemaining-\(remaining)")
+                Text(hasPaidChat ? "可继续文字与语音沟通" : "确认合适后可预约\(priceSuffix)")
                     .font(.system(size: 11))
                     .foregroundStyle(Color.dsTextSecondary)
                     .lineLimit(1)
@@ -479,7 +480,7 @@ private struct TrialChatStatusRow: View {
 
     private var priceSuffix: String {
         guard let priceText else { return "" }
-        return " · \(priceText)"
+        return "（\(priceText)）"
     }
 }
 
@@ -734,10 +735,6 @@ private struct SecureComposerBar: View {
 
     var body: some View {
         VStack(spacing: DS.Space.sm) {
-            if let disabledReason {
-                DSBanner(title: "当前无法发送", message: disabledReason, systemImage: "lock.fill", tone: .warning)
-            }
-
             HStack(alignment: .bottom, spacing: DS.Space.sm) {
                 Menu {
                     if canSendRecommendationCard {
@@ -756,9 +753,8 @@ private struct SecureComposerBar: View {
                 .accessibilityLabel("更多沟通操作")
                 .accessibilityIdentifier("chatMoreActions")
 
-                TextField("在平台内输入消息", text: $text, axis: .vertical)
+                TextField("在平台内输入消息", text: $text)
                     .font(.system(size: 15))
-                    .lineLimit(1...4)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled(false)
                     .submitLabel(.send)

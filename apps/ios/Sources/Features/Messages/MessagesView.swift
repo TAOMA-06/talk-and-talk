@@ -253,6 +253,7 @@ private struct MessageSearchBar: View {
                 .textInputAutocapitalization(.never)
                 .submitLabel(.search)
                 .accessibilityLabel("搜索联系人或消息内容")
+                .accessibilityIdentifier("messageSearchBar")
         }
         .padding(.horizontal, DS.Space.md)
         .frame(height: 46)
@@ -261,7 +262,6 @@ private struct MessageSearchBar: View {
             RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous)
                 .stroke(Color.dsBorder.opacity(0.72), lineWidth: DS.Stroke.hairline)
         }
-        .accessibilityIdentifier("messageSearchBar")
     }
 }
 

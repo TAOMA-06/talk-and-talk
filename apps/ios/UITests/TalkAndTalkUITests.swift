@@ -240,7 +240,7 @@ final class TalkAndTalkUITests: XCTestCase {
         app.buttons["detailChat-c1"].tap()
 
         XCTAssertTrue(app.textFields["messageInput"].waitForExistence(timeout: 4))
-        XCTAssertTrue(app.staticTexts["试聊额度"].exists)
+        XCTAssertTrue(app.staticTexts["trialRemaining-5"].exists)
 
         for index in 1...5 {
             let input = app.textFields["messageInput"]
@@ -250,7 +250,7 @@ final class TalkAndTalkUITests: XCTestCase {
             app.buttons["发送"].tap()
         }
 
-        XCTAssertTrue(app.staticTexts["试聊额度"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["trialRemaining-0"].waitForExistence(timeout: 5))
 
         let input = app.textFields["messageInput"]
         input.tap()
@@ -302,14 +302,14 @@ final class TalkAndTalkUITests: XCTestCase {
 
         let input = app.textFields["messageInput"]
         XCTAssertTrue(input.waitForExistence(timeout: 4))
-        XCTAssertTrue(app.staticTexts["试聊额度"].exists)
+        XCTAssertTrue(app.staticTexts["trialRemaining-5"].exists)
         input.tap()
         input.typeText("加微信")
         app.buttons["发送"].tap()
 
         XCTAssertTrue(app.staticTexts["消息未发送：疑似违规内容"].waitForExistence(timeout: 3))
         XCTAssertFalse(app.staticTexts["加微信"].exists)
-        XCTAssertTrue(app.staticTexts["试聊额度"].exists)
+        XCTAssertTrue(app.staticTexts["trialRemaining-5"].exists)
 
         let backButton = app.navigationBars.buttons.firstMatch
         XCTAssertTrue(backButton.waitForExistence(timeout: 3))
