@@ -2,7 +2,7 @@ import Foundation
 
 enum BackendConfig {
     static let supportedCompanionIds: Set<String> = ["c1", "c2", "c3"]
-    static let defaultBaseURL = URL(string: "http://127.0.0.1:8787")!
+    static let defaultBaseURL = URL(string: "http://127.0.0.1:3000")!
 
     static var baseURL: URL? {
         if let env = ProcessInfo.processInfo.environment["BACKEND_BASE_URL"],

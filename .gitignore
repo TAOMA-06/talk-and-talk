@@ -11,4 +11,7 @@ archive/**/.build/
 archive/**/node_modules/
 archive/**/dist/
 archive/legacy/root-build-cache/
-services/api-demo/.env
+services/api/.env
+services/api/node_modules/
+services/api/dist/
+services/api/coverage/

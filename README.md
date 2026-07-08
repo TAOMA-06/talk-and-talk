@@ -1,65 +1,79 @@
 # Talk&Talk
 
-女性友好的线上陪伴服务 **演示工程**（iOS App + 本机后端 + Web 审核后台）。
+女性友好的线上陪伴服务工程（iOS App + 正式 NestJS 后端）。
 
-**新人请先读 → [GUIDE.md](./GUIDE.md)**（产品是什么、**AI 内容识别干什么**、三端架构、常见误区）。
-
----
+新人请先读 [docs/GUIDE.md](./docs/GUIDE.md)。它说明产品边界、AI 内容识别的职责、当前分阶段后端化状态和常见误区。
 
 ## 快速开始
 
 ### iOS App
 
 ```bash
-open TalkAndTalk.xcodeproj
-# Xcode → TalkAndTalk scheme → 模拟器运行
+open apps/ios/TalkAndTalk.xcodeproj
+# Xcode -> TalkAndTalk scheme -> 模拟器运行
 ```
 
-工程由 XcodeGen 生成：`xcodegen generate`
-
-### 后端 + Web 审核后台
+工程由 XcodeGen 生成：
 
 ```bash
-cd BackendDemo
-cp .env.example .env   # 填入 DEEPSEEK_API_KEY
-npm start
+cd apps/ios
+xcodegen generate
 ```
 
-浏览器打开 http://localhost:8787
+模拟器默认正式后端地址为 `http://127.0.0.1:3000`，可用 Scheme 环境变量 `BACKEND_BASE_URL` 覆盖。真机调试时将它设为 Mac 局域网 IP，例如 `http://192.168.1.10:3000`。
 
-> 注意：后端在 **`BackendDemo/`** 目录，不要在仓库根目录执行 `npm start`。
+### 正式后端
 
----
+```bash
+cd services/api
+cp .env.example .env
+npm install
+npm run start:dev
+```
+
+健康检查：
+
+```bash
+curl http://localhost:3000/api/v1/health
+```
+
+Docker 启动 API、Postgres、Redis：
+
+```bash
+docker compose up --build
+```
 
 ## 仓库结构
 
 | 路径 | 说明 |
 |------|------|
-| [GUIDE.md](./GUIDE.md) | **项目总指引**（必读） |
-| `Sources/` | iOS SwiftUI 源码 |
-| [BackendDemo/](./BackendDemo/) | Node 聊天/审查 API + 审核后台页面 |
-| [BackendDemo/DEMO.md](./BackendDemo/DEMO.md) | 老板演示脚本 |
-| `review.md` | iOS 代码逐文件说明（部分描述已过时，架构以 GUIDE 为准） |
-| `Archive/` | 旧实验，非主工程 |
-
----
-
-## 双端联调（iOS + 后端）
-
-1. 终端启动 `BackendDemo`（见上）
-2. Xcode 运行 iOS 模拟器
-3. 打开与 **林屿 (c1)** 的聊天 → 应显示 **「后端已连接」**
-4. 发 `我们加微信聊吧` → App 拦截；Web 后台刷新可见工单
-
-模拟器默认后端地址：`http://127.0.0.1:8787`（可用 Scheme 环境变量 `BACKEND_BASE_URL` 覆盖）。
-
-真机调试：将 `BACKEND_BASE_URL` 设为 Mac 局域网 IP，例如 `http://192.168.1.10:8787`。
-
----
+| [docs/GUIDE.md](./docs/GUIDE.md) | 项目总指引 |
+| [apps/ios/](./apps/ios/) | iOS SwiftUI App |
+| [services/api/](./services/api/) | NestJS + TypeScript 正式后端 |
+| [docs/review.md](./docs/review.md) | iOS 代码逐文件说明 |
+| [archive/](./archive/) | 旧实验，非主工程 |
 
 ## 当前能力边界
 
-- **已接后端**：林屿/许澈/周映（`c1`/`c2`/`c3`）聊天 + 内容审查（规则 + DeepSeek）
-- **本地 mock**：其他陪伴者、订单、支付、社区发帖等
+- **正式后端 Phase 1**：NestJS 工程、模块骨架、统一响应 envelope、全局异常、请求 ID、配置校验、`GET /api/v1/health`、Docker Compose。
+- **iOS 已连接**：启动时可探测正式后端 health；`c1`/`c2`/`c3` 已标记为后端聊天对象。
+- **仍需兜底**：Day 4 聊天/审核接口完成前，聊天接口失败会自动回到 App 本地逻辑。
+- **后续阶段**：聊天与内容审核 API、业务域持久化、管理后台能力会逐步迁移到正式后端。
 
-部署目标：iOS 18+；iOS 26+ 使用 Liquid Glass API（低版本 Material 回退）。
+## 测试
+
+```bash
+cd services/api
+npm test
+npm run test:e2e
+```
+
+iOS 测试需 Xcode：
+
+```bash
+xcodebuild test \
+  -project apps/ios/TalkAndTalk.xcodeproj \
+  -scheme TalkAndTalk \
+  -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.5' \
+  -only-testing:TalkAndTalkTests
+```

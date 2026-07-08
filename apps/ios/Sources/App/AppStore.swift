@@ -30,6 +30,11 @@ final class AppStore: ObservableObject {
 
     private let moderationService: ModerationService = HybridModerationService()
     private let creditService = CreditService()
+    private let backendClientFactory: (URL) -> any BackendAPIClient
+
+    init(backendClientFactory: @escaping (URL) -> any BackendAPIClient = { BackendClient(baseURL: $0) }) {
+        self.backendClientFactory = backendClientFactory
+    }
 
     var currentUserCompanionId: String {
         "self-\(user.id)"
@@ -147,10 +152,7 @@ final class AppStore: ObservableObject {
         do {
             let status = try await client.health()
             isBackendConnected = status.connected
-            backendModerationModel = status.model ?? ""
-            if isBackendConnected {
-                await syncModerationCasesFromBackend(client: client)
-            }
+            backendModerationModel = status.version ?? ""
         } catch {
             isBackendConnected = false
             backendModerationModel = ""
@@ -161,22 +163,22 @@ final class AppStore: ObservableObject {
         guard BackendConfig.supportsChat(for: companionId), let client = backendClient() else { return }
 
         backendChatSyncingCompanionId = companionId
-        messages.removeAll { $0.conversationId == companionId }
         defer { backendChatSyncingCompanionId = nil }
 
         await refreshBackendConnection()
 
         guard isBackendConnected else {
-            lastModerationFeedback = "服务暂时不可用，请稍后重试。"
+            lastModerationFeedback = "服务暂时不可用，已切换本地聊天保护。"
             return
         }
 
         do {
             let fetched = try await client.fetchMessages(conversationId: companionId)
+            messages.removeAll { $0.conversationId == companionId }
             messages.append(contentsOf: fetched)
         } catch {
             isBackendConnected = false
-            lastModerationFeedback = "消息同步失败，请检查网络后重试。"
+            lastModerationFeedback = "消息同步失败，已切换本地聊天保护。"
         }
     }
 
@@ -184,7 +186,7 @@ final class AppStore: ObservableObject {
         await syncBackendChat(for: companionId)
     }
 
-    private func syncModerationCasesFromBackend(client: BackendDemoClient) async {
+    private func syncModerationCasesFromBackend(client: any BackendAPIClient) async {
         do {
             let cases = try await client.fetchModerationCases()
             moderationCases = cases
@@ -308,8 +310,7 @@ final class AppStore: ObservableObject {
                 return try await sendMessageViaBackend(trimmed, to: target, client: client)
             } catch {
                 isBackendConnected = false
-                lastModerationFeedback = "服务暂时不可用，请稍后重试。"
-                return .block
+                lastModerationFeedback = nil
             }
         }
 
@@ -359,7 +360,7 @@ final class AppStore: ObservableObject {
         if result.decision != .block {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
                 guard let self else { return }
-                guard !BackendConfig.supportsChat(for: target) else { return }
+                guard !BackendConfig.supportsChat(for: target) || !self.isBackendConnected else { return }
                 guard case .companion = target else { return }
                 let hasCompanionReply = self.messages(for: target).contains { $0.senderId == target.participantId }
                 guard !hasCompanionReply else { return }
@@ -610,15 +611,15 @@ final class AppStore: ObservableObject {
         messages.append(message)
     }
 
-    private func backendClient() -> BackendDemoClient? {
+    private func backendClient() -> (any BackendAPIClient)? {
         guard let baseURL = BackendConfig.baseURL else { return nil }
-        return BackendDemoClient(baseURL: baseURL)
+        return backendClientFactory(baseURL)
     }
 
     private func sendMessageViaBackend(
         _ content: String,
         to target: ContactTarget,
-        client: BackendDemoClient
+        client: any BackendAPIClient
     ) async throws -> ModerationDecision {
         let response = try await client.sendMessage(
             conversationId: target.conversationId,

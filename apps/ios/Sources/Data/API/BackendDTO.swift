@@ -6,14 +6,27 @@ struct BackendEnvelope<T: Decodable>: Decodable {
 
 struct BackendHealthData: Decodable {
     let status: String
-    let moderation: BackendModerationStatus?
+    let service: String?
+    let version: String?
+    let uptimeSeconds: Int?
+    let dependencies: BackendHealthDependencies?
 }
 
-struct BackendModerationStatus: Decodable {
-    let provider: String?
+struct BackendHealthDependencies: Decodable {
+    let database: BackendDependencyStatus?
+    let redis: BackendDependencyStatus?
+}
+
+struct BackendDependencyStatus: Decodable {
+    let status: String
+    let latencyMs: Int?
+    let message: String?
+}
+
+struct BackendServiceStatus: Decodable {
     let connected: Bool
-    let model: String?
-    let reason: String?
+    let version: String?
+    let status: String
 }
 
 struct BackendMessagesData: Decodable {

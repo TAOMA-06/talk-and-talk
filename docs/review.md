@@ -1,6 +1,6 @@
 # Talk&Talk iOS Demo 代码总览
 
-> **架构与「AI 识别干什么」请以 [GUIDE.md](./GUIDE.md) 为准。** 本文档侧重 iOS 逐文件说明；其中「完全本地、不接后端」等描述已部分过时（c1/c2/c3 聊天现已接 BackendDemo）。
+> **架构与「AI 识别干什么」请以 [GUIDE.md](./GUIDE.md) 为准。** 本文档侧重 iOS 逐文件说明；当前 Phase 1 只连接正式后端 health，聊天与审核仍由 App 本地逻辑兜底。
 
 ## 1. 项目概述
 

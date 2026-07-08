@@ -1,0 +1,60 @@
+services:
+  api:
+    build:
+      context: ./services/api
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      API_PREFIX: api/v1
+      APP_VERSION: 0.1.0
+      DATABASE_URL: postgres://talk:talk@postgres:5432/talk_and_talk
+      REDIS_URL: redis://redis:6379
+      CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+      JWT_ACCESS_SECRET: docker-local-access-secret
+      JWT_REFRESH_SECRET: docker-local-refresh-secret
+      DEEPSEEK_API_KEY: ""
+      DEEPSEEK_URL: https://api.deepseek.com
+      DEEPSEEK_MODEL: deepseek-chat
+      WECHAT_PAY_APP_ID: ""
+      WECHAT_PAY_MCH_ID: ""
+      WECHAT_PAY_API_V3_KEY: ""
+      WECHAT_PAY_PRIVATE_KEY_PATH: ""
+      WECHAT_PAY_CERT_SERIAL_NO: ""
+      APPLE_SIGN_IN_BUNDLE_ID: ""
+      SMS_PROVIDER: none
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: talk_and_talk
+      POSTGRES_USER: talk
+      POSTGRES_PASSWORD: talk
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U talk -d talk_and_talk"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres-data:
