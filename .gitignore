@@ -5,8 +5,10 @@ xcuserdata/
 *.xcuserstate
 TalkAndTalk.xcodeproj/project.xcworkspace/xcuserdata/
 TalkAndTalk.xcodeproj/xcuserdata/
-Archive/**/.build/
-Archive/**/node_modules/
-Archive/**/dist/
-Archive/root-build-cache/
-BackendDemo/.env
+apps/ios/TalkAndTalk.xcodeproj/project.xcworkspace/xcuserdata/
+apps/ios/TalkAndTalk.xcodeproj/xcuserdata/
+archive/**/.build/
+archive/**/node_modules/
+archive/**/dist/
+archive/legacy/root-build-cache/
+services/api-demo/.env

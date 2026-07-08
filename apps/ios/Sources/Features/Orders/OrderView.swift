@@ -3,6 +3,7 @@ import SwiftUI
 struct OrderView: View {
     let companionId: String
     @EnvironmentObject private var store: AppStore
+    @Environment(\.dismiss) private var dismiss
     @State private var selectedThemeId = ""
     @State private var selectedDuration = 30
     @State private var agreedToRules = false
@@ -26,8 +27,8 @@ struct OrderView: View {
                 PricePanel(duration: selectedDuration, totalPrice: totalPrice)
                 RulesPanel(agreedToRules: $agreedToRules)
                 DSPrimaryButton(
-                    title: isPaying ? "模拟支付中..." : "确认并进入沟通",
-                    systemImage: isPaying ? "hourglass" : "lock.fill",
+                    title: isPaying ? "正在确认..." : "确认订单并继续沟通",
+                    systemImage: isPaying ? "hourglass" : "bubble.left.and.bubble.right.fill",
                     isEnabled: agreedToRules && !isPaying,
                     isLoading: isPaying
                 ) {
@@ -35,7 +36,13 @@ struct OrderView: View {
                 }
                 .accessibilityIdentifier("confirmOrderButton")
             } else {
-                EmptyStateView(symbol: "cart.badge.questionmark", title: "订单对象不存在", subtitle: "请返回重新选择陪伴者。")
+                EmptyStateView(
+                    symbol: "cart.badge.questionmark",
+                    title: "暂时无法确认订单",
+                    subtitle: "这位陪伴者的信息暂时不可用，请返回重新选择。",
+                    actionTitle: "返回上一页",
+                    action: { dismiss() }
+                )
             }
         }
         .onAppear {
@@ -81,10 +88,10 @@ private struct OrderTrustPoints: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, DS.Space.sm)
-                .background(Color.dsSurface, in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
+                .background(Color.dsSurfaceElevated, in: RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous))
                 .overlay {
-                    RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous)
-                        .stroke(Color.dsBorder, lineWidth: 1)
+                    RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous)
+                        .stroke(Color.dsBorder.opacity(0.72), lineWidth: DS.Stroke.hairline)
                 }
             }
         }
@@ -117,26 +124,20 @@ private struct VerificationGate: View {
     @EnvironmentObject private var store: AppStore
 
     var body: some View {
-        SoftCard {
-            HStack(alignment: .top, spacing: DS.Space.md) {
-                Image(systemName: store.user.isVerified ? "checkmark.seal.fill" : "person.badge.key")
-                    .foregroundStyle(store.user.isVerified ? Color.dsSuccess : Color.dsWarning)
-                VStack(alignment: .leading, spacing: DS.Space.xxs) {
-                    Text(store.user.isVerified ? "18+ 实名已完成" : "下单前需完成 18+ 实名")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Color.dsTextPrimary)
-                    Text(store.user.isVerified ? "演示版已通过本地模拟实名与年龄核验。" : "不采集真实身份证，仅模拟姓名、年龄、人脸和手机号校验流程。")
-                        .font(.system(size: 13))
-                        .foregroundStyle(Color.dsTextSecondary)
+        DSBanner(
+            title: store.user.isVerified ? "18+ 实名已完成" : "先完成 18+ 实名",
+            message: store.user.isVerified ? "可以继续确认订单，沟通全程留在平台内。" : "完成实名与年龄核验后，再继续确认订单。",
+            systemImage: store.user.isVerified ? "checkmark.seal.fill" : "person.badge.key",
+            tone: store.user.isVerified ? .success : .warning
+        )
+        .overlay(alignment: .trailing) {
+            if !store.user.isVerified {
+                Button("去认证") {
+                    store.navigate(.verify)
                 }
-                Spacer()
-                if !store.user.isVerified {
-                    Button("去认证") {
-                        store.navigate(.verify)
-                    }
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Color.dsPrimary)
-                }
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Color.dsPrimary)
+                .padding(.trailing, DS.Space.md)
             }
         }
     }
@@ -196,11 +197,11 @@ private struct SelectableTile: View {
             .foregroundStyle(isSelected ? .white : Color.dsTextPrimary)
             .frame(maxWidth: .infinity)
             .padding(.vertical, DS.Space.md)
-            .background(isSelected ? Color.dsPrimary : Color.dsSurface, in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
+            .background(isSelected ? Color.dsPrimary : Color.dsSurfaceElevated, in: RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous))
             .overlay {
                 if !isSelected {
-                    RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous)
-                        .stroke(Color.dsBorder, lineWidth: 1)
+                    RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous)
+                        .stroke(Color.dsBorder.opacity(0.72), lineWidth: DS.Stroke.hairline)
                 }
             }
         }
@@ -223,12 +224,12 @@ private struct PricePanel: View {
                 HStack {
                     Text("平台担保")
                     Spacer()
-                    Text("模拟冻结资金")
+                    Text("资金托管中")
                 }
                 HStack(alignment: .top, spacing: DS.Space.sm) {
                     Image(systemName: "bubble.left.and.bubble.right.fill")
                         .foregroundStyle(Color.dsPrimary)
-                    Text("下单后可继续当前聊天，已发送的试聊内容会保留。")
+                    Text("确认后会进入聊天；如果是从试聊过来，已有内容会保留。")
                         .foregroundStyle(Color.dsTextSecondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }

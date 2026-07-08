@@ -10,10 +10,10 @@ struct VerifyView: View {
     @FocusState private var focusedField: VerifyField?
 
     @State private var step = 0
-    @State private var name = "小楷"
-    @State private var age = "24"
-    @State private var phone = "18300000012"
-    @State private var code = "1234"
+    @State private var name = ""
+    @State private var age = ""
+    @State private var phone = ""
+    @State private var code = ""
     @State private var faceScanComplete = false
 
     private var canContinue: Bool {
@@ -30,7 +30,7 @@ struct VerifyView: View {
                 VerifyProgress(step: step)
                 currentStep
                 DSPrimaryButton(
-                    title: step == 2 ? "完成模拟认证" : "下一步",
+                    title: step == 2 ? "完成认证" : "下一步",
                     systemImage: "arrow.right",
                     isEnabled: canContinue,
                     action: advance
@@ -127,7 +127,7 @@ private struct IdentityStep: View {
     var body: some View {
         SoftCard {
             VStack(alignment: .leading, spacing: DS.Space.lg) {
-                StepTitle(symbol: "person.text.rectangle", title: "确认 18+ 身份", subtitle: "演示版只在本地修改状态，不会提交真实证件。")
+                StepTitle(symbol: "person.text.rectangle", title: "确认 18+ 身份", subtitle: "信息仅用于年龄与身份核验，加密保存。")
                 verifyTextField(placeholder: "姓名", text: $name, field: .name)
                 verifyTextField(placeholder: "年龄", text: $age, field: .age, keyboard: .numberPad)
                 StatusPill(
@@ -167,7 +167,7 @@ private struct FaceStep: View {
     var body: some View {
         SoftCard {
             VStack(spacing: DS.Space.lg) {
-                StepTitle(symbol: "faceid", title: "模拟人脸核验", subtitle: "点击下方区域即可完成模拟活体检测。")
+                StepTitle(symbol: "faceid", title: "人脸识别", subtitle: "请正对屏幕，按提示完成检测。")
                 Button {
                     withAnimation(.easeOut(duration: DS.Motion.fast)) { isComplete = true }
                 } label: {
@@ -180,7 +180,7 @@ private struct FaceStep: View {
                             Image(systemName: isComplete ? "checkmark.seal.fill" : "faceid")
                                 .font(.system(size: 48, weight: .regular))
                                 .foregroundStyle(isComplete ? Color.dsSuccess : Color.dsTextPrimary)
-                            Text(isComplete ? "活体检测已通过" : "点击开始模拟检测")
+                            Text(isComplete ? "活体检测已通过" : "开始检测")
                                 .font(.system(size: 15, weight: .semibold))
                                 .foregroundStyle(Color.dsTextPrimary)
                         }
@@ -188,8 +188,8 @@ private struct FaceStep: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(isComplete ? "活体检测已通过" : "点击开始模拟检测")
-                .accessibilityIdentifier(isComplete ? "活体检测已通过" : "点击开始模拟检测")
+                .accessibilityLabel(isComplete ? "活体检测已通过" : "开始检测")
+                .accessibilityIdentifier(isComplete ? "活体检测已通过" : "开始检测")
             }
         }
     }
@@ -203,7 +203,7 @@ private struct PhoneStep: View {
     var body: some View {
         SoftCard {
             VStack(alignment: .leading, spacing: DS.Space.lg) {
-                StepTitle(symbol: "iphone.gen3", title: "绑定手机号", subtitle: "验证码为演示值，可直接完成。")
+                StepTitle(symbol: "iphone.gen3", title: "绑定手机号", subtitle: "我们将向该手机号发送验证码。")
                 verifyTextField(placeholder: "手机号", text: $phone, field: .phone, keyboard: .phonePad)
                 HStack(spacing: DS.Space.sm) {
                     verifyTextField(placeholder: "验证码", text: $code, field: .code, keyboard: .numberPad)

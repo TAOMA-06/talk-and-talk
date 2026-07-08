@@ -134,8 +134,10 @@ private extension View {
                     VerifyView()
                 case .safetyCenter:
                     SafetyCenterView()
+#if DEBUG
                 case .admin:
                     AdminView()
+#endif
                 }
             }
         }

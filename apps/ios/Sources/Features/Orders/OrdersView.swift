@@ -31,13 +31,13 @@ struct OrdersView: View {
     }
 
     private var sectionSubtitle: String {
-        store.user.gender == .male ? "别人预约你的未完成服务" : "本地模拟订单状态"
+        store.user.gender == .male ? "别人预约你的未完成服务" : "查看预约与沟通记录"
     }
 
     @ViewBuilder
     private var customerOrdersContent: some View {
         if store.orders.isEmpty {
-            EmptyStateView(symbol: "calendar.badge.clock", title: "暂无订单", subtitle: "从发现页选择一个陪伴者，完成一次演示下单。")
+            EmptyStateView(symbol: "calendar.badge.clock", title: "暂无订单", subtitle: "去发现页选择陪伴者，开始第一次沟通。")
         } else {
             LazyVStack(spacing: DS.Space.md) {
                 ForEach(store.orders) { order in
@@ -245,13 +245,6 @@ private struct ServiceCustomerAvatar: View {
     let initials: String
 
     var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous)
-                .fill(Color.dsPrimary.opacity(0.12))
-            Text(initials)
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(Color.dsPrimary)
-        }
-        .frame(width: 48, height: 48)
+        DSInitialsAvatar(initials: initials, tone: .primary, size: 48)
     }
 }

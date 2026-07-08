@@ -43,7 +43,9 @@ enum AppRoute: Hashable {
     case review(String)
     case verify
     case safetyCenter
+#if DEBUG
     case admin
+#endif
 }
 
 enum AvailabilityStatus: String, Codable, Hashable {

@@ -361,10 +361,28 @@ final class TalkAndTalkUITests: XCTestCase {
     private func completeVerification(in app: XCUIApplication) {
         app.buttons["先完成 18+ 认证"].tap()
         XCTAssertTrue(app.staticTexts["确认 18+ 身份"].waitForExistence(timeout: 3))
+
+        let nameField = app.textFields.element(boundBy: 0)
+        nameField.tap()
+        nameField.typeText("小楷")
+
+        let ageField = app.textFields.element(boundBy: 1)
+        ageField.tap()
+        ageField.typeText("24")
+
         app.buttons["下一步"].tap()
-        app.buttons["点击开始模拟检测"].tap()
+        app.buttons["开始检测"].tap()
         app.buttons["下一步"].tap()
-        app.buttons["完成模拟认证"].tap()
+
+        let phoneField = app.textFields.element(boundBy: 0)
+        phoneField.tap()
+        phoneField.typeText("18300000012")
+
+        let codeField = app.textFields.element(boundBy: 1)
+        codeField.tap()
+        codeField.typeText("123456")
+
+        app.buttons["完成认证"].tap()
         XCTAssertTrue(app.buttons["看看谁在线"].waitForExistence(timeout: 3))
     }
 }

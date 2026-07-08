@@ -5,7 +5,7 @@ struct ReviewView: View {
     @EnvironmentObject private var store: AppStore
     @Environment(\.dismiss) private var dismiss
     @State private var rating = 5
-    @State private var content = "沟通过程很安心，边界提醒也清楚。"
+    @State private var content = ""
     @State private var submitted = false
 
     private var companion: Companion? { store.companion(by: companionId) }
@@ -107,26 +107,7 @@ private struct ReviewEditor: View {
         SoftCard {
             VStack(alignment: .leading, spacing: DS.Space.md) {
                 SectionHeader(title: "评价内容", subtitle: "帮助其他用户理解服务体验")
-                ZStack(alignment: .topLeading) {
-                    if content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        Text("写下你的感受...")
-                            .font(.system(size: 15))
-                            .foregroundStyle(Color.dsTextSecondary)
-                            .padding(.horizontal, DS.Space.sm)
-                            .padding(.vertical, DS.Space.md)
-                    }
-                    TextEditor(text: $content)
-                        .font(.system(size: 15))
-                        .frame(minHeight: 120, maxHeight: 160)
-                        .scrollContentBackground(.hidden)
-                        .padding(.horizontal, DS.Space.xxs)
-                        .padding(.vertical, DS.Space.sm)
-                }
-                .background(Color.dsBackground, in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous)
-                        .stroke(Color.dsBorder, lineWidth: 1)
-                }
+                DSTextEditor(placeholder: "写下你的感受...", text: $content, minHeight: 120)
             }
         }
     }
@@ -144,7 +125,7 @@ private struct SuccessPanel: View {
                 Text("评价已提交")
                     .font(.system(size: 22, weight: .semibold))
                     .foregroundStyle(Color.dsTextPrimary)
-                Text("订单已完成，评价已写入本地 mock 数据。")
+                Text("感谢你的评价，这会帮助其他人做选择。")
                     .font(.system(size: 13))
                     .foregroundStyle(Color.dsTextSecondary)
                 DSPrimaryButton(title: "回到发现", systemImage: "house", action: onFinish)

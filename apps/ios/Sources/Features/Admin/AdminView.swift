@@ -1,10 +1,11 @@
 import SwiftUI
 
+#if DEBUG
 struct AdminView: View {
     @EnvironmentObject private var store: AppStore
 
     var body: some View {
-        AppScaffold(title: "演示后台", spacing: DS.Space.lg, bottomPadding: DS.Space.xxl) {
+        AppScaffold(title: "内容安全工作台", spacing: DS.Space.lg, bottomPadding: DS.Space.xxl) {
             AdminHero()
             AdminMetricGrid()
             ModerationQueue()
@@ -16,10 +17,10 @@ private struct AdminHero: View {
     var body: some View {
         SoftCard {
             VStack(alignment: .leading, spacing: DS.Space.sm) {
-                Text("审核与风控控制台")
+                Text("平台安全运营")
                     .font(.system(size: 22, weight: .semibold))
                     .foregroundStyle(Color.dsTextPrimary)
-                Text("规则引擎 + DeepSeek 审查，聊天、社区、举报统一进入工单台。")
+                Text("聊天、社区与举报内容会统一进入平台安全复核流程。")
                     .font(.system(size: 13))
                     .foregroundStyle(Color.dsTextSecondary)
                     .lineSpacing(3)
@@ -43,10 +44,10 @@ private struct AdminMetricGrid: View {
 
     var body: some View {
         LazyVGrid(columns: columns, spacing: DS.Space.md) {
-            AdminMetric(title: "待审工单", value: "\(store.pendingModerationCount)", symbol: "shield.checkered")
+            AdminMetric(title: "待复核内容", value: "\(store.pendingModerationCount)", symbol: "shield.checkered")
             AdminMetric(title: "今日拦截", value: "\(store.blockedTodayCount)", symbol: "hand.raised")
             AdminMetric(title: "受限用户", value: store.user.accountStatus == .restricted ? "1" : "0", symbol: "person.crop.circle.badge.exclamationmark")
-            AdminMetric(title: "AI 模式", value: aiModeValue, symbol: "brain")
+            AdminMetric(title: "安全模型", value: aiModeValue, symbol: "brain")
         }
     }
 }
@@ -80,7 +81,7 @@ private struct ModerationQueue: View {
     var body: some View {
         SoftCard {
             VStack(alignment: .leading, spacing: DS.Space.md) {
-                SectionHeader(title: "审核队列", subtitle: "资料、聊天、举报统一处理")
+                SectionHeader(title: "复核队列", subtitle: "资料、聊天、举报统一处理")
                 if let feedback {
                     Text(feedback)
                         .font(.system(size: 12, weight: .medium))
@@ -91,7 +92,7 @@ private struct ModerationQueue: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 if store.moderationCases.isEmpty {
-                    EmptyStateView(symbol: "tray", title: "暂无工单", subtitle: "触发风控或举报后会出现在这里。")
+                    EmptyStateView(symbol: "tray", title: "暂无待处理内容", subtitle: "触发平台安全规则或收到举报后会出现在这里。")
                 } else {
                     ForEach(store.moderationCases) { item in
                         ModerationCaseRow(item: item) { message in
@@ -124,12 +125,12 @@ private struct ModerationCaseRow: View {
                     Text("\(item.category) · 风险\(item.riskLevel.rawValue) · \(item.status.displayName)")
                         .font(.system(size: 11))
                         .foregroundStyle(Color.dsTextSecondary)
-                    Text("AI 分数 \(String(format: "%.2f", item.aiScore)) · \(item.aiReason)")
+                    Text("风险评分 \(String(format: "%.2f", item.aiScore)) · \(item.aiReason)")
                         .font(.system(size: 11))
                         .foregroundStyle(Color.dsTextSecondary)
                         .lineLimit(2)
                     if item.usedAI {
-                        TrustMicroBadge(text: "AI 参与", tone: .neutral)
+                        TrustMicroBadge(text: "辅助识别", tone: .neutral)
                     }
                 }
                 Spacer()
@@ -144,12 +145,12 @@ private struct ModerationCaseRow: View {
                     .tint(Color.dsDanger)
                     Button("误报驳回") {
                         store.resolveModerationCase(id: item.id, action: .dismiss)
-                        onAction("已驳回误报，演示信用分已恢复。")
+                        onAction("已驳回误报，安全分已恢复。")
                     }
                     .buttonStyle(.bordered)
-                    Button("升级人工") {
+                    Button("转人工复核") {
                         store.resolveModerationCase(id: item.id, action: .escalate)
-                        onAction("已升级人工复核，工单保留在审核队列中。")
+                        onAction("已转入人工复核，内容会继续保留在复核队列中。")
                     }
                     .buttonStyle(.bordered)
                 }
@@ -176,3 +177,4 @@ private struct ModerationCaseRow: View {
         }
     }
 }
+#endif

@@ -52,7 +52,7 @@ struct ChatView: View {
                     canStartCall: companion != nil,
                     openCompanion: {
                         if let companionId {
-                            store.navigate(.companionHomepage(companionId))
+                            store.navigate(.companionDetail(companionId))
                         }
                     },
                     toggleCall: toggleCall,
@@ -72,13 +72,6 @@ struct ChatView: View {
                         hasPaidChat: hasPaidChat,
                         remaining: remainingTrialMessages,
                         limit: store.freeTrialMessageLimit
-                    )
-                }
-
-                if usesBackendChat {
-                    BackendChatStatusRow(
-                        connected: store.isBackendConnected,
-                        model: store.backendModerationModel
                     )
                 }
 
@@ -124,14 +117,14 @@ struct ChatView: View {
             )
         }
         .alert("免费试聊已用完", isPresented: $showingTrialPaywall) {
-            Button("继续沟通") {
+            Button("确认订单后继续") {
                 if let companionId {
                     store.navigate(.order(companionId))
                 }
             }
             Button("稍后再说", role: .cancel) {}
         } message: {
-            Text("免费试聊已用完，继续沟通需下单。下单后可以回到当前聊天继续。")
+            Text("试聊内容会保留，确认订单后可以回到当前聊天继续沟通。")
         }
         .onReceive(timer) { _ in
             if isCallActive { seconds += 1 }
@@ -225,7 +218,7 @@ private struct WeChatChatHeader: View {
                                     .font(.system(size: 15, weight: .semibold))
                                     .foregroundStyle(Color.dsTextPrimary)
                                     .lineLimit(1)
-                                Text(isCallActive ? "语音沟通中 \(format(seconds))" : "点击进入主页")
+                                Text(isCallActive ? "语音沟通中 \(format(seconds))" : "查看资料与服务边界")
                                     .font(.system(size: 11, weight: .medium))
                                     .foregroundStyle(Color.dsTextSecondary)
                                     .lineLimit(1)
@@ -248,40 +241,20 @@ private struct WeChatChatHeader: View {
                 Spacer(minLength: DS.Space.sm)
 
                 if canStartCall {
-                    Button(action: toggleCall) {
-                        Image(systemName: isCallActive ? "phone.down.fill" : "phone.fill")
-                            .font(.system(size: 14, weight: .semibold))
-                            .frame(width: 32, height: 32)
-                            .foregroundStyle(isCallActive ? .white : Color.dsTextPrimary)
-                            .background(isCallActive ? Color.dsDanger : Color.dsSurface, in: Circle())
-                    }
+                    DSIconButton(
+                        systemImage: isCallActive ? "phone.down.fill" : "phone.fill",
+                        tone: isCallActive ? .danger : .neutral,
+                        size: 34,
+                        action: toggleCall
+                    )
                     .accessibilityLabel(isCallActive ? "结束语音" : "开始语音")
                 }
 
-                Button(action: onReport) {
-                    Image(systemName: "exclamationmark.bubble")
-                        .font(.system(size: 14, weight: .semibold))
-                        .frame(width: 32, height: 32)
-                        .foregroundStyle(Color.dsTextPrimary)
-                        .background(Color.dsSurface, in: Circle())
-                }
+                DSIconButton(systemImage: "exclamationmark.bubble", size: 34, action: onReport)
                 .accessibilityLabel("举报")
             }
             .padding(.horizontal, DS.Space.lg)
             .padding(.vertical, DS.Space.sm)
-
-            HStack(spacing: DS.Space.sm) {
-                Text("AI+规则审查")
-                Text("禁止私下交易")
-                if let companion {
-                    Text(companion.isOnline ? "在线" : "可预约")
-                }
-            }
-            .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(Color.dsTextSecondary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, DS.Space.lg)
-            .padding(.bottom, DS.Space.sm)
 
             Divider()
         }
@@ -297,18 +270,9 @@ private struct ModerationFeedbackBar: View {
     let text: String
 
     var body: some View {
-        HStack(spacing: DS.Space.sm) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(Color.dsDanger)
-            Text(text)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(Color.dsDanger)
-                .lineLimit(2)
-            Spacer()
-        }
+        DSBanner(title: text, systemImage: "exclamationmark.triangle.fill", tone: .danger)
         .padding(.horizontal, DS.Space.lg)
-        .padding(.vertical, DS.Space.sm)
-        .background(Color.dsDanger.opacity(0.08))
+        .padding(.vertical, DS.Space.xxs)
     }
 }
 
@@ -316,12 +280,9 @@ private struct RestrictionBanner: View {
     let text: String
 
     var body: some View {
-        Text(text)
-            .font(.system(size: 11))
-            .foregroundStyle(Color.dsTextSecondary)
+        DSBanner(title: text, systemImage: "lock.fill", tone: .warning)
             .padding(.horizontal, DS.Space.lg)
-            .padding(.vertical, DS.Space.sm)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, DS.Space.xxs)
     }
 }
 
@@ -415,12 +376,12 @@ private struct WeChatMessageBubble: View {
             if isCurrentUser {
                 Spacer(minLength: 56)
                 bubble
-                UserInitialsAvatar(initials: String(currentUser.name.prefix(1)), color: Color.dsPrimary)
+                UserInitialsAvatar(initials: String(currentUser.name.prefix(1)), tone: .primary)
             } else {
                 if let companion {
                     CompanionAvatar(companion: companion, size: 36)
                 } else {
-                    UserInitialsAvatar(initials: String(otherInitials.prefix(1)), color: Color.dsTextSecondary)
+                    UserInitialsAvatar(initials: String(otherInitials.prefix(1)), tone: .neutral)
                 }
                 bubble
                 Spacer(minLength: 56)
@@ -440,7 +401,7 @@ private struct WeChatMessageBubble: View {
             .overlay {
                 if !isCurrentUser {
                     RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous)
-                        .stroke(Color.dsBorder.opacity(0.55), lineWidth: 1)
+                        .stroke(Color.dsBorder.opacity(0.55), lineWidth: DS.Stroke.hairline)
                 }
             }
             .frame(maxWidth: 260, alignment: isCurrentUser ? .trailing : .leading)
@@ -461,12 +422,12 @@ private struct RecommendationCardRow: View {
             if isCurrentUser {
                 Spacer(minLength: 56)
                 card
-                UserInitialsAvatar(initials: String(currentUser.name.prefix(1)), color: Color.dsPrimary)
+                UserInitialsAvatar(initials: String(currentUser.name.prefix(1)), tone: .primary)
             } else {
                 if let chatCompanion {
                     CompanionAvatar(companion: chatCompanion, size: 36)
                 } else {
-                    UserInitialsAvatar(initials: String(otherInitials.prefix(1)), color: Color.dsTextSecondary)
+                    UserInitialsAvatar(initials: String(otherInitials.prefix(1)), tone: .neutral)
                 }
                 card
                 Spacer(minLength: 56)
@@ -507,10 +468,10 @@ private struct RecommendationCardRow: View {
             }
             .padding(DS.Space.md)
             .frame(maxWidth: 260, alignment: .leading)
-            .background(Color.dsSurface, in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
+            .background(Color.dsSurfaceElevated, in: RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous)
-                    .stroke(Color.dsBorder, lineWidth: 1)
+                RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous)
+                    .stroke(Color.dsBorder.opacity(0.72), lineWidth: DS.Stroke.hairline)
             }
         }
         .buttonStyle(DSPressButtonStyle())
@@ -538,17 +499,10 @@ private struct CenteredSystemMessage: View {
 
 private struct UserInitialsAvatar: View {
     let initials: String
-    let color: Color
+    var tone: DSBadge.Tone
 
     var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous)
-                .fill(color.opacity(0.14))
-            Text(initials)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(color)
-        }
-        .frame(width: 36, height: 36)
+        DSInitialsAvatar(initials: initials, tone: tone, size: 36)
     }
 }
 
@@ -587,50 +541,34 @@ private struct WeChatComposerBar: View {
                 }
                 .accessibilityLabel("更多")
 
-                TextField("输入消息", text: $text)
-                    .font(.system(size: 16))
+                DSInputField(placeholder: "输入消息", text: $text)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled(false)
                     .submitLabel(.send)
                     .onSubmit(send)
-                    .padding(.horizontal, DS.Space.md)
-                    .padding(.vertical, DS.Space.sm)
-                    .background(Color.dsSurface, in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
                     .accessibilityIdentifier("messageInput")
                     .disabled(isDisabled || isSending)
 
-                Button(action: send) {
-                    Group {
-                        if isSending {
-                            ProgressView()
-                                .tint(.white)
-                        } else {
-                            Text("发送")
-                                .font(.system(size: 14, weight: .semibold))
-                        }
-                    }
-                    .frame(width: 52, height: 36)
-                    .foregroundStyle(.white)
-                    .background(trimmedText.isEmpty || isDisabled ? Color.dsTextSecondary.opacity(0.45) : Color.dsPrimary, in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
-                }
+                DSButton(
+                    title: "发送",
+                    isEnabled: !trimmedText.isEmpty && !isDisabled,
+                    isLoading: isSending,
+                    maxWidth: 56,
+                    height: 42,
+                    action: send
+                )
                 .disabled(trimmedText.isEmpty || isDisabled || isSending)
                 .accessibilityLabel("发送")
             }
 
             if showsPaidControls {
-                Button(action: hasPaidChat ? finish : continuePaid) {
-                    Label(hasPaidChat ? "结束沟通并评价" : "继续沟通", systemImage: hasPaidChat ? "checkmark.circle" : "lock.open")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Color.dsPrimary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, DS.Space.sm)
-                        .background(Color.dsSurface, in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous)
-                                .stroke(Color.dsBorder, lineWidth: 1)
-                        }
-                }
-                .buttonStyle(DSPressButtonStyle())
+                DSButton(
+                    title: hasPaidChat ? "完成沟通并评价" : "确认订单后继续",
+                    systemImage: hasPaidChat ? "checkmark.circle" : "lock.open",
+                    variant: .secondary,
+                    height: 38,
+                    action: hasPaidChat ? finish : continuePaid
+                )
                 .accessibilityIdentifier("finishChatButton")
             }
         }
@@ -638,7 +576,7 @@ private struct WeChatComposerBar: View {
         .padding(.top, DS.Space.sm)
         .padding(.bottom, DS.Space.sm)
         .background(Color.dsBackground)
-        .overlay(alignment: .top) { Divider() }
+        .overlay(alignment: .top) { Color.dsSeparator.frame(height: DS.Stroke.hairline) }
     }
 }
 
@@ -656,7 +594,7 @@ private struct VoiceCallFloatingPanel: View {
                         Text("语音沟通中")
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(Color.dsTextPrimary)
-                        Text("\(seconds / 60):\(String(format: "%02d", seconds % 60)) · 模拟 RTC")
+                        Text("\(seconds / 60):\(String(format: "%02d", seconds % 60))")
                             .font(.system(size: 11))
                             .foregroundStyle(Color.dsTextSecondary)
                     }
@@ -686,7 +624,7 @@ private struct ReportSheetForChat: View {
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: DS.Space.lg) {
-                Text("举报后会进入 AI 分拣和人工复核队列。")
+                Text("我们会尽快处理你的举报。")
                     .font(.system(size: 15))
                     .foregroundStyle(Color.dsTextSecondary)
                 Picker("举报原因", selection: $reason) {
@@ -706,25 +644,5 @@ private struct ReportSheetForChat: View {
             .navigationTitle("举报")
             .navigationBarTitleDisplayMode(.inline)
         }
-    }
-}
-
-private struct BackendChatStatusRow: View {
-    let connected: Bool
-    let model: String
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Circle()
-                .fill(connected ? Color.dsSuccess : Color.dsWarning)
-                .frame(width: 8, height: 8)
-            Text(connected ? "后端已连接 · \(model.isEmpty ? "deepseek-chat" : model)" : "仅本地模式（后端未连接）")
-                .font(.caption)
-                .foregroundStyle(Color.dsTextSecondary)
-            Spacer()
-        }
-        .padding(.horizontal, DS.Space.lg)
-        .padding(.vertical, DS.Space.sm)
-        .background(Color.dsSurface)
     }
 }

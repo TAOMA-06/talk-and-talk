@@ -42,7 +42,7 @@ struct MessagesView: View {
                 MessagesSafetyLoginRow()
 
                 if conversations.isEmpty {
-                    EmptyStateView(symbol: "bubble.left.and.bubble.right", title: "暂无消息", subtitle: "下单后会自动生成安全沟通房间。")
+                    EmptyStateView(symbol: "bubble.left.and.bubble.right", title: "暂无消息", subtitle: "下单后即可与陪伴者沟通。")
                         .padding(.top, DS.Space.xl)
                 } else {
                     LazyVStack(spacing: 0) {
@@ -70,13 +70,9 @@ struct MessagesView: View {
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button {
+                DSIconButton(systemImage: "plus.circle", size: 34) {
                     showingNewConversation = true
-                } label: {
-                    Image(systemName: "plus.circle")
-                        .font(.system(size: 20, weight: .medium))
                 }
-                .foregroundStyle(Color.dsTextPrimary)
                 .accessibilityLabel("新建沟通")
             }
         }
@@ -152,10 +148,10 @@ private struct NewConversationRow: View {
             StatusPill(text: companion.availability.displayName, symbol: "circle.fill", color: companion.availabilityColor)
         }
         .padding(DS.Space.md)
-        .background(Color.dsSurface, in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
+        .background(Color.dsSurfaceElevated, in: RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous)
-                .stroke(Color.dsBorder, lineWidth: 1)
+            RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous)
+                .stroke(Color.dsBorder.opacity(0.72), lineWidth: DS.Stroke.hairline)
         }
     }
 }
@@ -175,7 +171,11 @@ private struct MessageSearchBar: View {
         }
         .padding(.horizontal, DS.Space.md)
         .frame(height: 44)
-        .background(Color.dsSurface, in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
+        .background(Color.dsSurfaceElevated, in: RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous)
+                .stroke(Color.dsBorder.opacity(0.72), lineWidth: DS.Stroke.hairline)
+        }
         .accessibilityIdentifier("messageSearchBar")
     }
 }
@@ -192,7 +192,7 @@ private struct MessagesSafetyLoginRow: View {
                 Text("平台内安全沟通")
                     .font(.system(size: 15, weight: .medium))
                     .foregroundStyle(Color.dsTextPrimary)
-                Text("AI+规则审查，禁止私下交易")
+                Text("平台内加密沟通")
                     .font(.system(size: 13))
                     .foregroundStyle(Color.dsTextSecondary)
                     .lineLimit(1)
@@ -276,13 +276,6 @@ private struct ConversationInitialsAvatar: View {
     let initials: String
 
     var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous)
-                .fill(Color.dsTextSecondary.opacity(0.14))
-            Text(initials)
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(Color.dsTextSecondary)
-        }
-        .frame(width: 52, height: 52)
+        DSInitialsAvatar(initials: initials, tone: .neutral, size: 52)
     }
 }

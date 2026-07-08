@@ -8,7 +8,6 @@ struct ProfileView: View {
             UserPanel()
             SafetyScorePanel()
             MenuPanel()
-            OperatorNote()
         }
     }
 }
@@ -148,14 +147,6 @@ private struct MenuPanel: View {
                 store.navigate(.verify)
             }
             Divider().padding(.leading, 52)
-            DSListRow(
-                title: "演示后台",
-                subtitle: "\(store.moderationCases.count) 条事件",
-                symbol: "shield.lefthalf.filled"
-            ) {
-                store.navigate(.admin)
-            }
-            Divider().padding(.leading, 52)
             DSListRow(title: "平台规范", subtitle: "线上服务边界", symbol: "doc.text")
         }
         .background(Color.dsSurface, in: RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous))
@@ -211,18 +202,3 @@ private struct GenderSettingsSheet: View {
     }
 }
 
-private struct OperatorNote: View {
-    var body: some View {
-        SoftCard {
-            VStack(alignment: .leading, spacing: DS.Space.sm) {
-                Label("Demo 说明", systemImage: "info.circle")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Color.dsTextPrimary)
-                Text("陪伴者聊天（林屿/许澈/周映）可接本机 BackendDemo；订单、社区等仍为本地演示。不保存真实身份、不发起真实支付。")
-                    .font(.system(size: 13))
-                    .foregroundStyle(Color.dsTextSecondary)
-                    .lineSpacing(3)
-            }
-        }
-    }
-}

@@ -219,10 +219,11 @@ private struct ComposeStorySheet: View {
                     }
                     .frame(maxWidth: .infinity)
                     .frame(height: 132)
-                    .background(Color.dsSurface, in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
+                    .padding(DS.Space.lg)
+                    .background(Color.dsSurfaceMuted.opacity(0.72), in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
                     .overlay {
                         RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous)
-                            .stroke(Color.dsBorder, style: StrokeStyle(lineWidth: 1, dash: [6, 5]))
+                            .stroke(Color.dsBorder.opacity(0.55), lineWidth: DS.Stroke.hairline)
                     }
                 }
                 .buttonStyle(.plain)
@@ -250,26 +251,7 @@ private struct ComposeStorySheet: View {
             Text(contentLabel)
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(Color.dsTextSecondary)
-            ZStack(alignment: .topLeading) {
-                if trimmedContent.isEmpty {
-                    Text(contentPlaceholder)
-                        .font(.system(size: 15))
-                        .foregroundStyle(Color.dsTextSecondary)
-                        .padding(.horizontal, DS.Space.md)
-                        .padding(.vertical, DS.Space.md)
-                }
-                TextEditor(text: $content)
-                    .font(.system(size: 15))
-                    .frame(minHeight: 140)
-                    .scrollContentBackground(.hidden)
-                    .padding(.horizontal, DS.Space.sm)
-                    .padding(.vertical, DS.Space.sm)
-            }
-            .background(Color.dsSurface, in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous)
-                    .stroke(Color.dsBorder, lineWidth: 1)
-            }
+            DSTextEditor(placeholder: contentPlaceholder, text: $content, minHeight: 140)
         }
     }
 
@@ -328,7 +310,7 @@ private struct BelongingBanner: View {
                 Text("这是属于我们的地方")
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(Color.dsTextPrimary)
-                Text("从女性视角出发，尊重每一种情绪。骚扰、低俗、越界内容零容忍——在这里，你可以安心做自己。")
+                Text("尊重每一种情绪，越界内容零容忍。")
                     .font(.system(size: 13))
                     .foregroundStyle(Color.dsTextSecondary)
                     .lineSpacing(4)
@@ -356,19 +338,16 @@ private struct CommunityFeedHeader: View {
                     .foregroundStyle(Color.dsTextSecondary)
             }
             Spacer()
-            Button(action: action) {
-                Label("发布", systemImage: "square.and.pencil")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(canPublish ? Color.dsPrimary : Color.dsTextSecondary)
-                    .padding(.horizontal, DS.Space.md)
-                    .padding(.vertical, DS.Space.sm)
-                    .background(Color.dsSurface, in: Capsule())
-                    .overlay {
-                        Capsule().stroke(Color.dsBorder, lineWidth: 1)
-                    }
-            }
+            DSButton(
+                title: "发布",
+                systemImage: "square.and.pencil",
+                variant: .quiet,
+                isEnabled: canPublish,
+                maxWidth: 86,
+                height: DS.ControlHeight.sm,
+                action: action
+            )
             .disabled(!canPublish)
-            .buttonStyle(DSPressButtonStyle())
         }
     }
 }
@@ -381,22 +360,9 @@ private struct CommunityTopicFilterBar: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: DS.Space.sm) {
                 ForEach(topics, id: \.self) { topic in
-                    Button {
+                    TagChip(title: topic, isSelected: selection == topic) {
                         selection = topic
-                    } label: {
-                        Text(topic)
-                            .font(.system(size: 14, weight: selection == topic ? .semibold : .medium))
-                            .foregroundStyle(selection == topic ? Color.dsSurface : Color.dsTextPrimary)
-                            .padding(.horizontal, DS.Space.md)
-                            .frame(height: 34)
-                            .background(selection == topic ? Color.dsPrimary : Color.dsSurface, in: Capsule())
-                            .overlay {
-                                if selection != topic {
-                                    Capsule().stroke(Color.dsBorder, lineWidth: 1)
-                                }
-                            }
                     }
-                    .buttonStyle(.plain)
                 }
             }
         }
@@ -496,23 +462,16 @@ private struct CommunityPostCard: View {
             }
             .padding(DS.Space.sm)
         }
-        .background(Color.dsSurface, in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
+        .background(Color.dsSurfaceElevated, in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous)
-                .stroke(Color.dsBorder, lineWidth: 1)
+                .stroke(Color.dsBorder.opacity(0.72), lineWidth: DS.Stroke.hairline)
         }
         .clipShape(RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
     }
 
     private var authorBadge: some View {
-        ZStack {
-            Circle()
-                .fill(Color.dsPrimary.opacity(0.12))
-            Text(post.authorInitials.prefix(1))
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(Color.dsPrimary)
-        }
-        .frame(width: 20, height: 20)
+        DSInitialsAvatar(initials: String(post.authorInitials.prefix(1)), tone: .primary, size: 20)
     }
 
     private var shouldShowContactActions: Bool {
@@ -523,31 +482,26 @@ private struct CommunityPostCard: View {
     private var contactActions: some View {
         if let target = post.contactTarget {
             HStack(spacing: DS.Space.xxs) {
-                Button {
+                DSButton(
+                    title: "聊天",
+                    systemImage: "bubble.left.and.bubble.right",
+                    variant: .secondary,
+                    maxWidth: .infinity,
+                    height: 32
+                ) {
                     store.navigate(.chat(target))
-                } label: {
-                    Label("聊天", systemImage: "bubble.left.and.bubble.right")
-                        .font(.system(size: 12, weight: .semibold))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 32)
-                        .foregroundStyle(Color.dsPrimary)
-                        .background(Color.dsBackground, in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
                 }
-                .buttonStyle(DSPressButtonStyle())
                 .accessibilityIdentifier("communityPostChat-\(post.id)")
 
                 if case .companion(let id) = target {
-                    Button {
+                    DSButton(
+                        title: "下单",
+                        systemImage: "creditcard",
+                        maxWidth: .infinity,
+                        height: 32
+                    ) {
                         store.navigate(.order(id))
-                    } label: {
-                        Label("下单", systemImage: "creditcard")
-                            .font(.system(size: 12, weight: .semibold))
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 32)
-                            .foregroundStyle(Color.dsSurface)
-                            .background(Color.dsPrimary, in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
                     }
-                    .buttonStyle(DSPressButtonStyle())
                     .accessibilityIdentifier("communityPostOrder-\(post.id)")
                 }
             }

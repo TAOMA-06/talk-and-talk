@@ -97,7 +97,7 @@ struct CreditService {
             return CreditEvent(
                 id: UUID().uuidString,
                 delta: delta,
-                reason: "后台确认违规",
+                reason: "平台确认违规",
                 createdAt: Date()
             )
         case .dismiss:

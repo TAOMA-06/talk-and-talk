@@ -41,7 +41,7 @@ struct CompanionHomepageView: View {
                 EmptyStateView(
                     symbol: "person.crop.circle.badge.questionmark",
                     title: "主页不存在",
-                    subtitle: "这位陪伴者可能已经下架或演示数据已刷新。"
+                    subtitle: "该主页暂不可用。"
                 )
                 .padding(DS.Space.lg)
             }
@@ -109,7 +109,7 @@ private struct CompanionPromotionSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Space.md) {
-            SectionHeader(title: "主页动态", subtitle: "已审核的宣传帖子")
+            SectionHeader(title: "主页动态", subtitle: "Ta 的动态")
             if posts.isEmpty {
                 SoftCard {
                     EmptyStateView(
