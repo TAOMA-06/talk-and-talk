@@ -27,7 +27,7 @@ struct CompanionDetailView: View {
                     .padding(.bottom, DS.Space.xl)
                 }
                 .safeAreaInset(edge: .bottom) {
-                    BottomActionBar(companion: companion)
+                    DetailActionBar(companion: companion)
                 }
             } else {
                 EmptyStateView(
@@ -60,22 +60,27 @@ private struct ProfileHero: View {
         SoftCard {
             VStack(alignment: .leading, spacing: DS.Space.lg) {
                 HStack(alignment: .top, spacing: DS.Space.lg) {
-                    CompanionAvatar(companion: companion, size: 72)
+                    CompanionAvatar(companion: companion, size: 78)
                     VStack(alignment: .leading, spacing: DS.Space.sm) {
                         HStack(alignment: .top, spacing: DS.Space.sm) {
                             VStack(alignment: .leading, spacing: DS.Space.sm) {
-                                HStack(spacing: DS.Space.sm) {
+                                HStack(alignment: .firstTextBaseline, spacing: DS.Space.sm) {
                                     Text(companion.name)
-                                        .font(.system(size: 22, weight: .semibold))
+                                        .font(.system(size: 24, weight: .semibold))
                                         .foregroundStyle(Color.dsTextPrimary)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.78)
                                     if companion.isVerified {
                                         Image(systemName: "checkmark.seal.fill")
+                                            .font(.system(size: 17, weight: .semibold))
                                             .foregroundStyle(Color.dsPrimary)
+                                            .accessibilityLabel("已认证")
                                     }
                                 }
                                 Text(companion.role)
-                                    .font(.system(size: 13))
+                                    .font(.system(size: 14))
                                     .foregroundStyle(Color.dsTextSecondary)
+                                    .fixedSize(horizontal: false, vertical: true)
                             }
                             Spacer(minLength: DS.Space.sm)
                             HStack(spacing: DS.Space.xxs) {
@@ -95,11 +100,17 @@ private struct ProfileHero: View {
                                 AvailabilityBadge(status: companion.availability)
                                 DistanceLabel(distanceKm: companion.distanceKm, district: companion.cityDistrict)
                                 StatusPill(text: String(format: "%.1f", companion.rating), symbol: "star.fill", color: Color.dsWarning)
-                                TrustMicroBadge(text: companion.isVerified ? "已认证" : "未认证", tone: companion.isVerified ? .success : .warning)
+                                TrustMicroBadge(text: companion.isVerified ? "资料已核验" : "先试聊了解", tone: companion.isVerified ? .success : .warning)
                             }
                         }
                     }
                 }
+
+                Text(companion.bio)
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color.dsTextSecondary)
+                    .lineSpacing(4)
+                    .lineLimit(3)
 
                 FlowLayout(spacing: DS.Space.sm) {
                     ForEach(companion.tags, id: \.self) { tag in
@@ -108,7 +119,7 @@ private struct ProfileHero: View {
                 }
 
                 HStack(spacing: DS.Space.md) {
-                    MetricTile(title: "完成", value: "\(companion.completedOrders)")
+                    MetricTile(title: "沟通过", value: "\(companion.completedOrders) 单")
                     MetricTile(title: "响应", value: companion.responseTime)
                     MetricTile(title: "价格", value: "¥\(companion.pricePerHalfHour)/30m")
                 }
@@ -122,13 +133,13 @@ private struct CertificationStatusCard: View {
 
     var body: some View {
         DSBanner(
-            title: companion.isVerified ? "平台认证已完成" : "认证信息待完善",
-            message: companion.isVerified ? "身份与服务资料已通过平台核验。" : "建议先试聊了解边界，必要时选择已认证陪伴者。",
+            title: "认证与沟通方式",
+            message: companion.isVerified ? "Ta 的资料已核验，文字和语音沟通都在平台内完成。" : "这位陪伴者还在完善资料，建议先试聊几句，确认合适再预约。",
             systemImage: companion.isVerified ? "checkmark.seal.fill" : "person.badge.key",
             tone: companion.isVerified ? .success : .warning
         )
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(companion.isVerified ? "已完成平台认证" : "暂未完成平台认证")
+        .accessibilityLabel(companion.isVerified ? "资料已核验" : "建议先试聊了解")
     }
 }
 
@@ -157,8 +168,8 @@ private struct MetricTile: View {
 private struct BoundaryNotice: View {
     var body: some View {
         DSBanner(
-            title: "平台内安全沟通",
-            message: "仅支持平台内文字与语音沟通；不接受线下邀约、私下转账、敏感交易和医疗诊断承诺。",
+            title: "聊得安心一点",
+            message: "沟通和付款都留在平台内；不约线下、不私下转账，也不做医疗诊断承诺。不舒服时可以结束并举报。",
             systemImage: "lock.shield.fill",
             tone: .warning
         )
@@ -171,19 +182,45 @@ private struct BioPanel: View {
     var body: some View {
         SoftCard {
             VStack(alignment: .leading, spacing: DS.Space.lg) {
-                SectionHeader(title: "介绍与可约时间")
-                Text(companion.bio)
-                    .font(.system(size: 13))
-                    .foregroundStyle(Color.dsTextSecondary)
-                    .lineSpacing(4)
+                SectionHeader(title: "关于 Ta", subtitle: "沟通风格、擅长方向和可约时间")
+
+                DetailInfoBlock(title: "介绍", symbol: "person.text.rectangle", text: companion.bio)
+
                 VStack(alignment: .leading, spacing: DS.Space.sm) {
-                    Label(companion.languages.joined(separator: " / "), systemImage: "globe.asia.australia")
-                    Label(companion.availableTimes.joined(separator: "  "), systemImage: "clock")
-                    Label(companion.specialties.joined(separator: " / "), systemImage: "tag")
+                    Text("适合聊什么")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.dsTextSecondary)
+                    FlowLayout(spacing: DS.Space.sm) {
+                        ForEach(companion.specialties, id: \.self) { specialty in
+                            TagChip(title: specialty)
+                        }
+                    }
                 }
-                .font(.system(size: 13))
-                .foregroundStyle(Color.dsTextPrimary)
+
+                VStack(alignment: .leading, spacing: DS.Space.sm) {
+                    DetailInfoBlock(title: "可约时间", symbol: "clock", text: companion.availableTimes.joined(separator: " · "))
+                    DetailInfoBlock(title: "语言", symbol: "globe.asia.australia", text: companion.languages.joined(separator: " / "))
+                }
             }
+        }
+    }
+}
+
+private struct DetailInfoBlock: View {
+    let title: String
+    let symbol: String
+    let text: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: DS.Space.xxs) {
+            Label(title, systemImage: symbol)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Color.dsTextSecondary)
+            Text(text)
+                .font(.system(size: 14))
+                .foregroundStyle(Color.dsTextPrimary)
+                .lineSpacing(4)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }
@@ -192,24 +229,92 @@ private struct ReviewPreview: View {
     let companion: Companion
     @EnvironmentObject private var store: AppStore
 
+    private var reviews: [Review] {
+        Array(store.reviews(for: companion.id).prefix(3))
+    }
+
     var body: some View {
         SoftCard {
             VStack(alignment: .leading, spacing: DS.Space.md) {
                 SectionHeader(title: "近期评价", subtitle: "\(companion.reviewCount) 条历史评价")
-                ForEach(store.reviews(for: companion.id).prefix(3)) { review in
+
+                if reviews.isEmpty {
                     DSInsetSurface(padding: DS.Space.md) {
                         VStack(alignment: .leading, spacing: DS.Space.sm) {
-                            HStack {
-                                Text(review.userName)
-                                    .font(.system(size: 15, weight: .semibold))
-                                Spacer()
-                                StatusPill(text: "\(review.rating)", symbol: "star.fill", color: Color.dsWarning)
-                            }
-                            Text(review.content)
+                            Label("还没有评价", systemImage: "text.bubble")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(Color.dsTextPrimary)
+                            Text("可以先试聊，确认沟通节奏舒服后再预约。")
                                 .font(.system(size: 13))
                                 .foregroundStyle(Color.dsTextSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                     }
+                } else {
+                    ForEach(reviews) { review in
+                        DSInsetSurface(padding: DS.Space.md) {
+                            VStack(alignment: .leading, spacing: DS.Space.sm) {
+                                HStack {
+                                    Text(review.userName)
+                                        .font(.system(size: 15, weight: .semibold))
+                                    Spacer()
+                                    StatusPill(text: "\(review.rating)", symbol: "star.fill", color: Color.dsWarning)
+                                }
+                                Text(review.content)
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(Color.dsTextSecondary)
+                                    .lineSpacing(3)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct DetailActionBar: View {
+    let companion: Companion
+    @EnvironmentObject private var store: AppStore
+
+    var body: some View {
+        ActionDock {
+            VStack(spacing: DS.Space.md) {
+                HStack(spacing: DS.Space.sm) {
+                    VStack(alignment: .leading, spacing: DS.Space.xxs) {
+                        Text("先聊几句再决定")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(Color.dsTextPrimary)
+                            .lineLimit(1)
+                        Text("试聊剩余 \(store.remainingTrialMessages(for: companion.id))/\(store.freeTrialMessageLimit) 条 · ¥\(companion.pricePerHalfHour)/30m")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color.dsTextSecondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.78)
+                    }
+                    .layoutPriority(1)
+
+                    Spacer(minLength: DS.Space.sm)
+                }
+
+                HStack(spacing: DS.Space.sm) {
+                    DSButton(title: "预约沟通", systemImage: "calendar.badge.plus", variant: .secondary) {
+                        store.navigate(.order(companion.id))
+                    }
+                    .accessibilityIdentifier("detailOrder-\(companion.id)")
+
+                    DSButton(
+                        title: store.user.isVerified ? "先聊几句" : "先完成认证",
+                        systemImage: "bubble.left.and.bubble.right",
+                        variant: .primary
+                    ) {
+                        guard store.user.isVerified else {
+                            store.navigate(.verify)
+                            return
+                        }
+                        store.navigate(.chat(.companion(id: companion.id)))
+                    }
+                    .accessibilityIdentifier("detailChat-\(companion.id)")
                 }
             }
         }
@@ -227,7 +332,7 @@ private struct ReportSheet: View {
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: DS.Space.lg) {
-                Text("平台安全团队会认真处理。")
+                Text("收到后会尽快查看。你也可以先结束沟通，把感受照顾好。")
                     .font(.system(size: 13))
                     .foregroundStyle(Color.dsTextSecondary)
                 Picker("原因", selection: $reason) {

@@ -33,8 +33,10 @@ struct CommunityView: View {
         store.approvedCommunityPosts().filter { $0.kind == browsingKind }
     }
 
-    private var pendingPosts: [CommunityPost] {
-        store.pendingCommunityPosts()
+    private var reviewPosts: [CommunityPost] {
+        store.communityPosts
+            .filter { $0.authorId == store.user.id && $0.moderationStatus != .approved }
+            .sorted { $0.createdAt > $1.createdAt }
     }
 
     private var filteredApprovedPosts: [CommunityPost] {
@@ -42,27 +44,29 @@ struct CommunityView: View {
         return approvedPosts.filter { $0.topic == selectedTopic }
     }
 
+    private var canStartPublishFlow: Bool {
+        store.accountRestrictions.canPostCommunity && publishingKind != nil
+    }
+
     var body: some View {
-        AppScaffold(title: "社区", spacing: DS.Space.lg) {
-            BelongingBanner()
+        AppScaffold(title: "广场", spacing: DS.Space.lg) {
+            SquareHeroHeader(
+                browsingText: browsingText,
+                publishTitle: publishTitle,
+                canPublish: canStartPublishFlow,
+                restrictionText: store.accountRestrictions.canPostCommunity ? nil : store.accountRestrictions.summary,
+                pendingCount: reviewPosts.count,
+                action: startPublishing
+            )
 
-            if !pendingPosts.isEmpty {
-                SectionHeader(title: "审核中", subtitle: "先审后发，保护社区氛围")
-                CommunityMasonryGrid(posts: pendingPosts)
+            if !reviewPosts.isEmpty {
+                SquareReviewSection(posts: reviewPosts)
             }
 
-            CommunityFeedHeader(canPublish: store.accountRestrictions.canPostCommunity) {
-                startPublishing()
-            }
+            SectionHeader(title: "广场动态", subtitle: feedSubtitle)
             CommunityTopicFilterBar(topics: topicFilters, selection: $selectedTopic)
 
-            if approvedPosts.isEmpty && pendingPosts.isEmpty {
-                EmptyStateView(symbol: "text.bubble", title: "还没有内容", subtitle: "成为第一个发布的人。")
-            } else if filteredApprovedPosts.isEmpty {
-                EmptyStateView(symbol: "text.bubble", title: "这个话题还没有内容", subtitle: "换个话题看看，或者发布第一篇。")
-            } else {
-                CommunityMasonryGrid(posts: filteredApprovedPosts)
-            }
+            feedContent
         }
         .sheet(item: $composingKind) { kind in
             ComposeStorySheet(
@@ -73,9 +77,64 @@ struct CommunityView: View {
         }
     }
 
+    @ViewBuilder
+    private var feedContent: some View {
+        if approvedPosts.isEmpty && reviewPosts.isEmpty {
+            SquareEmptyState(
+                title: "广场还在等第一条声音",
+                subtitle: "可以先说说此刻想聊的事，也可以稍后回来看看。",
+                primaryTitle: publishTitle,
+                primaryAction: startPublishing,
+                secondaryTitle: nil,
+                secondaryAction: nil,
+                isPrimaryEnabled: canStartPublishFlow
+            )
+        } else if filteredApprovedPosts.isEmpty {
+            SquareEmptyState(
+                title: "这个话题暂时安静",
+                subtitle: "换个话题看看，或者发一条让合适的人看见。",
+                primaryTitle: "查看全部话题",
+                primaryAction: { selectedTopic = "全部" },
+                secondaryTitle: publishTitle,
+                secondaryAction: startPublishing,
+                isPrimaryEnabled: true
+            )
+        } else {
+            CommunityMasonryGrid(posts: filteredApprovedPosts)
+        }
+    }
+
+    private var browsingText: String {
+        switch browsingKind {
+        case .femaleRequest:
+            return "正在寻找陪伴的人"
+        case .malePromotion:
+            return "已实名陪伴者"
+        }
+    }
+
+    private var feedSubtitle: String {
+        switch browsingKind {
+        case .femaleRequest:
+            return "看看谁正在寻找平台内沟通"
+        case .malePromotion:
+            return "按你的身份展示更适合的陪伴者"
+        }
+    }
+
+    private var publishTitle: String {
+        switch publishingKind {
+        case .femaleRequest:
+            return "发布需求"
+        case .malePromotion:
+            return store.user.isVerified ? "发布自荐" : "先认证再发布"
+        case nil:
+            return "发布"
+        }
+    }
+
     private func startPublishing() {
         guard store.accountRestrictions.canPostCommunity else { return }
-
         guard let publishingKind else { return }
         topic = defaultTopic(for: publishingKind)
 
@@ -120,18 +179,21 @@ private struct ComposeStorySheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: DS.Space.lg) {
+                    introBanner
                     if kind == .malePromotion {
                         coverPicker
                     }
                     topicPicker
                     storyEditor
                     if let feedbackMessage {
-                        Text(feedbackMessage)
-                            .font(.system(size: 13))
-                            .foregroundStyle(Color.dsDanger)
+                        DSBanner(
+                            title: feedbackMessage,
+                            systemImage: "exclamationmark.triangle.fill",
+                            tone: .warning
+                        )
                     }
                     DSPrimaryButton(
-                        title: isSubmitting ? "审核中..." : submitTitle,
+                        title: isSubmitting ? "正在确认..." : submitTitle,
                         systemImage: "paperplane",
                         isEnabled: !trimmedContent.isEmpty && !isSubmitting,
                         isLoading: isSubmitting,
@@ -162,22 +224,42 @@ private struct ComposeStorySheet: View {
     }
 
     private var navigationTitle: String {
-        "发布"
+        switch kind {
+        case .femaleRequest: "发一条需求"
+        case .malePromotion: "发布自荐"
+        }
     }
 
     private var submitTitle: String {
-        "发布"
+        switch kind {
+        case .femaleRequest: "发布到广场"
+        case .malePromotion: "发布自荐"
+        }
     }
 
     private var contentLabel: String {
-        "内容"
+        switch kind {
+        case .femaleRequest: "想说的话"
+        case .malePromotion: "自荐介绍"
+        }
     }
 
     private var contentPlaceholder: String {
         switch kind {
-        case .femaleRequest: "写下你想被怎样陪伴、沟通节奏和边界..."
-        case .malePromotion: "介绍你的陪伴风格、可聊话题和平台内沟通边界..."
+        case .femaleRequest:
+            return "说说你想聊什么、希望对方怎样陪伴，以及你在意的边界。"
+        case .malePromotion:
+            return "介绍你的陪伴风格、擅长话题、可沟通时间和平台内服务边界。"
         }
+    }
+
+    private var introBanner: some View {
+        DSBanner(
+            title: kind == .femaleRequest ? "发布后会先确认内容" : "自荐会展示给合适的人",
+            message: "通过后会出现在广场里；沟通始终留在平台内。",
+            systemImage: "lock.shield",
+            tone: .primary
+        )
     }
 
     private var coverPicker: some View {
@@ -193,7 +275,7 @@ private struct ComposeStorySheet: View {
                         .scaledToFill()
                         .frame(maxWidth: .infinity)
                         .aspectRatio(CGFloat(coverAspectRatio ?? 1), contentMode: .fit)
-                        .clipShape(RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous))
 
                     Button(action: removeCover) {
                         Image(systemName: "xmark.circle.fill")
@@ -210,19 +292,19 @@ private struct ComposeStorySheet: View {
                         Image(systemName: "photo.on.rectangle.angled")
                             .font(.system(size: 26, weight: .regular))
                             .foregroundStyle(Color.dsPrimary)
-                        Text("选择封面")
+                        Text("添加封面")
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(Color.dsTextPrimary)
-                        Text("未选择时会使用话题封面")
+                        Text("不添加也可以发布")
                             .font(.system(size: 12))
                             .foregroundStyle(Color.dsTextSecondary)
                     }
                     .frame(maxWidth: .infinity)
                     .frame(height: 132)
                     .padding(DS.Space.lg)
-                    .background(Color.dsSurfaceMuted.opacity(0.72), in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
+                    .background(Color.dsSurfaceMuted.opacity(0.72), in: RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous))
                     .overlay {
-                        RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous)
+                        RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous)
                             .stroke(Color.dsBorder.opacity(0.55), lineWidth: DS.Stroke.hairline)
                     }
                 }
@@ -251,7 +333,7 @@ private struct ComposeStorySheet: View {
             Text(contentLabel)
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(Color.dsTextSecondary)
-            DSTextEditor(placeholder: contentPlaceholder, text: $content, minHeight: 140)
+            DSTextEditor(placeholder: contentPlaceholder, text: $content, minHeight: 150)
         }
     }
 
@@ -303,51 +385,115 @@ private struct ComposeStorySheet: View {
     }
 }
 
-private struct BelongingBanner: View {
+private struct SquareHeroHeader: View {
+    let browsingText: String
+    let publishTitle: String
+    let canPublish: Bool
+    let restrictionText: String?
+    let pendingCount: Int
+    let action: () -> Void
+
     var body: some View {
-        SoftCard {
-            VStack(alignment: .leading, spacing: DS.Space.sm) {
-                Text("这是属于我们的地方")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Color.dsTextPrimary)
-                Text("尊重每一种情绪，越界内容零容忍。")
-                    .font(.system(size: 13))
-                    .foregroundStyle(Color.dsTextSecondary)
-                    .lineSpacing(4)
-                HStack(spacing: DS.Space.sm) {
-                    TrustMicroBadge(text: "女性主导", tone: .primary)
-                    TrustMicroBadge(text: "严格审核", tone: .success)
+        DSCard {
+            VStack(alignment: .leading, spacing: DS.Space.lg) {
+                HStack(alignment: .top, spacing: DS.Space.md) {
+                    VStack(alignment: .leading, spacing: DS.Space.sm) {
+                        DSBadge(text: "广场", tone: .primary)
+                        Text("看看大家此刻想聊什么")
+                            .font(.system(size: 22, weight: .semibold))
+                            .foregroundStyle(Color.dsTextPrimary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text("只展示适合你身份的内容，沟通留在平台内，发布会先确认内容。")
+                            .font(.system(size: 13))
+                            .foregroundStyle(Color.dsTextSecondary)
+                            .lineSpacing(3)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Spacer(minLength: DS.Space.md)
+
+                    DSInsetSurface(padding: DS.Space.md) {
+                        VStack(spacing: DS.Space.xxs) {
+                            Text("\(pendingCount)")
+                                .font(.system(size: 22, weight: .semibold))
+                                .foregroundStyle(Color.dsTextPrimary)
+                            Text("待确认")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(Color.dsTextSecondary)
+                        }
+                    }
+                    .frame(width: 78)
                 }
+
+                HStack(spacing: DS.Space.sm) {
+                    StatusPill(text: browsingText, symbol: "person.2", color: Color.dsPrimary)
+                    StatusPill(text: "平台内沟通", symbol: "lock.shield", color: Color.dsTextSecondary)
+                }
+
+                if let restrictionText {
+                    DSBanner(title: restrictionText, systemImage: "exclamationmark.triangle.fill", tone: .warning)
+                }
+
+                DSButton(
+                    title: publishTitle,
+                    systemImage: "square.and.pencil",
+                    isEnabled: canPublish,
+                    action: action
+                )
             }
         }
     }
 }
 
-private struct CommunityFeedHeader: View {
-    let canPublish: Bool
-    let action: () -> Void
+private struct SquareReviewSection: View {
+    let posts: [CommunityPost]
 
     var body: some View {
-        HStack(alignment: .center) {
-            VStack(alignment: .leading, spacing: DS.Space.xxs) {
-                Text("推荐内容")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Color.dsTextPrimary)
-                Text("按你的身份展示更合适的内容")
-                    .font(.system(size: 13))
-                    .foregroundStyle(Color.dsTextSecondary)
+        VStack(alignment: .leading, spacing: DS.Space.md) {
+            SectionHeader(title: "我的发布", subtitle: "确认中的内容会先在这里显示")
+            CommunityMasonryGrid(posts: posts)
+        }
+    }
+}
+
+private struct SquareEmptyState: View {
+    let title: String
+    let subtitle: String
+    let primaryTitle: String
+    let primaryAction: () -> Void
+    let secondaryTitle: String?
+    let secondaryAction: (() -> Void)?
+    let isPrimaryEnabled: Bool
+
+    var body: some View {
+        DSCard(padding: DS.Space.xl) {
+            VStack(spacing: DS.Space.md) {
+                DSInitialsAvatar(initials: "", tone: .neutral, size: 56)
+                    .overlay {
+                        Image(systemName: "text.bubble")
+                            .font(.system(size: 24, weight: .regular))
+                            .foregroundStyle(Color.dsPrimary)
+                    }
+
+                VStack(spacing: DS.Space.xxs) {
+                    Text(title)
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(Color.dsTextPrimary)
+                    Text(subtitle)
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color.dsTextSecondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                HStack(spacing: DS.Space.sm) {
+                    DSButton(title: primaryTitle, isEnabled: isPrimaryEnabled, action: primaryAction)
+                    if let secondaryTitle, let secondaryAction {
+                        DSButton(title: secondaryTitle, variant: .secondary, maxWidth: 118, action: secondaryAction)
+                    }
+                }
             }
-            Spacer()
-            DSButton(
-                title: "发布",
-                systemImage: "square.and.pencil",
-                variant: .quiet,
-                isEnabled: canPublish,
-                maxWidth: 86,
-                height: DS.ControlHeight.sm,
-                action: action
-            )
-            .disabled(!canPublish)
+            .frame(maxWidth: .infinity)
         }
     }
 }
@@ -413,9 +559,10 @@ private struct CommunityMasonryGrid: View {
     private func estimatedHeight(for post: CommunityPost) -> Double {
         let ratio = max(0.65, min(1.35, post.coverAspectRatio ?? CommunityPostCoverView.placeholderAspectRatio(for: post.topic)))
         let coverHeight = 160 / ratio
-        let textHeight = post.content.count > 36 ? 58.0 : 38.0
-        let actionHeight = post.contactTarget == nil || post.moderationStatus != .approved ? 0 : 42.0
-        return coverHeight + textHeight + 52 + actionHeight
+        let textHeight = post.content.count > 54 ? 72.0 : 48.0
+        let statusHeight = post.moderationStatus == .approved ? 0 : 34.0
+        let actionHeight = post.contactTarget == nil || post.moderationStatus != .approved ? 0 : 38.0
+        return coverHeight + textHeight + statusHeight + actionHeight + 82
     }
 }
 
@@ -432,11 +579,18 @@ private struct CommunityPostCard: View {
                 }
 
             VStack(alignment: .leading, spacing: DS.Space.sm) {
+                HStack(spacing: DS.Space.xxs) {
+                    DSBadge(text: post.topic, tone: .primary)
+                    if post.moderationStatus != .approved {
+                        statusBadge
+                    }
+                }
+
                 Text(post.content)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Color.dsTextPrimary)
                     .lineSpacing(2)
-                    .lineLimit(2)
+                    .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
                     .contentShape(Rectangle())
                     .onTapGesture {
@@ -454,6 +608,13 @@ private struct CommunityPostCard: View {
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(Color.dsTextSecondary)
                         .labelStyle(.titleAndIcon)
+                }
+
+                if post.moderationStatus != .approved {
+                    Text(statusMessage)
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.dsTextSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 if shouldShowContactActions {
@@ -474,6 +635,21 @@ private struct CommunityPostCard: View {
         DSInitialsAvatar(initials: String(post.authorInitials.prefix(1)), tone: .primary, size: 20)
     }
 
+    private var statusBadge: some View {
+        DSBadge(text: post.moderationStatus.displayName, tone: post.moderationStatus == .pending ? .warning : .danger)
+    }
+
+    private var statusMessage: String {
+        switch post.moderationStatus {
+        case .approved:
+            return ""
+        case .pending:
+            return "内容确认后会进入广场。"
+        case .rejected:
+            return "这条内容暂时没有发布，可以调整后再试。"
+        }
+    }
+
     private var shouldShowContactActions: Bool {
         post.moderationStatus == .approved && post.contactTarget != nil
     }
@@ -483,7 +659,7 @@ private struct CommunityPostCard: View {
         if let target = post.contactTarget {
             HStack(spacing: DS.Space.xxs) {
                 DSButton(
-                    title: "聊天",
+                    title: "聊聊",
                     systemImage: "bubble.left.and.bubble.right",
                     variant: .secondary,
                     maxWidth: .infinity,
@@ -495,14 +671,14 @@ private struct CommunityPostCard: View {
 
                 if case .companion(let id) = target {
                     DSButton(
-                        title: "下单",
-                        systemImage: "creditcard",
+                        title: "看详情",
+                        systemImage: "person.crop.circle",
                         maxWidth: .infinity,
                         height: 32
                     ) {
-                        store.navigate(.order(id))
+                        store.navigate(.companionDetail(id))
                     }
-                    .accessibilityIdentifier("communityPostOrder-\(post.id)")
+                    .accessibilityIdentifier("communityPostDetail-\(post.id)")
                 }
             }
         }

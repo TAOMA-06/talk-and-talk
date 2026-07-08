@@ -413,7 +413,7 @@ final class AppStore: ObservableObject {
         guard !trimmedTopic.isEmpty, !trimmedContent.isEmpty else { return .rejected }
 
         guard accountRestrictions.canPostCommunity else {
-            lastModerationFeedback = "账号受限，暂时无法在社区发帖。"
+            lastModerationFeedback = "账号暂时不能在广场发布内容。"
             return .rejected
         }
 
@@ -463,7 +463,7 @@ final class AppStore: ObservableObject {
             communityPosts[index].moderationStatus = .rejected
             insertModerationCase(
                 from: result,
-                title: "社区内容未通过：\(trimmedTopic)",
+                title: "广场内容未通过：\(trimmedTopic)",
                 source: .community,
                 content: trimmedContent,
                 targetId: post.id,
@@ -472,19 +472,19 @@ final class AppStore: ObservableObject {
             if result.decision == .block, let event = creditService.applyModerationResult(result, to: &user) {
                 creditEvents.insert(event, at: 0)
             }
-            lastModerationFeedback = result.decision == .block ? "帖子未通过审核" : "帖子已转人工复核"
+            lastModerationFeedback = result.decision == .block ? "这条内容暂时不能发布" : "内容需要进一步确认"
             return .rejected
         case .warn, .allow:
             if result.decision == .warn, applyWarnGraceIfNeeded(result: result) {
                 communityPosts[index].moderationStatus = .approved
-                lastModerationFeedback = "帖子已发布，但请阅读用户协议（第 \(user.warnGraceStrikeCount) 次提醒）"
+                lastModerationFeedback = "已发布到广场，请留意平台安全规范（第 \(user.warnGraceStrikeCount) 次提醒）"
                 return .approved
             }
             communityPosts[index].moderationStatus = .approved
             if result.decision == .warn {
                 insertModerationCase(
                     from: result,
-                    title: "社区内容预警：\(trimmedTopic)",
+                    title: "广场内容预警：\(trimmedTopic)",
                     source: .community,
                     content: trimmedContent,
                     targetId: post.id,
@@ -494,7 +494,7 @@ final class AppStore: ObservableObject {
                     creditEvents.insert(event, at: 0)
                 }
             }
-            lastModerationFeedback = "帖子已通过审核"
+            lastModerationFeedback = "已发布到广场"
             return .approved
         }
     }
@@ -708,7 +708,7 @@ final class AppStore: ObservableObject {
     private func category(for source: ModerationSource) -> String {
         switch source {
         case .chat: "实时风控"
-        case .community: "社区审核"
+        case .community: "广场内容"
         case .report: "用户举报"
         case .profile: "资料审核"
         }

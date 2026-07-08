@@ -31,6 +31,7 @@ struct CompanionHomepageView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: DS.Space.lg) {
                         CompanionHomepageHero(companion: companion)
+                        CompanionHomepageAboutCard(companion: companion)
                         CompanionHomepageReviewsSection(reviews: companionReviews, reviewCount: companionReviews.count)
                         CompanionPromotionSection(posts: promotionPosts)
                     }
@@ -55,36 +56,52 @@ struct CompanionHomepageView: View {
 
 private struct CompanionHomepageHero: View {
     let companion: Companion
+    @EnvironmentObject private var store: AppStore
 
     var body: some View {
         SoftCard {
             VStack(alignment: .leading, spacing: DS.Space.lg) {
                 HStack(alignment: .top, spacing: DS.Space.lg) {
-                    CompanionAvatar(companion: companion, size: 76)
+                    CompanionAvatar(companion: companion, size: 82)
+
                     VStack(alignment: .leading, spacing: DS.Space.sm) {
-                        HStack(spacing: DS.Space.sm) {
-                            Text(companion.name)
-                                .font(.system(size: 24, weight: .semibold))
-                                .foregroundStyle(Color.dsTextPrimary)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.8)
-                            if companion.isVerified {
-                                Image(systemName: "checkmark.seal.fill")
-                                    .font(.system(size: 18, weight: .semibold))
-                                    .foregroundStyle(Color.dsPrimary)
+                        VStack(alignment: .leading, spacing: DS.Space.xxs) {
+                            HStack(alignment: .firstTextBaseline, spacing: DS.Space.sm) {
+                                Text(companion.name)
+                                    .font(.system(size: 25, weight: .semibold))
+                                    .foregroundStyle(Color.dsTextPrimary)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.78)
+
+                                if companion.isVerified {
+                                    Image(systemName: "checkmark.seal.fill")
+                                        .font(.system(size: 17, weight: .semibold))
+                                        .foregroundStyle(Color.dsPrimary)
+                                        .accessibilityLabel("已认证")
+                                }
                             }
+
+                            Text(companion.role)
+                                .font(.system(size: 14))
+                                .foregroundStyle(Color.dsTextSecondary)
+                                .lineLimit(2)
                         }
-                        Text(companion.role)
-                            .font(.system(size: 14))
+                    }
+                }
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: DS.Space.sm) {
+                        AvailabilityBadge(status: companion.availability)
+                        TrustMicroBadge(text: companion.isVerified ? "资料已核验" : "可先试聊", tone: companion.isVerified ? .success : .warning)
+                        StatusPill(text: String(format: "%.1f", companion.rating), symbol: "star.fill", color: Color.dsWarning)
+                        StatusPill(text: companion.responseTime, symbol: "bolt.fill", color: Color.dsPrimary)
+                        Text("\(companion.cityDistrict) · \(distanceText)")
+                            .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(Color.dsTextSecondary)
-                            .lineLimit(1)
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: DS.Space.sm) {
-                                AvailabilityBadge(status: companion.availability)
-                                TrustMicroBadge(text: "主页认证", tone: .primary)
-                                StatusPill(text: String(format: "%.1f", companion.rating), symbol: "star.fill", color: Color.dsWarning)
-                            }
-                        }
+                            .padding(.horizontal, DS.Space.sm)
+                            .padding(.vertical, DS.Space.xxs)
+                            .background(Color.dsSurfaceElevated, in: Capsule())
+                            .overlay(Capsule().stroke(Color.dsBorder.opacity(0.74), lineWidth: DS.Stroke.hairline))
                     }
                 }
 
@@ -95,12 +112,78 @@ private struct CompanionHomepageHero: View {
                 }
 
                 HStack(spacing: DS.Space.md) {
-                    HomepageMetricTile(title: "完成", value: "\(companion.completedOrders)")
-                    HomepageMetricTile(title: "响应", value: companion.responseTime)
+                    HomepageMetricTile(title: "沟通过", value: "\(companion.completedOrders) 单")
+                    HomepageMetricTile(title: "评价", value: "\(companion.reviewCount) 条")
                     HomepageMetricTile(title: "价格", value: "¥\(companion.pricePerHalfHour)/30m")
+                }
+
+                HStack(spacing: DS.Space.sm) {
+                    DSButton(title: "和 Ta 聊聊", systemImage: "bubble.left.and.bubble.right", variant: .primary) {
+                        store.navigate(.chat(.companion(id: companion.id)))
+                    }
+                    .accessibilityIdentifier("homepageHeroChat-\(companion.id)")
+
+                    DSButton(title: "预约沟通", systemImage: "calendar.badge.plus", variant: .secondary, maxWidth: 118) {
+                        store.navigate(.order(companion.id))
+                    }
+                    .accessibilityIdentifier("homepageHeroOrder-\(companion.id)")
                 }
             }
         }
+    }
+
+    private var distanceText: String {
+        companion.distanceKm < 1
+            ? String(format: "%.0fm", companion.distanceKm * 1000)
+            : String(format: "%.1fkm", companion.distanceKm)
+    }
+}
+
+private struct CompanionHomepageAboutCard: View {
+    let companion: Companion
+
+    var body: some View {
+        SoftCard {
+            VStack(alignment: .leading, spacing: DS.Space.lg) {
+                SectionHeader(title: "关于 Ta", subtitle: "适合聊的方向和沟通方式")
+
+                Text(companion.bio)
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color.dsTextSecondary)
+                    .lineSpacing(4)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                VStack(alignment: .leading, spacing: DS.Space.sm) {
+                    HomepageTrustLine(symbol: "checkmark.seal", text: companion.isVerified ? "资料已核验，沟通留在平台内" : "可以先试聊，确认合适再预约")
+                    HomepageTrustLine(symbol: "clock", text: companion.availableTimes.joined(separator: " · "))
+                    HomepageTrustLine(symbol: "globe.asia.australia", text: companion.languages.joined(separator: " / "))
+                }
+
+                VStack(alignment: .leading, spacing: DS.Space.sm) {
+                    Text("擅长")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.dsTextSecondary)
+                    FlowLayout(spacing: DS.Space.sm) {
+                        ForEach(companion.specialties, id: \.self) { specialty in
+                            TagChip(title: specialty)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct HomepageTrustLine: View {
+    let symbol: String
+    let text: String
+
+    var body: some View {
+        Label(text, systemImage: symbol)
+            .font(.system(size: 13, weight: .medium))
+            .foregroundStyle(Color.dsTextPrimary)
+            .lineLimit(2)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }
 
@@ -109,13 +192,13 @@ private struct CompanionPromotionSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Space.md) {
-            SectionHeader(title: "主页动态", subtitle: "Ta 的动态")
+            SectionHeader(title: "最近动态", subtitle: "Ta 想分享的片段")
             if posts.isEmpty {
                 SoftCard {
                     EmptyStateView(
                         symbol: "sparkles.rectangle.stack",
-                        title: "还没有主页动态",
-                        subtitle: "对方暂时没有发布宣传帖子，可以先从详情页发起试聊。"
+                        title: "还没有更新动态",
+                        subtitle: "可以先发起试聊，看看你们聊起来是否合拍。"
                     )
                 }
             } else {
@@ -159,7 +242,7 @@ private struct HomepagePromotionCard: View {
                         Button {
                             store.navigate(.chat(target))
                         } label: {
-                            Label("聊天", systemImage: "bubble.left.and.bubble.right")
+                            Label("和 Ta 聊聊", systemImage: "bubble.left.and.bubble.right")
                                 .font(.system(size: 13, weight: .semibold))
                                 .foregroundStyle(Color.dsPrimary)
                                 .frame(maxWidth: .infinity)
@@ -177,7 +260,7 @@ private struct HomepagePromotionCard: View {
                             Button {
                                 store.navigate(.order(id))
                             } label: {
-                                Label("下单", systemImage: "creditcard")
+                                Label("预约这段时间", systemImage: "calendar.badge.plus")
                                     .font(.system(size: 13, weight: .semibold))
                                     .foregroundStyle(Color.dsSurface)
                                     .frame(maxWidth: .infinity)
@@ -278,8 +361,8 @@ private struct CompanionHomepageReviewsSection: View {
                 SoftCard {
                     EmptyStateView(
                         symbol: "text.bubble",
-                        title: "还没有用户评价",
-                        subtitle: "成为第一个预约并评价的人吧"
+                        title: "还没有评价",
+                        subtitle: "可以先试聊几句，再决定要不要预约。"
                     )
                 }
             } else {

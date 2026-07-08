@@ -66,7 +66,7 @@ struct InitialGenderSelectionView: View {
             Color.dsBackground.ignoresSafeArea()
             VStack(alignment: .leading, spacing: DS.Space.lg) {
                 Spacer()
-                StepTitle(symbol: "person.2", title: "选择你的身份", subtitle: "用于匹配社区发布规则：女生发需求，男生实名后发自荐。")
+                StepTitle(symbol: "person.2", title: "选择你的身份", subtitle: "用于匹配广场展示规则：女生发需求，男生实名后发自荐。")
                 HStack(spacing: DS.Space.sm) {
                     GenderChoiceButton(gender: .female, isSelected: false, symbol: "heart.text.square") {
                         store.setUserGender(.female)

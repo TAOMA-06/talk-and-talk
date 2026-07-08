@@ -11,7 +11,7 @@ enum AppTab: Hashable, CaseIterable {
     var title: String {
         switch self {
         case .discover: "发现"
-        case .community: "社区"
+        case .community: "广场"
         case .orders: "订单"
         case .messages: "消息"
         case .profile: "我的"
@@ -224,7 +224,7 @@ enum PlatformAgreement {
     static let sections: [(String, String)] = [
         ("服务边界", "本平台仅提供线上文字与语音陪伴服务，不提供线下见面、私下交易或医疗诊断承诺。"),
         ("沟通规范", "禁止诱导添加私人联系方式、转账、线下邀约，以及骚扰、低俗、PUA 等越界表达。"),
-        ("社区氛围", "社区内容需尊重他人，禁止广告引流、引战辱骂；违规内容将被审核拦截。"),
+        ("广场氛围", "广场内容需尊重他人，禁止广告引流、引战辱骂；越界内容会被拦截。"),
         ("信用与处置", "首次与再次轻度违规将收到协议提醒；累计违规将扣减安全分并限制发帖或沟通权限。"),
         ("申诉与举报", "如遇不适可立即结束沟通并举报；误报经核实后可恢复信用分。")
     ]
