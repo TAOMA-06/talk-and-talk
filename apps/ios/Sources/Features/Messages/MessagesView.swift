@@ -53,6 +53,7 @@ struct MessagesView: View {
                         subtitle: isSearching ? "换个姓名或消息关键词再试试。" : "可以从在线陪伴者开始试聊，也可以在广场里继续平台内沟通。"
                     )
                     .padding(.top, DS.Space.md)
+                    .accessibilityIdentifier(isSearching ? "messagesSearchEmptyState" : "messagesEmptyState")
                 } else {
                     LazyVStack(spacing: DS.Space.md) {
                         ForEach(conversations) { target in
@@ -62,8 +63,11 @@ struct MessagesView: View {
                                 SecureConversationRow(target: target)
                             }
                             .buttonStyle(.plain)
+                            .accessibilityLabel("打开与\(store.displayName(for: target))的会话")
+                            .accessibilityIdentifier("conversationRow-\(target.id)")
                         }
                     }
+                    .accessibilityIdentifier("conversationList")
                 }
             }
             .padding(DS.Space.lg)
@@ -80,6 +84,7 @@ struct MessagesView: View {
                     showingNewConversation = true
                 }
                 .accessibilityLabel("新建沟通")
+                .accessibilityIdentifier("newConversationButton")
             }
         }
         .sheet(isPresented: $showingNewConversation) {
@@ -116,10 +121,12 @@ private struct MessagesInboxHeader: View {
                     Spacer(minLength: DS.Space.sm)
                 }
 
-                HStack(spacing: DS.Space.sm) {
-                    InboxTrustPill(title: "平台内沟通", systemImage: "bubble.left.and.bubble.right")
-                    InboxTrustPill(title: "内容保护", systemImage: "checkmark.shield")
-                    InboxTrustPill(title: "可举报", systemImage: "exclamationmark.bubble")
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: DS.Space.sm) {
+                        InboxTrustPill(title: "平台内沟通", systemImage: "bubble.left.and.bubble.right")
+                        InboxTrustPill(title: "内容保护", systemImage: "checkmark.shield")
+                        InboxTrustPill(title: "可举报", systemImage: "exclamationmark.bubble")
+                    }
                 }
 
                 Text(conversationCount == 0 ? "还没有会话" : "\(conversationCount) 个正在进行的会话")
@@ -127,6 +134,7 @@ private struct MessagesInboxHeader: View {
                     .foregroundStyle(Color.dsTextSecondary)
             }
         }
+        .accessibilityIdentifier("messagesInboxHeader")
     }
 }
 
@@ -180,6 +188,8 @@ private struct NewConversationSheet: View {
                                 NewConversationRow(companion: companion)
                             }
                             .buttonStyle(.plain)
+                            .accessibilityLabel("开始与\(companion.name)沟通")
+                            .accessibilityIdentifier("newConversation-\(companion.id)")
                         }
                     }
                 }
@@ -191,9 +201,11 @@ private struct NewConversationSheet: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("关闭") { dismiss() }
+                        .accessibilityIdentifier("newConversationClose")
                 }
             }
         }
+        .accessibilityIdentifier("newConversationSheet")
     }
 }
 
@@ -240,6 +252,7 @@ private struct MessageSearchBar: View {
                 .font(.system(size: 15))
                 .textInputAutocapitalization(.never)
                 .submitLabel(.search)
+                .accessibilityLabel("搜索联系人或消息内容")
         }
         .padding(.horizontal, DS.Space.md)
         .frame(height: 46)

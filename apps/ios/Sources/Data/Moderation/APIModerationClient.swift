@@ -43,7 +43,7 @@ struct APIModerationClient: Sendable {
 
         return ModerationScoring.result(
             score: score,
-            reasons: topCategories.isEmpty ? ["AI 内容审查"] : topCategories.map { "AI 识别：\($0)" },
+            reasons: topCategories.isEmpty ? ["内容安全提醒"] : topCategories.map { "识别到：\($0)" },
             matchedRules: ["api.moderation"],
             usedAI: true
         )

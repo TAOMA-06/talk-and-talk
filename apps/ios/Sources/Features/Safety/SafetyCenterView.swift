@@ -40,7 +40,7 @@ struct SafetyCenterView: View {
                     Text("安全机制")
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(Color.dsTextPrimary)
-                    Text("实名、资金托管、内容审核和安全分，一起保护你的沟通。")
+                    Text("实名、平台托管、沟通留痕和举报入口，一起保护你的体验。")
                         .font(.system(size: 13))
                         .foregroundStyle(Color.dsTextSecondary)
                         .lineSpacing(3)
@@ -115,22 +115,22 @@ private struct SafetySectionCard: View {
         case .emergency:
             VStack(alignment: .leading, spacing: DS.Space.sm) {
                 EmergencyItem(symbol: "phone.fill", title: "一键报警", detail: "紧急情况快速求助")
-                EmergencyItem(symbol: "exclamationmark.bubble.fill", title: "越界预警", detail: "不当表达会提醒")
+                EmergencyItem(symbol: "exclamationmark.bubble.fill", title: "边界提醒", detail: "不舒服可立即提醒")
                 EmergencyItem(symbol: "person.2.fill", title: "紧急联系人", detail: "预设可信赖的人")
                 EmergencyItem(symbol: "clock.badge.exclamationmark", title: "超时提醒", detail: "异常时长自动提示")
             }
         case .credit:
             VStack(alignment: .leading, spacing: DS.Space.sm) {
-                Text("聊天、发帖和举报都会影响分数。")
+                Text("安全分用于提示账号状态，不影响正常、友善的沟通。")
                     .font(.system(size: 13))
                     .foregroundStyle(Color.dsTextSecondary)
                 CreditRuleRow(title: "完成实名", detail: "基础分 85")
-                CreditRuleRow(title: "轻度违规", detail: "-8 分；前 2 次仅提醒")
-                CreditRuleRow(title: "严重违规", detail: "-20 分；多次或低于 20 分封禁")
-                CreditRuleRow(title: "误报驳回", detail: "+5 分恢复")
-                Text("受限账号无法发帖；封禁账号无法发消息。")
+                CreditRuleRow(title: "边界提醒", detail: "前 2 次以提醒为主")
+                CreditRuleRow(title: "多次越界", detail: "可能暂停部分功能")
+                CreditRuleRow(title: "误报恢复", detail: "核实后恢复分数")
+                Text("若账号受限，可在安全中心查看原因。")
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Color.dsDanger)
+                    .foregroundStyle(Color.dsWarning)
             }
         case .insurance:
             Text("订单异常时平台介入，沟通全程留痕。")

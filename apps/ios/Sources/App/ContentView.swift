@@ -109,7 +109,10 @@ struct GenderChoiceButton: View {
             }
         }
         .buttonStyle(DSPressButtonStyle())
-        .accessibilityIdentifier("gender-\(gender.rawValue)")
+        .accessibilityLabel("选择\(gender.displayName)身份")
+        .accessibilityHint("用于匹配广场展示和发布规则，之后可在我的页面调整")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityIdentifier(gender.displayName)
     }
 }
 

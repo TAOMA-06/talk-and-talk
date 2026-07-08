@@ -76,13 +76,16 @@ struct ChatView: View {
                     toggleCall: toggleCall,
                     onReport: { showingReport = true }
                 )
+                .accessibilityIdentifier("chatHeader")
 
                 if let feedback = store.lastModerationFeedback {
                     ModerationFeedbackPanel(text: feedback)
+                        .accessibilityIdentifier("chatModerationFeedback")
                 }
 
                 if let disabledReason {
                     RestrictionBanner(text: disabledReason)
+                        .accessibilityIdentifier("chatRestrictionBanner")
                 }
 
                 if target.allowsPaidActions {
@@ -97,6 +100,7 @@ struct ChatView: View {
 
                 if isSyncingBackendChat {
                     ChatSyncPlaceholder()
+                        .accessibilityIdentifier("chatSyncLoading")
                 } else {
                     SecureMessageList(
                         messages: messages,
@@ -242,6 +246,7 @@ private struct SecureChatHeader: View {
                         if companion != nil {
                             DSButton(title: "资料", systemImage: "person.crop.square", variant: .secondary, maxWidth: 72, height: 34, action: openCompanion)
                                 .accessibilityLabel("查看资料")
+                                .accessibilityIdentifier("chatOpenProfile")
                         }
 
                         if canStartCall {
@@ -252,17 +257,21 @@ private struct SecureChatHeader: View {
                                 action: toggleCall
                             )
                             .accessibilityLabel(isCallActive ? "结束语音" : "开始语音")
+                            .accessibilityIdentifier(isCallActive ? "chatEndVoiceCall" : "chatStartVoiceCall")
                         }
 
                         DSIconButton(systemImage: "exclamationmark.bubble", tone: .warning, size: 34, action: onReport)
                             .accessibilityLabel("举报")
+                            .accessibilityIdentifier("chatReportButton")
                     }
                 }
 
-                HStack(spacing: DS.Space.sm) {
-                    HeaderStatusChip(text: primaryStatusText, systemImage: primaryStatusIcon, tone: primaryStatusTone)
-                    HeaderStatusChip(text: "平台内沟通", systemImage: "lock.shield", tone: .primary)
-                    HeaderStatusChip(text: backendStatusText, systemImage: backendStatusIcon, tone: backendStatusTone)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: DS.Space.sm) {
+                        HeaderStatusChip(text: primaryStatusText, systemImage: primaryStatusIcon, tone: primaryStatusTone)
+                        HeaderStatusChip(text: "平台内沟通", systemImage: "lock.shield", tone: .primary)
+                        HeaderStatusChip(text: backendStatusText, systemImage: backendStatusIcon, tone: backendStatusTone)
+                    }
                 }
             }
             .padding(.horizontal, DS.Space.lg)
@@ -334,12 +343,10 @@ private struct SecureChatHeader: View {
     }
 
     private var backendStatusText: String {
-        guard usesBackendChat else { return "本地会话" }
+        guard usesBackendChat else { return "本地保护" }
         if isSyncing { return "同步中" }
-        if isBackendConnected {
-            return backendModel.isEmpty ? "后端已连接" : backendModel
-        }
-        return "后端待连接"
+        if isBackendConnected { return "服务已连接" }
+        return "服务准备中"
     }
 
     private var backendStatusIcon: String {
@@ -372,6 +379,7 @@ private struct HeaderStatusChip: View {
             .padding(.vertical, DS.Space.xxs)
             .background(foreground.opacity(0.10), in: Capsule())
             .overlay(Capsule().stroke(foreground.opacity(0.14), lineWidth: DS.Stroke.hairline))
+            .fixedSize(horizontal: true, vertical: false)
     }
 
     private var foreground: Color {
@@ -746,6 +754,7 @@ private struct SecureComposerBar: View {
                         .frame(width: 40, height: 42)
                 }
                 .accessibilityLabel("更多沟通操作")
+                .accessibilityIdentifier("chatMoreActions")
 
                 TextField("在平台内输入消息", text: $text, axis: .vertical)
                     .font(.system(size: 15))
@@ -762,6 +771,7 @@ private struct SecureComposerBar: View {
                         RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous)
                             .stroke(Color.dsBorder.opacity(0.72), lineWidth: DS.Stroke.hairline)
                     }
+                    .accessibilityLabel("消息输入框")
                     .accessibilityIdentifier("messageInput")
                     .disabled(isDisabled || isSending)
 
@@ -775,6 +785,7 @@ private struct SecureComposerBar: View {
                 .disabled(trimmedText.isEmpty || isDisabled || isSending)
                 .buttonStyle(DSPressButtonStyle())
                 .accessibilityLabel("发送")
+                .accessibilityIdentifier("sendMessageButton")
             }
 
             if showsPaidControls {
@@ -785,7 +796,8 @@ private struct SecureComposerBar: View {
                     height: 38,
                     action: hasPaidChat ? finish : continuePaid
                 )
-                .accessibilityIdentifier("finishChatButton")
+                .accessibilityLabel(hasPaidChat ? "完成沟通并评价" : "确认订单后继续")
+                .accessibilityIdentifier(hasPaidChat ? "finishChatButton" : "continuePaidChatButton")
             }
         }
         .padding(.horizontal, DS.Space.lg)
@@ -831,6 +843,7 @@ private struct VoiceCallFloatingPanel: View {
                         }
                         .buttonStyle(DSPressButtonStyle())
                         .accessibilityLabel("结束通话")
+                        .accessibilityIdentifier("voiceCallEndButton")
                     }
 
                     Text("语音仅用于当前订单沟通，请勿交换私人联系方式或转账信息。")
@@ -843,6 +856,7 @@ private struct VoiceCallFloatingPanel: View {
             .padding(.top, 88)
             Spacer()
         }
+        .accessibilityIdentifier("voiceCallPanel")
     }
 
     private func format(_ seconds: Int) -> String {
@@ -872,11 +886,13 @@ private struct ReportSheetForChat: View {
                     Text("服务边界不清").tag("服务边界不清")
                 }
                 .pickerStyle(.inline)
+                .accessibilityIdentifier("chatReportReasonPicker")
 
                 DSPrimaryButton(title: "提交举报", systemImage: "paperplane") {
                     store.report(target: target, reason: reason)
                     dismiss()
                 }
+                .accessibilityIdentifier("chatReportSubmit")
 
                 Spacer()
             }

@@ -167,15 +167,17 @@ private struct QuickMatchPanel: View {
 
                 HStack(spacing: DS.Space.sm) {
                     DSButton(
-                        title: store.user.isVerified ? "查看在线陪伴者" : "先完成 18+ 认证",
+                        title: store.user.isVerified ? "看看谁在线" : "先完成 18+ 认证",
                         systemImage: store.user.isVerified ? "arrow.right" : "person.badge.key",
                         variant: .primary,
                         action: primaryAction
                     )
+                    .accessibilityIdentifier(store.user.isVerified ? "discoverOnlineCompanionsButton" : "discoverVerifyButton")
 
                     DSButton(title: "今晚可聊", systemImage: "moon.stars", variant: .secondary, maxWidth: 118) {
                         store.navigate(.companionList(themeId: nil, preset: .availableTonight))
                     }
+                    .accessibilityIdentifier("discoverTonightButton")
                 }
             }
         }
@@ -221,6 +223,8 @@ private struct TonightAvailableSection: View {
                                 TonightCompanionCard(companion: companion)
                             }
                             .buttonStyle(.plain)
+                            .accessibilityLabel("查看\(companion.name)详情")
+                            .accessibilityIdentifier("discoverTonightCompanion-\(companion.id)")
                         }
                     }
                 }

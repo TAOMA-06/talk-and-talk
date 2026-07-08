@@ -80,7 +80,7 @@ private struct SafetyScorePanel: View {
                     HStack(alignment: .center) {
                         SectionHeader(
                             title: "安全分",
-                            subtitle: "\(scoreLevel) · 违规 \(store.user.violationCount) 次"
+                            subtitle: "\(scoreLevel) · 提醒 \(store.user.violationCount) 次"
                         )
                         Spacer(minLength: DS.Space.sm)
                         Image(systemName: "chevron.right")
@@ -131,6 +131,7 @@ private struct SafetyScorePanel: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("安全分，前往安全中心")
+        .accessibilityIdentifier("profileSafetyScoreCard")
     }
 }
 
@@ -164,6 +165,7 @@ private struct MenuPanel: View {
                 ) {
                     store.navigate(.verify)
                 }
+                .accessibilityIdentifier("profileVerifyRow")
             }
 
             menuGroup(title: "安全与信任") {
@@ -174,6 +176,7 @@ private struct MenuPanel: View {
                 ) {
                     store.navigate(.safetyCenter)
                 }
+                .accessibilityIdentifier("profileSafetyCenterRow")
             }
 
             menuGroup(title: "帮助与规范") {
@@ -184,17 +187,19 @@ private struct MenuPanel: View {
                 ) {
                     showingAgreement = true
                 }
+                .accessibilityIdentifier("profileAgreementRow")
             }
 
 #if DEBUG
-            menuGroup(title: "开发工具") {
+            menuGroup(title: "内容安全") {
                 DSListRow(
-                    title: "审核后台",
-                    subtitle: "\(store.moderationCases.count) 条待处理",
+                    title: "安全工作台",
+                    subtitle: "\(store.moderationCases.count) 条待查看",
                     symbol: "shield.lefthalf.filled"
                 ) {
                     store.navigate(.admin)
                 }
+                .accessibilityIdentifier("profileSafetyWorkspaceRow")
             }
 #endif
         }
@@ -259,6 +264,7 @@ private struct PlatformAgreementSheet: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("完成") { dismiss() }
+                        .accessibilityIdentifier("agreementDoneButton")
                 }
             }
         }
@@ -278,7 +284,7 @@ private struct GenderSettingsSheet: View {
                 Text("当前身份会影响社区浏览和发布规则。")
                     .font(.system(size: 13))
                     .foregroundStyle(Color.dsTextSecondary)
-                HStack(spacing: DS.Space.sm) {
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: DS.Space.sm) {
                     genderButton(.female, symbol: "heart.text.square")
                     genderButton(.male, symbol: "checkmark.shield")
                 }
@@ -289,9 +295,11 @@ private struct GenderSettingsSheet: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("完成") { dismiss() }
+                        .accessibilityIdentifier("genderSettingsDoneButton")
                 }
             }
         }
+        .accessibilityIdentifier("genderSettingsSheet")
     }
 
     private func genderButton(_ gender: UserGender, symbol: String) -> some View {

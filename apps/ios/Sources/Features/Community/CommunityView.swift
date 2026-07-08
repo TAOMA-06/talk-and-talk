@@ -199,6 +199,8 @@ private struct ComposeStorySheet: View {
                         isLoading: isSubmitting,
                         action: submitPost
                     )
+                    .accessibilityLabel(submitTitle)
+                    .accessibilityIdentifier("communityComposeSubmit")
                 }
                 .padding(DS.Space.lg)
             }
@@ -209,9 +211,11 @@ private struct ComposeStorySheet: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("关闭") { dismiss() }
+                        .accessibilityIdentifier("communityComposeClose")
                 }
             }
         }
+        .accessibilityIdentifier("communityComposeSheet")
         .task(id: selectedPhotoItem) {
             await loadSelectedCover()
         }
@@ -255,8 +259,8 @@ private struct ComposeStorySheet: View {
 
     private var introBanner: some View {
         DSBanner(
-            title: kind == .femaleRequest ? "发布后会先确认内容" : "自荐会展示给合适的人",
-            message: "通过后会出现在广场里；沟通始终留在平台内。",
+            title: kind == .femaleRequest ? "发布后会展示给合适的人" : "自荐会展示给合适的人",
+            message: "发布后会出现在广场里；沟通始终留在平台内。",
             systemImage: "lock.shield",
             tone: .primary
         )
@@ -285,6 +289,7 @@ private struct ComposeStorySheet: View {
                             .padding(DS.Space.sm)
                     }
                     .accessibilityLabel("移除封面")
+                    .accessibilityIdentifier("communityCoverRemove")
                 }
             } else {
                 PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
@@ -309,6 +314,8 @@ private struct ComposeStorySheet: View {
                     }
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("添加发布封面")
+                .accessibilityIdentifier("communityCoverPicker")
             }
         }
     }
@@ -323,6 +330,9 @@ private struct ComposeStorySheet: View {
                     TagChip(title: item, isSelected: topic == item) {
                         topic = item
                     }
+                    .accessibilityLabel("选择话题\(item)")
+                    .accessibilityAddTraits(topic == item ? .isSelected : [])
+                    .accessibilityIdentifier("communityComposeTopic-\(item)")
                 }
             }
         }
@@ -334,6 +344,9 @@ private struct ComposeStorySheet: View {
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(Color.dsTextSecondary)
             DSTextEditor(placeholder: contentPlaceholder, text: $content, minHeight: 150)
+                .accessibilityLabel(contentLabel)
+                .accessibilityHint(contentPlaceholder)
+                .accessibilityIdentifier("communityComposeContent")
         }
     }
 
@@ -403,7 +416,7 @@ private struct SquareHeroHeader: View {
                             .font(.system(size: 22, weight: .semibold))
                             .foregroundStyle(Color.dsTextPrimary)
                             .fixedSize(horizontal: false, vertical: true)
-                        Text("只展示适合你身份的内容，沟通留在平台内，发布会先确认内容。")
+                        Text("只展示适合你身份的内容，沟通留在平台内。")
                             .font(.system(size: 13))
                             .foregroundStyle(Color.dsTextSecondary)
                             .lineSpacing(3)
@@ -417,7 +430,7 @@ private struct SquareHeroHeader: View {
                             Text("\(pendingCount)")
                                 .font(.system(size: 22, weight: .semibold))
                                 .foregroundStyle(Color.dsTextPrimary)
-                            Text("待确认")
+                            Text("发布中")
                                 .font(.system(size: 11, weight: .medium))
                                 .foregroundStyle(Color.dsTextSecondary)
                         }
@@ -440,6 +453,8 @@ private struct SquareHeroHeader: View {
                     isEnabled: canPublish,
                     action: action
                 )
+                .accessibilityLabel(publishTitle)
+                .accessibilityIdentifier("communityPublishButton")
             }
         }
     }
@@ -450,7 +465,7 @@ private struct SquareReviewSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Space.md) {
-            SectionHeader(title: "我的发布", subtitle: "确认中的内容会先在这里显示")
+            SectionHeader(title: "我的发布", subtitle: "暂未展示的内容会先在这里显示")
             CommunityMasonryGrid(posts: posts)
         }
     }
@@ -509,6 +524,9 @@ private struct CommunityTopicFilterBar: View {
                     TagChip(title: topic, isSelected: selection == topic) {
                         selection = topic
                     }
+                    .accessibilityLabel("广场话题\(topic)")
+                    .accessibilityAddTraits(selection == topic ? .isSelected : [])
+                    .accessibilityIdentifier("communityTopic-\(topic)")
                 }
             }
         }
@@ -636,7 +654,7 @@ private struct CommunityPostCard: View {
     }
 
     private var statusBadge: some View {
-        DSBadge(text: post.moderationStatus.displayName, tone: post.moderationStatus == .pending ? .warning : .danger)
+        DSBadge(text: statusText, tone: post.moderationStatus == .pending ? .warning : .danger)
     }
 
     private var statusMessage: String {
@@ -644,7 +662,7 @@ private struct CommunityPostCard: View {
         case .approved:
             return ""
         case .pending:
-            return "内容确认后会进入广场。"
+            return "发布后会进入广场。"
         case .rejected:
             return "这条内容暂时没有发布，可以调整后再试。"
         }
@@ -652,6 +670,17 @@ private struct CommunityPostCard: View {
 
     private var shouldShowContactActions: Bool {
         post.moderationStatus == .approved && post.contactTarget != nil
+    }
+
+    private var statusText: String {
+        switch post.moderationStatus {
+        case .approved:
+            return "已发布"
+        case .pending:
+            return "发布中"
+        case .rejected:
+            return "未发布"
+        }
     }
 
     @ViewBuilder
@@ -753,9 +782,9 @@ private struct CommunityPostCoverView: View {
         case .approved:
             EmptyView()
         case .pending:
-            TrustMicroBadge(text: "审核中", tone: .warning)
+            TrustMicroBadge(text: "发布中", tone: .warning)
         case .rejected:
-            TrustMicroBadge(text: "未通过", tone: .danger)
+            TrustMicroBadge(text: "未发布", tone: .danger)
         }
     }
 

@@ -45,6 +45,7 @@ struct OrderView: View {
                 ) {
                     submit()
                 }
+                .accessibilityLabel(isSubmitting ? "正在确认订单" : "确认并进入沟通")
                 .accessibilityIdentifier("confirmOrderButton")
             } else {
                 EmptyStateView(
@@ -135,22 +136,21 @@ private struct VerificationGate: View {
     @EnvironmentObject private var store: AppStore
 
     var body: some View {
-        DSBanner(
-            title: store.user.isVerified ? "18+ 实名已完成" : "先完成 18+ 实名",
-            message: store.user.isVerified ? "可以继续确认订单，沟通全程留在平台内。" : "完成实名与年龄核验后，再继续确认订单。",
-            systemImage: store.user.isVerified ? "checkmark.seal.fill" : "person.badge.key",
-            tone: store.user.isVerified ? .success : .warning
-        )
-        .overlay(alignment: .trailing) {
+        VStack(alignment: .leading, spacing: DS.Space.sm) {
+            DSBanner(
+                title: store.user.isVerified ? "18+ 实名已完成" : "先完成 18+ 实名",
+                message: store.user.isVerified ? "可继续预约，沟通全程留在平台内。" : "完成年龄核验后再继续预约。",
+                systemImage: store.user.isVerified ? "checkmark.seal.fill" : "person.badge.key",
+                tone: store.user.isVerified ? .success : .warning
+            )
             if !store.user.isVerified {
-                Button("去认证") {
+                DSButton(title: "去认证", systemImage: "person.badge.key", variant: .secondary, height: 38) {
                     store.navigate(.verify)
                 }
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Color.dsPrimary)
-                .padding(.trailing, DS.Space.md)
+                .accessibilityIdentifier("orderVerifyButton")
             }
         }
+        .accessibilityIdentifier("orderVerificationGate")
     }
 }
 
@@ -163,7 +163,12 @@ private struct ThemePicker: View {
             SectionHeader(title: "沟通主题", subtitle: "选择本次沟通主题")
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: DS.Space.sm) {
                 ForEach(store.themes) { theme in
-                    SelectableTile(title: theme.name, symbol: theme.icon, isSelected: selectedThemeId == theme.id) {
+                    SelectableTile(
+                        title: theme.name,
+                        symbol: theme.icon,
+                        isSelected: selectedThemeId == theme.id,
+                        accessibilityIdentifier: "orderTheme-\(theme.id)"
+                    ) {
                         selectedThemeId = theme.id
                     }
                 }
@@ -179,9 +184,14 @@ private struct DurationPicker: View {
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Space.md) {
             SectionHeader(title: "沟通时长", subtitle: "按 30 分钟计费")
-            HStack(spacing: DS.Space.sm) {
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: DS.Space.sm) {
                 ForEach(durations, id: \.self) { duration in
-                    SelectableTile(title: "\(duration) 分钟", symbol: "timer", isSelected: selectedDuration == duration) {
+                    SelectableTile(
+                        title: "\(duration) 分钟",
+                        symbol: "timer",
+                        isSelected: selectedDuration == duration,
+                        accessibilityIdentifier: "orderDuration-\(duration)"
+                    ) {
                         selectedDuration = duration
                     }
                 }
@@ -194,6 +204,7 @@ private struct SelectableTile: View {
     let title: String
     let symbol: String
     let isSelected: Bool
+    var accessibilityIdentifier: String? = nil
     let action: () -> Void
 
     var body: some View {
@@ -217,6 +228,9 @@ private struct SelectableTile: View {
             }
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityIdentifier(accessibilityIdentifier ?? "selectableTile-\(title)")
     }
 }
 
@@ -321,15 +335,16 @@ private struct RulesPanel: View {
     var body: some View {
         SoftCard {
             VStack(alignment: .leading, spacing: DS.Space.md) {
-                SectionHeader(title: "安全规范", subtitle: "继续下单代表你理解服务边界")
+                SectionHeader(title: "沟通边界", subtitle: "预约前确认即可")
                 ForEach(rules, id: \.self) { rule in
                     Label(rule, systemImage: "checkmark.circle.fill")
                         .font(.system(size: 13))
                         .foregroundStyle(Color.dsTextPrimary)
                 }
-                Toggle("我已阅读并同意平台安全规范", isOn: $agreedToRules)
+                Toggle("我理解沟通边界", isOn: $agreedToRules)
                     .font(.system(size: 13, weight: .semibold))
                     .tint(Color.dsPrimary)
+                    .accessibilityIdentifier("orderBoundaryToggle")
             }
         }
     }

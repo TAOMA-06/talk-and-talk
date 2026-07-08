@@ -88,11 +88,13 @@ private struct ProfileHero: View {
                                     store.navigate(.companionHomepage(companion.id))
                                 }
                                 .accessibilityLabel("进入主页")
+                                .accessibilityIdentifier("detailHomepage-\(companion.id)")
 
                                 DSIconButton(systemImage: "exclamationmark.bubble", size: 36) {
                                     showingReport = true
                                 }
                                 .accessibilityLabel("举报")
+                                .accessibilityIdentifier("detailReport-\(companion.id)")
                             }
                         }
                         ScrollView(.horizontal, showsIndicators: false) {
@@ -301,6 +303,7 @@ private struct DetailActionBar: View {
                     DSButton(title: "预约沟通", systemImage: "calendar.badge.plus", variant: .secondary) {
                         store.navigate(.order(companion.id))
                     }
+                    .accessibilityLabel("预约\(companion.name)沟通")
                     .accessibilityIdentifier("detailOrder-\(companion.id)")
 
                     DSButton(
@@ -314,6 +317,7 @@ private struct DetailActionBar: View {
                         }
                         store.navigate(.chat(.companion(id: companion.id)))
                     }
+                    .accessibilityLabel(store.user.isVerified ? "先和\(companion.name)聊几句" : "先完成认证再聊天")
                     .accessibilityIdentifier("detailChat-\(companion.id)")
                 }
             }
@@ -339,10 +343,12 @@ private struct ReportSheet: View {
                     ForEach(reasons, id: \.self) { Text($0) }
                 }
                 .pickerStyle(.inline)
+                .accessibilityIdentifier("detailReportReasonPicker")
                 DSPrimaryButton(title: "提交举报", systemImage: "paperplane") {
                     store.report(companionId: companionId, reason: reason)
                     dismiss()
                 }
+                .accessibilityIdentifier("detailReportSubmit")
                 Spacer()
             }
             .padding(DS.Space.lg)

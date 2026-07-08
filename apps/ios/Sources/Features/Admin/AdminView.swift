@@ -5,7 +5,7 @@ struct AdminView: View {
     @EnvironmentObject private var store: AppStore
 
     var body: some View {
-        AppScaffold(title: "内容安全工作台", spacing: DS.Space.lg, bottomPadding: DS.Space.xxl) {
+        AppScaffold(title: "安全工作台", spacing: DS.Space.lg, bottomPadding: DS.Space.xxl) {
             AdminHero()
             AdminMetricGrid()
             ModerationQueue()
@@ -17,10 +17,10 @@ private struct AdminHero: View {
     var body: some View {
         SoftCard {
             VStack(alignment: .leading, spacing: DS.Space.sm) {
-                Text("平台安全运营")
+                Text("内容安全")
                     .font(.system(size: 22, weight: .semibold))
                     .foregroundStyle(Color.dsTextPrimary)
-                Text("聊天、社区与举报内容会统一进入平台安全复核流程。")
+                Text("集中查看沟通提醒、发布状态和用户举报。")
                     .font(.system(size: 13))
                     .foregroundStyle(Color.dsTextSecondary)
                     .lineSpacing(3)
@@ -34,20 +34,17 @@ private struct AdminMetricGrid: View {
     @EnvironmentObject private var store: AppStore
     private let columns = [GridItem(.flexible()), GridItem(.flexible())]
 
-    private var aiModeValue: String {
+    private var serviceStatusValue: String {
         guard BackendConfig.isEnabled else { return "未启用" }
-        if store.isBackendConnected {
-            return store.backendModerationModel.isEmpty ? "DeepSeek" : store.backendModerationModel
-        }
-        return "未连接"
+        return store.isBackendConnected ? "已连接" : "待连接"
     }
 
     var body: some View {
         LazyVGrid(columns: columns, spacing: DS.Space.md) {
-            AdminMetric(title: "待复核内容", value: "\(store.pendingModerationCount)", symbol: "shield.checkered")
-            AdminMetric(title: "今日拦截", value: "\(store.blockedTodayCount)", symbol: "hand.raised")
+            AdminMetric(title: "待查看", value: "\(store.pendingModerationCount)", symbol: "shield.checkered")
+            AdminMetric(title: "今日提醒", value: "\(store.blockedTodayCount)", symbol: "hand.raised")
             AdminMetric(title: "受限用户", value: store.user.accountStatus == .restricted ? "1" : "0", symbol: "person.crop.circle.badge.exclamationmark")
-            AdminMetric(title: "安全模型", value: aiModeValue, symbol: "brain")
+            AdminMetric(title: "服务状态", value: serviceStatusValue, symbol: "server.rack")
         }
     }
 }
@@ -81,7 +78,7 @@ private struct ModerationQueue: View {
     var body: some View {
         SoftCard {
             VStack(alignment: .leading, spacing: DS.Space.md) {
-                SectionHeader(title: "复核队列", subtitle: "资料、聊天、举报统一处理")
+                SectionHeader(title: "待处理内容", subtitle: "资料、聊天、举报统一查看")
                 if let feedback {
                     Text(feedback)
                         .font(.system(size: 12, weight: .medium))
@@ -92,7 +89,7 @@ private struct ModerationQueue: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 if store.moderationCases.isEmpty {
-                    EmptyStateView(symbol: "tray", title: "暂无待处理内容", subtitle: "触发平台安全规则或收到举报后会出现在这里。")
+                    EmptyStateView(symbol: "tray", title: "暂无待处理内容", subtitle: "有新的提醒或举报时会出现在这里。")
                 } else {
                     ForEach(store.moderationCases) { item in
                         ModerationCaseRow(item: item) { message in
@@ -119,38 +116,38 @@ private struct ModerationCaseRow: View {
                     .foregroundStyle(color(for: item.riskLevel))
                     .frame(width: 24)
                 VStack(alignment: .leading, spacing: DS.Space.xxs) {
-                    Text(item.title)
+                    Text(displayTitle)
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(Color.dsTextPrimary)
-                    Text("\(item.category) · 风险\(item.riskLevel.rawValue) · \(item.status.displayName)")
+                    Text("\(item.category) · \(severityText(for: item.riskLevel)) · \(statusText(for: item.status))")
                         .font(.system(size: 11))
                         .foregroundStyle(Color.dsTextSecondary)
-                    Text("风险评分 \(String(format: "%.2f", item.aiScore)) · \(item.aiReason)")
+                    Text("处理说明：\(displayReason)")
                         .font(.system(size: 11))
                         .foregroundStyle(Color.dsTextSecondary)
                         .lineLimit(2)
                     if item.usedAI {
-                        TrustMicroBadge(text: "辅助识别", tone: .neutral)
+                        TrustMicroBadge(text: "辅助判断", tone: .neutral)
                     }
                 }
                 Spacer()
             }
             if item.status != .resolved && item.status != .dismissed {
                 HStack(spacing: DS.Space.sm) {
-                    Button("确认违规") {
+                    Button("确认处理") {
                         store.resolveModerationCase(id: item.id, action: .confirmViolation)
-                        onAction("已确认违规，信用分与账号状态已同步更新。")
+                        onAction("已完成处理，账号状态已同步更新。")
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(Color.dsDanger)
-                    Button("误报驳回") {
+                    Button("无需处理") {
                         store.resolveModerationCase(id: item.id, action: .dismiss)
-                        onAction("已驳回误报，安全分已恢复。")
+                        onAction("已标记为无需处理。")
                     }
                     .buttonStyle(.bordered)
-                    Button("转人工复核") {
+                    Button("继续查看") {
                         store.resolveModerationCase(id: item.id, action: .escalate)
-                        onAction("已转入人工复核，内容会继续保留在复核队列中。")
+                        onAction("已保留在待处理列表。")
                     }
                     .buttonStyle(.bordered)
                 }
@@ -175,6 +172,42 @@ private struct ModerationCaseRow: View {
         case .medium: Color.dsWarning
         case .high: Color.dsDanger
         }
+    }
+
+    private func severityText(for level: RiskLevel) -> String {
+        switch level {
+        case .low: "普通"
+        case .medium: "需留意"
+        case .high: "优先"
+        }
+    }
+
+    private func statusText(for status: ModerationCaseStatus) -> String {
+        switch status {
+        case .pending, .autoReviewing: "待查看"
+        case .humanReview: "继续查看"
+        case .resolved: "已处理"
+        case .dismissed: "无需处理"
+        }
+    }
+
+    private var displayTitle: String {
+        item.title
+            .replacingOccurrences(of: "审核", with: "资料")
+            .replacingOccurrences(of: "未通过", with: "未展示")
+            .replacingOccurrences(of: "违规", with: "越界")
+            .replacingOccurrences(of: "待复核", with: "待查看")
+            .replacingOccurrences(of: "预警", with: "提醒")
+            .replacingOccurrences(of: "拦截", with: "未发送")
+    }
+
+    private var displayReason: String {
+        if item.aiReason.contains("规则引擎") {
+            return "需要继续查看"
+        }
+        return item.aiReason
+            .replacingOccurrences(of: "违规", with: "越界")
+            .replacingOccurrences(of: "审核", with: "查看")
     }
 }
 #endif

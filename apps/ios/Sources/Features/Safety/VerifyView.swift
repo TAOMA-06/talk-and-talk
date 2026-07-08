@@ -41,8 +41,10 @@ struct VerifyView: View {
                     isEnabled: canContinue,
                     action: advance
                 )
+                .accessibilityIdentifier(step == 2 ? "verifyCompleteButton" : "verifyNextButton")
                 if step > 0 {
                     DSSecondaryButton(title: "上一步", action: goBack)
+                        .accessibilityIdentifier("verifyBackButton")
                 }
                 Button(action: openSafetyCenter) {
                     HStack {
@@ -54,12 +56,15 @@ struct VerifyView: View {
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("查看安全中心")
+                .accessibilityIdentifier("verifySafetyCenterButton")
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, DS.Space.lg)
             .padding(.top, DS.Space.md)
             .padding(.bottom, DS.Space.xxxl)
         }
+        .accessibilityIdentifier("verifyView")
         .scrollDismissesKeyboard(.interactively)
         .background(Color.dsBackground)
         .navigationTitle("18+ 实名认证")
@@ -70,6 +75,7 @@ struct VerifyView: View {
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button("关闭") { dismiss() }
+                    .accessibilityIdentifier("verifyCloseButton")
             }
         }
     }
@@ -175,6 +181,8 @@ private struct IdentityStep: View {
                 RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous)
                     .stroke(Color.dsBorder, lineWidth: 1)
             }
+            .accessibilityLabel(placeholder)
+            .accessibilityIdentifier("verify\(String(describing: field).capitalized)Field")
     }
 }
 
@@ -222,12 +230,13 @@ private struct PhoneStep: View {
             VStack(alignment: .leading, spacing: DS.Space.lg) {
                 StepTitle(symbol: "iphone.gen3", title: "绑定手机号", subtitle: "用于接收验证码")
                 verifyTextField(placeholder: "手机号", text: $phone, field: .phone, keyboard: .phonePad)
-                HStack(spacing: DS.Space.sm) {
+                VStack(alignment: .leading, spacing: DS.Space.sm) {
                     verifyTextField(placeholder: "验证码", text: $code, field: .code, keyboard: .numberPad)
                     Button("重新发送") {}
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(Color.dsPrimary)
-                        .frame(minWidth: 72)
+                        .frame(minHeight: DS.ControlHeight.sm, alignment: .leading)
+                        .accessibilityIdentifier("verifyResendCodeButton")
                 }
             }
         }
@@ -251,6 +260,8 @@ private struct PhoneStep: View {
                 RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous)
                     .stroke(Color.dsBorder, lineWidth: 1)
             }
+            .accessibilityLabel(placeholder)
+            .accessibilityIdentifier("verify\(String(describing: field).capitalized)Field")
     }
 }
 

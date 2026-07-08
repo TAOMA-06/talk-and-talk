@@ -106,10 +106,13 @@ struct CompanionListView: View {
                             CompanionSummaryCard(companion: companion)
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel("查看\(companion.name)详情，\(companion.role)，\(companion.availability.displayName)")
+                        .accessibilityIdentifier("companionListCard-\(companion.id)")
                     }
                 }
             }
         }
+        .accessibilityIdentifier("companionListView")
     }
 
     private func resetFilters() {
@@ -200,11 +203,14 @@ private struct CompanionListEmptyState: View {
 
                 HStack(spacing: DS.Space.sm) {
                     DSButton(title: "放宽筛选", variant: .primary, action: reset)
+                        .accessibilityIdentifier("companionListResetFilters")
                     DSButton(title: "返回发现", variant: .secondary, maxWidth: 108, action: back)
+                        .accessibilityIdentifier("companionListBackToDiscover")
                 }
             }
             .frame(maxWidth: .infinity)
         }
+        .accessibilityIdentifier("companionListEmptyState")
     }
 }
 
@@ -256,9 +262,13 @@ private struct FilterStrip: View {
                         TagChip(title: item.rawValue, isSelected: filter == item) {
                             filter = item
                         }
+                        .accessibilityLabel("筛选\(item.rawValue)")
+                        .accessibilityAddTraits(filter == item ? .isSelected : [])
+                        .accessibilityIdentifier("discoverFilter-\(item.rawValue)")
                     }
                 }
             }
+            .accessibilityIdentifier("discoverFilterStrip")
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: DS.Space.sm) {
                     StatusPill(text: "排序", symbol: "arrow.up.arrow.down", color: Color.dsTextSecondary)
@@ -266,9 +276,13 @@ private struct FilterStrip: View {
                         TagChip(title: item.rawValue, isSelected: sort == item) {
                             sort = item
                         }
+                        .accessibilityLabel("排序\(item.rawValue)")
+                        .accessibilityAddTraits(sort == item ? .isSelected : [])
+                        .accessibilityIdentifier("discoverSort-\(item.rawValue)")
                     }
                 }
             }
+            .accessibilityIdentifier("discoverSortStrip")
         }
     }
 }
