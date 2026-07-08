@@ -31,17 +31,33 @@ struct OrdersView: View {
     }
 
     private var sectionSubtitle: String {
-        store.user.gender == .male ? "别人预约你的未完成服务" : "查看预约与沟通记录"
+        store.user.gender == .male
+            ? "以下为用户预约你的服务，按状态处理即可。"
+            : "查看预约与沟通记录"
     }
 
     @ViewBuilder
     private var customerOrdersContent: some View {
+        let activeOrders = store.orders.filter { $0.status.isActive }
+        let historyOrders = store.orders.filter { !$0.status.isActive }
+
         if store.orders.isEmpty {
             EmptyStateView(symbol: "calendar.badge.clock", title: "暂无订单", subtitle: "去发现页选择陪伴者，开始第一次沟通。")
         } else {
-            LazyVStack(spacing: DS.Space.md) {
-                ForEach(store.orders) { order in
-                    OrderCard(order: order)
+            LazyVStack(spacing: DS.Space.lg) {
+                if !activeOrders.isEmpty {
+                    orderSection(title: "进行中", subtitle: "可进入沟通继续服务") {
+                        ForEach(activeOrders) { order in
+                            OrderCard(order: order)
+                        }
+                    }
+                }
+                if !historyOrders.isEmpty {
+                    orderSection(title: "历史订单", subtitle: "已完成或已退款的记录") {
+                        ForEach(historyOrders) { order in
+                            OrderCard(order: order)
+                        }
+                    }
                 }
             }
         }
@@ -58,6 +74,89 @@ struct OrdersView: View {
                     ServiceOrderCard(order: order)
                 }
             }
+        }
+    }
+
+    private func orderSection<Content: View>(
+        title: String,
+        subtitle: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: DS.Space.md) {
+            SectionHeader(title: title, subtitle: subtitle)
+            LazyVStack(spacing: DS.Space.md) {
+                content()
+            }
+        }
+    }
+}
+
+private extension OrderStatus {
+    var detailText: String {
+        switch self {
+        case .pending: "等待平台确认订单"
+        case .confirmed: "可以进入沟通"
+        case .inProgress: "沟通进行中"
+        case .completed: "服务已结束"
+        case .refunded: "订单已退款"
+        }
+    }
+
+    var isActive: Bool {
+        self == .pending || self == .confirmed || self == .inProgress
+    }
+}
+
+private struct OrderDetailsSection: View {
+    let themeName: String
+    let durationMinutes: Int
+    let totalPrice: Int
+    let scheduledAt: Date
+    let status: OrderStatus
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: DS.Space.sm) {
+            detailRow(title: "沟通主题", value: themeName)
+            detailRow(title: "沟通时长", value: "\(durationMinutes) 分钟")
+            detailRow(title: "订单金额", value: "¥\(totalPrice)")
+            detailRow(title: "预约时间", value: scheduledAt.formatted(date: .abbreviated, time: .shortened))
+
+            HStack(alignment: .top) {
+                Text("订单状态")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.dsTextSecondary)
+                Spacer()
+                VStack(alignment: .trailing, spacing: DS.Space.xxs) {
+                    StatusPill(text: status.displayName, symbol: status.symbol, color: statusColor(for: status))
+                    Text(status.detailText)
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.dsTextSecondary)
+                        .multilineTextAlignment(.trailing)
+                }
+            }
+        }
+        .padding(DS.Space.md)
+        .background(Color.dsBackground, in: RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous))
+    }
+
+    private func detailRow(title: String, value: String) -> some View {
+        HStack {
+            Text(title)
+                .font(.system(size: 12))
+                .foregroundStyle(Color.dsTextSecondary)
+            Spacer()
+            Text(value)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Color.dsTextPrimary)
+        }
+    }
+
+    private func statusColor(for status: OrderStatus) -> Color {
+        switch status {
+        case .pending, .confirmed: Color.dsWarning
+        case .inProgress: Color.dsPrimary
+        case .completed: Color.dsTextSecondary
+        case .refunded: Color.dsDanger
         }
     }
 }
@@ -93,20 +192,15 @@ private struct OrderCard: View {
                         companionTitle(nil)
                     }
                     Spacer()
-                    StatusPill(text: order.status.displayName, symbol: order.status.symbol, color: color(for: order.status))
                 }
 
-                HStack {
-                    Label("\(order.durationMinutes)分钟", systemImage: "timer")
-                    Spacer()
-                    Label("¥\(order.totalPrice)", systemImage: "creditcard")
-                }
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Color.dsTextPrimary)
-
-                Text(order.scheduledAt.formatted(date: .abbreviated, time: .shortened))
-                    .font(.system(size: 11))
-                    .foregroundStyle(Color.dsTextSecondary)
+                OrderDetailsSection(
+                    themeName: theme?.name ?? "线上沟通",
+                    durationMinutes: order.durationMinutes,
+                    totalPrice: order.totalPrice,
+                    scheduledAt: order.scheduledAt,
+                    status: order.status
+                )
 
                 if showsConversationEntry, let companion {
                     DSPrimaryButton(
@@ -125,7 +219,7 @@ private struct OrderCard: View {
             Text(companion?.name ?? "未知陪伴者")
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(Color.dsTextPrimary)
-            Text(theme?.name ?? "线上沟通")
+            Text(companion?.role ?? "线上沟通")
                 .font(.system(size: 13))
                 .foregroundStyle(Color.dsTextSecondary)
         }
@@ -148,15 +242,6 @@ private struct OrderCard: View {
 
     private var conversationEntryIcon: String {
         order.status == .completed ? "headphones" : "bubble.left.and.bubble.right"
-    }
-
-    private func color(for status: OrderStatus) -> Color {
-        switch status {
-        case .pending, .confirmed: Color.dsWarning
-        case .inProgress: Color.dsPrimary
-        case .completed: Color.dsTextSecondary
-        case .refunded: Color.dsDanger
-        }
     }
 }
 
@@ -183,34 +268,38 @@ private struct ServiceOrderCard: View {
         return String(customerName.prefix(1))
     }
 
+    private var canMarkComplete: Bool {
+        order.status == .confirmed || order.status == .inProgress
+    }
+
     var body: some View {
         SoftCard {
             VStack(alignment: .leading, spacing: DS.Space.md) {
+                HStack {
+                    TrustMicroBadge(text: "服务订单", tone: .primary)
+                    Spacer()
+                }
+
                 HStack(spacing: DS.Space.md) {
                     ServiceCustomerAvatar(initials: customerInitials)
                     VStack(alignment: .leading, spacing: DS.Space.xxs) {
+                        Text("预约用户")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(Color.dsTextSecondary)
                         Text(customerName)
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(Color.dsTextPrimary)
-                        Text(theme?.name ?? "线上沟通")
-                            .font(.system(size: 13))
-                            .foregroundStyle(Color.dsTextSecondary)
                     }
                     Spacer()
-                    StatusPill(text: order.status.displayName, symbol: order.status.symbol, color: color(for: order.status))
                 }
 
-                HStack {
-                    Label("\(order.durationMinutes)分钟", systemImage: "timer")
-                    Spacer()
-                    Label("¥\(order.totalPrice)", systemImage: "creditcard")
-                }
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Color.dsTextPrimary)
-
-                Text(order.scheduledAt.formatted(date: .abbreviated, time: .shortened))
-                    .font(.system(size: 11))
-                    .foregroundStyle(Color.dsTextSecondary)
+                OrderDetailsSection(
+                    themeName: theme?.name ?? "线上沟通",
+                    durationMinutes: order.durationMinutes,
+                    totalPrice: order.totalPrice,
+                    scheduledAt: order.scheduledAt,
+                    status: order.status
+                )
 
                 HStack(spacing: DS.Space.sm) {
                     DSPrimaryButton(
@@ -223,20 +312,17 @@ private struct ServiceOrderCard: View {
                         }
                     }
 
-                    DSSecondaryButton(title: "标记完成") {
-                        store.completeOrder(id: order.id)
+                    if canMarkComplete {
+                        DSSecondaryButton(title: "标记完成") {
+                            store.completeOrder(id: order.id)
+                        }
                     }
                 }
-            }
-        }
-    }
 
-    private func color(for status: OrderStatus) -> Color {
-        switch status {
-        case .pending, .confirmed: Color.dsWarning
-        case .inProgress: Color.dsPrimary
-        case .completed: Color.dsTextSecondary
-        case .refunded: Color.dsDanger
+                Text("请在平台内完成服务，勿引导私下联系。")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color.dsTextSecondary)
+            }
         }
     }
 }

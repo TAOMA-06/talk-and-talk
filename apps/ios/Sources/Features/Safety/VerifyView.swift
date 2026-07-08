@@ -27,6 +27,12 @@ struct VerifyView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: DS.Space.lg) {
+                DSBanner(
+                    title: "完成认证后即可下单与试聊",
+                    message: "信息仅用于年龄核验。",
+                    systemImage: "person.badge.key",
+                    tone: .primary
+                )
                 VerifyProgress(step: step)
                 currentStep
                 DSPrimaryButton(
@@ -40,7 +46,7 @@ struct VerifyView: View {
                 }
                 Button(action: openSafetyCenter) {
                     HStack {
-                        Text("了解完整安全体系")
+                        Text("查看安全中心")
                         Image(systemName: "arrow.right")
                     }
                     .font(.system(size: 13, weight: .semibold))
@@ -105,14 +111,25 @@ struct VerifyView: View {
 
 private struct VerifyProgress: View {
     let step: Int
+    private let labels = ["身份", "人脸", "手机"]
 
     var body: some View {
         SoftCard {
-            HStack(spacing: DS.Space.sm) {
-                ForEach(0..<3, id: \.self) { item in
-                    Capsule()
-                        .fill(item <= step ? Color.dsPrimary : Color.dsBorder)
-                        .frame(height: 4)
+            VStack(spacing: DS.Space.sm) {
+                HStack(spacing: DS.Space.sm) {
+                    ForEach(0..<3, id: \.self) { item in
+                        Capsule()
+                            .fill(item <= step ? Color.dsPrimary : Color.dsBorder)
+                            .frame(height: 4)
+                    }
+                }
+                HStack {
+                    ForEach(Array(labels.enumerated()), id: \.offset) { index, label in
+                        Text(label)
+                            .font(.system(size: 11, weight: index == step ? .semibold : .medium))
+                            .foregroundStyle(index == step ? Color.dsPrimary : Color.dsTextSecondary)
+                            .frame(maxWidth: .infinity)
+                    }
                 }
             }
         }
@@ -127,7 +144,7 @@ private struct IdentityStep: View {
     var body: some View {
         SoftCard {
             VStack(alignment: .leading, spacing: DS.Space.lg) {
-                StepTitle(symbol: "person.text.rectangle", title: "确认 18+ 身份", subtitle: "信息仅用于年龄与身份核验，加密保存。")
+                StepTitle(symbol: "person.text.rectangle", title: "确认 18+ 身份", subtitle: "用于确认年满 18 岁")
                 verifyTextField(placeholder: "姓名", text: $name, field: .name)
                 verifyTextField(placeholder: "年龄", text: $age, field: .age, keyboard: .numberPad)
                 StatusPill(
@@ -167,7 +184,7 @@ private struct FaceStep: View {
     var body: some View {
         SoftCard {
             VStack(spacing: DS.Space.lg) {
-                StepTitle(symbol: "faceid", title: "人脸识别", subtitle: "请正对屏幕，按提示完成检测。")
+                StepTitle(symbol: "faceid", title: "人脸识别", subtitle: "正对屏幕完成检测")
                 Button {
                     withAnimation(.easeOut(duration: DS.Motion.fast)) { isComplete = true }
                 } label: {
@@ -203,7 +220,7 @@ private struct PhoneStep: View {
     var body: some View {
         SoftCard {
             VStack(alignment: .leading, spacing: DS.Space.lg) {
-                StepTitle(symbol: "iphone.gen3", title: "绑定手机号", subtitle: "我们将向该手机号发送验证码。")
+                StepTitle(symbol: "iphone.gen3", title: "绑定手机号", subtitle: "用于接收验证码")
                 verifyTextField(placeholder: "手机号", text: $phone, field: .phone, keyboard: .phonePad)
                 HStack(spacing: DS.Space.sm) {
                     verifyTextField(placeholder: "验证码", text: $code, field: .code, keyboard: .numberPad)

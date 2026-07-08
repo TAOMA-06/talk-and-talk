@@ -21,52 +21,58 @@ struct MessagesView: View {
             return .communityUser(id: id, name: post.authorName, initials: post.authorInitials)
         }
 
-        let allTargets = companionTargets + communityTargets
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return allTargets }
+        let sortedTargets = (companionTargets + communityTargets).sorted {
+            let lhsDate = store.latestMessage(for: $0)?.timestamp ?? .distantPast
+            let rhsDate = store.latestMessage(for: $1)?.timestamp ?? .distantPast
+            return lhsDate > rhsDate
+        }
 
-        return allTargets.filter { target in
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return sortedTargets }
+
+        return sortedTargets.filter { target in
             store.displayName(for: target).localizedStandardContains(query)
                 || (store.latestMessage(for: target)?.content.localizedStandardContains(query) ?? false)
         }
     }
 
+    private var isSearching: Bool {
+        !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     var body: some View {
         ScrollView(showsIndicators: false) {
-            VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: DS.Space.lg) {
+                MessagesInboxHeader(conversationCount: conversations.count)
                 MessageSearchBar(text: $searchText)
-                    .padding(.horizontal, DS.Space.lg)
-                    .padding(.top, DS.Space.md)
-                    .padding(.bottom, DS.Space.sm)
-
-                MessagesSafetyLoginRow()
 
                 if conversations.isEmpty {
-                    EmptyStateView(symbol: "bubble.left.and.bubble.right", title: "暂无消息", subtitle: "下单后即可与陪伴者沟通。")
-                        .padding(.top, DS.Space.xl)
+                    EmptyStateView(
+                        symbol: isSearching ? "magnifyingglass" : "bubble.left.and.bubble.right",
+                        title: isSearching ? "没有找到相关会话" : "暂无沟通会话",
+                        subtitle: isSearching ? "换个姓名或消息关键词再试试。" : "可以从在线陪伴者开始试聊，也可以在广场里继续平台内沟通。"
+                    )
+                    .padding(.top, DS.Space.md)
                 } else {
-                    LazyVStack(spacing: 0) {
+                    LazyVStack(spacing: DS.Space.md) {
                         ForEach(conversations) { target in
                             Button {
                                 store.navigate(.chat(target))
                             } label: {
-                                WeChatConversationRow(target: target)
+                                SecureConversationRow(target: target)
                             }
                             .buttonStyle(.plain)
-
-                            Divider()
-                                .padding(.leading, 84)
                         }
                     }
-                    .background(Color.dsSurface)
                 }
             }
+            .padding(DS.Space.lg)
             .padding(.bottom, 96)
         }
-        .background(Color.dsBackground)
+        .background(AppBackground())
         .navigationTitle("消息")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(Color.dsBackground, for: .navigationBar)
+        .toolbarBackground(Color.dsBackground.opacity(0.96), for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -80,6 +86,64 @@ struct MessagesView: View {
             NewConversationSheet()
                 .presentationDetents([.medium, .large])
         }
+    }
+}
+
+private struct MessagesInboxHeader: View {
+    let conversationCount: Int
+
+    var body: some View {
+        SoftCard {
+            VStack(alignment: .leading, spacing: DS.Space.lg) {
+                HStack(alignment: .top, spacing: DS.Space.md) {
+                    Image(systemName: "lock.shield.fill")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(Color.dsPrimary)
+                        .frame(width: 42, height: 42)
+                        .background(Color.dsPrimarySoft.opacity(0.78), in: RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous))
+
+                    VStack(alignment: .leading, spacing: DS.Space.xxs) {
+                        Text("平台内安全沟通")
+                            .font(.system(size: 19, weight: .semibold))
+                            .foregroundStyle(Color.dsTextPrimary)
+                        Text("聊天、试聊和订单沟通都留在这里，遇到不适可以随时举报。")
+                            .font(.system(size: 13))
+                            .foregroundStyle(Color.dsTextSecondary)
+                            .lineSpacing(3)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Spacer(minLength: DS.Space.sm)
+                }
+
+                HStack(spacing: DS.Space.sm) {
+                    InboxTrustPill(title: "平台内沟通", systemImage: "bubble.left.and.bubble.right")
+                    InboxTrustPill(title: "内容保护", systemImage: "checkmark.shield")
+                    InboxTrustPill(title: "可举报", systemImage: "exclamationmark.bubble")
+                }
+
+                Text(conversationCount == 0 ? "还没有会话" : "\(conversationCount) 个正在进行的会话")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Color.dsTextSecondary)
+            }
+        }
+    }
+}
+
+private struct InboxTrustPill: View {
+    let title: String
+    let systemImage: String
+
+    var body: some View {
+        Label(title, systemImage: systemImage)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(Color.dsPrimary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.82)
+            .padding(.horizontal, DS.Space.sm)
+            .padding(.vertical, DS.Space.xxs)
+            .background(Color.dsPrimarySoft.opacity(0.72), in: Capsule())
+            .overlay(Capsule().stroke(Color.dsPrimary.opacity(0.12), lineWidth: DS.Stroke.hairline))
     }
 }
 
@@ -99,20 +163,24 @@ private struct NewConversationSheet: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: DS.Space.md) {
-                    Text("选择一位在线或可约的陪伴者，进入平台内安全沟通房间。")
-                        .font(.system(size: 14))
-                        .foregroundStyle(Color.dsTextSecondary)
-                        .lineSpacing(3)
+                VStack(alignment: .leading, spacing: DS.Space.lg) {
+                    DSBanner(
+                        title: "选择一位可沟通的陪伴者",
+                        message: "会话会在平台内进行。可以先试聊，再决定是否预约更长时间。",
+                        systemImage: "lock.shield.fill",
+                        tone: .primary
+                    )
 
-                    ForEach(candidates) { companion in
-                        Button {
-                            dismiss()
-                            store.navigate(.chat(.companion(id: companion.id)))
-                        } label: {
-                            NewConversationRow(companion: companion)
+                    LazyVStack(spacing: DS.Space.md) {
+                        ForEach(candidates) { companion in
+                            Button {
+                                dismiss()
+                                store.navigate(.chat(.companion(id: companion.id)))
+                            } label: {
+                                NewConversationRow(companion: companion)
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                     }
                 }
                 .padding(DS.Space.lg)
@@ -133,25 +201,29 @@ private struct NewConversationRow: View {
     let companion: Companion
 
     var body: some View {
-        HStack(spacing: DS.Space.md) {
-            CompanionAvatar(companion: companion, size: 52)
-            VStack(alignment: .leading, spacing: DS.Space.xxs) {
-                Text(companion.name)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Color.dsTextPrimary)
-                Text("\(companion.role) · \(companion.responseTime)")
-                    .font(.system(size: 13))
-                    .foregroundStyle(Color.dsTextSecondary)
-                    .lineLimit(1)
+        DSCard(padding: DS.Space.md) {
+            HStack(spacing: DS.Space.md) {
+                CompanionAvatar(companion: companion, size: 52)
+                VStack(alignment: .leading, spacing: DS.Space.xxs) {
+                    HStack(spacing: DS.Space.sm) {
+                        Text(companion.name)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(Color.dsTextPrimary)
+                            .lineLimit(1)
+                        if companion.isVerified {
+                            Image(systemName: "checkmark.seal.fill")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(Color.dsPrimary)
+                        }
+                    }
+                    Text("\(companion.role) · \(companion.responseTime)")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color.dsTextSecondary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: DS.Space.sm)
+                StatusPill(text: companion.availability.displayName, symbol: "circle.fill", color: companion.availabilityColor)
             }
-            Spacer()
-            StatusPill(text: companion.availability.displayName, symbol: "circle.fill", color: companion.availabilityColor)
-        }
-        .padding(DS.Space.md)
-        .background(Color.dsSurfaceElevated, in: RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous)
-                .stroke(Color.dsBorder.opacity(0.72), lineWidth: DS.Stroke.hairline)
         }
     }
 }
@@ -162,15 +234,15 @@ private struct MessageSearchBar: View {
     var body: some View {
         HStack(spacing: DS.Space.sm) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 18))
+                .font(.system(size: 17, weight: .medium))
                 .foregroundStyle(Color.dsTextSecondary)
-            TextField("搜索", text: $text)
-                .font(.system(size: 16))
+            TextField("搜索联系人或消息内容", text: $text)
+                .font(.system(size: 15))
                 .textInputAutocapitalization(.never)
                 .submitLabel(.search)
         }
         .padding(.horizontal, DS.Space.md)
-        .frame(height: 44)
+        .frame(height: 46)
         .background(Color.dsSurfaceElevated, in: RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous)
@@ -180,31 +252,7 @@ private struct MessageSearchBar: View {
     }
 }
 
-private struct MessagesSafetyLoginRow: View {
-    var body: some View {
-        HStack(spacing: DS.Space.md) {
-            Image(systemName: "lock.shield")
-                .font(.system(size: 24, weight: .regular))
-                .foregroundStyle(Color.dsTextSecondary)
-                .frame(width: 52, height: 52)
-
-            VStack(alignment: .leading, spacing: DS.Space.xxs) {
-                Text("平台内安全沟通")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(Color.dsTextPrimary)
-                Text("平台内加密沟通")
-                    .font(.system(size: 13))
-                    .foregroundStyle(Color.dsTextSecondary)
-                    .lineLimit(1)
-            }
-            Spacer()
-        }
-        .padding(.horizontal, DS.Space.lg)
-        .padding(.vertical, DS.Space.sm)
-    }
-}
-
-private struct WeChatConversationRow: View {
+private struct SecureConversationRow: View {
     let target: ContactTarget
     @EnvironmentObject private var store: AppStore
 
@@ -212,43 +260,61 @@ private struct WeChatConversationRow: View {
         store.latestMessage(for: target)
     }
 
-    var body: some View {
-        HStack(alignment: .center, spacing: DS.Space.md) {
-            conversationAvatar
+    private var companion: Companion? {
+        guard case .companion(let id) = target else { return nil }
+        return store.companion(by: id)
+    }
 
-            VStack(alignment: .leading, spacing: DS.Space.xxs) {
-                HStack(alignment: .firstTextBaseline, spacing: DS.Space.sm) {
-                    Text(store.displayName(for: target))
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(Color.dsTextPrimary)
+    var body: some View {
+        DSCard(padding: DS.Space.md) {
+            HStack(alignment: .top, spacing: DS.Space.md) {
+                conversationAvatar
+
+                VStack(alignment: .leading, spacing: DS.Space.sm) {
+                    HStack(alignment: .firstTextBaseline, spacing: DS.Space.sm) {
+                        Text(store.displayName(for: target))
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(Color.dsTextPrimary)
+                            .lineLimit(1)
+
+                        if companion?.isVerified == true {
+                            Image(systemName: "checkmark.seal.fill")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(Color.dsPrimary)
+                        }
+
+                        Spacer(minLength: DS.Space.sm)
+
+                        if let lastMessage {
+                            Text(lastMessage.timestamp, style: .time)
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(Color.dsTextSecondary)
+                        }
+                    }
+
+                    Text(participantSubtitle)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.dsTextSecondary)
                         .lineLimit(1)
 
-                    Spacer(minLength: DS.Space.sm)
+                    HStack(alignment: .top, spacing: DS.Space.sm) {
+                        Text(lastMessagePreview)
+                            .font(.system(size: 14))
+                            .foregroundStyle(previewColor)
+                            .lineLimit(2)
+                            .frame(maxWidth: .infinity, alignment: .leading)
 
-                    if let lastMessage {
-                        Text(lastMessage.timestamp, style: .time)
-                            .font(.system(size: 12))
-                            .foregroundStyle(Color.dsTextSecondary)
+                        ConversationStatusPill(text: statusText, tone: statusTone)
                     }
                 }
-
-                Text(lastMessagePreview)
-                    .font(.system(size: 14))
-                    .foregroundStyle(Color.dsTextSecondary)
-                    .lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .padding(.horizontal, DS.Space.lg)
-        .padding(.vertical, DS.Space.md)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.dsSurface)
         .contentShape(Rectangle())
     }
 
     @ViewBuilder
     private var conversationAvatar: some View {
-        if case .companion(let id) = target, let companion = store.companion(by: id) {
+        if let companion {
             CompanionAvatar(companion: companion, size: 52)
         } else if let initials = target.communityInitials {
             ConversationInitialsAvatar(initials: String(initials.prefix(1)))
@@ -257,18 +323,54 @@ private struct WeChatConversationRow: View {
         }
     }
 
+    private var participantSubtitle: String {
+        if let companion {
+            return "\(companion.role) · \(companion.responseTime)"
+        }
+        return "广场用户 · 平台内沟通"
+    }
+
     private var lastMessagePreview: String {
         guard let lastMessage else { return "暂无消息" }
         switch lastMessage.type {
         case .system:
-            return "[系统] \(lastMessage.content)"
+            return "系统消息：\(lastMessage.content)"
         case .safety:
-            return "[安全提醒] \(lastMessage.content)"
+            return "安全提醒：\(lastMessage.content)"
         case .recommendationCard:
-            return "[推荐卡片]"
+            return "推荐卡片：可查看陪伴者资料"
         case .text:
             return lastMessage.content
         }
+    }
+
+    private var previewColor: Color {
+        lastMessage?.type == .safety ? Color.dsWarning : Color.dsTextSecondary
+    }
+
+    private var statusText: String {
+        if lastMessage?.type == .safety { return "安全提醒" }
+        guard let companion else { return "平台内" }
+        if store.hasActivePaidChat(with: companion.id) { return "付费沟通" }
+        return "试聊 \(store.remainingTrialMessages(for: companion.id))/\(store.freeTrialMessageLimit)"
+    }
+
+    private var statusTone: DSBadge.Tone {
+        if lastMessage?.type == .safety { return .warning }
+        guard let companion else { return .neutral }
+        if store.hasActivePaidChat(with: companion.id) { return .success }
+        return store.remainingTrialMessages(for: companion.id) > 0 ? .primary : .warning
+    }
+}
+
+private struct ConversationStatusPill: View {
+    let text: String
+    let tone: DSBadge.Tone
+
+    var body: some View {
+        DSBadge(text: text, tone: tone)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
     }
 }
 

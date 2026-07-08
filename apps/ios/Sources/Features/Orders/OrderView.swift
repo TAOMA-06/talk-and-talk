@@ -7,10 +7,11 @@ struct OrderView: View {
     @State private var selectedThemeId = ""
     @State private var selectedDuration = 30
     @State private var agreedToRules = false
-    @State private var isPaying = false
+    @State private var isSubmitting = false
 
     private let durations = [30, 60, 90, 120]
     private var companion: Companion? { store.companion(by: companionId) }
+    private var selectedTheme: Theme? { store.theme(by: selectedThemeId) }
     private var totalPrice: Int {
         guard let companion else { return 0 }
         return companion.pricePerHalfHour * max(1, selectedDuration / 30)
@@ -24,13 +25,23 @@ struct OrderView: View {
                 VerificationGate()
                 ThemePicker(selectedThemeId: $selectedThemeId)
                 DurationPicker(selectedDuration: $selectedDuration, durations: durations)
-                PricePanel(duration: selectedDuration, totalPrice: totalPrice)
+                PricePanel(
+                    unitPrice: companion.pricePerHalfHour,
+                    duration: selectedDuration,
+                    totalPrice: totalPrice
+                )
+                PlatformGuaranteePanel()
                 RulesPanel(agreedToRules: $agreedToRules)
+                OrderCheckoutSummary(
+                    themeName: selectedTheme?.name ?? "线上沟通",
+                    duration: selectedDuration,
+                    totalPrice: totalPrice
+                )
                 DSPrimaryButton(
-                    title: isPaying ? "正在确认..." : "确认订单并继续沟通",
-                    systemImage: isPaying ? "hourglass" : "bubble.left.and.bubble.right.fill",
-                    isEnabled: agreedToRules && !isPaying,
-                    isLoading: isPaying
+                    title: isSubmitting ? "正在确认订单..." : "确认并进入沟通",
+                    systemImage: isSubmitting ? "hourglass" : "bubble.left.and.bubble.right.fill",
+                    isEnabled: agreedToRules && !isSubmitting,
+                    isLoading: isSubmitting
                 ) {
                     submit()
                 }
@@ -57,10 +68,10 @@ struct OrderView: View {
             store.navigate(.verify)
             return
         }
-        isPaying = true
+        isSubmitting = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
             _ = store.createOrder(companionId: companionId, themeId: selectedThemeId, durationMinutes: selectedDuration)
-            isPaying = false
+            isSubmitting = false
             store.navigate(.chat(.companion(id: companionId)))
         }
     }
@@ -149,7 +160,7 @@ private struct ThemePicker: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Space.md) {
-            SectionHeader(title: "沟通主题")
+            SectionHeader(title: "沟通主题", subtitle: "选择本次沟通主题")
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: DS.Space.sm) {
                 ForEach(store.themes) { theme in
                     SelectableTile(title: theme.name, symbol: theme.icon, isSelected: selectedThemeId == theme.id) {
@@ -167,7 +178,7 @@ private struct DurationPicker: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Space.md) {
-            SectionHeader(title: "沟通时长")
+            SectionHeader(title: "沟通时长", subtitle: "按 30 分钟计费")
             HStack(spacing: DS.Space.sm) {
                 ForEach(durations, id: \.self) { duration in
                     SelectableTile(title: "\(duration) 分钟", symbol: "timer", isSelected: selectedDuration == duration) {
@@ -210,26 +221,21 @@ private struct SelectableTile: View {
 }
 
 private struct PricePanel: View {
+    let unitPrice: Int
     let duration: Int
     let totalPrice: Int
 
     var body: some View {
         SoftCard {
             VStack(spacing: DS.Space.md) {
-                HStack {
-                    Text("沟通时长")
-                    Spacer()
-                    Text("\(duration) 分钟")
-                }
-                HStack {
-                    Text("平台担保")
-                    Spacer()
-                    Text("资金托管中")
-                }
+                SectionHeader(title: "费用明细", subtitle: "确认前请核对金额与托管方式")
+                priceRow(title: "单价", value: "¥\(unitPrice)/30 分钟")
+                priceRow(title: "沟通时长", value: "\(duration) 分钟")
+                priceRow(title: "资金托管", value: "资金托管中")
                 HStack(alignment: .top, spacing: DS.Space.sm) {
                     Image(systemName: "bubble.left.and.bubble.right.fill")
                         .foregroundStyle(Color.dsPrimary)
-                    Text("确认后会进入聊天；如果是从试聊过来，已有内容会保留。")
+                    Text("确认后进入聊天，试聊内容会保留。")
                         .foregroundStyle(Color.dsTextSecondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -245,6 +251,65 @@ private struct PricePanel: View {
             }
             .font(.system(size: 13))
             .foregroundStyle(Color.dsTextPrimary)
+        }
+    }
+
+    private func priceRow(title: String, value: String) -> some View {
+        HStack {
+            Text(title)
+            Spacer()
+            Text(value)
+        }
+    }
+}
+
+private struct PlatformGuaranteePanel: View {
+    private let steps = [
+        ("1.circle.fill", "先付到平台托管", "费用暂由平台保管"),
+        ("2.circle.fill", "全程平台内沟通", "文字与语音均在 App 内完成"),
+        ("3.circle.fill", "服务完成后结算", "防止跑单，保障双方权益")
+    ]
+
+    var body: some View {
+        SoftCard {
+            VStack(alignment: .leading, spacing: DS.Space.md) {
+                SectionHeader(title: "平台保障", subtitle: "资金与服务全程受平台规则保护")
+                ForEach(steps, id: \.1) { step in
+                    HStack(alignment: .top, spacing: DS.Space.md) {
+                        Image(systemName: step.0)
+                            .foregroundStyle(Color.dsPrimary)
+                            .frame(width: 20)
+                        VStack(alignment: .leading, spacing: DS.Space.xxs) {
+                            Text(step.1)
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(Color.dsTextPrimary)
+                            Text(step.2)
+                                .font(.system(size: 12))
+                                .foregroundStyle(Color.dsTextSecondary)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct OrderCheckoutSummary: View {
+    let themeName: String
+    let duration: Int
+    let totalPrice: Int
+
+    var body: some View {
+        SoftCard {
+            HStack(spacing: DS.Space.sm) {
+                Image(systemName: "doc.text")
+                    .foregroundStyle(Color.dsPrimary)
+                Text("\(themeName) · \(duration) 分钟 · ¥\(totalPrice)")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.dsTextPrimary)
+                    .lineLimit(2)
+                Spacer(minLength: 0)
+            }
         }
     }
 }

@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct SafetyCenterView: View {
-    @State private var expandedSection: SafetySection? = .verification
+    @State private var expandedSection: SafetySection?
 
     enum SafetySection: String, CaseIterable, Identifiable {
         case verification
@@ -14,11 +14,11 @@ struct SafetyCenterView: View {
 
         var title: String {
             switch self {
-            case .verification: "三层实名认证"
-            case .escrow: "平台担保交易"
-            case .emergency: "紧急安全机制"
-            case .credit: "信用档案"
-            case .insurance: "保险兜底"
+            case .verification: "实名认证"
+            case .escrow: "资金托管"
+            case .emergency: "紧急求助"
+            case .credit: "安全分"
+            case .insurance: "异常保障"
             }
         }
 
@@ -37,10 +37,10 @@ struct SafetyCenterView: View {
         AppScaffold(title: "安全中心", spacing: DS.Space.lg, bottomPadding: DS.Space.xl) {
             SoftCard {
                 VStack(alignment: .leading, spacing: DS.Space.sm) {
-                    Text("信任，是我们最核心的壁垒")
+                    Text("安全机制")
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(Color.dsTextPrimary)
-                    Text("我们把线上陪伴的安全机制做完整：实名、托管、审核、信用分。")
+                    Text("实名、资金托管、内容审核和安全分，一起保护你的沟通。")
                         .font(.system(size: 13))
                         .foregroundStyle(Color.dsTextSecondary)
                         .lineSpacing(3)
@@ -102,38 +102,38 @@ private struct SafetySectionCard: View {
         switch section {
         case .verification:
             VStack(alignment: .leading, spacing: DS.Space.md) {
-                VerificationStep(number: 1, title: "身份证核验", detail: "确认真实身份与年龄")
-                VerificationStep(number: 2, title: "人脸识别", detail: "活体检测，防止冒用")
-                VerificationStep(number: 3, title: "手机号三绑", detail: "账号、支付、通知三重绑定")
+                VerificationStep(number: 1, title: "身份证核验", detail: "确认身份与年龄")
+                VerificationStep(number: 2, title: "人脸识别", detail: "活体防冒用")
+                VerificationStep(number: 3, title: "手机号绑定", detail: "绑定通知手机")
             }
         case .escrow:
             VStack(alignment: .leading, spacing: DS.Space.md) {
                 EscrowStep(number: 1, title: "先付到平台", detail: "资金由平台托管")
-                EscrowStep(number: 2, title: "服务进行中", detail: "全程平台内沟通")
-                EscrowStep(number: 3, title: "完成后结算", detail: "防止跑单和欺诈")
+                EscrowStep(number: 2, title: "平台内沟通", detail: "全程留在 App 内")
+                EscrowStep(number: 3, title: "完成后结算", detail: "服务结束再结算")
             }
         case .emergency:
             VStack(alignment: .leading, spacing: DS.Space.sm) {
-                EmergencyItem(symbol: "phone.fill", title: "一键报警", detail: "紧急情况下快速求助")
-                EmergencyItem(symbol: "exclamationmark.bubble.fill", title: "越界内容预警", detail: "检测到不当表达时自动提醒并支持一键结束")
+                EmergencyItem(symbol: "phone.fill", title: "一键报警", detail: "紧急情况快速求助")
+                EmergencyItem(symbol: "exclamationmark.bubble.fill", title: "越界预警", detail: "不当表达会提醒")
                 EmergencyItem(symbol: "person.2.fill", title: "紧急联系人", detail: "预设可信赖的人")
-                EmergencyItem(symbol: "clock.badge.exclamationmark", title: "超时自动提醒", detail: "异常时长自动触发安全流程")
+                EmergencyItem(symbol: "clock.badge.exclamationmark", title: "超时提醒", detail: "异常时长自动提示")
             }
         case .credit:
             VStack(alignment: .leading, spacing: DS.Space.sm) {
-                Text("安全分会随聊天、社区发帖和举报处置实时变化。")
+                Text("聊天、发帖和举报都会影响分数。")
                     .font(.system(size: 13))
                     .foregroundStyle(Color.dsTextSecondary)
-                CreditRuleRow(title: "完成实名", detail: "基础信任分 85")
-                CreditRuleRow(title: "轻度违规", detail: "-8 分；前 2 次仅协议提醒不扣分")
-                CreditRuleRow(title: "严重违规", detail: "-20 分，累计 5 次或低于 20 分封禁")
+                CreditRuleRow(title: "完成实名", detail: "基础分 85")
+                CreditRuleRow(title: "轻度违规", detail: "-8 分；前 2 次仅提醒")
+                CreditRuleRow(title: "严重违规", detail: "-20 分；多次或低于 20 分封禁")
                 CreditRuleRow(title: "误报驳回", detail: "+5 分恢复")
-                Text("受限账号无法在社区发帖；封禁账号无法发送消息。")
+                Text("受限账号无法发帖；封禁账号无法发消息。")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(Color.dsDanger)
             }
         case .insurance:
-            Text("异常订单平台会介入处理，沟通全程留痕可追溯。")
+            Text("订单异常时平台介入，沟通全程留痕。")
                 .font(.system(size: 13))
                 .foregroundStyle(Color.dsTextSecondary)
                 .lineSpacing(3)
