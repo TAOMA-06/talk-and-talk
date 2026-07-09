@@ -11,6 +11,11 @@ struct HomeView: View {
             TonightAvailableSection()
             RecommendedCompanions()
         }
+        .task {
+            if store.companionListLoadState == .idle {
+                await store.loadCompanions(pageSize: 50)
+            }
+        }
     }
 }
 
@@ -206,13 +211,22 @@ private struct TonightAvailableSection: View {
             }
 
             if companions.isEmpty {
-                EmptyStateView(
-                    symbol: "moon.zzz",
-                    title: "今晚暂时没有可聊的人",
-                    subtitle: "可以先看看全部陪伴者，找到适合稍后沟通的人。",
-                    actionTitle: "查看全部",
-                    action: { store.navigate(.companionList(themeId: nil, preset: nil)) }
-                )
+                switch store.companionListLoadState {
+                case .loading:
+                    CompanionLoadingCard(title: "正在加载今晚可聊的人")
+                case .failed(let message):
+                    CompanionLoadErrorCard(message: message) {
+                        Task { await store.loadCompanions(pageSize: 50) }
+                    }
+                default:
+                    EmptyStateView(
+                        symbol: "moon.zzz",
+                        title: "今晚暂时没有可聊的人",
+                        subtitle: "可以先看看全部陪伴者，找到适合稍后沟通的人。",
+                        actionTitle: "查看全部",
+                        action: { store.navigate(.companionList(themeId: nil, preset: nil)) }
+                    )
+                }
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: DS.Space.md) {
@@ -285,16 +299,66 @@ private struct RecommendedCompanions: View {
             }
 
             LazyVStack(spacing: DS.Space.md) {
-                ForEach(companions) { companion in
-                    Button {
-                        store.navigate(.companionDetail(companion.id))
-                    } label: {
-                        CompanionSummaryCard(companion: companion)
+                if companions.isEmpty {
+                    switch store.companionListLoadState {
+                    case .loading:
+                        CompanionLoadingCard(title: "正在加载推荐陪伴者")
+                    case .failed(let message):
+                        CompanionLoadErrorCard(message: message) {
+                            Task { await store.loadCompanions(pageSize: 50) }
+                        }
+                    default:
+                        EmptyStateView(
+                            symbol: "person.2.slash",
+                            title: "暂无推荐陪伴者",
+                            subtitle: "稍后再来看看，或换一个沟通主题。"
+                        )
                     }
-                    .buttonStyle(.plain)
+                } else {
+                    ForEach(companions) { companion in
+                        Button {
+                            store.navigate(.companionDetail(companion.id))
+                        } label: {
+                            CompanionSummaryCard(companion: companion)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
             }
         }
+    }
+}
+
+private struct CompanionLoadingCard: View {
+    let title: String
+
+    var body: some View {
+        DSCard(padding: DS.Space.md) {
+            HStack(spacing: DS.Space.md) {
+                ProgressView()
+                Text(title)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(Color.dsTextSecondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .accessibilityIdentifier("discoverCompanionLoading")
+    }
+}
+
+private struct CompanionLoadErrorCard: View {
+    let message: String
+    let retry: () -> Void
+
+    var body: some View {
+        EmptyStateView(
+            symbol: "wifi.exclamationmark",
+            title: "陪伴者加载失败",
+            subtitle: message,
+            actionTitle: "重试",
+            action: retry
+        )
+        .accessibilityIdentifier("discoverCompanionError")
     }
 }
 

@@ -26,6 +26,7 @@ final class AuthSessionTests: XCTestCase {
                 profile: AuthUserProfileResponse(
                     displayName: "测试用户",
                     phone: "138****8000",
+                    age: 25,
                     gender: nil,
                     isVerified: false,
                     safetyScore: 80

@@ -1,5 +1,13 @@
 import SwiftUI
 
+enum BackendLoadState: Equatable {
+    case idle
+    case loading
+    case loaded
+    case empty
+    case failed(String)
+}
+
 @MainActor
 final class AppStore: ObservableObject {
     @Published var selectedTab: AppTab = .discover
@@ -10,7 +18,11 @@ final class AppStore: ObservableObject {
     @Published var profilePath = NavigationPath()
 
     @Published var user = MockData.user
+#if DEBUG
     @Published var companions = MockData.companions
+#else
+    @Published var companions: [Companion] = []
+#endif
     @Published var themes = MockData.themes
     @Published var orders = MockData.orders
     @Published var reviews = MockData.reviews
@@ -25,6 +37,8 @@ final class AppStore: ObservableObject {
     @Published var isBackendConnected = false
     @Published var backendModerationModel = ""
     @Published var backendChatSyncingCompanionId: String?
+    @Published var companionListLoadState: BackendLoadState = .idle
+    @Published var companionDetailLoadStateById: [String: BackendLoadState] = [:]
 
     let freeTrialMessageLimit = 5
 
@@ -172,6 +186,58 @@ final class AppStore: ObservableObject {
         }
     }
 
+    func loadCompanions(
+        page: Int = 1,
+        pageSize: Int = 50,
+        tag: String? = nil,
+        availability: AvailabilityStatus? = nil,
+        isOnline: Bool? = nil
+    ) async {
+        guard BackendConfig.isEnabled, let client = backendClient() else {
+            applyCompanionListFallback(message: "后端未配置")
+            return
+        }
+
+        companionListLoadState = .loading
+        do {
+            let fetched = try await client.fetchCompanions(
+                page: page,
+                pageSize: pageSize,
+                tag: tag,
+                availability: availability,
+                isOnline: isOnline
+            )
+            companions = fetched
+            isBackendConnected = true
+            companionListLoadState = fetched.isEmpty ? .empty : .loaded
+        } catch {
+            isBackendConnected = false
+            applyCompanionListFallback(message: userFacingMessage(for: error))
+        }
+    }
+
+    func loadCompanionDetail(id: String) async {
+        guard BackendConfig.isEnabled, let client = backendClient() else {
+            applyCompanionDetailFallback(id: id, message: "后端未配置")
+            return
+        }
+
+        companionDetailLoadStateById[id] = .loading
+        do {
+            let fetched = try await client.fetchCompanion(id: id)
+            upsertCompanion(fetched)
+            isBackendConnected = true
+            companionDetailLoadStateById[id] = .loaded
+        } catch {
+            isBackendConnected = false
+            applyCompanionDetailFallback(id: id, message: userFacingMessage(for: error))
+        }
+    }
+
+    func companionDetailLoadState(for id: String) -> BackendLoadState {
+        companionDetailLoadStateById[id] ?? .idle
+    }
+
     func syncBackendChat(for companionId: String) async {
         guard BackendConfig.supportsChat(for: companionId), let client = backendClient() else { return }
 
@@ -206,6 +272,46 @@ final class AppStore: ObservableObject {
         } catch {
             // Keep existing cases if the queue sync fails; chat may still work.
         }
+    }
+
+    private func applyCompanionListFallback(message: String) {
+#if DEBUG
+        if companions.isEmpty {
+            companions = MockData.companions
+        }
+        companionListLoadState = companions.isEmpty ? .empty : .loaded
+        lastModerationFeedback = "开发模式：\(message)，已使用本地陪伴者数据。"
+#else
+        companions = []
+        companionListLoadState = .failed(message)
+#endif
+    }
+
+    private func applyCompanionDetailFallback(id: String, message: String) {
+#if DEBUG
+        if let fallback = MockData.companions.first(where: { $0.id == id }) {
+            upsertCompanion(fallback)
+            companionDetailLoadStateById[id] = .loaded
+            lastModerationFeedback = "开发模式：\(message)，已使用本地陪伴者详情。"
+            return
+        }
+#endif
+        companionDetailLoadStateById[id] = .failed(message)
+    }
+
+    private func upsertCompanion(_ companion: Companion) {
+        if let index = companions.firstIndex(where: { $0.id == companion.id }) {
+            companions[index] = companion
+        } else {
+            companions.append(companion)
+        }
+    }
+
+    private func userFacingMessage(for error: Error) -> String {
+        if let backendError = error as? BackendError {
+            return backendError.userFacingMessage
+        }
+        return "服务暂时不可用，请稍后重试"
     }
 
     func approvedCommunityPosts() -> [CommunityPost] {

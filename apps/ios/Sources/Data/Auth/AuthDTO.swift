@@ -16,6 +16,7 @@ struct AuthUserResponse: Decodable {
 struct AuthUserProfileResponse: Decodable {
     let displayName: String?
     let phone: String?
+    let age: Int?
     let gender: String?
     let isVerified: Bool
     let safetyScore: Int
@@ -41,7 +42,7 @@ enum AuthDTOMapper {
             id: response.id,
             name: profile?.displayName ?? "用户",
             phone: profile?.phone ?? "",
-            age: 18,
+            age: profile?.age ?? 18,
             gender: profile?.gender.flatMap { UserGender(rawValue: $0) },
             isVerified: profile?.isVerified ?? false,
             safetyScore: profile?.safetyScore ?? 80,

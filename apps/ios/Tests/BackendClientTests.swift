@@ -191,6 +191,96 @@ final class BackendClientTests: XCTestCase {
         XCTAssertEqual(status?.status, "degraded")
     }
 
+    func testFetchCompanionsMapsBackendPayload() async throws {
+        StubURLProtocol.nextResponse = (
+            """
+            {
+              "data": {
+                "items": [
+                  {
+                    "id": "c1",
+                    "name": "林屿",
+                    "role": "温柔倾听者",
+                    "initials": "LY",
+                    "tags": ["心理学背景", "深夜在线"],
+                    "rating": 4.9,
+                    "reviewCount": 168,
+                    "pricePerHalfHour": 39,
+                    "isOnline": true,
+                    "isVerified": true,
+                    "bio": "擅长倾听和梳理情绪，尊重边界，仅平台内沟通。",
+                    "availableTimes": ["20:00", "21:30"],
+                    "languages": ["中文"],
+                    "specialties": ["情绪倾听"],
+                    "completedOrders": 426,
+                    "responseTime": "约30秒",
+                    "distanceKm": 1.2,
+                    "availability": "online",
+                    "cityDistrict": "南山区"
+                  }
+                ],
+                "pagination": { "page": 1, "pageSize": 20, "total": 1, "totalPages": 1 }
+              },
+              "meta": { "timestamp": "2026-07-07T02:00:00.000Z", "requestId": "req-companions" }
+            }
+            """,
+            200
+        )
+
+        let client = BackendClient(baseURL: URL(string: "http://127.0.0.1:3000")!, session: session)
+        let companions = try await client.fetchCompanions(page: 1, pageSize: 20, tag: "心理学背景", availability: .online, isOnline: true)
+
+        XCTAssertEqual(companions.count, 1)
+        XCTAssertEqual(companions[0].id, "c1")
+        XCTAssertEqual(companions[0].availability, .online)
+        XCTAssertEqual(companions[0].pricePerHalfHour, 39)
+    }
+
+    func testFetchCompanionMapsBackendPayload() async throws {
+        StubURLProtocol.nextResponse = (
+            companionEnvelope(id: "c2", name: "许澈"),
+            200
+        )
+
+        let client = BackendClient(baseURL: URL(string: "http://127.0.0.1:3000")!, session: session)
+        let companion = try await client.fetchCompanion(id: "c2")
+
+        XCTAssertEqual(companion.id, "c2")
+        XCTAssertEqual(companion.name, "许澈")
+        XCTAssertEqual(companion.specialties, ["职场减压"])
+    }
+
+    func testFetchMeMapsUserProfile() async throws {
+        StubURLProtocol.nextResponse = (
+            """
+            {
+              "data": {
+                "id": "u1",
+                "role": "user",
+                "profile": {
+                  "displayName": "小楷",
+                  "phone": "138****8000",
+                  "age": 23,
+                  "gender": "male",
+                  "isVerified": true,
+                  "safetyScore": 88
+                }
+              },
+              "meta": { "timestamp": "2026-07-07T02:00:00.000Z", "requestId": "req-me" }
+            }
+            """,
+            200
+        )
+
+        let client = BackendClient(baseURL: URL(string: "http://127.0.0.1:3000")!, session: session)
+        let user = try await client.fetchMe()
+
+        XCTAssertEqual(user.name, "小楷")
+        XCTAssertEqual(user.age, 23)
+        XCTAssertEqual(user.gender, .male)
+        XCTAssertTrue(user.isVerified)
+    }
+
     func testBackendConfigSupportsProductionChatCompanions() {
         XCTAssertTrue(BackendConfig.supportsChat(for: "c1"))
         XCTAssertTrue(BackendConfig.supportsChat(for: "c2"))
@@ -252,10 +342,59 @@ final class BackendClientTests: XCTestCase {
         XCTAssertEqual(messages.count, before + 1)
         XCTAssertTrue(messages.contains { $0.senderId == store.user.id && $0.content == "今天有点累，想有人听我说。" })
     }
+
+    @MainActor
+    func testLoadCompanionsSuccessUpdatesStore() async {
+        let store = AppStore(backendClientFactory: { _ in SuccessfulBackendAPIClient() })
+        store.companions = []
+
+        await store.loadCompanions(pageSize: 50)
+
+        XCTAssertEqual(store.companionListLoadState, .loaded)
+        XCTAssertEqual(store.companions.map(\.id), ["c-test"])
+    }
+
+    @MainActor
+    func testLoadCompanionsFailureFallsBackToLocalMockInDebug() async {
+        let store = AppStore(backendClientFactory: { _ in FailingBackendAPIClient() })
+        store.companions = []
+
+        await store.loadCompanions(pageSize: 50)
+
+        XCTAssertEqual(store.companionListLoadState, .loaded)
+        XCTAssertTrue(store.companions.contains { $0.id == "c1" })
+    }
+
+    @MainActor
+    func testLoadCompanionDetailSuccessUpdatesStore() async {
+        let store = AppStore(backendClientFactory: { _ in SuccessfulBackendAPIClient() })
+        store.companions = []
+
+        await store.loadCompanionDetail(id: "c-test")
+
+        XCTAssertEqual(store.companionDetailLoadState(for: "c-test"), .loaded)
+        XCTAssertEqual(store.companion(by: "c-test")?.name, "测试陪伴者")
+    }
 }
 
 private struct FailingBackendAPIClient: BackendAPIClient, Sendable {
     func health() async throws -> BackendServiceStatus {
+        throw BackendError.unavailable
+    }
+
+    func fetchCompanions(page: Int, pageSize: Int, tag: String?, availability: AvailabilityStatus?, isOnline: Bool?) async throws -> [Companion] {
+        throw BackendError.unavailable
+    }
+
+    func fetchCompanion(id: String) async throws -> Companion {
+        throw BackendError.unavailable
+    }
+
+    func fetchMe() async throws -> User {
+        throw BackendError.unavailable
+    }
+
+    func updateMe(displayName: String?, gender: UserGender?, age: Int?) async throws -> User {
         throw BackendError.unavailable
     }
 
@@ -270,6 +409,91 @@ private struct FailingBackendAPIClient: BackendAPIClient, Sendable {
     func sendMessage(conversationId: String, content: String, senderId: String) async throws -> BackendSendMessageResponse {
         throw BackendError.unavailable
     }
+}
+
+private struct SuccessfulBackendAPIClient: BackendAPIClient, Sendable {
+    func health() async throws -> BackendServiceStatus {
+        BackendServiceStatus(connected: true, version: "0.1.0", status: "ok")
+    }
+
+    func fetchCompanions(page: Int, pageSize: Int, tag: String?, availability: AvailabilityStatus?, isOnline: Bool?) async throws -> [Companion] {
+        [Self.companion]
+    }
+
+    func fetchCompanion(id: String) async throws -> Companion {
+        Self.companion
+    }
+
+    func fetchMe() async throws -> User {
+        MockData.user
+    }
+
+    func updateMe(displayName: String?, gender: UserGender?, age: Int?) async throws -> User {
+        MockData.user
+    }
+
+    func fetchMessages(conversationId: String) async throws -> [Message] {
+        []
+    }
+
+    func fetchModerationCases() async throws -> [ModerationCase] {
+        []
+    }
+
+    func sendMessage(conversationId: String, content: String, senderId: String) async throws -> BackendSendMessageResponse {
+        throw BackendError.unavailable
+    }
+
+    private static let companion = Companion(
+        id: "c-test",
+        name: "测试陪伴者",
+        role: "测试角色",
+        initials: "CS",
+        tags: ["测试"],
+        rating: 4.8,
+        reviewCount: 1,
+        pricePerHalfHour: 30,
+        isOnline: true,
+        isVerified: true,
+        bio: "用于测试。",
+        availableTimes: ["20:00"],
+        languages: ["中文"],
+        specialties: ["情绪倾听"],
+        completedOrders: 1,
+        responseTime: "约1分钟",
+        distanceKm: 0,
+        availability: .online,
+        cityDistrict: "平台内"
+    )
+}
+
+private func companionEnvelope(id: String, name: String) -> String {
+    """
+    {
+      "data": {
+        "id": "\(id)",
+        "name": "\(name)",
+        "role": "职场沟通陪伴",
+        "initials": "XC",
+        "tags": ["职业沟通"],
+        "rating": 4.8,
+        "reviewCount": 116,
+        "pricePerHalfHour": 49,
+        "isOnline": true,
+        "isVerified": true,
+        "bio": "聊职场压力和沟通卡点。",
+        "availableTimes": ["19:00"],
+        "languages": ["中文"],
+        "specialties": ["职场减压"],
+        "completedOrders": 318,
+        "responseTime": "约1分钟",
+        "distanceKm": 2.8,
+        "availability": "available",
+        "cityDistrict": "宝安区"
+      },
+      "meta": { "timestamp": "2026-07-07T02:00:00.000Z", "requestId": "req-companion" }
+    }
+    """
 }
 
 private final class StubURLProtocol: URLProtocol {

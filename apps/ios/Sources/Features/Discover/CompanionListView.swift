@@ -91,12 +91,21 @@ struct CompanionListView: View {
             )
             FilterStrip(filter: $filter, sort: $sort)
             if companions.isEmpty {
-                CompanionListEmptyState(
-                    title: emptyTitle,
-                    subtitle: emptySubtitle,
-                    reset: resetFilters,
-                    back: { dismiss() }
-                )
+                switch store.companionListLoadState {
+                case .loading:
+                    CompanionListLoadingState()
+                case .failed(let message):
+                    CompanionListErrorState(message: message) {
+                        Task { await store.loadCompanions(pageSize: 50) }
+                    }
+                default:
+                    CompanionListEmptyState(
+                        title: emptyTitle,
+                        subtitle: emptySubtitle,
+                        reset: resetFilters,
+                        back: { dismiss() }
+                    )
+                }
             } else {
                 LazyVStack(spacing: DS.Space.sm) {
                     ForEach(companions) { companion in
@@ -113,6 +122,11 @@ struct CompanionListView: View {
             }
         }
         .accessibilityIdentifier("companionListView")
+        .task {
+            if store.companionListLoadState == .idle {
+                await store.loadCompanions(pageSize: 50)
+            }
+        }
     }
 
     private func resetFilters() {
@@ -171,6 +185,39 @@ struct CompanionListView: View {
         if value.contains("秒") { return amount }
         if value.contains("分钟") { return amount * 60 }
         return Int.max
+    }
+}
+
+private struct CompanionListLoadingState: View {
+    var body: some View {
+        DSCard(padding: DS.Space.xl) {
+            VStack(spacing: DS.Space.md) {
+                ProgressView()
+                Text("正在加载陪伴者")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(Color.dsTextSecondary)
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .accessibilityIdentifier("companionListLoadingState")
+    }
+}
+
+private struct CompanionListErrorState: View {
+    let message: String
+    let retry: () -> Void
+
+    var body: some View {
+        DSCard(padding: DS.Space.xl) {
+            EmptyStateView(
+                symbol: "wifi.exclamationmark",
+                title: "陪伴者加载失败",
+                subtitle: message,
+                actionTitle: "重试",
+                action: retry
+            )
+        }
+        .accessibilityIdentifier("companionListErrorState")
     }
 }
 

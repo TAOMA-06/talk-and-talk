@@ -29,6 +29,7 @@ export interface UserWithProfile {
   profile: {
     displayName: string | null;
     phone: string | null;
+    age: number | null;
     gender: string | null;
     isVerified: boolean;
     safetyScore: number;
@@ -217,6 +218,7 @@ export class AuthService {
         ? {
             displayName: user.profile.displayName,
             phone: user.profile.phone ? maskPhone(user.profile.phone) : null,
+            age: user.profile.age,
             gender: user.profile.gender,
             isVerified: user.profile.isVerified,
             safetyScore: user.profile.safetyScore

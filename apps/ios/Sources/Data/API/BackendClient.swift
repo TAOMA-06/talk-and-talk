@@ -34,6 +34,10 @@ struct BackendSendMessageResponse: Sendable {
 
 protocol BackendAPIClient: Sendable {
     func health() async throws -> BackendServiceStatus
+    func fetchCompanions(page: Int, pageSize: Int, tag: String?, availability: AvailabilityStatus?, isOnline: Bool?) async throws -> [Companion]
+    func fetchCompanion(id: String) async throws -> Companion
+    func fetchMe() async throws -> User
+    func updateMe(displayName: String?, gender: UserGender?, age: Int?) async throws -> User
     func fetchMessages(conversationId: String) async throws -> [Message]
     func fetchModerationCases() async throws -> [ModerationCase]
     func sendMessage(conversationId: String, content: String, senderId: String) async throws -> BackendSendMessageResponse
@@ -61,6 +65,56 @@ struct BackendClient: BackendAPIClient, Sendable {
         let data: BackendHealthData = try await request(path: "/api/v1/health")
         guard data.status == "ok" || data.status == "degraded" else { throw BackendError.unavailable }
         return BackendServiceStatus(connected: true, version: data.version, status: data.status)
+    }
+
+    func fetchCompanions(
+        page: Int = 1,
+        pageSize: Int = 20,
+        tag: String? = nil,
+        availability: AvailabilityStatus? = nil,
+        isOnline: Bool? = nil
+    ) async throws -> [Companion] {
+        var queryItems = [
+            URLQueryItem(name: "page", value: String(page)),
+            URLQueryItem(name: "pageSize", value: String(pageSize))
+        ]
+        if let tag {
+            queryItems.append(URLQueryItem(name: "tag", value: tag))
+        }
+        if let availability {
+            queryItems.append(URLQueryItem(name: "availability", value: availability.rawValue))
+        }
+        if let isOnline {
+            queryItems.append(URLQueryItem(name: "isOnline", value: isOnline ? "true" : "false"))
+        }
+
+        let data: BackendCompanionsData = try await request(path: queryPath("/api/v1/companions", queryItems: queryItems))
+        return data.items.map(BackendDTOMapper.companion(from:))
+    }
+
+    func fetchCompanion(id: String) async throws -> Companion {
+        let encoded = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
+        let data: BackendCompanionDTO = try await request(path: "/api/v1/companions/\(encoded)")
+        return BackendDTOMapper.companion(from: data)
+    }
+
+    func fetchMe() async throws -> User {
+        let data: AuthUserResponse = try await request(path: "/api/v1/me")
+        return AuthDTOMapper.user(from: data)
+    }
+
+    func updateMe(displayName: String?, gender: UserGender?, age: Int?) async throws -> User {
+        var body: [String: Any] = [:]
+        if let displayName { body["displayName"] = displayName }
+        if let gender { body["gender"] = gender.rawValue }
+        if let age { body["age"] = age }
+
+        let data: AuthUserResponse = try await request(
+            path: "/api/v1/me",
+            method: "PATCH",
+            body: body
+        )
+        return AuthDTOMapper.user(from: data)
     }
 
     func fetchMessages(conversationId: String) async throws -> [Message] {
@@ -111,7 +165,7 @@ struct BackendClient: BackendAPIClient, Sendable {
     private func request<T: Decodable>(
         path: String,
         method: String = "GET",
-        body: [String: String]? = nil,
+        body: [String: Any]? = nil,
         allowRetry: Bool = true
     ) async throws -> T {
         do {
@@ -127,7 +181,7 @@ struct BackendClient: BackendAPIClient, Sendable {
     private func performRequest<T: Decodable>(
         path: String,
         method: String,
-        body: [String: String]?,
+        body: [String: Any]?,
         allowRetry: Bool = true
     ) async throws -> T {
         guard let url = URL(string: path, relativeTo: baseURL) else {
@@ -168,6 +222,13 @@ struct BackendClient: BackendAPIClient, Sendable {
         } catch {
             throw BackendError.decodingFailed
         }
+    }
+
+    private func queryPath(_ path: String, queryItems: [URLQueryItem]) -> String {
+        var components = URLComponents()
+        components.path = path
+        components.queryItems = queryItems
+        return components.string ?? path
     }
 }
 

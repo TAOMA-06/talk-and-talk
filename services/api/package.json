@@ -4,15 +4,16 @@
   "private": true,
   "description": "Talk&Talk production API",
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "npm run prisma:generate && tsc -p tsconfig.build.json",
     "start": "node dist/main.js",
     "start:dev": "ts-node-dev --respawn --transpile-only src/main.ts",
     "start:prod": "node dist/main.js",
-    "test": "jest --runInBand",
-    "test:e2e": "jest --config test/jest-e2e.json --runInBand",
+    "test": "npm run prisma:generate && jest --runInBand",
+    "test:e2e": "npm run prisma:generate && jest --config test/jest-e2e.json --runInBand",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:deploy": "prisma migrate deploy"
+    "prisma:deploy": "prisma migrate deploy",
+    "prisma:seed": "ts-node src/database/seed.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.15",
@@ -21,6 +22,7 @@
     "@nestjs/jwt": "^11.0.2",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^10.4.15",
+    "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",

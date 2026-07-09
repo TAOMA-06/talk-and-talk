@@ -29,6 +29,40 @@ struct BackendServiceStatus: Decodable {
     let status: String
 }
 
+struct BackendPaginationDTO: Decodable {
+    let page: Int
+    let pageSize: Int
+    let total: Int
+    let totalPages: Int
+}
+
+struct BackendCompanionsData: Decodable {
+    let items: [BackendCompanionDTO]
+    let pagination: BackendPaginationDTO
+}
+
+struct BackendCompanionDTO: Decodable {
+    let id: String
+    let name: String
+    let role: String
+    let initials: String
+    let tags: [String]
+    let rating: Double
+    let reviewCount: Int
+    let pricePerHalfHour: Int
+    let isOnline: Bool
+    let isVerified: Bool
+    let bio: String
+    let availableTimes: [String]
+    let languages: [String]
+    let specialties: [String]
+    let completedOrders: Int
+    let responseTime: String
+    let distanceKm: Double
+    let availability: String
+    let cityDistrict: String
+}
+
 struct BackendMessagesData: Decodable {
     let messages: [BackendMessageDTO]
 }
@@ -103,6 +137,30 @@ enum BackendDTOMapper {
             content: dto.content,
             type: type,
             timestamp: parseDate(dto.timestamp)
+        )
+    }
+
+    static func companion(from dto: BackendCompanionDTO) -> Companion {
+        Companion(
+            id: dto.id,
+            name: dto.name,
+            role: dto.role,
+            initials: dto.initials,
+            tags: dto.tags,
+            rating: dto.rating,
+            reviewCount: dto.reviewCount,
+            pricePerHalfHour: dto.pricePerHalfHour,
+            isOnline: dto.isOnline,
+            isVerified: dto.isVerified,
+            bio: dto.bio,
+            availableTimes: dto.availableTimes,
+            languages: dto.languages,
+            specialties: dto.specialties,
+            completedOrders: dto.completedOrders,
+            responseTime: dto.responseTime,
+            distanceKm: dto.distanceKm,
+            availability: AvailabilityStatus(rawValue: dto.availability) ?? .available,
+            cityDistrict: dto.cityDistrict
         )
     }
 

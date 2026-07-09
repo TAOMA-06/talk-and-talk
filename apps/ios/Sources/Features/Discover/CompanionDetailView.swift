@@ -30,14 +30,7 @@ struct CompanionDetailView: View {
                     DetailActionBar(companion: companion)
                 }
             } else {
-                EmptyStateView(
-                    symbol: "person.crop.circle.badge.questionmark",
-                    title: "陪伴者暂不可用",
-                    subtitle: "这位陪伴者的信息暂时无法打开，可以返回继续看看其他人。",
-                    actionTitle: "返回上一页",
-                    action: { dismiss() }
-                )
-                .padding(DS.Space.lg)
+                detailFallback
             }
         }
         .navigationTitle("陪伴者详情")
@@ -47,6 +40,46 @@ struct CompanionDetailView: View {
         .sheet(isPresented: $showingReport) {
             ReportSheet(companionId: companionId, reason: $reportReason)
                 .presentationDetents([.medium])
+        }
+        .task(id: companionId) {
+            await store.loadCompanionDetail(id: companionId)
+        }
+    }
+
+    @ViewBuilder
+    private var detailFallback: some View {
+        switch store.companionDetailLoadState(for: companionId) {
+        case .loading:
+            DSCard(padding: DS.Space.xl) {
+                VStack(spacing: DS.Space.md) {
+                    ProgressView()
+                    Text("正在加载陪伴者详情")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(Color.dsTextSecondary)
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .padding(DS.Space.lg)
+            .accessibilityIdentifier("companionDetailLoading")
+        case .failed(let message):
+            EmptyStateView(
+                symbol: "wifi.exclamationmark",
+                title: "详情加载失败",
+                subtitle: message,
+                actionTitle: "重试",
+                action: { Task { await store.loadCompanionDetail(id: companionId) } }
+            )
+            .padding(DS.Space.lg)
+            .accessibilityIdentifier("companionDetailError")
+        default:
+            EmptyStateView(
+                symbol: "person.crop.circle.badge.questionmark",
+                title: "陪伴者暂不可用",
+                subtitle: "这位陪伴者的信息暂时无法打开，可以返回继续看看其他人。",
+                actionTitle: "返回上一页",
+                action: { dismiss() }
+            )
+            .padding(DS.Space.lg)
         }
     }
 }

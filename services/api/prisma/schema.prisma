@@ -25,6 +25,12 @@ enum AccountStatus {
   banned
 }
 
+enum Availability {
+  online
+  available
+  busy
+}
+
 model User {
   id            String        @id @default(uuid())
   role          UserRole      @default(user)
@@ -52,11 +58,58 @@ model UserProfile {
   userId      String  @id
   displayName String?
   phone       String?
+  age         Int?
   gender      String?
   isVerified  Boolean @default(false)
   safetyScore Int     @default(80)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model CompanionProfile {
+  id               String       @id
+  name             String
+  role             String
+  initials         String
+  rating           Float        @default(0)
+  reviewCount      Int          @default(0)
+  pricePerHalfHour Int
+  isOnline         Boolean      @default(false)
+  isVerified       Boolean      @default(false)
+  bio              String
+  availableTimes   String[]
+  languages        String[]
+  specialties      String[]
+  completedOrders  Int          @default(0)
+  responseTime     String
+  distanceKm       Float        @default(0)
+  availability     Availability @default(available)
+  cityDistrict     String
+  isPublished      Boolean      @default(false)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  serviceTags      CompanionServiceTag[]
+
+  @@index([isPublished, availability])
+  @@index([isOnline])
+}
+
+model ServiceTag {
+  id         String   @id @default(uuid())
+  name       String   @unique
+  createdAt  DateTime @default(now())
+  companions CompanionServiceTag[]
+}
+
+model CompanionServiceTag {
+  companionId String
+  tagId       String
+
+  companion CompanionProfile @relation(fields: [companionId], references: [id], onDelete: Cascade)
+  tag       ServiceTag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([companionId, tagId])
+  @@index([tagId])
 }
 
 model VerificationCode {
