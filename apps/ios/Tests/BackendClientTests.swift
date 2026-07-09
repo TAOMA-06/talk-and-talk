@@ -18,6 +18,40 @@ final class BackendClientTests: XCTestCase {
         super.tearDown()
     }
 
+    func testCreateAndPrepayOrderMapsBackendPayload() async throws {
+        StubURLProtocol.nextResponse = (
+            """
+            {
+              "data": {
+                "id": "ord-1",
+                "userId": "u1",
+                "companionId": "c1",
+                "themeId": "t1",
+                "durationMinutes": 30,
+                "amountCents": 3900,
+                "amountYuan": 39,
+                "currency": "CNY",
+                "status": "pending",
+                "conversationId": null,
+                "paidAt": null,
+                "cancelledAt": null,
+                "completedAt": null,
+                "createdAt": "2026-07-09T02:00:00.000Z",
+                "updatedAt": "2026-07-09T02:00:00.000Z"
+              },
+              "meta": { "timestamp": "2026-07-09T02:00:00.000Z", "requestId": "req-order" }
+            }
+            """,
+            201
+        )
+
+        let client = BackendClient(baseURL: URL(string: "http://127.0.0.1:3000")!, session: session)
+        let order = try await client.createOrder(companionId: "c1", themeId: "t1", durationMinutes: 30)
+        XCTAssertEqual(order.id, "ord-1")
+        XCTAssertEqual(order.status, .pending)
+        XCTAssertEqual(order.totalPrice, 39)
+    }
+
     func testFetchMessagesMapsBackendPayload() async throws {
         StubURLProtocol.nextResponse = (
             """
@@ -565,6 +599,30 @@ private struct FailingBackendAPIClient: BackendAPIClient, Sendable {
     func submitReport(reason: String, conversationId: String?, targetId: String?, recentContext: String?) async throws -> ModerationCase {
         throw BackendError.unavailable
     }
+
+    func createOrder(companionId: String, themeId: String, durationMinutes: Int) async throws -> Order {
+        throw BackendError.unavailable
+    }
+
+    func fetchOrders() async throws -> [Order] {
+        throw BackendError.unavailable
+    }
+
+    func fetchOrder(id: String) async throws -> Order {
+        throw BackendError.unavailable
+    }
+
+    func cancelOrder(id: String) async throws -> Order {
+        throw BackendError.unavailable
+    }
+
+    func prepayOrder(id: String) async throws -> BackendPrepayResult {
+        throw BackendError.unavailable
+    }
+
+    func mockWechatNotify(outTradeNo: String, amountCents: Int?) async throws {
+        throw BackendError.unavailable
+    }
 }
 
 private struct SuccessfulBackendAPIClient: BackendAPIClient, Sendable {
@@ -622,6 +680,68 @@ private struct SuccessfulBackendAPIClient: BackendAPIClient, Sendable {
             resolvedAt: nil
         )
     }
+
+    func createOrder(companionId: String, themeId: String, durationMinutes: Int) async throws -> Order {
+        Order(
+            id: "o-test",
+            companionId: companionId,
+            themeId: themeId,
+            durationMinutes: durationMinutes,
+            totalPrice: 30,
+            status: .pending,
+            createdAt: Date(),
+            scheduledAt: Date()
+        )
+    }
+
+    func fetchOrders() async throws -> [Order] {
+        []
+    }
+
+    func fetchOrder(id: String) async throws -> Order {
+        Order(
+            id: id,
+            companionId: "c-test",
+            themeId: "t1",
+            durationMinutes: 30,
+            totalPrice: 30,
+            status: .paid,
+            createdAt: Date(),
+            scheduledAt: Date()
+        )
+    }
+
+    func cancelOrder(id: String) async throws -> Order {
+        Order(
+            id: id,
+            companionId: "c-test",
+            themeId: "t1",
+            durationMinutes: 30,
+            totalPrice: 30,
+            status: .cancelled,
+            createdAt: Date(),
+            scheduledAt: Date()
+        )
+    }
+
+    func prepayOrder(id: String) async throws -> BackendPrepayResult {
+        BackendPrepayResult(
+            order: try await fetchOrder(id: id),
+            outTradeNo: "T-test",
+            isMock: true,
+            wechatParams: WeChatAppPayParams(
+                appId: "wx_mock",
+                partnerId: "1900000000",
+                prepayId: "prepay",
+                package: "Sign=WXPay",
+                nonceStr: "n",
+                timeStamp: "1",
+                sign: "s"
+            )
+        )
+    }
+
+    func mockWechatNotify(outTradeNo: String, amountCents: Int?) async throws {}
 
     private static let companion = Companion(
         id: "c-test",
@@ -688,6 +808,30 @@ private struct ChatBackendAPIClient: BackendAPIClient, Sendable {
     }
 
     func submitReport(reason: String, conversationId: String?, targetId: String?, recentContext: String?) async throws -> ModerationCase {
+        throw BackendError.unavailable
+    }
+
+    func createOrder(companionId: String, themeId: String, durationMinutes: Int) async throws -> Order {
+        throw BackendError.unavailable
+    }
+
+    func fetchOrders() async throws -> [Order] {
+        []
+    }
+
+    func fetchOrder(id: String) async throws -> Order {
+        throw BackendError.unavailable
+    }
+
+    func cancelOrder(id: String) async throws -> Order {
+        throw BackendError.unavailable
+    }
+
+    func prepayOrder(id: String) async throws -> BackendPrepayResult {
+        throw BackendError.unavailable
+    }
+
+    func mockWechatNotify(outTradeNo: String, amountCents: Int?) async throws {
         throw BackendError.unavailable
     }
 

@@ -65,6 +65,30 @@ enum ModerationCaseStatus {
   dismissed
 }
 
+enum OrderStatus {
+  pending
+  paying
+  paid
+  inService
+  completed
+  cancelled
+  refunded
+}
+
+enum PaymentTxnStatus {
+  initiated
+  success
+  failed
+  closed
+}
+
+enum RefundTxnStatus {
+  pending
+  processing
+  success
+  failed
+}
+
 model User {
   id            String        @id @default(uuid())
   role          UserRole      @default(user)
@@ -76,6 +100,7 @@ model User {
   refreshTokens RefreshToken[]
   conversations Conversation[]
   readStates    MessageReadState[]
+  orders        Order[]
 }
 
 model AuthIdentity {
@@ -126,6 +151,7 @@ model CompanionProfile {
   updatedAt        DateTime     @updatedAt
   serviceTags      CompanionServiceTag[]
   conversations    Conversation[]
+  orders           Order[]
 
   @@index([isPublished, availability])
   @@index([isOnline])
@@ -143,11 +169,82 @@ model Conversation {
   companion CompanionProfile   @relation(fields: [companionId], references: [id], onDelete: Cascade)
   messages  Message[]
   readStates MessageReadState[]
+  orders    Order[]
 
   @@unique([userId, externalId])
   @@unique([userId, companionId])
   @@index([userId, updatedAt])
   @@index([companionId])
+}
+
+model Order {
+  id              String      @id @default(uuid())
+  userId          String
+  companionId     String
+  themeId         String
+  durationMinutes Int
+  amountCents     Int
+  currency        String      @default("CNY")
+  status          OrderStatus @default(pending)
+  conversationId  String?
+  paidAt          DateTime?
+  cancelledAt     DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companion    CompanionProfile     @relation(fields: [companionId], references: [id], onDelete: Restrict)
+  conversation Conversation?        @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  payments     PaymentTransaction[]
+  refunds      RefundTransaction[]
+
+  @@index([userId, createdAt])
+  @@index([companionId, status])
+  @@index([status, createdAt])
+  @@index([conversationId])
+}
+
+model PaymentTransaction {
+  id            String           @id @default(uuid())
+  orderId       String
+  outTradeNo    String           @unique
+  provider      String           @default("wechat")
+  amountCents   Int
+  status        PaymentTxnStatus @default(initiated)
+  prepayId      String?
+  transactionId String?
+  clientParams  Json?
+  notifyPayload Json?
+  paidAt        DateTime?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  order   Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  refunds RefundTransaction[]
+
+  @@unique([provider, transactionId])
+  @@index([orderId])
+  @@index([status])
+}
+
+model RefundTransaction {
+  id               String          @id @default(uuid())
+  orderId          String
+  paymentId        String
+  outRefundNo      String          @unique
+  amountCents      Int
+  status           RefundTxnStatus @default(pending)
+  reason           String?
+  providerRefundId String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  order   Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  payment PaymentTransaction @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([paymentId])
 }
 
 model Message {

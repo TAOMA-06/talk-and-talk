@@ -302,6 +302,8 @@ struct Order: Identifiable, Codable, Hashable {
     let createdAt: Date
     let scheduledAt: Date
     let customerTarget: ContactTarget?
+    var conversationId: String?
+    var outTradeNo: String?
 
     init(
         id: String,
@@ -312,7 +314,9 @@ struct Order: Identifiable, Codable, Hashable {
         status: OrderStatus,
         createdAt: Date,
         scheduledAt: Date,
-        customerTarget: ContactTarget? = nil
+        customerTarget: ContactTarget? = nil,
+        conversationId: String? = nil,
+        outTradeNo: String? = nil
     ) {
         self.id = id
         self.companionId = companionId
@@ -323,22 +327,28 @@ struct Order: Identifiable, Codable, Hashable {
         self.createdAt = createdAt
         self.scheduledAt = scheduledAt
         self.customerTarget = customerTarget
+        self.conversationId = conversationId
+        self.outTradeNo = outTradeNo
     }
 }
 
 enum OrderStatus: String, Codable, CaseIterable {
     case pending
-    case confirmed
-    case inProgress
+    case paying
+    case paid
+    case inService
     case completed
+    case cancelled
     case refunded
 
     var displayName: String {
         switch self {
-        case .pending: "待确认"
-        case .confirmed: "待开始"
-        case .inProgress: "沟通中"
+        case .pending: "待支付"
+        case .paying: "支付中"
+        case .paid: "已支付"
+        case .inService: "服务中"
         case .completed: "已完成"
+        case .cancelled: "已取消"
         case .refunded: "已退款"
         }
     }
@@ -346,11 +356,25 @@ enum OrderStatus: String, Codable, CaseIterable {
     var symbol: String {
         switch self {
         case .pending: "clock"
-        case .confirmed: "checkmark.seal"
-        case .inProgress: "waveform"
+        case .paying: "yensign.circle"
+        case .paid: "checkmark.seal"
+        case .inService: "waveform"
         case .completed: "checkmark.circle"
+        case .cancelled: "xmark.circle"
         case .refunded: "arrow.uturn.left.circle"
         }
+    }
+
+    var isActive: Bool {
+        self == .pending || self == .paying || self == .paid || self == .inService
+    }
+
+    var allowsChat: Bool {
+        self == .paid || self == .inService || self == .completed
+    }
+
+    var canCancel: Bool {
+        self == .pending || self == .paying
     }
 }
 

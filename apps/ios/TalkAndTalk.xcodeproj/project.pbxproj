@@ -33,6 +33,7 @@
 		B23779AE4B101CF005715ECA /* VerifyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F878EB904DAF2776F1CB6ED3 /* VerifyView.swift */; };
 		B6AC1C7D35FAB661E12DA64A /* ModerationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E263317F08697595B130FB5D /* ModerationService.swift */; };
 		B81503F26333913BA98EEA8D /* ModerationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FF03BAEB72A56CFE6283799 /* ModerationTests.swift */; };
+		B8D26328C1590E4DF65AEB77 /* WeChatPayClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C764869353423E79178BB4E3 /* WeChatPayClient.swift */; };
 		BE8CB25A7F33C99B8280A102 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 007F9F5619ED56C144799B00 /* Models.swift */; };
 		C9A2FB0AC8EFAFC384F611BE /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDCBDDAD4FB2128224897576 /* HomeView.swift */; };
 		CC7B970062E49A992E5BE0A6 /* AuthSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = F31F2D6E952D2DAF7708EEC2 /* AuthSession.swift */; };
@@ -104,6 +105,7 @@
 		A8049AC3D2DA38FB7C6FAD82 /* BackendClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendClientTests.swift; sourceTree = "<group>"; };
 		AECDA8341B86D04387480CE1 /* ModerationConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModerationConfig.swift; sourceTree = "<group>"; };
 		BC62D953D307AB680378E63A /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		C764869353423E79178BB4E3 /* WeChatPayClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeChatPayClient.swift; sourceTree = "<group>"; };
 		C896E2DA7B23DAE646765221 /* AdminView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminView.swift; sourceTree = "<group>"; };
 		D4C7B5A8F5944B691DC285D3 /* LoginStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginStateTests.swift; sourceTree = "<group>"; };
 		D9D33707B48743328A9E03D2 /* OrdersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrdersView.swift; sourceTree = "<group>"; };
@@ -315,6 +317,14 @@
 			path = Orders;
 			sourceTree = "<group>";
 		};
+		D643A9F990EAD6D981FE513D /* Payments */ = {
+			isa = PBXGroup;
+			children = (
+				C764869353423E79178BB4E3 /* WeChatPayClient.swift */,
+			);
+			path = Payments;
+			sourceTree = "<group>";
+		};
 		DB6F7034086EBB8FDF3750ED /* Sources */ = {
 			isa = PBXGroup;
 			children = (
@@ -341,6 +351,7 @@
 				73AC411BD0BFC5F2455E5085 /* API */,
 				A7A3B556F54C4DC361D8614B /* Auth */,
 				A488F49E80D517774174E7FA /* Moderation */,
+				D643A9F990EAD6D981FE513D /* Payments */,
 				B7805F1913834A74CDA74FB0 /* Services */,
 			);
 			path = Data;
@@ -519,6 +530,7 @@
 				2EA05BBB0C8924ABF9D424E6 /* TalkAndTalkApp.swift in Sources */,
 				475E9D0887A2DDF7C445216C /* TokenStore.swift in Sources */,
 				B23779AE4B101CF005715ECA /* VerifyView.swift in Sources */,
+				B8D26328C1590E4DF65AEB77 /* WeChatPayClient.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

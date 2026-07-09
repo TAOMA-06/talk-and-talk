@@ -12,7 +12,9 @@ import { EnvelopeInterceptor } from "./common/envelope/envelope.interceptor";
 import { buildCorsOptions } from "./config/cors";
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    rawBody: true
+  });
   const config = app.get(ConfigService);
 
   app.useStaticAssets(join(__dirname, "..", "public"), {

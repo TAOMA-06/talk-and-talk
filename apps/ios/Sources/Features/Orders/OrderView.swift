@@ -8,6 +8,7 @@ struct OrderView: View {
     @State private var selectedDuration = 30
     @State private var agreedToRules = false
     @State private var isSubmitting = false
+    @State private var errorMessage: String?
 
     private let durations = [30, 60, 90, 120]
     private var companion: Companion? { store.companion(by: companionId) }
@@ -37,15 +38,23 @@ struct OrderView: View {
                     duration: selectedDuration,
                     totalPrice: totalPrice
                 )
+                if let errorMessage {
+                    DSBanner(
+                        title: "支付未完成",
+                        message: errorMessage,
+                        systemImage: "exclamationmark.triangle",
+                        tone: .warning
+                    )
+                }
                 DSPrimaryButton(
-                    title: isSubmitting ? "正在确认订单..." : "确认并进入沟通",
-                    systemImage: isSubmitting ? "hourglass" : "bubble.left.and.bubble.right.fill",
+                    title: isSubmitting ? "正在支付..." : "确认并支付",
+                    systemImage: isSubmitting ? "hourglass" : "yensign.circle.fill",
                     isEnabled: agreedToRules && !isSubmitting,
                     isLoading: isSubmitting
                 ) {
                     submit()
                 }
-                .accessibilityLabel(isSubmitting ? "正在确认订单" : "确认并进入沟通")
+                .accessibilityLabel(isSubmitting ? "正在支付" : "确认并支付")
                 .accessibilityIdentifier("confirmOrderButton")
             } else {
                 EmptyStateView(
@@ -70,10 +79,38 @@ struct OrderView: View {
             return
         }
         isSubmitting = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-            _ = store.createOrder(companionId: companionId, themeId: selectedThemeId, durationMinutes: selectedDuration)
-            isSubmitting = false
-            store.navigate(.chat(.companion(id: companionId)))
+        errorMessage = nil
+        Task {
+            do {
+                let order = try await store.createAndPayOrder(
+                    companionId: companionId,
+                    themeId: selectedThemeId,
+                    durationMinutes: selectedDuration
+                )
+                isSubmitting = false
+                guard order.status == .paid || order.status == .inService else {
+                    errorMessage = "支付结果未确认，请到订单页查看状态。"
+                    store.selectedTab = .orders
+                    return
+                }
+                store.navigate(.chat(.companion(id: companionId)))
+            } catch {
+                isSubmitting = false
+                if let backendError = error as? BackendError {
+                    errorMessage = backendError.userFacingMessage
+                } else if let payError = error as? WeChatPayError {
+                    switch payError {
+                    case .cancelled:
+                        errorMessage = "已取消支付"
+                    case .notConfigured:
+                        errorMessage = "微信支付未配置"
+                    case .failed(let message):
+                        errorMessage = message
+                    }
+                } else {
+                    errorMessage = "下单或支付失败，请稍后重试"
+                }
+            }
         }
     }
 }

@@ -172,7 +172,7 @@ final class AppStore: ObservableObject {
 
     func hasActivePaidChat(with companionId: String) -> Bool {
         orders.contains { order in
-            order.companionId == companionId && (order.status == .confirmed || order.status == .inProgress)
+            order.companionId == companionId && (order.status == .paid || order.status == .inService)
         }
     }
 
@@ -376,12 +376,108 @@ final class AppStore: ObservableObject {
                 order.companionId == currentUserCompanionId
                     && order.status != .completed
                     && order.status != .refunded
+                    && order.status != .cancelled
             }
             .sorted { $0.scheduledAt < $1.scheduledAt }
     }
 
+    func loadOrders() async {
+        guard BackendConfig.isEnabled, let client = backendClient() else {
+#if DEBUG
+            if orders.isEmpty {
+                orders = MockData.orders
+            }
+#endif
+            return
+        }
+
+        do {
+            let fetched = try await client.fetchOrders()
+            orders = fetched
+            isBackendConnected = true
+        } catch {
+            isBackendConnected = false
+#if DEBUG
+            lastModerationFeedback = "订单同步失败：\(userFacingMessage(for: error))"
+#endif
+        }
+    }
+
+    /// Create order → prepay → WeChat (or mock) → fulfill → paid.
+    func createAndPayOrder(
+        companionId: String,
+        themeId: String,
+        durationMinutes: Int
+    ) async throws -> Order {
+        if BackendConfig.isEnabled, let client = backendClient() {
+            var order = try await client.createOrder(
+                companionId: companionId,
+                themeId: themeId,
+                durationMinutes: durationMinutes
+            )
+            upsertOrder(order)
+
+            let prepay = try await client.prepayOrder(id: order.id)
+            order = prepay.order
+            order.outTradeNo = prepay.outTradeNo
+            upsertOrder(order)
+
+            let payClient = WeChatPayClientFactory.make()
+            if let params = prepay.wechatParams {
+                try await payClient.pay(with: params)
+            }
+
+            // Mock SDK path (or backend mock provider): complete via mock-notify.
+            if prepay.isMock || !payClient.isConfigured {
+                try await client.mockWechatNotify(outTradeNo: prepay.outTradeNo, amountCents: nil)
+            }
+
+            order = try await client.fetchOrder(id: order.id)
+            upsertOrder(order)
+            activeOrderId = order.id
+
+            if order.status == .paid || order.status == .inService {
+                insertSystemMessage(
+                    "订单已支付，平台担保沟通已开启。",
+                    target: .companion(id: companionId),
+                    type: .system
+                )
+                await syncBackendChat(for: companionId)
+            }
+            return order
+        }
+
+#if DEBUG
+        return try createLocalPaidOrder(
+            companionId: companionId,
+            themeId: themeId,
+            durationMinutes: durationMinutes
+        )
+#else
+        throw BackendError.unavailable
+#endif
+    }
+
     func createOrder(companionId: String, themeId: String, durationMinutes: Int) -> Order? {
-        guard let companion = companion(by: companionId) else { return nil }
+#if DEBUG
+        return try? createLocalPaidOrder(
+            companionId: companionId,
+            themeId: themeId,
+            durationMinutes: durationMinutes
+        )
+#else
+        return nil
+#endif
+    }
+
+    private func createLocalPaidOrder(
+        companionId: String,
+        themeId: String,
+        durationMinutes: Int
+    ) throws -> Order {
+        guard let companion = companion(by: companionId) else {
+            throw BackendError.unavailable
+        }
         let totalPrice = companion.pricePerHalfHour * max(1, (durationMinutes + 29) / 30)
         let order = Order(
             id: "o-\(Int(Date().timeIntervalSince1970))",
@@ -389,7 +485,7 @@ final class AppStore: ObservableObject {
             themeId: themeId,
             durationMinutes: durationMinutes,
             totalPrice: totalPrice,
-            status: .confirmed,
+            status: .paid,
             createdAt: Date(),
             scheduledAt: Date().addingTimeInterval(60),
             customerTarget: .communityUser(id: user.id, name: user.name, initials: String(user.name.prefix(2)))
@@ -400,14 +496,28 @@ final class AppStore: ObservableObject {
         return order
     }
 
+    func cancelOrder(id: String) async {
+        if BackendConfig.isEnabled, let client = backendClient() {
+            do {
+                let order = try await client.cancelOrder(id: id)
+                upsertOrder(order)
+                return
+            } catch {
+                lastModerationFeedback = userFacingMessage(for: error)
+            }
+        }
+        guard let index = orders.firstIndex(where: { $0.id == id }), orders[index].status.canCancel else { return }
+        orders[index].status = .cancelled
+    }
+
     func startActiveOrder(with companionId: String) {
-        guard let index = orderIndex(for: companionId, allowedStatuses: [.confirmed]) else { return }
-        orders[index].status = .inProgress
+        guard let index = orderIndex(for: companionId, allowedStatuses: [.paid]) else { return }
+        orders[index].status = .inService
         activeOrderId = orders[index].id
     }
 
     func completeActiveOrder(with companionId: String) {
-        guard let index = orderIndex(for: companionId, allowedStatuses: [.inProgress]) else { return }
+        guard let index = orderIndex(for: companionId, allowedStatuses: [.inService, .paid]) else { return }
         orders[index].status = .completed
         activeOrderId = nil
         if let event = creditService.applyOrderCompletion(to: &user) {
@@ -420,6 +530,14 @@ final class AppStore: ObservableObject {
         orders[index].status = .completed
         if activeOrderId == id {
             activeOrderId = nil
+        }
+    }
+
+    private func upsertOrder(_ order: Order) {
+        if let index = orders.firstIndex(where: { $0.id == order.id }) {
+            orders[index] = order
+        } else {
+            orders.insert(order, at: 0)
         }
     }
 
@@ -1002,8 +1120,8 @@ enum MockData {
 
     static let orders: [Order] = [
         Order(id: "o1", companionId: "c1", themeId: "t1", durationMinutes: 30, totalPrice: 39, status: .completed, createdAt: .now.addingTimeInterval(-86400), scheduledAt: .now.addingTimeInterval(-82800)),
-        Order(id: "o2", companionId: "c3", themeId: "t4", durationMinutes: 60, totalPrice: 90, status: .confirmed, createdAt: .now.addingTimeInterval(-3600), scheduledAt: .now.addingTimeInterval(1800)),
-        Order(id: "o3", companionId: "self-u1", themeId: "t2", durationMinutes: 30, totalPrice: 39, status: .confirmed, createdAt: .now.addingTimeInterval(-1800), scheduledAt: .now.addingTimeInterval(2400), customerTarget: .communityUser(id: "u3", name: "木子", initials: "木子"))
+        Order(id: "o2", companionId: "c3", themeId: "t4", durationMinutes: 60, totalPrice: 90, status: .paid, createdAt: .now.addingTimeInterval(-3600), scheduledAt: .now.addingTimeInterval(1800)),
+        Order(id: "o3", companionId: "self-u1", themeId: "t2", durationMinutes: 30, totalPrice: 39, status: .paid, createdAt: .now.addingTimeInterval(-1800), scheduledAt: .now.addingTimeInterval(2400), customerTarget: .communityUser(id: "u3", name: "木子", initials: "木子"))
     ]
 
     static let reviews: [Review] = [

@@ -52,6 +52,9 @@ describe("Conversations (e2e)", () => {
 
   async function cleanup() {
     if (!prisma) return;
+    await prisma.refundTransaction.deleteMany();
+    await prisma.paymentTransaction.deleteMany();
+    await prisma.order.deleteMany();
     await prisma.messageReadState.deleteMany();
     await prisma.message.deleteMany();
     await prisma.conversation.deleteMany();

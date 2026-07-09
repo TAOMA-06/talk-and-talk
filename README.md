@@ -73,7 +73,7 @@ docker compose up --build
 - **正式后端 Phase 2（Auth）**：手机号/Apple 登录、JWT、refresh/logout、RBAC、`GET /users/me`。
 - **正式后端 Phase 3（聊天/审核）**：`c1`–`c3` 消息发送与审核、Admin Moderation API、Web 运营后台、用户举报入库。
 - **iOS 已连接**：登录门控、Keychain token、自动 refresh；聊天与举报优先走后端。
-- **后续阶段**：订单/支付/通知等业务域继续迁移到正式后端。
+- **订单/支付**：`Order` / `PaymentTransaction` / `RefundTransaction`；创建 → 微信预支付 → 回调（验签/幂等/金额校验）→ `paid` 并激活会话；开发环境 mock 回调。
 
 ## 测试
 

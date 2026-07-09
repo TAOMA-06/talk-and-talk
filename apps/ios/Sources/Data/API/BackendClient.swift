@@ -32,6 +32,13 @@ struct BackendSendMessageResponse: Sendable {
     let moderationCase: ModerationCase?
 }
 
+struct BackendPrepayResult: Sendable {
+    let order: Order
+    let outTradeNo: String
+    let isMock: Bool
+    let wechatParams: WeChatAppPayParams?
+}
+
 protocol BackendAPIClient: Sendable {
     func health() async throws -> BackendServiceStatus
     func fetchCompanions(page: Int, pageSize: Int, tag: String?, availability: AvailabilityStatus?, isOnline: Bool?) async throws -> [Companion]
@@ -43,6 +50,12 @@ protocol BackendAPIClient: Sendable {
     func fetchModerationCases() async throws -> [ModerationCase]
     func sendMessage(conversationId: String, content: String, senderId: String) async throws -> BackendSendMessageResponse
     func submitReport(reason: String, conversationId: String?, targetId: String?, recentContext: String?) async throws -> ModerationCase
+    func createOrder(companionId: String, themeId: String, durationMinutes: Int) async throws -> Order
+    func fetchOrders() async throws -> [Order]
+    func fetchOrder(id: String) async throws -> Order
+    func cancelOrder(id: String) async throws -> Order
+    func prepayOrder(id: String) async throws -> BackendPrepayResult
+    func mockWechatNotify(outTradeNo: String, amountCents: Int?) async throws
 }
 
 extension BackendAPIClient {
@@ -210,6 +223,80 @@ struct BackendClient: BackendAPIClient, Sendable {
             moderation: BackendDTOMapper.moderationResult(from: data.moderation),
             messages: messages,
             moderationCase: data.moderationCase.flatMap(BackendDTOMapper.moderationCase(from:))
+        )
+    }
+
+    func createOrder(companionId: String, themeId: String, durationMinutes: Int) async throws -> Order {
+        let body: [String: Any] = [
+            "companionId": companionId,
+            "themeId": themeId,
+            "durationMinutes": durationMinutes
+        ]
+        let data: BackendOrderDTO = try await request(
+            path: "/api/v1/orders",
+            method: "POST",
+            body: body
+        )
+        guard let order = BackendDTOMapper.order(from: data) else {
+            throw BackendError.decodingFailed
+        }
+        return order
+    }
+
+    func fetchOrders() async throws -> [Order] {
+        let data: BackendOrdersData = try await request(path: "/api/v1/orders")
+        return data.items.compactMap(BackendDTOMapper.order(from:))
+    }
+
+    func fetchOrder(id: String) async throws -> Order {
+        let encoded = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
+        let data: BackendOrderDTO = try await request(path: "/api/v1/orders/\(encoded)")
+        guard let order = BackendDTOMapper.order(from: data) else {
+            throw BackendError.decodingFailed
+        }
+        return order
+    }
+
+    func cancelOrder(id: String) async throws -> Order {
+        let encoded = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
+        let data: BackendOrderDTO = try await request(
+            path: "/api/v1/orders/\(encoded)/cancel",
+            method: "POST",
+            body: [:]
+        )
+        guard let order = BackendDTOMapper.order(from: data) else {
+            throw BackendError.decodingFailed
+        }
+        return order
+    }
+
+    func prepayOrder(id: String) async throws -> BackendPrepayResult {
+        let encoded = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
+        let data: BackendPrepayData = try await request(
+            path: "/api/v1/orders/\(encoded)/prepay",
+            method: "POST",
+            body: [:]
+        )
+        guard let order = BackendDTOMapper.order(from: data.order) else {
+            throw BackendError.decodingFailed
+        }
+        return BackendPrepayResult(
+            order: order,
+            outTradeNo: data.payment.outTradeNo,
+            isMock: data.payment.mock,
+            wechatParams: data.payment.wechatAppParams.map(BackendDTOMapper.wechatParams(from:))
+        )
+    }
+
+    func mockWechatNotify(outTradeNo: String, amountCents: Int? = nil) async throws {
+        var body: [String: Any] = ["outTradeNo": outTradeNo]
+        if let amountCents {
+            body["amountCents"] = amountCents
+        }
+        let _: BackendMockNotifyData = try await request(
+            path: "/api/v1/payments/wechat/mock-notify",
+            method: "POST",
+            body: body
         )
     }
 

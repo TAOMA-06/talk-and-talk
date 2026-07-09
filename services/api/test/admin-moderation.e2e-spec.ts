@@ -52,6 +52,9 @@ describe("Admin Moderation (e2e)", () => {
 
   async function cleanup() {
     if (!prisma) return;
+    await prisma.refundTransaction.deleteMany();
+    await prisma.paymentTransaction.deleteMany();
+    await prisma.order.deleteMany();
     await prisma.auditLog.deleteMany();
     await prisma.moderationLabel.deleteMany();
     await prisma.moderationActionLog.deleteMany();

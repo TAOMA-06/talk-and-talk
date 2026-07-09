@@ -54,7 +54,7 @@ Phase 1：
 - App 启动时调用 `GET /api/v1/health` 检查正式后端状态。
 - `BackendConfig.supportsChat` 对 `c1` / `c2` / `c3` 返回 true；这些会话优先走正式后端聊天与审核。
 - DEBUG 下后端聊天失败可回退本地聊天与本地审核；Release 失败则提示重试，不以本地规则覆盖服务端决策。
-- 社区发帖、订单、支付等仍走 App 本地逻辑。
+- 订单/微信支付闭环已接正式后端（创建 → 预支付 → 回调/mock 回调 → paid 并激活会话）；社区发帖等仍可有本地逻辑。
 
 Phase 2（Auth）：
 

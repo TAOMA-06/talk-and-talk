@@ -48,8 +48,16 @@ Day 1 routes currently available:
 | `POST /api/v1/admin/moderation/cases/:id/actions` | `confirmViolation` / `dismiss` / `escalate` |
 | `POST /api/v1/admin/moderation/labels` | Create training label sample |
 | `GET /api/v1/admin/moderation/labels/export` | Export label samples |
-| `GET /api/v1/orders/status` | Orders module skeleton status |
-| `GET /api/v1/payments/status` | Payments module skeleton status |
+| `GET /api/v1/orders/status` | Orders module status (`active`) |
+| `POST /api/v1/orders` | Create order (JWT): `{ companionId, themeId, durationMinutes }` → pending |
+| `GET /api/v1/orders` | List current user orders (JWT) |
+| `GET /api/v1/orders/:id` | Order detail (JWT, owner) |
+| `POST /api/v1/orders/:id/cancel` | Cancel pending/paying order (JWT) |
+| `POST /api/v1/orders/:id/prepay` | WeChat App prepay → paying (JWT); returns `wechatAppParams` + `mock` flag |
+| `POST /api/v1/orders/:id/refund` | Refund skeleton (JWT): creates pending `RefundTransaction` |
+| `GET /api/v1/payments/status` | Payments module status (`active`) |
+| `POST /api/v1/payments/wechat/notify` | WeChat notify (signature verify, idempotent, amount/status checks; activates conversation on first success) |
+| `POST /api/v1/payments/wechat/mock-notify` | Dev/test only: simulate successful notify (JWT) |
 | `GET /api/v1/admin/status` | Admin module skeleton status (`admin` only) |
 | `GET /api/v1/notifications/status` | Notifications module skeleton status |
 

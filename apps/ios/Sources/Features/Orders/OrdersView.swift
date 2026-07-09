@@ -24,6 +24,12 @@ struct OrdersView: View {
                 }
             }
         }
+        .task {
+            await store.loadOrders()
+        }
+        .refreshable {
+            await store.loadOrders()
+        }
     }
 
     private var sectionTitle: String {
@@ -94,16 +100,14 @@ struct OrdersView: View {
 private extension OrderStatus {
     var detailText: String {
         switch self {
-        case .pending: "等待平台确认订单"
-        case .confirmed: "可以进入沟通"
-        case .inProgress: "沟通进行中"
+        case .pending: "待支付，完成支付后可进入沟通"
+        case .paying: "正在等待微信支付结果"
+        case .paid: "已支付，可以进入沟通"
+        case .inService: "服务进行中"
         case .completed: "服务已结束"
+        case .cancelled: "订单已取消"
         case .refunded: "订单已退款"
         }
-    }
-
-    var isActive: Bool {
-        self == .pending || self == .confirmed || self == .inProgress
     }
 }
 
@@ -153,10 +157,10 @@ private struct OrderDetailsSection: View {
 
     private func statusColor(for status: OrderStatus) -> Color {
         switch status {
-        case .pending, .confirmed: Color.dsWarning
-        case .inProgress: Color.dsPrimary
+        case .pending, .paying: Color.dsWarning
+        case .paid, .inService: Color.dsPrimary
         case .completed: Color.dsTextSecondary
-        case .refunded: Color.dsDanger
+        case .cancelled, .refunded: Color.dsDanger
         }
     }
 }
@@ -210,6 +214,12 @@ private struct OrderCard: View {
                         store.navigate(.chat(.companion(id: companion.id)))
                     }
                 }
+
+                if order.status.canCancel {
+                    DSButton(title: "取消订单", systemImage: "xmark.circle", variant: .secondary, height: 40) {
+                        Task { await store.cancelOrder(id: order.id) }
+                    }
+                }
             }
         }
     }
@@ -226,12 +236,12 @@ private struct OrderCard: View {
     }
 
     private var showsConversationEntry: Bool {
-        order.status == .confirmed || order.status == .inProgress || order.status == .completed
+        order.status.allowsChat
     }
 
     private var conversationEntryTitle: String {
         switch order.status {
-        case .inProgress:
+        case .inService:
             "继续沟通"
         case .completed:
             "查看沟通"
@@ -269,7 +279,7 @@ private struct ServiceOrderCard: View {
     }
 
     private var canMarkComplete: Bool {
-        order.status == .confirmed || order.status == .inProgress
+        order.status == .paid || order.status == .inService
     }
 
     var body: some View {

@@ -99,6 +99,64 @@ struct BackendReportData: Decodable {
     let moderationCase: BackendModerationCaseDTO
 }
 
+struct BackendOrdersData: Decodable {
+    let items: [BackendOrderDTO]
+}
+
+struct BackendOrderDTO: Decodable {
+    let id: String
+    let userId: String?
+    let companionId: String
+    let themeId: String
+    let durationMinutes: Int
+    let amountCents: Int
+    let amountYuan: Int?
+    let currency: String?
+    let status: String
+    let conversationId: String?
+    let paidAt: String?
+    let cancelledAt: String?
+    let completedAt: String?
+    let createdAt: String
+    let updatedAt: String?
+}
+
+struct BackendWeChatAppParamsDTO: Decodable {
+    let appId: String
+    let partnerId: String
+    let prepayId: String
+    let package: String
+    let nonceStr: String
+    let timeStamp: String
+    let sign: String
+}
+
+struct BackendPaymentDTO: Decodable {
+    let id: String?
+    let outTradeNo: String
+    let status: String
+    let mock: Bool
+    let wechatAppParams: BackendWeChatAppParamsDTO?
+}
+
+struct BackendPrepayData: Decodable {
+    let order: BackendOrderDTO
+    let payment: BackendPaymentDTO
+}
+
+struct BackendMockNotifyData: Decodable {
+    let code: String
+    let message: String?
+    let data: BackendMockNotifyInnerDTO?
+}
+
+struct BackendMockNotifyInnerDTO: Decodable {
+    let alreadyProcessed: Bool?
+    let orderId: String?
+    let conversationCreated: Bool?
+    let orderStatus: String?
+}
+
 struct BackendReportSummaryDTO: Decodable {
     let id: String
     let status: String
@@ -206,6 +264,35 @@ enum BackendDTOMapper {
             distanceKm: dto.distanceKm,
             availability: AvailabilityStatus(rawValue: dto.availability) ?? .available,
             cityDistrict: dto.cityDistrict
+        )
+    }
+
+    static func order(from dto: BackendOrderDTO) -> Order? {
+        guard let status = OrderStatus(rawValue: dto.status) else { return nil }
+        let totalPrice = dto.amountYuan ?? (dto.amountCents / 100)
+        let createdAt = parseDate(dto.createdAt)
+        return Order(
+            id: dto.id,
+            companionId: dto.companionId,
+            themeId: dto.themeId,
+            durationMinutes: dto.durationMinutes,
+            totalPrice: totalPrice,
+            status: status,
+            createdAt: createdAt,
+            scheduledAt: createdAt,
+            conversationId: dto.conversationId
+        )
+    }
+
+    static func wechatParams(from dto: BackendWeChatAppParamsDTO) -> WeChatAppPayParams {
+        WeChatAppPayParams(
+            appId: dto.appId,
+            partnerId: dto.partnerId,
+            prepayId: dto.prepayId,
+            package: dto.package,
+            nonceStr: dto.nonceStr,
+            timeStamp: dto.timeStamp,
+            sign: dto.sign
         )
     }
 
