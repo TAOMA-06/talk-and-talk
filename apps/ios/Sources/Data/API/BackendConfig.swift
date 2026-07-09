@@ -25,6 +25,25 @@ enum BackendConfig {
 
     static var isEnabled: Bool { baseURL != nil }
 
+    /// Production Release sets `ENABLE_PHONE_LOGIN=NO` (Apple-only). Debug/Staging keep phone SMS.
+    static var isPhoneLoginEnabled: Bool {
+        if let env = ProcessInfo.processInfo.environment["ENABLE_PHONE_LOGIN"] {
+            return env.compare("YES", options: .caseInsensitive) == .orderedSame
+                || env == "1"
+                || env.compare("true", options: .caseInsensitive) == .orderedSame
+        }
+        if let plist = Bundle.main.object(forInfoDictionaryKey: "ENABLE_PHONE_LOGIN") as? String {
+            return plist.compare("YES", options: .caseInsensitive) == .orderedSame
+                || plist == "1"
+                || plist.compare("true", options: .caseInsensitive) == .orderedSame
+        }
+        #if DEBUG
+        return true
+        #else
+        return false
+        #endif
+    }
+
     static func supportsChat(for companionId: String) -> Bool {
         isEnabled && supportedCompanionIds.contains(companionId)
     }

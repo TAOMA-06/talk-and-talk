@@ -95,6 +95,27 @@ describe("AuthService", () => {
       expect(lastCode?.code).toMatch(/^\d{6}$/);
     });
 
+    it("should reject SMS when provider is none", async () => {
+      const config = (service as any).config as {
+        get: jest.Mock;
+      };
+      config.get.mockImplementation((key: string, fallback?: any) => {
+        if (key === "SMS_PROVIDER") return "none";
+        const vals: Record<string, any> = {
+          REDIS_URL: "redis://localhost:6379",
+          SMS_CODE_TTL_SECONDS: 300,
+          JWT_ACCESS_TTL: "15m",
+          JWT_REFRESH_TTL: "30d"
+        };
+        return vals[key] ?? fallback;
+      });
+
+      await expect(service.sendCode("13800138000")).rejects.toMatchObject({
+        code: "SMS_UNAVAILABLE"
+      });
+      expect(mockPrisma.verificationCode.create).not.toHaveBeenCalled();
+    });
+
     it("should reject rate-limited phone", async () => {
       mockRedis.get.mockResolvedValue("1");
 

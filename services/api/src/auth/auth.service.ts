@@ -67,6 +67,15 @@ export class AuthService {
   }
 
   async sendCode(phone: string, ip?: string): Promise<{ expiresInSeconds: number; devCode?: string }> {
+    const smsProvider = this.config.get<string>("SMS_PROVIDER", "mock");
+    if (smsProvider === "none") {
+      throw new AppException(
+        "SMS_UNAVAILABLE",
+        "SMS verification is not available in this environment. Use Sign in with Apple.",
+        HttpStatus.SERVICE_UNAVAILABLE
+      );
+    }
+
     const parsed = parsePhoneNumberFromString(phone, "CN");
     if (!parsed?.isValid()) {
       throw new AppException("INVALID_PHONE", "Invalid phone number", HttpStatus.BAD_REQUEST);
@@ -105,7 +114,6 @@ export class AuthService {
     await this.sms.sendCode(e164, code);
 
     const appEnv = this.config.get<string>("APP_ENV", "development");
-    const smsProvider = this.config.get<string>("SMS_PROVIDER", "mock");
     if (appEnv !== "production" && smsProvider === "mock") {
       return { expiresInSeconds: ttl, devCode: code };
     }

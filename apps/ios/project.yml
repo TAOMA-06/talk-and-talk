@@ -1,5 +1,10 @@
 name: TalkAndTalk
 
+configs:
+  Debug: debug
+  Staging: release
+  Release: release
+
 packages:
   WechatOpenSDK:
     url: https://github.com/yanyin1986/WechatOpenSDK.git
@@ -18,6 +23,7 @@ targets:
           - Info.plist
     configFiles:
       Debug: Config/Debug.xcconfig
+      Staging: Config/Staging.xcconfig
       Release: Config/Release.xcconfig
     dependencies:
       - package: WechatOpenSDK
@@ -43,9 +49,6 @@ targets:
         CODE_SIGN_ENTITLEMENTS: TalkAndTalk.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         WECHAT_URL_SCHEME: wx$(WECHAT_APP_ID)
-    scheme:
-      testTargets:
-        - TalkAndTalkTests
   TalkAndTalkTests:
     type: bundle.unit-test
     platform: iOS
@@ -70,3 +73,39 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
     dependencies:
       - target: TalkAndTalk
+
+schemes:
+  TalkAndTalk:
+    build:
+      targets:
+        TalkAndTalk: all
+        TalkAndTalkTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - TalkAndTalkTests
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
+  TalkAndTalk-Staging:
+    build:
+      targets:
+        TalkAndTalk: all
+        TalkAndTalkTests: [test]
+    run:
+      config: Staging
+    test:
+      config: Staging
+      targets:
+        - TalkAndTalkTests
+    profile:
+      config: Staging
+    analyze:
+      config: Staging
+    archive:
+      config: Staging

@@ -1,10 +1,17 @@
 # Replace server_name and certificate paths before production use.
 # For local TLS testing, place self-signed certs in deploy/nginx/certs/.
+#
+# Metrics and Admin UI are restricted to private networks by default.
+# Adjust allow CIDRs for your VPC / VPN. Remove auth_basic if using network-only.
 
 upstream talk_api {
     server api:3000;
     keepalive 16;
 }
+
+# Optional basic auth for admin (htpasswd -c deploy/nginx/.htpasswd admin).
+# Uncomment auth_basic lines under /admin/ when the file is mounted.
+# map $remote_addr $admin_ok { ... }  # alternative allowlists
 
 server {
     listen 80;
@@ -28,6 +35,47 @@ server {
     ssl_protocols       TLSv1.2 TLSv1.3;
 
     client_max_body_size 1m;
+
+    # Prometheus / internal metrics — private networks only
+    location = /api/v1/metrics {
+        allow 10.0.0.0/8;
+        allow 172.16.0.0/12;
+        allow 192.168.0.0/16;
+        allow 127.0.0.1;
+        allow ::1;
+        deny all;
+
+        proxy_pass http://talk_api;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 60s;
+    }
+
+    # Admin static UI — private networks (+ optional basic auth)
+    location /admin/ {
+        allow 10.0.0.0/8;
+        allow 172.16.0.0/12;
+        allow 192.168.0.0/16;
+        allow 127.0.0.1;
+        allow ::1;
+        deny all;
+
+        # auth_basic "Talk&Talk Admin";
+        # auth_basic_user_file /etc/nginx/.htpasswd;
+
+        proxy_pass http://talk_api;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 60s;
+    }
 
     location / {
         proxy_pass http://talk_api;

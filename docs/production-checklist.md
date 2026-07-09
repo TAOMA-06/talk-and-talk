@@ -27,20 +27,23 @@
 ## 微信支付
 
 - [ ] `WECHAT_PAY_APP_ID` / `MCH_ID` / `API_V3_KEY` / `CERT_SERIAL_NO` / `NOTIFY_BASE_URL` 已填
-- [ ] `WECHAT_PAY_PRIVATE_KEY_PATH` 指向容器内可读私钥；compose / 宿主机已挂载
+- [ ] `WECHAT_PAY_PRIVATE_KEY_PATH` 指向容器内可读私钥；compose 中已取消注释 volume 并挂载（见 `secrets/README.md`）
 - [ ] 通知 URL 可达：`https://api.talkandtalk.app/api/v1/payments/wechat/notify`
-- [ ] **代码现状：** 真实预支付/平台证书验签若仍为壳实现，**生产真实收款不可用** → 见 NEXT_PHASE；staging 用 mock-notify 演示
+- [ ] 生产未配齐微信时 prepay 返回 `WECHAT_PAY_NOT_CONFIGURED`（**禁止** Mock 提供商）
+- [ ] 真实 prepay / 平台证书验签 / resource 解密已联调通过（沙箱或生产小额）
+- [ ] staging 演示仍可用 mock-notify；production mock-notify → 403
 
 ## DeepSeek（可选）
 
 - [ ] 未配置 `DEEPSEEK_API_KEY` 时确认纯规则审核可接受
 - [ ] 若配置了 key：URL/Model 正确；日志无泄漏完整 prompt 中的敏感字段
 
-## 短信
+## 短信 / 登录策略
 
 - [ ] `APP_ENV=production` 时 **禁止** `SMS_PROVIDER=mock`（启动校验会拒绝）
-- [ ] 当前实现仅 `mock` / `none`；`none` 下手机验证码登录不可用
-- [ ] 生产手机号登录策略二选一写明：仅 Apple 登录，或阻塞上线直到真实 SMS（NEXT_PHASE）
+- [ ] **产品策略：production 仅 Apple 登录**（`SMS_PROVIDER=none` → `SMS_UNAVAILABLE`）
+- [ ] iOS Release `ENABLE_PHONE_LOGIN=NO`；Staging/Debug 可保留手机登录
+- [ ] 真实 SMS（Aliyun/Tencent）为后续增强，不阻塞「仅 Apple」商业路径
 
 ## Apple 登录
 

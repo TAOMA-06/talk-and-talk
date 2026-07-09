@@ -1,3 +1,6 @@
 #include "Shared.xcconfig"
 
 BACKEND_BASE_URL = https:/$()/api-staging.talkandtalk.app
+WECHAT_UNIVERSAL_LINK = https:/$()/api-staging.talkandtalk.app/wechat/
+// Staging uses mock SMS — keep phone login for TestFlight acceptance.
+ENABLE_PHONE_LOGIN = YES

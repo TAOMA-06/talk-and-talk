@@ -24,4 +24,10 @@ final class LoginStateTests: XCTestCase {
         XCTAssertEqual(store.user.id, "api-user-1")
         XCTAssertNotEqual(store.user.id, MockData.user.id)
     }
+
+    func testPhoneLoginEnabledInDebugBuild() {
+        // Debug scheme injects ENABLE_PHONE_LOGIN=YES via Debug.xcconfig.
+        // Production Release uses ENABLE_PHONE_LOGIN=NO (Apple-only).
+        XCTAssertTrue(BackendConfig.isPhoneLoginEnabled)
+    }
 }

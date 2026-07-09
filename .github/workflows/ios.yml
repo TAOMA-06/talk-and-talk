@@ -1,0 +1,37 @@
+name: iOS
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/ios/**"
+      - ".github/workflows/ios.yml"
+  pull_request:
+    paths:
+      - "apps/ios/**"
+      - ".github/workflows/ios.yml"
+
+jobs:
+  test:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+      - name: Unit tests
+        working-directory: apps/ios
+        run: |
+          set -euo pipefail
+          xcodebuild test \
+            -project TalkAndTalk.xcodeproj \
+            -scheme TalkAndTalk \
+            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+            -only-testing:TalkAndTalkTests \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcpretty || xcodebuild test \
+            -project TalkAndTalk.xcodeproj \
+            -scheme TalkAndTalk \
+            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+            -only-testing:TalkAndTalkTests \
+            CODE_SIGNING_ALLOWED=NO

@@ -132,6 +132,14 @@ export class PaymentsService {
     rawBody: string
   ) {
     try {
+      // Real provider needs platform certs before sync RSA verify.
+      const maybeReal = this.wechat as WeChatPayProvider & {
+        ensurePlatformCertificates?: () => Promise<void>;
+      };
+      if (typeof maybeReal.ensurePlatformCertificates === "function") {
+        await maybeReal.ensurePlatformCertificates();
+      }
+
       if (!this.wechat.verifyNotifySignature(headers, rawBody)) {
         throw new AppException(
           "WECHAT_SIGN_INVALID",

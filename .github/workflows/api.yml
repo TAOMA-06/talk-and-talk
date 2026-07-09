@@ -1,0 +1,73 @@
+name: API
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "services/api/**"
+      - ".github/workflows/api.yml"
+  pull_request:
+    paths:
+      - "services/api/**"
+      - ".github/workflows/api.yml"
+
+defaults:
+  run:
+    working-directory: services/api
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: talk_and_talk
+          POSTGRES_USER: talk
+          POSTGRES_PASSWORD: talk
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U talk -d talk_and_talk"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      NODE_ENV: test
+      APP_ENV: development
+      DATABASE_URL: postgres://talk:talk@localhost:5432/talk_and_talk
+      REDIS_URL: redis://localhost:6379
+      JWT_ACCESS_SECRET: ci-access-secret
+      JWT_REFRESH_SECRET: ci-refresh-secret
+      SMS_PROVIDER: mock
+      CORS_ORIGINS: http://localhost:3000
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: services/api/package-lock.json
+      - name: Install
+        run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Unit tests
+        run: npm test
+      - name: Migrate
+        run: npx prisma migrate deploy
+      - name: E2E tests
+        run: npm run test:e2e

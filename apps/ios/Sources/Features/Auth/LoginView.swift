@@ -26,6 +26,8 @@ struct LoginView: View {
         phone.filter(\.isNumber).count >= 11 && code.count >= 4 && !isLoggingIn
     }
 
+    private var phoneLoginEnabled: Bool { BackendConfig.isPhoneLoginEnabled }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: DS.Space.xl) {
@@ -33,17 +35,19 @@ struct LoginView: View {
                 if let message = authSession.errorMessage ?? appleSignIn.errorMessage {
                     errorBanner(message)
                 }
-                phoneSection
-                codeSection
-                DSPrimaryButton(
-                    title: isLoggingIn ? "登录中..." : "登录",
-                    systemImage: "arrow.right.circle.fill",
-                    isEnabled: canLogin && !isLoggingIn,
-                    action: login
-                )
-                .accessibilityIdentifier("loginButton")
+                if phoneLoginEnabled {
+                    phoneSection
+                    codeSection
+                    DSPrimaryButton(
+                        title: isLoggingIn ? "登录中..." : "登录",
+                        systemImage: "arrow.right.circle.fill",
+                        isEnabled: canLogin && !isLoggingIn,
+                        action: login
+                    )
+                    .accessibilityIdentifier("loginButton")
 
-                divider
+                    divider
+                }
                 appleSection
                 retrySection
             }
@@ -63,7 +67,11 @@ struct LoginView: View {
             Text("登录 Talk&Talk")
                 .font(.system(size: 28, weight: .semibold))
                 .foregroundStyle(Color.dsTextPrimary)
-            Text("使用手机号验证码或 Apple 账号登录，开始安全陪伴体验。")
+            Text(
+                phoneLoginEnabled
+                    ? "使用手机号验证码或 Apple 账号登录，开始安全陪伴体验。"
+                    : "使用 Apple 账号登录，开始安全陪伴体验。"
+            )
                 .font(.system(size: 15))
                 .foregroundStyle(Color.dsTextSecondary)
                 .lineSpacing(3)

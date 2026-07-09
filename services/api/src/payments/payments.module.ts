@@ -5,6 +5,7 @@ import { NotificationsModule } from "../notifications/notifications.module";
 import { OrdersModule } from "../orders/orders.module";
 import { PaymentsController } from "./payments.controller";
 import { PaymentsService } from "./payments.service";
+import { DisabledWeChatPayProvider } from "./wechat/disabled-wechat-pay.provider";
 import { MockWeChatPayProvider } from "./wechat/mock-wechat-pay.provider";
 import { RealWeChatPayProvider, isWeChatConfigured } from "./wechat/real-wechat-pay.provider";
 import { WECHAT_PAY_PROVIDER } from "./wechat/wechat-pay.provider";
@@ -17,7 +18,7 @@ import { WECHAT_PAY_PROVIDER } from "./wechat/wechat-pay.provider";
     {
       provide: WECHAT_PAY_PROVIDER,
       useFactory: (config: ConfigService) => {
-        const nodeEnv = config.getOrThrow<string>("NODE_ENV");
+        const appEnv = config.getOrThrow<string>("APP_ENV");
         const env = {
           WECHAT_PAY_APP_ID: config.get<string>("WECHAT_PAY_APP_ID", ""),
           WECHAT_PAY_MCH_ID: config.get<string>("WECHAT_PAY_MCH_ID", ""),
@@ -26,7 +27,22 @@ import { WECHAT_PAY_PROVIDER } from "./wechat/wechat-pay.provider";
           WECHAT_PAY_CERT_SERIAL_NO: config.get<string>("WECHAT_PAY_CERT_SERIAL_NO", "")
         };
 
-        if (nodeEnv === "production" && isWeChatConfigured(env)) {
+        // Production: Real when fully configured; otherwise Disabled (never Mock).
+        if (appEnv === "production") {
+          if (isWeChatConfigured(env)) {
+            return new RealWeChatPayProvider({
+              appId: env.WECHAT_PAY_APP_ID,
+              mchId: env.WECHAT_PAY_MCH_ID,
+              apiV3Key: env.WECHAT_PAY_API_V3_KEY,
+              privateKeyPath: env.WECHAT_PAY_PRIVATE_KEY_PATH,
+              certSerialNo: env.WECHAT_PAY_CERT_SERIAL_NO
+            });
+          }
+          return new DisabledWeChatPayProvider();
+        }
+
+        // Staging / development / test: prefer Real when configured, else Mock closed-loop.
+        if (isWeChatConfigured(env)) {
           return new RealWeChatPayProvider({
             appId: env.WECHAT_PAY_APP_ID,
             mchId: env.WECHAT_PAY_MCH_ID,
@@ -36,7 +52,6 @@ import { WECHAT_PAY_PROVIDER } from "./wechat/wechat-pay.provider";
           });
         }
 
-        // Development, test, or incomplete credentials: mock provider for closed-loop acceptance.
         return new MockWeChatPayProvider();
       },
       inject: [ConfigService]

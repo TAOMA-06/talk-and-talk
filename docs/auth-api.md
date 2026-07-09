@@ -26,11 +26,16 @@ Talk&Talk 正式账号体系 API，前缀均为 `/api/v1`。所有 JSON 响应�
 { "phone": "13800138000" }
 ```
 
-响应 `data`：
+响应 `data`（`SMS_PROVIDER=mock` 且非 production）：
 
 ```json
-{ "expiresInSeconds": 300 }
+{ "expiresInSeconds": 300, "devCode": "123456" }
 ```
+
+`devCode` 仅在 `APP_ENV != production` 且 `SMS_PROVIDER=mock` 时返回，便于 staging smoke。
+
+**生产（`SMS_PROVIDER=none`）：** 返回错误 envelope，`error.code = SMS_UNAVAILABLE`（HTTP 503）。  
+当前商业策略为 **production 仅 Sign in with Apple**；手机号登录待接入真实 SMS 后恢复。
 
 ### POST /auth/phone/login
 

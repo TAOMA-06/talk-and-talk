@@ -1,3 +1,5 @@
 #include "Shared.xcconfig"
 
 BACKEND_BASE_URL = https:/$()/api.talkandtalk.app
+// Commercial production shortest path: Sign in with Apple only (no SMS until real provider).
+ENABLE_PHONE_LOGIN = NO

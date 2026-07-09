@@ -20,5 +20,8 @@ services/api/coverage/
 services/api/backups/
 deploy/nginx/certs/
 *.pem
+secrets/*
+!secrets/.gitkeep
+!secrets/README.md
 apps/ios/build/
 **/TalkAndTalk 2.xcodeproj/

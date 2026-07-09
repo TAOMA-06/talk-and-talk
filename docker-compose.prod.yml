@@ -18,7 +18,13 @@ services:
     env_file:
       - ${DEPLOY_ENV_FILE:-./services/api/.env.production}
     environment:
-      SEED_ON_STARTUP: ${SEED_ON_STARTUP:-true}
+      # Default false so missing host SEED_ON_STARTUP cannot override .env.production.
+      # Staging: export SEED_ON_STARTUP=true or set in .env.staging.
+      SEED_ON_STARTUP: ${SEED_ON_STARTUP:-false}
+      REDIS_URL: ${REDIS_URL:-redis://:${REDIS_PASSWORD:-change-me-redis}@redis:6379}
+    # Production WeChat: mount merchant private key (do not commit the PEM).
+    # volumes:
+    #   - ${WECHAT_PAY_PRIVATE_KEY_HOST_PATH:-./secrets/wechat_private_key.pem}:/run/secrets/wechat_private_key.pem:ro
     expose:
       - "3000"
     depends_on:
@@ -49,14 +55,13 @@ services:
       retries: 10
     restart: unless-stopped
 
-  # Production hardening (manual): enable requirepass and set REDIS_URL=redis://:PASSWORD@redis:6379
-  # WeChat pay private key: mount host secret to WECHAT_PAY_PRIVATE_KEY_PATH (e.g. /run/secrets/wechat_private_key.pem)
   redis:
     image: redis:7-alpine
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-change-me-redis}"]
     volumes:
       - redis-data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-change-me-redis}", "ping"]
       interval: 5s
       timeout: 3s
       retries: 10

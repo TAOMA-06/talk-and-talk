@@ -4,6 +4,8 @@
 <dict>
 	<key>BACKEND_BASE_URL</key>
 	<string>$(BACKEND_BASE_URL)</string>
+	<key>ENABLE_PHONE_LOGIN</key>
+	<string>$(ENABLE_PHONE_LOGIN)</string>
 	<key>WECHAT_APP_ID</key>
 	<string>$(WECHAT_APP_ID)</string>
 	<key>WECHAT_UNIVERSAL_LINK</key>
