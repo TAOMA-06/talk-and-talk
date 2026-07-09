@@ -56,7 +56,15 @@ Phase 1：
 - Day 4 聊天/审核接口完成前，后端聊天调用失败会自动回退到 App 本地聊天与本地审核，不能阻断用户使用。
 - 社区发帖、订单、支付等仍走 App 本地逻辑。
 
-Phase 2：
+Phase 2（Auth）：
+
+- 正式账号体系：手机号验证码登录、Apple 登录、JWT access/refresh、logout、`GET /users/me`。
+- iOS 启动门控：未登录显示 `LoginView`，已登录进入主 App。
+- Token 持久化在 Keychain；401 时自动 refresh 并重试。
+- Release 构建必须在 Info.plist 或 Scheme 中配置 `BACKEND_BASE_URL`。
+- 详见 [docs/auth-api.md](./auth-api.md)。
+
+Phase 3（聊天/审核）：
 
 - 新增正式聊天与审核 API。
 - iOS 再开启后端聊天同步。
@@ -124,6 +132,9 @@ xcodebuild test \
 
 | 需求 | 建议位置 |
 |------|----------|
+| Auth API 契约 | `docs/auth-api.md` |
+| 后端 Auth / JWT | `services/api/src/auth` |
+| iOS 登录与 token | `apps/ios/Sources/Data/Auth` |
 | 后端基础设施 / health | `services/api/src` |
 | iOS 后端地址与开关 | `apps/ios/Sources/Data/API/BackendConfig.swift` |
 | iOS API client | `apps/ios/Sources/Data/API/BackendClient.swift` |

@@ -28,8 +28,13 @@ Day 1 routes currently available:
 | New route | Purpose |
 |---|---|
 | `GET /api/v1/health` | Service health, version, uptime, Postgres status, Redis status |
-| `GET /api/v1/auth/status` | Auth module skeleton status |
-| `GET /api/v1/users/status` | Users module skeleton status |
+| `POST /api/v1/auth/sms/send-code` | Send phone verification code |
+| `POST /api/v1/auth/phone/login` | Phone + code login |
+| `POST /api/v1/auth/apple` | Apple Sign-In login |
+| `POST /api/v1/auth/refresh` | Refresh JWT token pair |
+| `POST /api/v1/auth/logout` | Revoke refresh token |
+| `GET /api/v1/users/me` | Current authenticated user |
+| `GET /api/v1/admin/status` | Admin status (requires `admin` role) |
 | `GET /api/v1/companions/status` | Companions module skeleton status |
 | `GET /api/v1/conversations/status` | Conversations module skeleton status |
 | `GET /api/v1/moderation/status` | Moderation module skeleton status |
@@ -49,12 +54,15 @@ Every JSON response must use:
 
 The iOS app currently depends on:
 
-| Client method | Current route | Day 1 behavior |
+| Client | Route | Status |
 |---|---|---|
+| `AuthSession` / `BackendAuthClient` | Auth endpoints | Active — login required before main app |
 | `BackendClient.health()` | `GET /api/v1/health` | Active |
 | `BackendClient.fetchMessages(conversationId:)` | `GET /api/v1/conversations/:id/messages` | Backend may 404; App falls back locally |
 | `BackendClient.sendMessage(...)` | `POST /api/v1/conversations/:id/messages` | Backend may 404; App falls back locally |
 | `BackendClient.fetchModerationCases()` | `GET /api/v1/moderation/cases` | Planned |
+
+Auth details: see [docs/auth-api.md](./auth-api.md).
 
 `BackendConfig.supportedCompanionIds` is `["c1", "c2", "c3"]`. These IDs are backend-capable from the iOS point of view, but local fallback remains required until compatibility routes exist.
 

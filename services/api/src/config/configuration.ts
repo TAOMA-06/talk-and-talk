@@ -10,6 +10,9 @@ interface Environment {
   CORS_ORIGINS: string[];
   JWT_ACCESS_SECRET: string;
   JWT_REFRESH_SECRET: string;
+  JWT_ACCESS_TTL: string;
+  JWT_REFRESH_TTL: string;
+  SMS_CODE_TTL_SECONDS: number;
   DEEPSEEK_API_KEY: string;
   DEEPSEEK_URL: string;
   DEEPSEEK_MODEL: string;
@@ -90,6 +93,13 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
   const nodeEnv = parseNodeEnv(env.NODE_ENV);
   const apiPrefix = env.API_PREFIX?.trim() || "api/v1";
 
+  const jwtAccessSecret = env.JWT_ACCESS_SECRET?.trim() || (nodeEnv === "production" ? "" : "dev-access-secret");
+  const jwtRefreshSecret = env.JWT_REFRESH_SECRET?.trim() || (nodeEnv === "production" ? "" : "dev-refresh-secret");
+
+  if (nodeEnv === "production" && (!jwtAccessSecret || !jwtRefreshSecret)) {
+    throw new Error("JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must be set in production");
+  }
+
   return {
     NODE_ENV: nodeEnv,
     PORT: parsePort(env.PORT),
@@ -98,8 +108,11 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     DATABASE_URL: requiredUrl("DATABASE_URL", env.DATABASE_URL, DEFAULT_DATABASE_URL),
     REDIS_URL: requiredUrl("REDIS_URL", env.REDIS_URL, DEFAULT_REDIS_URL),
     CORS_ORIGINS: parseCorsOrigins(env.CORS_ORIGINS, nodeEnv),
-    JWT_ACCESS_SECRET: optionalString(env.JWT_ACCESS_SECRET),
-    JWT_REFRESH_SECRET: optionalString(env.JWT_REFRESH_SECRET),
+    JWT_ACCESS_SECRET: jwtAccessSecret,
+    JWT_REFRESH_SECRET: jwtRefreshSecret,
+    JWT_ACCESS_TTL: env.JWT_ACCESS_TTL?.trim() || "15m",
+    JWT_REFRESH_TTL: env.JWT_REFRESH_TTL?.trim() || "30d",
+    SMS_CODE_TTL_SECONDS: parseInt(env.SMS_CODE_TTL_SECONDS ?? "300", 10),
     DEEPSEEK_API_KEY: optionalString(env.DEEPSEEK_API_KEY),
     DEEPSEEK_URL: requiredUrl("DEEPSEEK_URL", env.DEEPSEEK_URL, DEFAULT_DEEPSEEK_URL),
     DEEPSEEK_MODEL: env.DEEPSEEK_MODEL?.trim() || DEFAULT_DEEPSEEK_MODEL,
@@ -109,7 +122,7 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     WECHAT_PAY_PRIVATE_KEY_PATH: optionalString(env.WECHAT_PAY_PRIVATE_KEY_PATH),
     WECHAT_PAY_CERT_SERIAL_NO: optionalString(env.WECHAT_PAY_CERT_SERIAL_NO),
     APPLE_SIGN_IN_BUNDLE_ID: optionalString(env.APPLE_SIGN_IN_BUNDLE_ID),
-    SMS_PROVIDER: env.SMS_PROVIDER?.trim() || "none"
+    SMS_PROVIDER: env.SMS_PROVIDER?.trim() || (nodeEnv === "production" ? "none" : "mock")
   };
 }
 

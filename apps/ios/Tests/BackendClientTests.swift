@@ -198,6 +198,47 @@ final class BackendClientTests: XCTestCase {
         XCTAssertFalse(BackendConfig.supportsChat(for: "c4"))
     }
 
+    func testRequestSetsAuthorizationHeaderWhenTokenProvided() async throws {
+        StubURLProtocol.nextResponse = (
+            """
+            {
+              "data": {
+                "status": "ok",
+                "service": "talk-and-talk-api",
+                "version": "0.1.0",
+                "uptimeSeconds": 1,
+                "dependencies": {
+                  "database": { "status": "ok", "latencyMs": 1 },
+                  "redis": { "status": "ok", "latencyMs": 1 }
+                }
+              },
+              "meta": { "timestamp": "2026-07-07T02:00:00.000Z", "requestId": "req-auth" }
+            }
+            """,
+            200
+        )
+        StubURLProtocol.captureAuthorization = true
+
+        let client = BackendClient(
+            baseURL: URL(string: "http://127.0.0.1:3000")!,
+            session: session,
+            tokenProvider: { "test-access-token" }
+        )
+        _ = try await client.health()
+
+        XCTAssertEqual(StubURLProtocol.lastAuthorization, "Bearer test-access-token")
+        StubURLProtocol.captureAuthorization = false
+    }
+
+    func testApiErrorMapsUserFacingMessage() {
+        let error = BackendError.apiError(
+            code: "RATE_LIMITED",
+            message: "too frequent",
+            statusCode: 429
+        )
+        XCTAssertEqual(error.userFacingMessage, "验证码发送太频繁，请稍后再试")
+    }
+
     @MainActor
     func testBackendChatFailureFallsBackToLocalMessage() async {
         let store = AppStore(backendClientFactory: { _ in FailingBackendAPIClient() })
@@ -213,7 +254,7 @@ final class BackendClientTests: XCTestCase {
     }
 }
 
-private struct FailingBackendAPIClient: BackendAPIClient {
+private struct FailingBackendAPIClient: BackendAPIClient, Sendable {
     func health() async throws -> BackendServiceStatus {
         throw BackendError.unavailable
     }
@@ -233,11 +274,17 @@ private struct FailingBackendAPIClient: BackendAPIClient {
 
 private final class StubURLProtocol: URLProtocol {
     nonisolated(unsafe) static var nextResponse: (String, Int)?
+    nonisolated(unsafe) static var captureAuthorization = false
+    nonisolated(unsafe) static var lastAuthorization: String?
 
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
     override func startLoading() {
+        if Self.captureAuthorization {
+            Self.lastAuthorization = request.value(forHTTPHeaderField: "Authorization")
+        }
+
         guard let (body, statusCode) = Self.nextResponse else {
             client?.urlProtocol(self, didFailWithError: BackendError.unavailable)
             return

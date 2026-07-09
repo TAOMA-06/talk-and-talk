@@ -150,6 +150,15 @@ private struct MenuPanel: View {
         VStack(alignment: .leading, spacing: DS.Space.lg) {
             menuGroup(title: "账户与身份") {
                 DSListRow(
+                    title: "退出登录",
+                    subtitle: "清除本机登录状态",
+                    symbol: "rectangle.portrait.and.arrow.right"
+                ) {
+                    Task { await store.logout() }
+                }
+                .accessibilityIdentifier("logoutRow")
+                menuDivider()
+                DSListRow(
                     title: "身份设置",
                     subtitle: store.user.gender?.displayName ?? "待选择",
                     symbol: "person.2"

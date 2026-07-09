@@ -31,9 +31,22 @@ final class AppStore: ObservableObject {
     private let moderationService: ModerationService = HybridModerationService()
     private let creditService = CreditService()
     private let backendClientFactory: (URL) -> any BackendAPIClient
+    private weak var authSession: AuthSession?
 
-    init(backendClientFactory: @escaping (URL) -> any BackendAPIClient = { BackendClient(baseURL: $0) }) {
+    init(
+        authSession: AuthSession? = nil,
+        backendClientFactory: @escaping (URL) -> any BackendAPIClient = { BackendClient(baseURL: $0) }
+    ) {
+        self.authSession = authSession
         self.backendClientFactory = backendClientFactory
+    }
+
+    func bindAuthSession(_ session: AuthSession) {
+        authSession = session
+    }
+
+    func applyAuthenticatedUser(_ authenticatedUser: User) {
+        user = authenticatedUser
     }
 
     var currentUserCompanionId: String {
@@ -565,6 +578,10 @@ final class AppStore: ObservableObject {
 
     func dismissAgreementPrompt() {
         agreementPrompt = nil
+    }
+
+    func logout() async {
+        await authSession?.logout()
     }
 
     /// 在正式 warn 扣分前给予两次协议提醒。返回 true 表示本次走了提醒流程。

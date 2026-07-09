@@ -10,7 +10,7 @@ describe("validateEnvironment", () => {
     expect(env.CORS_ORIGINS).toContain("http://localhost:3000");
     expect(env.DEEPSEEK_URL).toBe("https://api.deepseek.com");
     expect(env.DEEPSEEK_MODEL).toBe("deepseek-chat");
-    expect(env.SMS_PROVIDER).toBe("none");
+    expect(env.SMS_PROVIDER).toBe("mock");
   });
 
   it("rejects invalid ports", () => {
@@ -32,13 +32,19 @@ describe("validateEnvironment", () => {
   });
 
   it("requires explicit CORS origins in production", () => {
-    expect(() => validateEnvironment({ NODE_ENV: "production" })).toThrow("CORS_ORIGINS");
+    expect(() => validateEnvironment({
+      NODE_ENV: "production",
+      JWT_ACCESS_SECRET: "prod-access",
+      JWT_REFRESH_SECRET: "prod-refresh"
+    })).toThrow("CORS_ORIGINS");
   });
 
   it("accepts production when CORS origins are explicit", () => {
     const env = validateEnvironment({
       NODE_ENV: "production",
-      CORS_ORIGINS: "https://api.talkandtalk.example"
+      CORS_ORIGINS: "https://api.talkandtalk.example",
+      JWT_ACCESS_SECRET: "prod-access",
+      JWT_REFRESH_SECRET: "prod-refresh"
     });
 
     expect(env.NODE_ENV).toBe("production");
@@ -47,5 +53,22 @@ describe("validateEnvironment", () => {
 
   it("validates URL-shaped environment values", () => {
     expect(() => validateEnvironment({ DEEPSEEK_URL: "not-a-url" })).toThrow("DEEPSEEK_URL");
+  });
+
+  it("provides JWT defaults in development", () => {
+    const env = validateEnvironment({});
+    expect(env.JWT_ACCESS_SECRET).toBe("dev-access-secret");
+    expect(env.JWT_REFRESH_SECRET).toBe("dev-refresh-secret");
+    expect(env.JWT_ACCESS_TTL).toBe("15m");
+    expect(env.JWT_REFRESH_TTL).toBe("30d");
+  });
+
+  it("requires JWT secrets in production", () => {
+    expect(() =>
+      validateEnvironment({
+        NODE_ENV: "production",
+        CORS_ORIGINS: "https://app.example.com"
+      })
+    ).toThrow("JWT_ACCESS_SECRET");
   });
 });

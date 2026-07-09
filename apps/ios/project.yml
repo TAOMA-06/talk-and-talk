@@ -19,6 +19,7 @@ targets:
         SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
         SWIFT_STRICT_CONCURRENCY: minimal
         GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_ENTITLEMENTS: TalkAndTalk.entitlements
   TalkAndTalkTests:
     type: bundle.unit-test
     platform: iOS

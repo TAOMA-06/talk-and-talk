@@ -28,6 +28,7 @@ xcodegen generate
 cd services/api
 cp .env.example .env
 npm install
+npx prisma migrate deploy
 npm run start:dev
 ```
 
@@ -35,6 +36,14 @@ npm run start:dev
 
 ```bash
 curl http://localhost:3000/api/v1/health
+```
+
+发送验证码（开发环境 mock SMS，验证码会打印在 API 日志）：
+
+```bash
+curl -X POST http://localhost:3000/api/v1/auth/sms/send-code \
+  -H 'Content-Type: application/json' \
+  -d '{"phone":"13800138000"}'
 ```
 
 Docker 启动 API、Postgres、Redis：
@@ -48,6 +57,7 @@ docker compose up --build
 | 路径 | 说明 |
 |------|------|
 | [docs/GUIDE.md](./docs/GUIDE.md) | 项目总指引 |
+| [docs/auth-api.md](./docs/auth-api.md) | Auth API 契约 |
 | [apps/ios/](./apps/ios/) | iOS SwiftUI App |
 | [services/api/](./services/api/) | NestJS + TypeScript 正式后端 |
 | [docs/review.md](./docs/review.md) | iOS 代码逐文件说明 |
@@ -55,10 +65,11 @@ docker compose up --build
 
 ## 当前能力边界
 
-- **正式后端 Phase 1**：NestJS 工程、模块骨架、统一响应 envelope、全局异常、请求 ID、配置校验、`GET /api/v1/health`、Docker Compose。
-- **iOS 已连接**：启动时可探测正式后端 health；`c1`/`c2`/`c3` 已标记为后端聊天对象。
-- **仍需兜底**：Day 4 聊天/审核接口完成前，聊天接口失败会自动回到 App 本地逻辑。
-- **后续阶段**：聊天与内容审核 API、业务域持久化、管理后台能力会逐步迁移到正式后端。
+- **正式后端 Phase 1**：NestJS 工程、统一 envelope、health、Docker Compose、Prisma。
+- **正式后端 Phase 2（Auth）**：手机号/Apple 登录、JWT、refresh/logout、RBAC、`GET /users/me`。
+- **iOS 已连接**：登录门控、Keychain token、自动 refresh；`c1`/`c2`/`c3` 为后端聊天对象。
+- **仍需兜底**：Day 4 聊天/审核接口完成前，聊天失败会自动回到 App 本地逻辑。
+- **后续阶段**：聊天与内容审核 API、业务域持久化会逐步迁移到正式后端。
 
 ## 测试
 

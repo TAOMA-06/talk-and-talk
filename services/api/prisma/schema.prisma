@@ -1,0 +1,84 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  user
+  companion
+  moderator
+  admin
+}
+
+enum AuthProvider {
+  phone
+  apple
+}
+
+enum AccountStatus {
+  active
+  restricted
+  banned
+}
+
+model User {
+  id            String        @id @default(uuid())
+  role          UserRole      @default(user)
+  accountStatus AccountStatus @default(active)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  identities    AuthIdentity[]
+  profile       UserProfile?
+  refreshTokens RefreshToken[]
+}
+
+model AuthIdentity {
+  id         String       @id @default(uuid())
+  userId     String
+  provider   AuthProvider
+  providerId String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerId])
+  @@index([userId])
+}
+
+model UserProfile {
+  userId      String  @id
+  displayName String?
+  phone       String?
+  gender      String?
+  isVerified  Boolean @default(false)
+  safetyScore Int     @default(80)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationCode {
+  id         String    @id @default(uuid())
+  phone      String
+  codeHash   String
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([phone, createdAt])
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}

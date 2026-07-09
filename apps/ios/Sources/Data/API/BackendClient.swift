@@ -5,6 +5,25 @@ enum BackendError: Error, Equatable {
     case httpError(Int)
     case decodingFailed
     case unavailable
+    case apiError(code: String, message: String, statusCode: Int)
+
+    var userFacingMessage: String {
+        switch self {
+        case .apiError(let code, let message, _):
+            switch code {
+            case "RATE_LIMITED": return "验证码发送太频繁，请稍后再试"
+            case "INVALID_VERIFICATION_CODE": return "验证码错误或已过期"
+            case "INVALID_PHONE": return "请输入正确的手机号"
+            case "UNAUTHORIZED": return "登录已过期，请重新登录"
+            case "FORBIDDEN": return "没有权限执行此操作"
+            default: return message.isEmpty ? "操作失败，请稍后重试" : message
+            }
+        case .unavailable: return "无法连接服务器，请检查网络后重试"
+        case .httpError(let code): return "服务器错误（\(code)），请稍后重试"
+        case .invalidURL: return "请求地址无效"
+        case .decodingFailed: return "数据解析失败，请稍后重试"
+        }
+    }
 }
 
 struct BackendSendMessageResponse: Sendable {
@@ -13,7 +32,7 @@ struct BackendSendMessageResponse: Sendable {
     let moderationCase: ModerationCase?
 }
 
-protocol BackendAPIClient {
+protocol BackendAPIClient: Sendable {
     func health() async throws -> BackendServiceStatus
     func fetchMessages(conversationId: String) async throws -> [Message]
     func fetchModerationCases() async throws -> [ModerationCase]
@@ -23,10 +42,19 @@ protocol BackendAPIClient {
 struct BackendClient: BackendAPIClient, Sendable {
     private let baseURL: URL
     private let session: URLSession
+    private let tokenProvider: @Sendable () -> String?
+    private let unauthorizedHandler: @Sendable () async -> Bool
 
-    init(baseURL: URL, session: URLSession = .shared) {
+    init(
+        baseURL: URL,
+        session: URLSession = .shared,
+        tokenProvider: @escaping @Sendable () -> String? = { nil },
+        unauthorizedHandler: @escaping @Sendable () async -> Bool = { false }
+    ) {
         self.baseURL = baseURL
         self.session = session
+        self.tokenProvider = tokenProvider
+        self.unauthorizedHandler = unauthorizedHandler
     }
 
     func health() async throws -> BackendServiceStatus {
@@ -83,7 +111,24 @@ struct BackendClient: BackendAPIClient, Sendable {
     private func request<T: Decodable>(
         path: String,
         method: String = "GET",
-        body: [String: String]? = nil
+        body: [String: String]? = nil,
+        allowRetry: Bool = true
+    ) async throws -> T {
+        do {
+            return try await performRequest(path: path, method: method, body: body)
+        } catch let error as BackendError {
+            if allowRetry, case .httpError(401) = error, await unauthorizedHandler() {
+                return try await performRequest(path: path, method: method, body: body, allowRetry: false)
+            }
+            throw error
+        }
+    }
+
+    private func performRequest<T: Decodable>(
+        path: String,
+        method: String,
+        body: [String: String]?,
+        allowRetry: Bool = true
     ) async throws -> T {
         guard let url = URL(string: path, relativeTo: baseURL) else {
             throw BackendError.invalidURL
@@ -94,6 +139,10 @@ struct BackendClient: BackendAPIClient, Sendable {
         request.timeoutInterval = 12
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
+        if let token = tokenProvider() {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
         if let body {
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
         }
@@ -103,6 +152,13 @@ struct BackendClient: BackendAPIClient, Sendable {
             throw BackendError.unavailable
         }
         guard (200...299).contains(http.statusCode) else {
+            if let envelope = try? JSONDecoder().decode(BackendErrorEnvelope.self, from: data) {
+                throw BackendError.apiError(
+                    code: envelope.error.code,
+                    message: envelope.error.message,
+                    statusCode: http.statusCode
+                )
+            }
             throw BackendError.httpError(http.statusCode)
         }
 
@@ -113,4 +169,8 @@ struct BackendClient: BackendAPIClient, Sendable {
             throw BackendError.decodingFailed
         }
     }
+}
+
+private struct BackendErrorEnvelope: Decodable {
+    let error: BackendErrorDetail
 }
