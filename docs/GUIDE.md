@@ -66,8 +66,11 @@ Phase 2（Auth）：
 
 Phase 3（聊天/审核）：
 
-- 正式聊天与审核 API 已接入：`POST /conversations/:id/messages`、`POST /moderation/check`、`GET /moderation/cases`。
+- 正式聊天与审核 API 已接入：`POST /conversations/:id/messages`、`POST /moderation/check`、`GET /moderation/cases`（staff）。
 - 审核流水线：RuleEngine →（高风险 block 跳过）可选 DeepSeek → Case/Evidence/ActionLog。
+- Admin Moderation：概览、筛选队列、详情、会话证据、人工处置、样本标注/导出；动作写 `ModerationActionLog` + `AuditLog`。
+- 用户举报：`POST /moderation/reports`；iOS 举报入口优先提交后端。
+- Web 运营后台：`http://localhost:3000/admin/`。
 - iOS `c1`–`c3` 以服务端 decision 为准（含 `review` 反馈「内容已进入平台复核」）。
 - 会话、消息、审核工单持久化到 Postgres。
 
@@ -79,6 +82,8 @@ Phase 3（聊天/审核）：
 cd services/api
 cp .env.example .env
 npm install
+npm run prisma:migrate   # 或 prisma:deploy
+npm run prisma:seed      # companions + admin/moderator 账号
 npm run start:dev
 ```
 
@@ -87,6 +92,14 @@ npm run start:dev
 ```bash
 curl http://localhost:3000/api/v1/health
 ```
+
+Web 审核后台：
+
+```text
+http://localhost:3000/admin/
+```
+
+开发账号：`13800000001`（admin）、`13800000002`（moderator）。`SMS_PROVIDER=mock` 时验证码见 API 日志。
 
 Docker：
 
@@ -125,9 +138,10 @@ xcodebuild test \
 | 误区 | 正确理解 |
 |------|----------|
 | “旧 demo 后端还在” | 已移除，正式后端在 `services/api` |
-| “聊天已经完全接正式后端” | `c1`–`c3` 聊天与审核已走正式后端；社区/举报仍本地；DEBUG 失败可本地兜底 |
+| “聊天已经完全接正式后端” | `c1`–`c3` 聊天与审核已走正式后端；举报已接 `POST /moderation/reports`；社区仍本地；DEBUG 失败可本地兜底 |
 | “AI 是陪聊” | AI/审核逻辑只负责内容安全 |
 | “在根目录 npm start” | 后端命令在 `services/api` 执行 |
+| “审核后台还是旧 demo” | 已迁到 `services/api/public/admin` + `/api/v1/admin/moderation/*` |
 
 ## 8. 改代码建议
 
@@ -141,3 +155,6 @@ xcodebuild test \
 | iOS API client | `apps/ios/Sources/Data/API/BackendClient.swift` |
 | 本地内容审核规则（DEBUG/非后端会话） | `apps/ios/Sources/Data/Moderation/RuleBasedModerationEngine.swift` |
 | 正式审核 API（RuleEngine + DeepSeek） | `services/api/src/moderation` |
+| Admin 审核 API / 处置 / 样本 | `services/api/src/admin/moderation` |
+| Web 审核后台 | `services/api/public/admin` |
+| Admin 审核契约 | `docs/admin-moderation-api.md` |

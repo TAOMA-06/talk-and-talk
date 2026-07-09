@@ -10,8 +10,20 @@ export interface CreateModerationCaseInput {
   targetId?: string | null;
   messageId?: string | null;
   actorId?: string | null;
+  title?: string;
+  status?: "pending" | "autoReviewing" | "humanReview" | "resolved" | "dismissed";
+  /** When true, create even if decision is allow (used for user reports). */
+  forceCreate?: boolean;
   /** When provided, writes inside an existing Prisma interactive transaction. */
   db?: { moderationCase: PrismaService["moderationCase"] };
+}
+
+export interface CreateReportCaseInput {
+  result: ModerationResult;
+  reason: string;
+  content: string;
+  targetId?: string | null;
+  actorId?: string | null;
 }
 
 @Injectable()
@@ -19,18 +31,21 @@ export class ModerationCaseService {
   constructor(private readonly prisma: PrismaService) {}
 
   async createFromResult(input: CreateModerationCaseInput) {
-    const { result, source, content, targetId, messageId, actorId, db } = input;
-    if (result.decision === "allow") {
+    const { result, source, content, targetId, messageId, actorId, title, status, forceCreate, db } =
+      input;
+    if (result.decision === "allow" && !forceCreate) {
       return null;
     }
 
     const client = db ?? this.prisma;
     return client.moderationCase.create({
       data: {
-        title: this.caseTitle(result, content),
+        title: title ?? this.caseTitle(result, content),
         category: this.categoryFor(source),
         riskLevel: result.riskLevel,
-        status: result.decision === "review" ? "pending" : "humanReview",
+        status:
+          status ??
+          (result.decision === "review" || result.decision === "allow" ? "pending" : "humanReview"),
         source,
         content,
         targetId: targetId ?? null,
@@ -56,6 +71,43 @@ export class ModerationCaseService {
         actionLogs: true
       }
     } as any);
+  }
+
+  async createReportCase(input: CreateReportCaseInput) {
+    const { result, reason, content, targetId, actorId } = input;
+    const status = result.score >= 0.55 ? "humanReview" : "pending";
+    const created = await this.createFromResult({
+      result,
+      source: "report",
+      content,
+      targetId,
+      actorId,
+      title: `举报：${reason.slice(0, 40)}`,
+      status,
+      forceCreate: true
+    });
+
+    if (!created) {
+      throw new Error("Expected report case creation to succeed");
+    }
+
+    if (actorId) {
+      await this.prisma.auditLog.create({
+        data: {
+          actorId,
+          action: "create_report",
+          resourceType: "moderation_case",
+          resourceId: created.id,
+          metadata: {
+            reason: reason.slice(0, 200),
+            source: "report",
+            decision: result.decision
+          }
+        }
+      } as any);
+    }
+
+    return created;
   }
 
   private buildEvidences(result: ModerationResult, content: string) {

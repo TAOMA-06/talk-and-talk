@@ -1,0 +1,626 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Talk&Talk 审核后台</title>
+    <style>
+      :root {
+        --bg: #f5f7f5;
+        --surface: #fffffc;
+        --ink: #141a1a;
+        --muted: #6e7875;
+        --line: #dce1dc;
+        --primary: #00665c;
+        --primary-soft: rgba(0, 102, 92, 0.12);
+        --success: #299e57;
+        --warning: #cc7d17;
+        --danger: #d12e2b;
+        --shadow: 0 5px 18px rgba(20, 26, 26, 0.045);
+        --radius: 12px;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+      }
+      button, input, select, textarea { font: inherit; }
+      button { border: 0; cursor: pointer; }
+      .hidden { display: none !important; }
+      .app { min-height: 100vh; display: grid; grid-template-columns: 240px 1fr; }
+      .sidebar {
+        position: sticky; top: 0; height: 100vh; padding: 20px 16px;
+        border-right: 1px solid var(--line); background: rgba(255,255,252,.85);
+        display: grid; grid-template-rows: auto 1fr auto; gap: 20px;
+      }
+      .brand h1 { margin: 0; font-size: 20px; }
+      .brand p { margin: 6px 0 0; color: var(--muted); font-size: 13px; }
+      .nav { display: grid; gap: 8px; align-content: start; }
+      .nav-item {
+        text-align: left; padding: 10px 12px; border-radius: 10px;
+        background: transparent; color: var(--ink);
+      }
+      .nav-item.active, .nav-item:hover { background: var(--primary-soft); color: var(--primary); }
+      .main { padding: 20px 24px 40px; display: grid; gap: 16px; }
+      .topbar { display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; }
+      .badge {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 4px 8px; border-radius: 999px; background: #eef3f0;
+        font-size: 12px; color: var(--muted);
+      }
+      .badge.high, .badge.block, .badge.danger { background: rgba(209,46,43,.12); color: var(--danger); }
+      .badge.medium, .badge.warn, .badge.warning { background: rgba(204,125,23,.12); color: var(--warning); }
+      .badge.low, .badge.allow, .badge.resolved { background: rgba(41,158,87,.12); color: var(--success); }
+      .badge.pending, .badge.humanReview, .badge.review { background: var(--primary-soft); color: var(--primary); }
+      .stats { display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: 12px; }
+      .stat, .panel, .card {
+        background: var(--surface); border: 1px solid var(--line);
+        border-radius: var(--radius); box-shadow: var(--shadow);
+      }
+      .stat { padding: 14px; }
+      .stat strong { display: block; font-size: 24px; margin-top: 6px; }
+      .stat span { color: var(--muted); font-size: 13px; }
+      .panel { padding: 16px; }
+      .panel h2, .panel h3 { margin: 0 0 12px; font-size: 16px; }
+      .grid-2 { display: grid; grid-template-columns: 1.1fr 1.4fr; gap: 16px; }
+      .queue { display: grid; gap: 8px; max-height: 70vh; overflow: auto; }
+      .case-card {
+        text-align: left; width: 100%; padding: 12px; border-radius: 10px;
+        border: 1px solid var(--line); background: #fbfcfa;
+      }
+      .case-card.active, .case-card:hover { border-color: var(--primary); background: var(--primary-soft); }
+      .case-card h4 { margin: 0 0 6px; font-size: 14px; }
+      .case-card p { margin: 0 0 8px; color: var(--muted); font-size: 13px; line-height: 1.4; }
+      .meta { display: flex; flex-wrap: wrap; gap: 6px; }
+      .field { display: grid; gap: 6px; margin-bottom: 12px; }
+      .field span { color: var(--muted); font-size: 12px; }
+      .filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+      input, select, textarea {
+        width: 100%; padding: 10px 12px; border: 1px solid var(--line);
+        border-radius: 10px; background: #fff;
+      }
+      textarea { min-height: 80px; resize: vertical; }
+      .filters input, .filters select { width: auto; min-width: 120px; }
+      .toolbar { display: flex; flex-wrap: wrap; gap: 8px; }
+      .button {
+        padding: 10px 14px; border-radius: 10px; background: var(--primary); color: #fff;
+      }
+      .button.secondary { background: #eef3f0; color: var(--ink); }
+      .button.danger { background: var(--danger); }
+      .button.warning { background: var(--warning); }
+      .empty { color: var(--muted); padding: 20px 0; }
+      .messages { display: grid; gap: 8px; max-height: 280px; overflow: auto; }
+      .message {
+        padding: 10px 12px; border-radius: 10px; background: #f7f9f7; border: 1px solid var(--line);
+      }
+      .message.user { background: var(--primary-soft); }
+      .message.safety { background: rgba(204,125,23,.1); }
+      .message .head { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; margin-bottom: 4px; }
+      .export-box { min-height: 160px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+      .toast { color: var(--muted); font-size: 13px; min-height: 1.2em; }
+      .login-wrap {
+        min-height: 100vh; display: grid; place-items: center; padding: 24px;
+      }
+      .login-card {
+        width: min(420px, 100%); background: var(--surface); border: 1px solid var(--line);
+        border-radius: 16px; padding: 28px; box-shadow: var(--shadow);
+      }
+      .login-card h1 { margin: 0 0 8px; font-size: 24px; }
+      .login-card p { margin: 0 0 20px; color: var(--muted); }
+      @media (max-width: 960px) {
+        .app { grid-template-columns: 1fr; }
+        .sidebar { position: static; height: auto; }
+        .stats { grid-template-columns: repeat(2, minmax(0,1fr)); }
+        .grid-2 { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="loginView" class="login-wrap">
+      <div class="login-card">
+        <h1>Talk&Talk 审核后台</h1>
+        <p>使用管理员 / 审核员账号登录（开发：13800000001 admin / 13800000002 moderator）</p>
+        <div class="field">
+          <span>手机号</span>
+          <input id="loginPhone" value="13800000002" placeholder="手机号" />
+        </div>
+        <div class="field">
+          <span>验证码</span>
+          <div class="toolbar">
+            <input id="loginCode" placeholder="验证码" style="flex:1" />
+            <button class="button secondary" type="button" id="sendCodeBtn">发送验证码</button>
+          </div>
+        </div>
+        <div class="toolbar">
+          <button class="button" type="button" id="loginBtn">登录</button>
+        </div>
+        <p class="toast" id="loginToast"></p>
+      </div>
+    </div>
+
+    <div id="appView" class="app hidden">
+      <aside class="sidebar">
+        <div class="brand">
+          <h1>审核后台</h1>
+          <p>运营工具 · /api/v1</p>
+        </div>
+        <nav class="nav">
+          <button class="nav-item active" data-section="section-queue" type="button">工单队列</button>
+          <button class="nav-item" data-section="section-labels" type="button">样本标注</button>
+        </nav>
+        <div>
+          <div class="badge" id="roleBadge">role</div>
+          <div class="toolbar" style="margin-top:10px">
+            <button class="button secondary" type="button" id="refreshBtn">刷新</button>
+            <button class="button secondary" type="button" id="logoutBtn">退出</button>
+          </div>
+        </div>
+      </aside>
+
+      <main class="main">
+        <div class="topbar">
+          <div class="meta">
+            <span class="badge" id="pendingBadge">待处理 0</span>
+            <span class="badge" id="resolvedBadge">已处理 0</span>
+            <span class="toast" id="toast"></span>
+          </div>
+        </div>
+
+        <section class="stats" aria-label="审核统计">
+          <div class="stat"><span>待处理</span><strong id="statPending">0</strong></div>
+          <div class="stat"><span>拦截</span><strong id="statBlocked">0</strong></div>
+          <div class="stat"><span>预警</span><strong id="statWarned">0</strong></div>
+          <div class="stat"><span>复核</span><strong id="statReviewed">0</strong></div>
+          <div class="stat"><span>样本</span><strong id="statLabels">0</strong></div>
+          <div class="stat"><span>会话</span><strong id="statConversations">0</strong></div>
+        </section>
+
+        <section id="section-queue" class="section">
+          <div class="grid-2">
+            <div class="panel">
+              <h2>工单队列 <span class="badge" id="caseCount">0</span></h2>
+              <div class="filters">
+                <select id="filterStatus">
+                  <option value="">全部状态</option>
+                  <option value="pending">pending</option>
+                  <option value="humanReview">humanReview</option>
+                  <option value="resolved">resolved</option>
+                  <option value="dismissed">dismissed</option>
+                </select>
+                <select id="filterRisk">
+                  <option value="">全部风险</option>
+                  <option value="high">high</option>
+                  <option value="medium">medium</option>
+                  <option value="low">low</option>
+                </select>
+                <select id="filterSource">
+                  <option value="">全部来源</option>
+                  <option value="chat">chat</option>
+                  <option value="report">report</option>
+                  <option value="community">community</option>
+                  <option value="profile">profile</option>
+                </select>
+                <input id="filterKeyword" placeholder="关键词" />
+                <button class="button secondary" type="button" id="applyFilterBtn">筛选</button>
+              </div>
+              <div id="caseQueue" class="queue"></div>
+            </div>
+
+            <div class="panel">
+              <h2>工单详情 <span class="badge" id="selectedCaseBadge">未选择</span></h2>
+              <div id="caseDetail"><div class="empty">请选择左侧工单</div></div>
+              <hr style="border:none;border-top:1px solid var(--line);margin:16px 0" />
+              <h3>会话证据</h3>
+              <div id="messageList" class="messages"><div class="empty">选择工单后加载会话</div></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="section-labels" class="section hidden">
+          <div class="panel">
+            <h2>样本标注与导出</h2>
+            <div class="field">
+              <span>样本文本</span>
+              <textarea id="labelText" placeholder="粘贴需要标注的文本"></textarea>
+            </div>
+            <div class="filters">
+              <select id="expectedDecision">
+                <option value="block">expected: block</option>
+                <option value="warn">expected: warn</option>
+                <option value="review">expected: review</option>
+                <option value="allow">expected: allow</option>
+              </select>
+              <select id="actualDecision">
+                <option value="allow">actual: allow</option>
+                <option value="review">actual: review</option>
+                <option value="warn">actual: warn</option>
+                <option value="block">actual: block</option>
+              </select>
+              <input id="labelNote" placeholder="备注" style="min-width:200px" />
+            </div>
+            <div class="toolbar">
+              <button class="button" type="button" id="saveLabelBtn">保存样本</button>
+              <button class="button secondary" type="button" id="exportBtn">导出样本</button>
+            </div>
+            <textarea id="exportBox" class="export-box" readonly></textarea>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script>
+      const TOKEN_KEY = "tt_admin_access_token";
+      const USER_KEY = "tt_admin_user";
+      const API = "/api/v1";
+
+      const state = {
+        token: sessionStorage.getItem(TOKEN_KEY) || "",
+        user: JSON.parse(sessionStorage.getItem(USER_KEY) || "null"),
+        overview: null,
+        cases: [],
+        selectedCaseId: null,
+        messages: []
+      };
+
+      const el = {
+        loginView: document.querySelector("#loginView"),
+        appView: document.querySelector("#appView"),
+        loginPhone: document.querySelector("#loginPhone"),
+        loginCode: document.querySelector("#loginCode"),
+        sendCodeBtn: document.querySelector("#sendCodeBtn"),
+        loginBtn: document.querySelector("#loginBtn"),
+        loginToast: document.querySelector("#loginToast"),
+        roleBadge: document.querySelector("#roleBadge"),
+        toast: document.querySelector("#toast"),
+        pendingBadge: document.querySelector("#pendingBadge"),
+        resolvedBadge: document.querySelector("#resolvedBadge"),
+        statPending: document.querySelector("#statPending"),
+        statBlocked: document.querySelector("#statBlocked"),
+        statWarned: document.querySelector("#statWarned"),
+        statReviewed: document.querySelector("#statReviewed"),
+        statLabels: document.querySelector("#statLabels"),
+        statConversations: document.querySelector("#statConversations"),
+        caseCount: document.querySelector("#caseCount"),
+        caseQueue: document.querySelector("#caseQueue"),
+        caseDetail: document.querySelector("#caseDetail"),
+        selectedCaseBadge: document.querySelector("#selectedCaseBadge"),
+        messageList: document.querySelector("#messageList"),
+        filterStatus: document.querySelector("#filterStatus"),
+        filterRisk: document.querySelector("#filterRisk"),
+        filterSource: document.querySelector("#filterSource"),
+        filterKeyword: document.querySelector("#filterKeyword"),
+        applyFilterBtn: document.querySelector("#applyFilterBtn"),
+        refreshBtn: document.querySelector("#refreshBtn"),
+        logoutBtn: document.querySelector("#logoutBtn"),
+        labelText: document.querySelector("#labelText"),
+        expectedDecision: document.querySelector("#expectedDecision"),
+        actualDecision: document.querySelector("#actualDecision"),
+        labelNote: document.querySelector("#labelNote"),
+        saveLabelBtn: document.querySelector("#saveLabelBtn"),
+        exportBtn: document.querySelector("#exportBtn"),
+        exportBox: document.querySelector("#exportBox")
+      };
+
+      function escapeHtml(value) {
+        return String(value ?? "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;");
+      }
+
+      function formatTime(value) {
+        if (!value) return "-";
+        return new Intl.DateTimeFormat("zh-CN", {
+          month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit"
+        }).format(new Date(value));
+      }
+
+      function badge(value) {
+        return `<span class="badge ${escapeHtml(value)}">${escapeHtml(value)}</span>`;
+      }
+
+      function clearSession() {
+        state.token = "";
+        state.user = null;
+        sessionStorage.removeItem(TOKEN_KEY);
+        sessionStorage.removeItem(USER_KEY);
+      }
+
+      async function api(path, options = {}) {
+        const headers = {
+          "content-type": "application/json",
+          ...(options.headers || {})
+        };
+        if (state.token) headers.Authorization = `Bearer ${state.token}`;
+
+        const response = await fetch(API + path, { ...options, headers });
+        const body = await response.json().catch(() => ({}));
+
+        if (response.status === 401 || response.status === 403) {
+          if (path !== "/auth/phone/login" && path !== "/auth/sms/send-code") {
+            clearSession();
+            showLogin(body.error?.message || "登录已失效或无权限");
+            throw new Error(body.error?.message || `HTTP ${response.status}`);
+          }
+        }
+
+        if (!response.ok) {
+          throw new Error(body.error?.message || `HTTP ${response.status}`);
+        }
+        return body.data;
+      }
+
+      function showLogin(message = "") {
+        el.loginView.classList.remove("hidden");
+        el.appView.classList.add("hidden");
+        el.loginToast.textContent = message;
+      }
+
+      function showApp() {
+        el.loginView.classList.add("hidden");
+        el.appView.classList.remove("hidden");
+        el.roleBadge.textContent = state.user?.role || "staff";
+      }
+
+      function renderOverview() {
+        const o = state.overview || {};
+        el.pendingBadge.textContent = `待处理 ${o.pendingCases ?? 0}`;
+        el.resolvedBadge.textContent = `已处理 ${o.resolved ?? 0}`;
+        el.statPending.textContent = o.pendingCases ?? 0;
+        el.statBlocked.textContent = o.blocked ?? 0;
+        el.statWarned.textContent = o.warned ?? 0;
+        el.statReviewed.textContent = o.reviewed ?? 0;
+        el.statLabels.textContent = o.labels ?? 0;
+        el.statConversations.textContent = o.activeConversations ?? 0;
+      }
+
+      function renderCases() {
+        el.caseCount.textContent = String(state.cases.length);
+        if (!state.selectedCaseId && state.cases.length) {
+          state.selectedCaseId = state.cases[0].id;
+        }
+        el.caseQueue.innerHTML = state.cases.length
+          ? state.cases.map((item) => {
+              const active = item.id === state.selectedCaseId ? "active" : "";
+              return `
+                <button class="case-card ${active}" type="button" data-case-id="${escapeHtml(item.id)}">
+                  <h4>${escapeHtml(item.title)}</h4>
+                  <p>${escapeHtml(item.content)}</p>
+                  <div class="meta">
+                    ${badge(item.riskLevel)}
+                    ${badge(item.decision)}
+                    ${badge(item.status)}
+                    <span class="badge">${escapeHtml(item.source)}</span>
+                  </div>
+                </button>`;
+            }).join("")
+          : `<div class="empty">暂无工单</div>`;
+
+        for (const button of el.caseQueue.querySelectorAll("[data-case-id]")) {
+          button.addEventListener("click", async () => {
+            state.selectedCaseId = button.dataset.caseId;
+            renderCases();
+            await loadCaseDetail(state.selectedCaseId);
+          });
+        }
+      }
+
+      async function loadCaseDetail(id) {
+        if (!id) {
+          el.caseDetail.innerHTML = `<div class="empty">请选择左侧工单</div>`;
+          return;
+        }
+        try {
+          const data = await api(`/admin/moderation/cases/${encodeURIComponent(id)}`);
+          const item = data.case;
+          el.selectedCaseBadge.textContent = item.status;
+          el.selectedCaseBadge.className = `badge ${item.status}`;
+          const rules = (item.matchedRules || []).map((r) => badge(r)).join("") || badge("no-rule");
+          const logs = (item.actionLog || []).length
+            ? item.actionLog.map((entry) =>
+                `<p>${escapeHtml(formatTime(entry.createdAt))} · ${escapeHtml(entry.action)} · ${escapeHtml(entry.note || "无备注")}</p>`
+              ).join("")
+            : "<p>暂无处理记录</p>";
+
+          const closed = item.status === "resolved" || item.status === "dismissed";
+          el.caseDetail.innerHTML = `
+            <div class="field"><span>标题</span><strong>${escapeHtml(item.title)}</strong></div>
+            <div class="field"><span>证据内容</span><strong>${escapeHtml(item.content)}</strong></div>
+            <div class="meta" style="margin-bottom:12px">${badge(item.riskLevel)}${badge(item.decision)}${badge(item.source)}${rules}</div>
+            <div class="field"><span>审查原因</span><strong>${escapeHtml(item.aiReason)}</strong></div>
+            <div class="field"><span>创建时间</span><strong>${escapeHtml(formatTime(item.createdAt))}</strong></div>
+            ${closed ? "" : `
+              <label class="field">
+                <span>处理备注</span>
+                <textarea id="caseActionNote" placeholder="记录确认违规、误报驳回或升级人工的原因"></textarea>
+              </label>
+              <div class="toolbar">
+                <button class="button danger" type="button" data-action="confirmViolation">确认违规</button>
+                <button class="button secondary" type="button" data-action="dismiss">误报驳回</button>
+                <button class="button warning" type="button" data-action="escalate">升级人工</button>
+              </div>`}
+            <div class="field" style="margin-top:12px"><span>处理记录</span>${logs}</div>
+          `;
+
+          for (const button of el.caseDetail.querySelectorAll("[data-action]")) {
+            button.addEventListener("click", () => applyAction(button.dataset.action));
+          }
+
+          el.labelText.value = item.content;
+          el.expectedDecision.value = item.decision === "allow" ? "review" : item.decision;
+          el.actualDecision.value = item.decision;
+
+          await loadConversation(id);
+        } catch (error) {
+          el.toast.textContent = error.message;
+        }
+      }
+
+      async function loadConversation(caseId) {
+        try {
+          const data = await api(`/admin/moderation/cases/${encodeURIComponent(caseId)}/conversation`);
+          state.messages = data.messages || [];
+          if (!state.messages.length) {
+            el.messageList.innerHTML = `<div class="empty">暂无关联会话消息</div>`;
+            return;
+          }
+          el.messageList.innerHTML = state.messages.map((message) => {
+            const klass = message.type === "safety" ? "safety" : (message.senderId === "system" ? "" : "user");
+            return `
+              <article class="message ${klass}">
+                <div class="head">
+                  <span>${escapeHtml(message.senderName || message.senderId)} · ${escapeHtml(formatTime(message.timestamp))}</span>
+                  <span>${escapeHtml(message.type)}</span>
+                </div>
+                <div>${escapeHtml(message.content)}</div>
+              </article>`;
+          }).join("");
+        } catch (error) {
+          el.messageList.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`;
+        }
+      }
+
+      async function applyAction(action) {
+        if (!state.selectedCaseId) return;
+        const note = document.querySelector("#caseActionNote")?.value ?? "";
+        try {
+          await api(`/admin/moderation/cases/${encodeURIComponent(state.selectedCaseId)}/actions`, {
+            method: "POST",
+            body: JSON.stringify({ action, note })
+          });
+          el.toast.textContent = "工单状态已更新";
+          await loadAll();
+        } catch (error) {
+          el.toast.textContent = error.message;
+        }
+      }
+
+      async function loadOverview() {
+        const data = await api("/admin/moderation/overview");
+        state.overview = data.overview;
+        renderOverview();
+      }
+
+      async function loadCases() {
+        const params = new URLSearchParams();
+        if (el.filterStatus.value) params.set("status", el.filterStatus.value);
+        if (el.filterRisk.value) params.set("riskLevel", el.filterRisk.value);
+        if (el.filterSource.value) params.set("source", el.filterSource.value);
+        if (el.filterKeyword.value.trim()) params.set("keyword", el.filterKeyword.value.trim());
+        params.set("pageSize", "100");
+        const qs = params.toString();
+        const data = await api(`/admin/moderation/cases${qs ? `?${qs}` : ""}`);
+        state.cases = data.cases || [];
+        if (state.selectedCaseId && !state.cases.some((c) => c.id === state.selectedCaseId)) {
+          state.selectedCaseId = state.cases[0]?.id || null;
+        }
+        renderCases();
+        if (state.selectedCaseId) await loadCaseDetail(state.selectedCaseId);
+      }
+
+      async function loadAll() {
+        await loadOverview();
+        await loadCases();
+      }
+
+      el.sendCodeBtn.addEventListener("click", async () => {
+        try {
+          await api("/auth/sms/send-code", {
+            method: "POST",
+            body: JSON.stringify({ phone: el.loginPhone.value.trim() })
+          });
+          el.loginToast.textContent = "验证码已发送（开发环境见 API 日志）";
+        } catch (error) {
+          el.loginToast.textContent = error.message;
+        }
+      });
+
+      el.loginBtn.addEventListener("click", async () => {
+        try {
+          const data = await api("/auth/phone/login", {
+            method: "POST",
+            body: JSON.stringify({
+              phone: el.loginPhone.value.trim(),
+              code: el.loginCode.value.trim()
+            })
+          });
+          const role = data.user?.role;
+          if (role !== "admin" && role !== "moderator") {
+            throw new Error("当前账号无审核后台权限");
+          }
+          state.token = data.accessToken;
+          state.user = data.user;
+          sessionStorage.setItem(TOKEN_KEY, state.token);
+          sessionStorage.setItem(USER_KEY, JSON.stringify(state.user));
+          showApp();
+          await loadAll();
+          el.toast.textContent = "登录成功";
+        } catch (error) {
+          el.loginToast.textContent = error.message;
+        }
+      });
+
+      el.logoutBtn.addEventListener("click", () => {
+        clearSession();
+        showLogin("已退出登录");
+      });
+
+      el.refreshBtn.addEventListener("click", () => loadAll().catch((e) => { el.toast.textContent = e.message; }));
+      el.applyFilterBtn.addEventListener("click", () => loadCases().catch((e) => { el.toast.textContent = e.message; }));
+
+      for (const button of document.querySelectorAll(".nav-item")) {
+        button.addEventListener("click", () => {
+          for (const item of document.querySelectorAll(".nav-item")) item.classList.remove("active");
+          button.classList.add("active");
+          for (const section of document.querySelectorAll(".section")) section.classList.add("hidden");
+          document.querySelector(`#${button.dataset.section}`)?.classList.remove("hidden");
+        });
+      }
+
+      el.saveLabelBtn.addEventListener("click", async () => {
+        try {
+          const data = await api("/admin/moderation/labels", {
+            method: "POST",
+            body: JSON.stringify({
+              text: el.labelText.value.trim(),
+              expectedDecision: el.expectedDecision.value,
+              actualDecision: el.actualDecision.value,
+              note: el.labelNote.value.trim(),
+              caseId: state.selectedCaseId || undefined
+            })
+          });
+          el.toast.textContent = `样本已保存（共 ${data.count} 条）`;
+          await loadOverview();
+        } catch (error) {
+          el.toast.textContent = error.message;
+        }
+      });
+
+      el.exportBtn.addEventListener("click", async () => {
+        try {
+          const data = await api("/admin/moderation/labels/export");
+          el.exportBox.value = JSON.stringify(data, null, 2);
+          el.toast.textContent = `已导出 ${data.count} 条样本`;
+        } catch (error) {
+          el.toast.textContent = error.message;
+        }
+      });
+
+      (async function boot() {
+        if (!state.token) {
+          showLogin();
+          return;
+        }
+        showApp();
+        try {
+          await loadAll();
+        } catch (error) {
+          showLogin(error.message);
+        }
+      })();
+    </script>
+  </body>
+</html>

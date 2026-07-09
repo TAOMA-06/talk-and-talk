@@ -3,8 +3,10 @@ import { ModerationResult } from "./moderation.service";
 
 describe("ModerationCaseService", () => {
   const create = jest.fn();
+  const auditCreate = jest.fn();
   const prisma = {
-    moderationCase: { create }
+    moderationCase: { create },
+    auditLog: { create: auditCreate }
   } as any;
 
   let service: ModerationCaseService;
@@ -125,6 +127,47 @@ describe("ModerationCaseService", () => {
           evidences: {
             create: expect.arrayContaining([expect.objectContaining({ type: "ai_score" })])
           }
+        })
+      })
+    );
+  });
+
+  it("force-creates report cases even for allow decisions", async () => {
+    const created = { id: "report-1", status: "pending", source: "report" };
+    create.mockResolvedValue(created);
+    auditCreate.mockResolvedValue({ id: "audit-1" });
+
+    const output = await service.createReportCase({
+      result: {
+        decision: "allow",
+        riskLevel: "low",
+        score: 0.1,
+        reasons: ["内容正常"],
+        matchedRules: [],
+        usedAI: false
+      },
+      reason: "对方索要联系方式",
+      content: "对方索要联系方式 加我微信吧",
+      targetId: "c1",
+      actorId: "user-1"
+    });
+
+    expect(output).toBe(created);
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          source: "report",
+          title: "举报：对方索要联系方式",
+          status: "pending"
+        })
+      })
+    );
+    expect(auditCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          action: "create_report",
+          resourceType: "moderation_case",
+          resourceId: "report-1"
         })
       })
     );

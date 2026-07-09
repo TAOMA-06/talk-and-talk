@@ -200,6 +200,9 @@ model ModerationCase {
 
   @@index([source, status])
   @@index([targetId])
+  @@index([status, createdAt])
+  @@index([riskLevel, createdAt])
+  @@index([createdAt])
 }
 
 model ModerationEvidence {
@@ -224,6 +227,35 @@ model ModerationActionLog {
 
   case ModerationCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
 
+  @@index([caseId])
+}
+
+model AuditLog {
+  id           String   @id @default(uuid())
+  actorId      String?
+  action       String
+  resourceType String
+  resourceId   String?
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  @@index([resourceType, resourceId])
+  @@index([actorId, createdAt])
+  @@index([createdAt])
+}
+
+model ModerationLabel {
+  id               String              @id @default(uuid())
+  text             String
+  expectedDecision ModerationDecision
+  actualDecision   ModerationDecision
+  note             String?
+  caseId           String?
+  actorId          String?
+  source           ModerationSource?
+  createdAt        DateTime            @default(now())
+
+  @@index([createdAt])
   @@index([caseId])
 }
 

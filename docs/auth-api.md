@@ -118,6 +118,15 @@ Talk&Talk 正式账号体系 API，前缀均为 `/api/v1`。所有 JSON 响应�
 受保护的管理端示例：
 
 - `GET /admin/status` 需要 `admin` 角色
+- `GET|POST /admin/moderation/*` 需要 `moderator` 或 `admin`
+- `GET /moderation/cases` 需要 `moderator` 或 `admin`
+
+开发 seed 账号：
+
+| 手机号 | 角色 |
+|--------|------|
+| `13800000001` | admin |
+| `13800000002` | moderator |
 
 ## 错误码
 

@@ -1,6 +1,9 @@
+import { join } from "node:path";
+
 import { ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { ConfigService } from "@nestjs/config";
+import { NestExpressApplication } from "@nestjs/platform-express";
 import "reflect-metadata";
 
 import { AppModule } from "./app.module";
@@ -9,8 +12,12 @@ import { EnvelopeInterceptor } from "./common/envelope/envelope.interceptor";
 import { buildCorsOptions } from "./config/cors";
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const config = app.get(ConfigService);
+
+  app.useStaticAssets(join(__dirname, "..", "public"), {
+    index: false
+  });
 
   app.setGlobalPrefix(config.getOrThrow<string>("API_PREFIX"));
   app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }));

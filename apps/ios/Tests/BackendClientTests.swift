@@ -561,6 +561,10 @@ private struct FailingBackendAPIClient: BackendAPIClient, Sendable {
     func sendMessage(conversationId: String, content: String, senderId: String) async throws -> BackendSendMessageResponse {
         throw BackendError.unavailable
     }
+
+    func submitReport(reason: String, conversationId: String?, targetId: String?, recentContext: String?) async throws -> ModerationCase {
+        throw BackendError.unavailable
+    }
 }
 
 private struct SuccessfulBackendAPIClient: BackendAPIClient, Sendable {
@@ -598,6 +602,25 @@ private struct SuccessfulBackendAPIClient: BackendAPIClient, Sendable {
 
     func sendMessage(conversationId: String, content: String, senderId: String) async throws -> BackendSendMessageResponse {
         throw BackendError.unavailable
+    }
+
+    func submitReport(reason: String, conversationId: String?, targetId: String?, recentContext: String?) async throws -> ModerationCase {
+        ModerationCase(
+            id: "report-1",
+            title: "举报：\(reason)",
+            category: "用户举报",
+            riskLevel: .medium,
+            status: .pending,
+            source: .report,
+            content: reason,
+            targetId: conversationId ?? targetId,
+            aiScore: 0.4,
+            aiReason: "用户举报",
+            decision: .review,
+            matchedRules: [],
+            usedAI: false,
+            resolvedAt: nil
+        )
     }
 
     private static let companion = Companion(
@@ -662,6 +685,10 @@ private struct ChatBackendAPIClient: BackendAPIClient, Sendable {
 
     func fetchModerationCases() async throws -> [ModerationCase] {
         []
+    }
+
+    func submitReport(reason: String, conversationId: String?, targetId: String?, recentContext: String?) async throws -> ModerationCase {
+        throw BackendError.unavailable
     }
 
     func sendMessage(conversationId: String, content: String, senderId: String) async throws -> BackendSendMessageResponse {

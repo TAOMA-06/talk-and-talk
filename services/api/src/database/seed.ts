@@ -144,6 +144,76 @@ type SeedClient = {
   serviceTag: Pick<PrismaClient["serviceTag"], "upsert">;
 };
 
+export const seedStaffUsers = [
+  {
+    phone: "13800000001",
+    role: "admin" as const,
+    displayName: "运营管理员"
+  },
+  {
+    phone: "13800000002",
+    role: "moderator" as const,
+    displayName: "内容审核员"
+  }
+];
+
+export async function seedStaffAccounts(client: PrismaClient = prisma) {
+  for (const staff of seedStaffUsers) {
+    const e164 = `+86${staff.phone}`;
+    const existing = await client.authIdentity.findUnique({
+      where: {
+        provider_providerId: {
+          provider: "phone",
+          providerId: e164
+        }
+      }
+    });
+
+    if (existing) {
+      await client.user.update({
+        where: { id: existing.userId },
+        data: { role: staff.role }
+      });
+      await client.userProfile.upsert({
+        where: { userId: existing.userId },
+        create: {
+          userId: existing.userId,
+          displayName: staff.displayName,
+          phone: e164,
+          isVerified: true,
+          safetyScore: 100
+        },
+        update: {
+          displayName: staff.displayName,
+          phone: e164,
+          isVerified: true
+        }
+      });
+      continue;
+    }
+
+    await client.user.create({
+      data: {
+        role: staff.role,
+        profile: {
+          create: {
+            displayName: staff.displayName,
+            phone: e164,
+            isVerified: true,
+            safetyScore: 100
+          }
+        },
+        identities: {
+          create: {
+            provider: "phone",
+            providerId: e164
+          }
+        }
+      }
+    });
+  }
+}
+
 export async function seedDatabase(client: SeedClient = prisma) {
   for (const companion of seedCompanions) {
     await client.companionProfile.upsert({
@@ -221,6 +291,7 @@ export async function seedDatabase(client: SeedClient = prisma) {
 
 if (require.main === module) {
   seedDatabase()
+    .then(() => seedStaffAccounts())
     .then(async () => {
       await prisma.$disconnect();
     })

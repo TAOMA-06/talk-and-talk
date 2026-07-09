@@ -94,6 +94,17 @@ struct BackendModerationCasesData: Decodable {
     let cases: [BackendModerationCaseDTO]
 }
 
+struct BackendReportData: Decodable {
+    let report: BackendReportSummaryDTO?
+    let moderationCase: BackendModerationCaseDTO
+}
+
+struct BackendReportSummaryDTO: Decodable {
+    let id: String
+    let status: String
+    let source: String
+}
+
 struct BackendMessageDTO: Decodable {
     let id: String
     let conversationId: String

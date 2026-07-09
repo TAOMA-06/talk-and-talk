@@ -42,6 +42,7 @@ protocol BackendAPIClient: Sendable {
     func fetchMessages(conversationId: String, cursor: String?, limit: Int?) async throws -> [Message]
     func fetchModerationCases() async throws -> [ModerationCase]
     func sendMessage(conversationId: String, content: String, senderId: String) async throws -> BackendSendMessageResponse
+    func submitReport(reason: String, conversationId: String?, targetId: String?, recentContext: String?) async throws -> ModerationCase
 }
 
 extension BackendAPIClient {
@@ -148,6 +149,34 @@ struct BackendClient: BackendAPIClient, Sendable {
     func fetchModerationCases() async throws -> [ModerationCase] {
         let data: BackendModerationCasesData = try await request(path: "/api/v1/moderation/cases")
         return data.cases.compactMap(BackendDTOMapper.moderationCase(from:))
+    }
+
+    func submitReport(
+        reason: String,
+        conversationId: String?,
+        targetId: String?,
+        recentContext: String?
+    ) async throws -> ModerationCase {
+        var body: [String: Any] = ["reason": reason]
+        if let conversationId, !conversationId.isEmpty {
+            body["conversationId"] = conversationId
+        }
+        if let targetId, !targetId.isEmpty {
+            body["targetId"] = targetId
+        }
+        if let recentContext, !recentContext.isEmpty {
+            body["recentContext"] = recentContext
+        }
+
+        let data: BackendReportData = try await request(
+            path: "/api/v1/moderation/reports",
+            method: "POST",
+            body: body
+        )
+        guard let moderationCase = BackendDTOMapper.moderationCase(from: data.moderationCase) else {
+            throw BackendError.decodingFailed
+        }
+        return moderationCase
     }
 
     func sendMessage(

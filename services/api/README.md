@@ -93,16 +93,19 @@ Completed:
 - Global `/api/v1` prefix, request ID, response envelopes
 - Environment validation, including JWT secrets in production
 - `GET /api/v1/health` with Postgres and Redis dependency checks
-- Prisma schema: `User`, `AuthIdentity`, `UserProfile`, `VerificationCode`, `RefreshToken`
+- Prisma: users/auth, companions, conversations/messages, moderation cases/evidence/action logs, audit logs, labels
 - Auth: phone SMS login (mock provider), Apple login, JWT refresh/logout, `GET /users/me`
-- RBAC guards with `admin` example on `GET /admin/status`
+- RBAC: `admin` for companions management; `moderator`/`admin` for moderation ops
+- Chat send with RuleEngine + optional DeepSeek; case creation on non-allow
+- Admin Moderation API: overview, filtered queue, detail, conversation evidence, actions, labels export
+- User reports: `POST /moderation/reports`
+- Web ops console at `/admin/` (static)
 
 Not implemented yet:
 
-- Production chat and moderation endpoints
-- Persistent conversations, messages, moderation cases, orders, payments, and notifications
-- Real SMS (Aliyun/Tencent), WeChat Pay, DeepSeek integrations
+- Orders, payments, notifications product APIs
+- Real SMS (Aliyun/Tencent), WeChat Pay production wiring
 
-The iOS app requires login before entering the main UI. It uses this service for auth and health checks, and marks `c1`, `c2`, and `c3` as backend-capable for chat. Until Day 4 chat/moderation compatibility endpoints are implemented, the app falls back to local chat and local moderation when backend chat calls fail.
+Web 审核后台：启动后打开 `http://localhost:3000/admin/`。Seed 账号见 [docs/admin-moderation-api.md](../../docs/admin-moderation-api.md)。
 
 Auth API details: [docs/auth-api.md](../../docs/auth-api.md)

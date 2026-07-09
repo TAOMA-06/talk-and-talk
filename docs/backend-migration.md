@@ -9,16 +9,16 @@ Recovered from git history:
 | Old route | Purpose | Day 1 status |
 |---|---|---|
 | `GET /api/health` | Demo health and DeepSeek status | Replaced by `GET /api/v1/health` |
-| `GET /api/admin/overview` | Demo admin dashboard summary | Not migrated |
+| `GET /api/admin/overview` | Demo admin dashboard summary | Replaced by `GET /api/v1/admin/moderation/overview` |
 | `GET /api/conversations` | List demo conversations | Day 4 compatibility required |
 | `GET /api/conversations/:id/messages` | List messages in demo conversation | Day 4 compatibility required |
 | `POST /api/conversations/:id/messages` | Send chat message and run moderation | Day 4 compatibility required |
 | `POST /api/moderate` | Standalone text moderation | Replaced by `POST /api/v1/moderation/check` |
-| `GET /api/moderation-cases` | List moderation cases | Replaced by `GET /api/v1/moderation/cases` |
-| `POST /api/moderation-cases/:id/actions` | Resolve/escalate/dismiss case | Not migrated |
-| `GET /api/violation-examples` | Demo examples for admin UI | Not migrated |
-| `POST /api/labels` | Demo training label creation | Not migrated |
-| `GET /api/labels/export` | Demo training label export | Not migrated |
+| `GET /api/moderation-cases` | List moderation cases | Replaced by `GET /api/v1/admin/moderation/cases` (staff) |
+| `POST /api/moderation-cases/:id/actions` | Resolve/escalate/dismiss case | Replaced by `POST /api/v1/admin/moderation/cases/:id/actions` |
+| `GET /api/violation-examples` | Demo examples for admin UI | Dropped (use live queue + labels) |
+| `POST /api/labels` | Demo training label creation | Replaced by `POST /api/v1/admin/moderation/labels` |
+| `GET /api/labels/export` | Demo training label export | Replaced by `GET /api/v1/admin/moderation/labels/export` |
 | `POST /api/reset` | Reset in-memory demo state | Removed |
 
 ## New Production API
@@ -39,11 +39,21 @@ Day 1 routes currently available:
 | `GET /api/v1/conversations/status` | Conversations module skeleton status |
 | `GET /api/v1/moderation/status` | Moderation module status (`active`, includes `aiConfigured`) |
 | `POST /api/v1/moderation/check` | Standalone text moderation (JWT); RuleEngine + optional DeepSeek |
-| `GET /api/v1/moderation/cases` | List moderation cases (JWT) |
+| `POST /api/v1/moderation/reports` | User report → create `source=report` case (JWT user) |
+| `GET /api/v1/moderation/cases` | List moderation cases (`moderator`/`admin` only) |
+| `GET /api/v1/admin/moderation/overview` | Staff overview stats + queue |
+| `GET /api/v1/admin/moderation/cases` | Staff case list with filters |
+| `GET /api/v1/admin/moderation/cases/:id` | Case detail + evidences + action logs |
+| `GET /api/v1/admin/moderation/cases/:id/conversation` | Session evidence messages |
+| `POST /api/v1/admin/moderation/cases/:id/actions` | `confirmViolation` / `dismiss` / `escalate` |
+| `POST /api/v1/admin/moderation/labels` | Create training label sample |
+| `GET /api/v1/admin/moderation/labels/export` | Export label samples |
 | `GET /api/v1/orders/status` | Orders module skeleton status |
 | `GET /api/v1/payments/status` | Payments module skeleton status |
-| `GET /api/v1/admin/status` | Admin module skeleton status |
+| `GET /api/v1/admin/status` | Admin module skeleton status (`admin` only) |
 | `GET /api/v1/notifications/status` | Notifications module skeleton status |
+
+Web 运营后台：`http://localhost:3000/admin/`（静态页，需 staff JWT）。详见 [admin-moderation-api.md](./admin-moderation-api.md)。
 
 Every JSON response must use:
 

@@ -29,6 +29,7 @@ cd services/api
 cp .env.example .env
 npm install
 npx prisma migrate deploy
+npm run prisma:seed
 npm run start:dev
 ```
 
@@ -37,6 +38,8 @@ npm run start:dev
 ```bash
 curl http://localhost:3000/api/v1/health
 ```
+
+Web 审核后台：`http://localhost:3000/admin/`（开发账号 `13800000002` moderator / `13800000001` admin，mock 验证码见日志）。
 
 发送验证码（开发环境 mock SMS，验证码会打印在 API 日志）：
 
@@ -58,6 +61,7 @@ docker compose up --build
 |------|------|
 | [docs/GUIDE.md](./docs/GUIDE.md) | 项目总指引 |
 | [docs/auth-api.md](./docs/auth-api.md) | Auth API 契约 |
+| [docs/admin-moderation-api.md](./docs/admin-moderation-api.md) | 审核后台 API 契约 |
 | [apps/ios/](./apps/ios/) | iOS SwiftUI App |
 | [services/api/](./services/api/) | NestJS + TypeScript 正式后端 |
 | [docs/review.md](./docs/review.md) | iOS 代码逐文件说明 |
@@ -67,9 +71,9 @@ docker compose up --build
 
 - **正式后端 Phase 1**：NestJS 工程、统一 envelope、health、Docker Compose、Prisma。
 - **正式后端 Phase 2（Auth）**：手机号/Apple 登录、JWT、refresh/logout、RBAC、`GET /users/me`。
-- **iOS 已连接**：登录门控、Keychain token、自动 refresh；`c1`/`c2`/`c3` 为后端聊天对象。
-- **仍需兜底**：Day 4 聊天/审核接口完成前，聊天失败会自动回到 App 本地逻辑。
-- **后续阶段**：聊天与内容审核 API、业务域持久化会逐步迁移到正式后端。
+- **正式后端 Phase 3（聊天/审核）**：`c1`–`c3` 消息发送与审核、Admin Moderation API、Web 运营后台、用户举报入库。
+- **iOS 已连接**：登录门控、Keychain token、自动 refresh；聊天与举报优先走后端。
+- **后续阶段**：订单/支付/通知等业务域继续迁移到正式后端。
 
 ## 测试
 

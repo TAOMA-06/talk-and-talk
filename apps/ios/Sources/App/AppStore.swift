@@ -693,6 +693,25 @@ final class AppStore: ObservableObject {
         lastModerationFeedback = "举报已提交，我们会尽快处理。"
 
         Task { [moderationService] in
+            if BackendConfig.isEnabled, let client = backendClient() {
+                do {
+                    let moderationCase = try await client.submitReport(
+                        reason: reason,
+                        conversationId: target.conversationId,
+                        targetId: target.conversationId,
+                        recentContext: recent.isEmpty ? nil : recent
+                    )
+                    insertBackendModerationCase(moderationCase)
+                    return
+                } catch {
+#if DEBUG
+                    // Fall through to local case creation for offline development.
+#else
+                    return
+#endif
+                }
+            }
+
             let result = await moderationService.moderate(
                 text: reportText,
                 source: .report,
