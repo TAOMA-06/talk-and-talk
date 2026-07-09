@@ -66,7 +66,7 @@ export class AuthService {
     return this.redis;
   }
 
-  async sendCode(phone: string, ip?: string): Promise<{ expiresInSeconds: number }> {
+  async sendCode(phone: string, ip?: string): Promise<{ expiresInSeconds: number; devCode?: string }> {
     const parsed = parsePhoneNumberFromString(phone, "CN");
     if (!parsed?.isValid()) {
       throw new AppException("INVALID_PHONE", "Invalid phone number", HttpStatus.BAD_REQUEST);
@@ -103,6 +103,12 @@ export class AuthService {
 
     await redis.set(phoneKey, "1", "EX", 60);
     await this.sms.sendCode(e164, code);
+
+    const appEnv = this.config.get<string>("APP_ENV", "development");
+    const smsProvider = this.config.get<string>("SMS_PROVIDER", "mock");
+    if (appEnv !== "production" && smsProvider === "mock") {
+      return { expiresInSeconds: ttl, devCode: code };
+    }
 
     return { expiresInSeconds: ttl };
   }

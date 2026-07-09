@@ -419,11 +419,13 @@ final class BackendClientTests: XCTestCase {
         XCTAssertTrue(user.isVerified)
     }
 
-    func testBackendConfigSupportsProductionChatCompanions() {
+    func testBackendConfigSupportsWhitelistedChatCompanions() {
+        XCTAssertTrue(BackendConfig.isEnabled)
         XCTAssertTrue(BackendConfig.supportsChat(for: "c1"))
         XCTAssertTrue(BackendConfig.supportsChat(for: "c2"))
         XCTAssertTrue(BackendConfig.supportsChat(for: "c3"))
         XCTAssertFalse(BackendConfig.supportsChat(for: "c4"))
+        XCTAssertFalse(BackendConfig.supportsChat(for: ""))
     }
 
     func testRequestSetsAuthorizationHeaderWhenTokenProvided() async throws {
@@ -464,7 +466,7 @@ final class BackendClientTests: XCTestCase {
             message: "too frequent",
             statusCode: 429
         )
-        XCTAssertEqual(error.userFacingMessage, "验证码发送太频繁，请稍后再试")
+        XCTAssertEqual(error.userFacingMessage, "操作过于频繁，请稍后再试")
     }
 
     @MainActor

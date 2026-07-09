@@ -17,9 +17,14 @@ describe("PaymentsService", () => {
     $transaction: jest.fn()
   } as any;
 
+  const metrics = {
+    recordWechatNotifyFailure: jest.fn(),
+    recordWechatNotifySuccess: jest.fn()
+  } as any;
+
   const config = {
     getOrThrow: jest.fn((key: string) => {
-      if (key === "NODE_ENV") return "test";
+      if (key === "APP_ENV") return "staging";
       if (key === "API_PREFIX") return "api/v1";
       throw new Error(`missing ${key}`);
     }),
@@ -77,7 +82,7 @@ describe("PaymentsService", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new PaymentsService(prisma, config, ordersService, wechat, notifications, audit);
+    service = new PaymentsService(prisma, config, ordersService, wechat, notifications, audit, metrics);
   });
 
   it("fulfills mock notify: paying -> paid and activates conversation once", async () => {

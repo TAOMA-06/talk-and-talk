@@ -21,8 +21,10 @@
 		475E9D0887A2DDF7C445216C /* TokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 363DCDF5566BD9FCFECC733D /* TokenStore.swift */; };
 		4793219FE63077EEA4450925 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B1E327B0E0600DD2FA7DA0B /* ContentView.swift */; };
 		4AE49DFC612BF88AC5997434 /* CreditService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 062507A80BCACC829F743FAE /* CreditService.swift */; };
+		5187A08AA93DBCA5C80A0AAC /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 30E1C8C508469734A60262FC /* Assets.xcassets */; };
 		567779000564DDCCA22F448F /* AppStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6E3835F343B22384B2A21A2 /* AppStore.swift */; };
 		5A9F47B2F8BDA522C73C25D8 /* TokenStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13E17E67BD70A4FD39C8A2DC /* TokenStoreTests.swift */; };
+		5D04CD58F3A70B98A7C5AD2A /* WechatOpenSDK in Frameworks */ = {isa = PBXBuildFile; productRef = B988DC50DABD932218177FF2 /* WechatOpenSDK */; };
 		6CFADD99C309A52C6B425C75 /* BackendClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8049AC3D2DA38FB7C6FAD82 /* BackendClientTests.swift */; };
 		70EB8E37D12BAF7511AD14EA /* LoginStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4C7B5A8F5944B691DC285D3 /* LoginStateTests.swift */; };
 		7B2DD2E0120B8B7122D32607 /* MessagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3218FC9B8690CE90A5813155 /* MessagesView.swift */; };
@@ -35,6 +37,7 @@
 		B6AC1C7D35FAB661E12DA64A /* ModerationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E263317F08697595B130FB5D /* ModerationService.swift */; };
 		B81503F26333913BA98EEA8D /* ModerationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FF03BAEB72A56CFE6283799 /* ModerationTests.swift */; };
 		B8D26328C1590E4DF65AEB77 /* WeChatPayClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C764869353423E79178BB4E3 /* WeChatPayClient.swift */; };
+		BA9CC4FCCD7713B1797DC79F /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5A6477B74715507A1104BE31 /* WebKit.framework */; };
 		BE8CB25A7F33C99B8280A102 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 007F9F5619ED56C144799B00 /* Models.swift */; };
 		C9A2FB0AC8EFAFC384F611BE /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDCBDDAD4FB2128224897576 /* HomeView.swift */; };
 		CC7B970062E49A992E5BE0A6 /* AuthSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = F31F2D6E952D2DAF7708EEC2 /* AuthSession.swift */; };
@@ -47,8 +50,10 @@
 		E1DACA212E56BC7618277004 /* SharedViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45B56637DD1304D85224005F /* SharedViews.swift */; };
 		E51B292A24789C68B570BD4A /* HybridModerationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02811E1FB9FE0F48E87C6ED9 /* HybridModerationService.swift */; };
 		E62C59F9BB7700CF763C716B /* OrderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CD87BBB9699358FF42C6C09 /* OrderView.swift */; };
+		E94DD7288271F6A9C47FA5B3 /* AppCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13D9DF7A81F40BC52D080F2C /* AppCatalog.swift */; };
 		E9A7A6322E71F6A41F76C785 /* BackendAuthClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B637A4D9A771D3580A47473 /* BackendAuthClient.swift */; };
 		EA414DFDDA89D7FCA486C2CF /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E605DC8006E9FCCFE36D0FD /* DesignSystem.swift */; };
+		F10E43C579EC5F063A4449CC /* WeChatPayCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1560AEF5DCEB3C2E614ACA8 /* WeChatPayCoordinator.swift */; };
 		F37053D926592BBDCCC4AAB8 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3348682DD5A84F91D553C6BA /* ProfileView.swift */; };
 		F6F3CAAB6B61BE508526C263 /* AppleSignInCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBF8E318E6C1D48C49ABFAA0 /* AppleSignInCoordinator.swift */; };
 		FDB6F44BDB15C85CB2BF05DD /* AuthDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1834BD6CE233300421A2C8F /* AuthDTO.swift */; };
@@ -77,20 +82,25 @@
 		02811E1FB9FE0F48E87C6ED9 /* HybridModerationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HybridModerationService.swift; sourceTree = "<group>"; };
 		062507A80BCACC829F743FAE /* CreditService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreditService.swift; sourceTree = "<group>"; };
 		0D8CCF9F4F5456AC8E94630E /* APIModerationClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIModerationClient.swift; sourceTree = "<group>"; };
+		13D9DF7A81F40BC52D080F2C /* AppCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppCatalog.swift; sourceTree = "<group>"; };
 		13DAFC7288570D536CF5B548 /* AuthSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthSessionTests.swift; sourceTree = "<group>"; };
 		13E17E67BD70A4FD39C8A2DC /* TokenStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenStoreTests.swift; sourceTree = "<group>"; };
 		1FF03BAEB72A56CFE6283799 /* ModerationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModerationTests.swift; sourceTree = "<group>"; };
 		2C940FDF0D6D4B02E03CFD7E /* ReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewView.swift; sourceTree = "<group>"; };
+		30E1C8C508469734A60262FC /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		3218FC9B8690CE90A5813155 /* MessagesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagesView.swift; sourceTree = "<group>"; };
 		32E80B2F111798E5AF4A8DC5 /* TalkAndTalk.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = TalkAndTalk.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3348682DD5A84F91D553C6BA /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
 		363DCDF5566BD9FCFECC733D /* TokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenStore.swift; sourceTree = "<group>"; };
+		386B51ED76DC7271912EFA03 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 		392FE95B480426F77701CDC0 /* TalkAndTalkApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TalkAndTalkApp.swift; sourceTree = "<group>"; };
 		45B56637DD1304D85224005F /* SharedViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedViews.swift; sourceTree = "<group>"; };
 		5020F25F640675828F21E1CE /* CompanionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionDetailView.swift; sourceTree = "<group>"; };
 		51F1133260FDA37354A743ED /* TalkAndTalkUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TalkAndTalkUITests.swift; sourceTree = "<group>"; };
 		53C782BEDC76786409DCC7C2 /* CompanionHomepageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionHomepageView.swift; sourceTree = "<group>"; };
 		5437FBCE2ED1922E0FDFFAB4 /* CompanionListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionListView.swift; sourceTree = "<group>"; };
+		5A57141CEC4C4E749C4B2676 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
+		5A6477B74715507A1104BE31 /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
 		5CD87BBB9699358FF42C6C09 /* OrderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrderView.swift; sourceTree = "<group>"; };
 		5E605DC8006E9FCCFE36D0FD /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 		5F2CEA87CEF6D8015A2B2E77 /* ModerationConfig.example.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = ModerationConfig.example.plist; sourceTree = "<group>"; };
@@ -112,6 +122,7 @@
 		D4C7B5A8F5944B691DC285D3 /* LoginStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginStateTests.swift; sourceTree = "<group>"; };
 		D9D33707B48743328A9E03D2 /* OrdersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrdersView.swift; sourceTree = "<group>"; };
 		DDA3918A52F3CD3042DA07B2 /* NotificationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsView.swift; sourceTree = "<group>"; };
+		E1560AEF5DCEB3C2E614ACA8 /* WeChatPayCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeChatPayCoordinator.swift; sourceTree = "<group>"; };
 		E263317F08697595B130FB5D /* ModerationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModerationService.swift; sourceTree = "<group>"; };
 		E318D1532BA33F6CC4EBB232 /* BackendConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendConfig.swift; sourceTree = "<group>"; };
 		ED8AD8B6D2BC8036E23BC976 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
@@ -123,6 +134,18 @@
 		FBF8E318E6C1D48C49ABFAA0 /* AppleSignInCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSignInCoordinator.swift; sourceTree = "<group>"; };
 		FCB553A9D165F3912587BB17 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		D72F3BE12FFA0781F09DC918 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5D04CD58F3A70B98A7C5AD2A /* WechatOpenSDK in Frameworks */,
+				BA9CC4FCCD7713B1797DC79F /* WebKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		013802AA42693921EC6652FA /* Profile */ = {
@@ -138,10 +161,12 @@
 		0234AB4592A7537F3FE9226A = {
 			isa = PBXGroup;
 			children = (
+				974C7A309FEB5869859F4F81 /* Config */,
 				071AA4C83EAA4CAD306C1181 /* Resources */,
 				DB6F7034086EBB8FDF3750ED /* Sources */,
 				46CCA859C30524C990A86B6C /* Tests */,
 				365CAADD2E92BDD3C864C45D /* UITests */,
+				2C6ECC42F788D4730F31559D /* Frameworks */,
 				C0F91BEE52CD29F4F81EF344 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -157,6 +182,7 @@
 		071AA4C83EAA4CAD306C1181 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				30E1C8C508469734A60262FC /* Assets.xcassets */,
 				FCB553A9D165F3912587BB17 /* LaunchScreen.storyboard */,
 				5F2CEA87CEF6D8015A2B2E77 /* ModerationConfig.example.plist */,
 			);
@@ -188,6 +214,14 @@
 				BC62D953D307AB680378E63A /* LoginView.swift */,
 			);
 			path = Auth;
+			sourceTree = "<group>";
+		};
+		2C6ECC42F788D4730F31559D /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				5A6477B74715507A1104BE31 /* WebKit.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 		3336BD16582331189312E1A8 /* UI */ = {
@@ -266,6 +300,15 @@
 			path = Features;
 			sourceTree = "<group>";
 		};
+		974C7A309FEB5869859F4F81 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				5A57141CEC4C4E749C4B2676 /* Debug.xcconfig */,
+				386B51ED76DC7271912EFA03 /* Release.xcconfig */,
+			);
+			path = Config;
+			sourceTree = "<group>";
+		};
 		A488F49E80D517774174E7FA /* Moderation */ = {
 			isa = PBXGroup;
 			children = (
@@ -327,6 +370,7 @@
 			isa = PBXGroup;
 			children = (
 				C764869353423E79178BB4E3 /* WeChatPayClient.swift */,
+				E1560AEF5DCEB3C2E614ACA8 /* WeChatPayCoordinator.swift */,
 			);
 			path = Payments;
 			sourceTree = "<group>";
@@ -345,6 +389,7 @@
 		DF136D062D95ACAF8BD2CF4E /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				F3C2541D6D84B42E5319BFCE /* Catalog */,
 				0B2F10B85FCF66CE82DA8056 /* Models */,
 				3336BD16582331189312E1A8 /* UI */,
 			);
@@ -361,6 +406,14 @@
 				B7805F1913834A74CDA74FB0 /* Services */,
 			);
 			path = Data;
+			sourceTree = "<group>";
+		};
+		F3C2541D6D84B42E5319BFCE /* Catalog */ = {
+			isa = PBXGroup;
+			children = (
+				13D9DF7A81F40BC52D080F2C /* AppCatalog.swift */,
+			);
+			path = Catalog;
 			sourceTree = "<group>";
 		};
 		FAA6311B9D4D76D491C2D95F /* Messages */ = {
@@ -417,6 +470,7 @@
 			buildPhases = (
 				DA388CC8F0CE74E458A104AC /* Sources */,
 				8D99AF591F4BBBCD930A1538 /* Resources */,
+				D72F3BE12FFA0781F09DC918 /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -424,6 +478,7 @@
 			);
 			name = TalkAndTalk;
 			packageProductDependencies = (
+				B988DC50DABD932218177FF2 /* WechatOpenSDK */,
 			);
 			productName = TalkAndTalk;
 			productReference = 32E80B2F111798E5AF4A8DC5 /* TalkAndTalk.app */;
@@ -452,6 +507,9 @@
 			);
 			mainGroup = 0234AB4592A7537F3FE9226A;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				8A8DB8058A856323371B75B7 /* XCRemoteSwiftPackageReference "WechatOpenSDK" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = C0F91BEE52CD29F4F81EF344 /* Products */;
 			projectDirPath = "";
@@ -469,6 +527,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5187A08AA93DBCA5C80A0AAC /* Assets.xcassets in Resources */,
 				FF9D7B1BADCE9B22E67CAA88 /* LaunchScreen.storyboard in Resources */,
 				1BDA7B82C2D97AE2B0CDE6C7 /* ModerationConfig.example.plist in Resources */,
 			);
@@ -503,6 +562,7 @@
 			files = (
 				AFC3B4F23F7C3DE02FB796C1 /* APIModerationClient.swift in Sources */,
 				98047900BEEF7A46AB44DCBE /* AdminView.swift in Sources */,
+				E94DD7288271F6A9C47FA5B3 /* AppCatalog.swift in Sources */,
 				567779000564DDCCA22F448F /* AppStore.swift in Sources */,
 				F6F3CAAB6B61BE508526C263 /* AppleSignInCoordinator.swift in Sources */,
 				FDB6F44BDB15C85CB2BF05DD /* AuthDTO.swift in Sources */,
@@ -539,6 +599,7 @@
 				475E9D0887A2DDF7C445216C /* TokenStore.swift in Sources */,
 				B23779AE4B101CF005715ECA /* VerifyView.swift in Sources */,
 				B8D26328C1590E4DF65AEB77 /* WeChatPayClient.swift in Sources */,
+				F10E43C579EC5F063A4449CC /* WeChatPayCoordinator.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -658,14 +719,16 @@
 		};
 		AF6A664D62D84AF205C08B27 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 386B51ED76DC7271912EFA03 /* Release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = TalkAndTalk.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Resources/Info-Supplement.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Talk&Talk";
-				INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "用于拍摄并上传广场封面图，仅在你主动拍照时访问。";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "用于语音陪伴通话，仅在你主动发起或接听时使用麦克风。";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "用于在广场发布图片时选择相册内容，仅在你主动选择图片时访问。";
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
@@ -680,6 +743,7 @@
 				SWIFT_STRICT_CONCURRENCY = minimal;
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
+				WECHAT_URL_SCHEME = "wx$(WECHAT_APP_ID)";
 			};
 			name = Release;
 		};
@@ -776,14 +840,16 @@
 		};
 		F447FE37B6D96CCE9135C4D1 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 5A57141CEC4C4E749C4B2676 /* Debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = TalkAndTalk.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Resources/Info-Supplement.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Talk&Talk";
-				INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking = YES;
 				INFOPLIST_KEY_NSCameraUsageDescription = "用于拍摄并上传广场封面图，仅在你主动拍照时访问。";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "用于语音陪伴通话，仅在你主动发起或接听时使用麦克风。";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "用于在广场发布图片时选择相册内容，仅在你主动选择图片时访问。";
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
@@ -798,6 +864,7 @@
 				SWIFT_STRICT_CONCURRENCY = minimal;
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
+				WECHAT_URL_SCHEME = "wx$(WECHAT_APP_ID)";
 			};
 			name = Debug;
 		};
@@ -841,6 +908,25 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		8A8DB8058A856323371B75B7 /* XCRemoteSwiftPackageReference "WechatOpenSDK" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/yanyin1986/WechatOpenSDK.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.0.5;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		B988DC50DABD932218177FF2 /* WechatOpenSDK */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 8A8DB8058A856323371B75B7 /* XCRemoteSwiftPackageReference "WechatOpenSDK" */;
+			productName = WechatOpenSDK;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 788E5DF5F57A9A612D79C7F3 /* Project object */;
 }

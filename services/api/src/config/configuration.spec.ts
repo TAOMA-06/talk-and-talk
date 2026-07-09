@@ -10,7 +10,36 @@ describe("validateEnvironment", () => {
     expect(env.CORS_ORIGINS).toContain("http://localhost:3000");
     expect(env.DEEPSEEK_URL).toBe("https://api.deepseek.com");
     expect(env.DEEPSEEK_MODEL).toBe("deepseek-chat");
+    expect(env.APP_ENV).toBe("development");
     expect(env.SMS_PROVIDER).toBe("mock");
+    expect(env.SEED_ON_STARTUP).toBe(false);
+  });
+
+  it("defaults staging app env and seed flag", () => {
+    const env = validateEnvironment({
+      NODE_ENV: "production",
+      APP_ENV: "staging",
+      CORS_ORIGINS: "https://api-staging.example.com",
+      JWT_ACCESS_SECRET: "staging-access",
+      JWT_REFRESH_SECRET: "staging-refresh"
+    });
+
+    expect(env.APP_ENV).toBe("staging");
+    expect(env.SEED_ON_STARTUP).toBe(true);
+    expect(env.SMS_PROVIDER).toBe("mock");
+  });
+
+  it("rejects mock sms in production app env", () => {
+    expect(() =>
+      validateEnvironment({
+        NODE_ENV: "production",
+        APP_ENV: "production",
+        CORS_ORIGINS: "https://api.example.com",
+        JWT_ACCESS_SECRET: "prod-access",
+        JWT_REFRESH_SECRET: "prod-refresh",
+        SMS_PROVIDER: "mock"
+      })
+    ).toThrow("SMS_PROVIDER=mock");
   });
 
   it("rejects invalid ports", () => {

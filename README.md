@@ -55,6 +55,21 @@ Docker 启动 API、Postgres、Redis：
 docker compose up --build
 ```
 
+Staging / 生产部署：
+
+```bash
+# Production (default loads services/api/.env.production into the API container)
+cp services/api/.env.production.example services/api/.env.production
+docker compose -f docker-compose.prod.yml up -d --build
+
+# Staging — override container env file explicitly
+cp services/api/.env.staging.example services/api/.env.staging
+DEPLOY_ENV_FILE=./services/api/.env.staging \
+  docker compose -f docker-compose.prod.yml --env-file services/api/.env.staging up -d --build
+```
+
+验收与回滚见 [docs/staging-acceptance.md](./docs/staging-acceptance.md)、[docs/deploy-rollback.md](./docs/deploy-rollback.md)。
+
 ## 仓库结构
 
 | 路径 | 说明 |

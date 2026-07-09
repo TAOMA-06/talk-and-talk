@@ -1,4 +1,10 @@
 name: TalkAndTalk
+
+packages:
+  WechatOpenSDK:
+    url: https://github.com/yanyin1986/WechatOpenSDK.git
+    from: 2.0.5
+
 targets:
   TalkAndTalk:
     type: application
@@ -6,22 +12,37 @@ targets:
     deploymentTarget: "18.0"
     sources:
       - Sources
-      - Resources
+      - path: Resources
+        excludes:
+          - Info-Supplement.plist
+          - Info.plist
+    configFiles:
+      Debug: Config/Debug.xcconfig
+      Release: Config/Release.xcconfig
+    dependencies:
+      - package: WechatOpenSDK
+      - sdk: WebKit.framework
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.talkandtalk.app
         PRODUCT_NAME: TalkAndTalk
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_FILE: Resources/Info-Supplement.plist
         INFOPLIST_KEY_CFBundleDisplayName: Talk&Talk
         INFOPLIST_KEY_UILaunchStoryboardName: LaunchScreen
-        INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking: YES
         INFOPLIST_KEY_NSPhotoLibraryUsageDescription: 用于在广场发布图片时选择相册内容，仅在你主动选择图片时访问。
         INFOPLIST_KEY_NSCameraUsageDescription: 用于拍摄并上传广场封面图，仅在你主动拍照时访问。
+        INFOPLIST_KEY_NSMicrophoneUsageDescription: 用于语音陪伴通话，仅在你主动发起或接听时使用麦克风。
         SWIFT_VERSION: "6.0"
         TARGETED_DEVICE_FAMILY: "1,2"
         SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
         SWIFT_STRICT_CONCURRENCY: minimal
-        GENERATE_INFOPLIST_FILE: YES
         CODE_SIGN_ENTITLEMENTS: TalkAndTalk.entitlements
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        WECHAT_URL_SCHEME: wx$(WECHAT_APP_ID)
+    scheme:
+      testTargets:
+        - TalkAndTalkTests
   TalkAndTalkTests:
     type: bundle.unit-test
     platform: iOS

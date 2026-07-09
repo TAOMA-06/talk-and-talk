@@ -1,7 +1,9 @@
 type NodeEnv = "development" | "test" | "production";
+type AppEnv = "development" | "staging" | "production";
 
 interface Environment {
   NODE_ENV: NodeEnv;
+  APP_ENV: AppEnv;
   PORT: number;
   API_PREFIX: string;
   APP_VERSION: string;
@@ -21,10 +23,12 @@ interface Environment {
   WECHAT_PAY_API_V3_KEY: string;
   WECHAT_PAY_PRIVATE_KEY_PATH: string;
   WECHAT_PAY_CERT_SERIAL_NO: string;
+  WECHAT_PAY_NOTIFY_BASE_URL: string;
   APPLE_SIGN_IN_BUNDLE_ID: string;
   SMS_PROVIDER: string;
   RATE_LIMIT_PER_MINUTE: number;
   BODY_SIZE_LIMIT: string;
+  SEED_ON_STARTUP: boolean;
 }
 
 const DEFAULT_DATABASE_URL = "postgres://talk:talk@localhost:5432/talk_and_talk";
@@ -59,6 +63,34 @@ function parseNodeEnv(value: string | undefined): NodeEnv {
   throw new Error("NODE_ENV must be development, test, or production");
 }
 
+function parseAppEnv(value: string | undefined, nodeEnv: NodeEnv): AppEnv {
+  const appEnv = value?.trim();
+  if (appEnv === "development" || appEnv === "staging" || appEnv === "production") {
+    return appEnv;
+  }
+  if (nodeEnv === "test") {
+    return "development";
+  }
+  if (nodeEnv === "production") {
+    return "production";
+  }
+  return "development";
+}
+
+function parseBoolean(value: string | undefined, fallback = false): boolean {
+  if (value === undefined || value.trim() === "") {
+    return fallback;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalized)) {
+    return true;
+  }
+  if (["0", "false", "no", "off"].includes(normalized)) {
+    return false;
+  }
+  throw new Error(`Invalid boolean value: ${value}`);
+}
+
 function requiredUrl(name: string, value: string | undefined, fallback: string): string {
   const candidate = value?.trim() || fallback;
   try {
@@ -69,11 +101,24 @@ function requiredUrl(name: string, value: string | undefined, fallback: string):
   return candidate;
 }
 
+function optionalUrl(value: string | undefined): string {
+  const candidate = value?.trim() ?? "";
+  if (!candidate) {
+    return "";
+  }
+  try {
+    new URL(candidate);
+  } catch {
+    throw new Error("WECHAT_PAY_NOTIFY_BASE_URL must be a valid URL when set");
+  }
+  return candidate.replace(/\/+$/, "");
+}
+
 function optionalString(value: string | undefined): string {
   return value?.trim() ?? "";
 }
 
-function parseCorsOrigins(value: string | undefined, nodeEnv: NodeEnv): string[] {
+function parseCorsOrigins(value: string | undefined, nodeEnv: NodeEnv, appEnv: AppEnv): string[] {
   const rawOrigins = value
     ?.split(",")
     .map((origin) => origin.trim())
@@ -83,33 +128,47 @@ function parseCorsOrigins(value: string | undefined, nodeEnv: NodeEnv): string[]
     return [...new Set(rawOrigins)];
   }
 
-  if (nodeEnv === "production") {
+  if (nodeEnv === "production" || appEnv === "production") {
     throw new Error("CORS_ORIGINS must be explicitly configured in production");
   }
 
   return DEFAULT_DEVELOPMENT_CORS_ORIGINS;
 }
 
+function defaultSmsProvider(appEnv: AppEnv): string {
+  if (appEnv === "production") {
+    return "none";
+  }
+  return "mock";
+}
+
 export function validateEnvironment(raw: Record<string, unknown>): Environment {
   const env = raw as Record<string, string | undefined>;
   const nodeEnv = parseNodeEnv(env.NODE_ENV);
+  const appEnv = parseAppEnv(env.APP_ENV, nodeEnv);
   const apiPrefix = env.API_PREFIX?.trim() || "api/v1";
 
   const jwtAccessSecret = env.JWT_ACCESS_SECRET?.trim() || (nodeEnv === "production" ? "" : "dev-access-secret");
   const jwtRefreshSecret = env.JWT_REFRESH_SECRET?.trim() || (nodeEnv === "production" ? "" : "dev-refresh-secret");
 
-  if (nodeEnv === "production" && (!jwtAccessSecret || !jwtRefreshSecret)) {
+  if ((nodeEnv === "production" || appEnv === "production") && (!jwtAccessSecret || !jwtRefreshSecret)) {
     throw new Error("JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must be set in production");
+  }
+
+  const smsProvider = env.SMS_PROVIDER?.trim() || defaultSmsProvider(appEnv);
+  if (appEnv === "production" && smsProvider === "mock") {
+    throw new Error("SMS_PROVIDER=mock is not allowed when APP_ENV=production");
   }
 
   return {
     NODE_ENV: nodeEnv,
+    APP_ENV: appEnv,
     PORT: parsePort(env.PORT),
     API_PREFIX: apiPrefix.replace(/^\/+|\/+$/g, ""),
     APP_VERSION: env.APP_VERSION?.trim() || "0.1.0",
     DATABASE_URL: requiredUrl("DATABASE_URL", env.DATABASE_URL, DEFAULT_DATABASE_URL),
     REDIS_URL: requiredUrl("REDIS_URL", env.REDIS_URL, DEFAULT_REDIS_URL),
-    CORS_ORIGINS: parseCorsOrigins(env.CORS_ORIGINS, nodeEnv),
+    CORS_ORIGINS: parseCorsOrigins(env.CORS_ORIGINS, nodeEnv, appEnv),
     JWT_ACCESS_SECRET: jwtAccessSecret,
     JWT_REFRESH_SECRET: jwtRefreshSecret,
     JWT_ACCESS_TTL: env.JWT_ACCESS_TTL?.trim() || "15m",
@@ -123,10 +182,12 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     WECHAT_PAY_API_V3_KEY: optionalString(env.WECHAT_PAY_API_V3_KEY),
     WECHAT_PAY_PRIVATE_KEY_PATH: optionalString(env.WECHAT_PAY_PRIVATE_KEY_PATH),
     WECHAT_PAY_CERT_SERIAL_NO: optionalString(env.WECHAT_PAY_CERT_SERIAL_NO),
+    WECHAT_PAY_NOTIFY_BASE_URL: optionalUrl(env.WECHAT_PAY_NOTIFY_BASE_URL),
     APPLE_SIGN_IN_BUNDLE_ID: optionalString(env.APPLE_SIGN_IN_BUNDLE_ID),
-    SMS_PROVIDER: env.SMS_PROVIDER?.trim() || (nodeEnv === "production" ? "none" : "mock"),
+    SMS_PROVIDER: smsProvider,
     RATE_LIMIT_PER_MINUTE: parseInt(env.RATE_LIMIT_PER_MINUTE ?? "120", 10) || 120,
-    BODY_SIZE_LIMIT: env.BODY_SIZE_LIMIT?.trim() || "1mb"
+    BODY_SIZE_LIMIT: env.BODY_SIZE_LIMIT?.trim() || "1mb",
+    SEED_ON_STARTUP: parseBoolean(env.SEED_ON_STARTUP, appEnv === "staging")
   };
 }
 

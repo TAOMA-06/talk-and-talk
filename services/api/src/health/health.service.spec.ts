@@ -1,5 +1,6 @@
 import { ConfigService } from "@nestjs/config";
 
+import { MetricsService } from "../metrics/metrics.service";
 import { HealthService } from "./health.service";
 
 jest.mock("pg", () => ({
@@ -16,6 +17,7 @@ function config(): ConfigService {
     getOrThrow: jest.fn((key: string) => {
       const values: Record<string, string> = {
         APP_VERSION: "9.9.9",
+        APP_ENV: "staging",
         DATABASE_URL: "postgres://test:test@localhost:5432/test",
         REDIS_URL: "redis://localhost:6379"
       };
@@ -41,10 +43,12 @@ describe("HealthService", () => {
       disconnect: jest.fn()
     }));
 
-    const result = await new HealthService(config()).check();
+    const result = await new HealthService(config(), new MetricsService()).check();
 
     expect(result.status).toBe("ok");
     expect(result.version).toBe("9.9.9");
+    expect(result.appEnv).toBe("staging");
+    expect(result.metrics.requestsTotal).toBe(0);
     expect(result.dependencies.database.status).toBe("ok");
     expect(result.dependencies.redis.status).toBe("ok");
   });
@@ -61,7 +65,7 @@ describe("HealthService", () => {
       disconnect: jest.fn()
     }));
 
-    const result = await new HealthService(config()).check();
+    const result = await new HealthService(config(), new MetricsService()).check();
 
     expect(result.status).toBe("degraded");
     expect(result.dependencies.database.status).toBe("error");

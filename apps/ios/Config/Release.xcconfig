@@ -1,0 +1,3 @@
+#include "Shared.xcconfig"
+
+BACKEND_BASE_URL = https:/$()/api.talkandtalk.app

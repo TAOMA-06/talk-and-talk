@@ -1,0 +1,15 @@
+{
+  "originHash" : "9eeece30a8dcefbfc1a0e208b187969a7e114d140e0c08fb8d51e37d01cdd852",
+  "pins" : [
+    {
+      "identity" : "wechatopensdk",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/yanyin1986/WechatOpenSDK.git",
+      "state" : {
+        "revision" : "291a3f40fd03ce23d193e7b761d79bcbb12eb8a9",
+        "version" : "2.0.7"
+      }
+    }
+  ],
+  "version" : 3
+}

@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 
 import { AuditService } from "../common/audit/audit.service";
 import { AppException } from "../common/errors/app.exception";
+import { MetricsService } from "../metrics/metrics.service";
 import { PrismaService } from "../database/prisma.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { OrdersService } from "../orders/orders.service";
@@ -30,7 +31,8 @@ export class PaymentsService {
     @Inject(forwardRef(() => OrdersService)) private readonly ordersService: OrdersService,
     @Inject(WECHAT_PAY_PROVIDER) private readonly wechat: WeChatPayProvider,
     private readonly notifications: NotificationsService,
-    private readonly audit: AuditService
+    private readonly audit: AuditService,
+    private readonly metrics: MetricsService
   ) {}
 
   async prepay(userId: string, orderId: string) {
@@ -129,20 +131,27 @@ export class PaymentsService {
     headers: Record<string, string | string[] | undefined>,
     rawBody: string
   ) {
-    if (!this.wechat.verifyNotifySignature(headers, rawBody)) {
-      throw new AppException(
-        "WECHAT_SIGN_INVALID",
-        "WeChat notify signature verification failed",
-        HttpStatus.UNAUTHORIZED
-      );
-    }
+    try {
+      if (!this.wechat.verifyNotifySignature(headers, rawBody)) {
+        throw new AppException(
+          "WECHAT_SIGN_INVALID",
+          "WeChat notify signature verification failed",
+          HttpStatus.UNAUTHORIZED
+        );
+      }
 
-    const payload = this.wechat.parseNotifyPayload(rawBody);
-    return this.fulfillPayment(payload);
+      const payload = this.wechat.parseNotifyPayload(rawBody);
+      const result = await this.fulfillPayment(payload);
+      this.metrics.recordWechatNotifySuccess();
+      return result;
+    } catch (error) {
+      this.metrics.recordWechatNotifyFailure();
+      throw error;
+    }
   }
 
   async mockNotify(userId: string, body: { outTradeNo: string; amountCents?: number; transactionId?: string }) {
-    if (this.config.getOrThrow<string>("NODE_ENV") === "production") {
+    if (this.config.getOrThrow<string>("APP_ENV") === "production") {
       throw new AppException(
         "MOCK_PAY_DISABLED",
         "Mock WeChat notify is disabled in production",
@@ -365,7 +374,8 @@ export class PaymentsService {
 
   private buildNotifyUrl(): string {
     const prefix = this.config.getOrThrow<string>("API_PREFIX");
-    // Absolute notify URL is merchant-dashboard specific; relative path is enough for mock.
-    return `/${prefix}/payments/wechat/notify`;
+    const baseUrl = this.config.get<string>("WECHAT_PAY_NOTIFY_BASE_URL")?.trim();
+    const path = `/${prefix}/payments/wechat/notify`;
+    return baseUrl ? `${baseUrl}${path}` : path;
   }
 }

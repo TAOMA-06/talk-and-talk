@@ -348,7 +348,11 @@ private struct SecureChatHeader: View {
     }
 
     private var backendStatusText: String {
+        #if DEBUG
         guard usesBackendChat else { return "本地保护" }
+        #else
+        guard usesBackendChat else { return "" }
+        #endif
         if isSyncing { return "同步中" }
         if isBackendConnected { return "服务已连接" }
         return "服务准备中"

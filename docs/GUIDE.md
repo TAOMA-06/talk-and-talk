@@ -102,11 +102,26 @@ http://localhost:3000/admin/
 
 开发账号：`13800000001`（admin）、`13800000002`（moderator）。`SMS_PROVIDER=mock` 时验证码见 API 日志。
 
-Docker：
+Docker（本地）：
 
 ```bash
 docker compose up --build
 ```
+
+Staging 部署：
+
+```bash
+cp services/api/.env.staging.example services/api/.env.staging
+DEPLOY_ENV_FILE=./services/api/.env.staging \
+  docker compose -f docker-compose.prod.yml --env-file services/api/.env.staging up -d --build
+./services/api/scripts/acceptance-smoke.sh https://api-staging.talkandtalk.app
+```
+
+生产部署默认加载 `services/api/.env.production`（见 `docker-compose.prod.yml` 中 `DEPLOY_ENV_FILE`）。
+
+环境变量：`APP_ENV`（development/staging/production）控制 mock 支付与 seed；`GET /api/v1/health` 返回 metrics 快照。
+
+iOS：Debug 默认 `http://127.0.0.1:3000`（[`Config/Debug.xcconfig`](../apps/ios/Config/Debug.xcconfig)）；Release 默认 `https://api.talkandtalk.app`。TestFlight 前在 `Config/Shared.xcconfig` 填写 `WECHAT_APP_ID` 与 Apple Team。
 
 ### iOS
 

@@ -101,10 +101,18 @@ Completed:
 - User reports: `POST /moderation/reports`
 - Web ops console at `/admin/` (static)
 
+Deployment:
+
+- `APP_ENV`：`development` / `staging` / `production`（控制 mock 支付、SMS、seed）
+- `GET /api/v1/health` 含依赖状态与运行时 metrics
+- `GET /api/v1/metrics` Prometheus 文本格式
+- `docker compose -f ../../docker-compose.prod.yml` + `deploy/nginx/` 示例
+- `scripts/db-backup.sh`、`scripts/acceptance-smoke.sh`
+
 Not implemented yet:
 
-- Orders, payments, notifications product APIs
-- Real SMS (Aliyun/Tencent), WeChat Pay production wiring
+- Real SMS (Aliyun/Tencent) production providers
+- WeChat Pay 生产验签证书自动化挂载
 
 Web 审核后台：启动后打开 `http://localhost:3000/admin/`。Seed 账号见 [docs/admin-moderation-api.md](../../docs/admin-moderation-api.md)。
 

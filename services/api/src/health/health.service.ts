@@ -5,6 +5,8 @@ import { ConfigService } from "@nestjs/config";
 import Redis from "ioredis";
 import { Pool } from "pg";
 
+import { MetricsService, MetricsSnapshot } from "../metrics/metrics.service";
+
 export type DependencyStatus = {
   status: "ok" | "error";
   latencyMs: number;
@@ -15,16 +17,21 @@ export type HealthResponse = {
   status: "ok" | "degraded";
   service: "talk-and-talk-api";
   version: string;
+  appEnv: string;
   uptimeSeconds: number;
   dependencies: {
     database: DependencyStatus;
     redis: DependencyStatus;
   };
+  metrics: MetricsSnapshot;
 };
 
 @Injectable()
 export class HealthService {
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    private readonly metrics: MetricsService
+  ) {}
 
   async check(): Promise<HealthResponse> {
     const [database, redis] = await Promise.all([
@@ -37,11 +44,13 @@ export class HealthService {
       status: healthy ? "ok" : "degraded",
       service: "talk-and-talk-api",
       version: this.config.getOrThrow<string>("APP_VERSION"),
+      appEnv: this.config.getOrThrow<string>("APP_ENV"),
       uptimeSeconds: Math.round(process.uptime()),
       dependencies: {
         database,
         redis
-      }
+      },
+      metrics: this.metrics.snapshot()
     };
   }
 

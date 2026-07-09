@@ -6,6 +6,7 @@ struct TalkAndTalkApp: App {
     @StateObject private var appStore: AppStore
 
     init() {
+        WeChatPayCoordinator.shared.registerIfNeeded()
         let tokenStore = KeychainTokenStore()
         let session = AuthSession(tokenStore: tokenStore)
         _authSession = StateObject(wrappedValue: session)
@@ -29,6 +30,12 @@ struct TalkAndTalkApp: App {
             RootView()
                 .environmentObject(authSession)
                 .environmentObject(appStore)
+                .onOpenURL { url in
+                    _ = WeChatPayCoordinator.shared.handleOpenURL(url)
+                }
+                .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
+                    _ = WeChatPayCoordinator.shared.handleUniversalLink(activity)
+                }
                 .task {
                     await authSession.bootstrap()
                     if case .authenticated(let user) = authSession.state {

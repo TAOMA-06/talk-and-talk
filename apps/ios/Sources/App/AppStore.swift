@@ -17,12 +17,9 @@ final class AppStore: ObservableObject {
     @Published var messagesPath = NavigationPath()
     @Published var profilePath = NavigationPath()
 
+    #if DEBUG
     @Published var user = MockData.user
-#if DEBUG
     @Published var companions = MockData.companions
-#else
-    @Published var companions: [Companion] = []
-#endif
     @Published var themes = MockData.themes
     @Published var orders = MockData.orders
     @Published var reviews = MockData.reviews
@@ -30,6 +27,17 @@ final class AppStore: ObservableObject {
     @Published var moderationCases = MockData.moderationCases
     @Published var communityPosts = MockData.communityPosts
     @Published var creditEvents: [CreditEvent] = MockData.initialCreditEvents
+    #else
+    @Published var user = AppCatalog.placeholderUser
+    @Published var companions: [Companion] = []
+    @Published var themes = AppCatalog.themes
+    @Published var orders: [Order] = []
+    @Published var reviews: [Review] = []
+    @Published var messages: [Message] = []
+    @Published var moderationCases: [ModerationCase] = []
+    @Published var communityPosts: [CommunityPost] = []
+    @Published var creditEvents: [CreditEvent] = []
+    #endif
     @Published var activeOrderId: String?
     @Published var trialMessageCountsByCompanionId: [String: Int] = [:]
     @Published var lastModerationFeedback: String?
@@ -283,7 +291,11 @@ final class AppStore: ObservableObject {
         await refreshBackendConnection()
 
         guard isBackendConnected else {
+            #if DEBUG
             lastModerationFeedback = "服务暂时不可用，已切换本地聊天保护。"
+            #else
+            lastModerationFeedback = "服务暂时不可用，请稍后重试。"
+            #endif
             return
         }
 
@@ -296,7 +308,11 @@ final class AppStore: ObservableObject {
             upsertBackendConversationSummary(for: .companion(id: companionId))
         } catch {
             isBackendConnected = false
+            #if DEBUG
             lastModerationFeedback = "消息同步失败，已切换本地聊天保护。"
+            #else
+            lastModerationFeedback = userFacingMessage(for: error)
+            #endif
         }
     }
 

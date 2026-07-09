@@ -1,6 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 
+import { MetricsService } from "../../metrics/metrics.service";
 import { ModerationContext } from "../rule-engine";
 import { AIModerationResult, AIProvider } from "./ai-provider.interface";
 
@@ -8,7 +9,10 @@ import { AIModerationResult, AIProvider } from "./ai-provider.interface";
 export class DeepSeekAIProvider implements AIProvider {
   private readonly logger = new Logger(DeepSeekAIProvider.name);
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    private readonly metrics: MetricsService
+  ) {}
 
   async moderate(text: string, _context?: ModerationContext): Promise<AIModerationResult> {
     const apiKey = this.config.get<string>("DEEPSEEK_API_KEY")?.trim();
@@ -50,6 +54,7 @@ export class DeepSeekAIProvider implements AIProvider {
 
       if (!response.ok) {
         this.logger.warn(`DeepSeek moderation failed with status ${response.status}`);
+        this.metrics.recordAiFailure();
         return { score: 0.05, reasons: [], available: false };
       }
 
@@ -66,6 +71,7 @@ export class DeepSeekAIProvider implements AIProvider {
       return { score, reasons, available: true };
     } catch (error) {
       this.logger.warn(`DeepSeek moderation unavailable: ${error instanceof Error ? error.message : "unknown"}`);
+      this.metrics.recordAiFailure();
       return { score: 0.05, reasons: [], available: false };
     }
   }

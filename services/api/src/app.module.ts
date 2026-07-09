@@ -11,6 +11,8 @@ import { RequestIdMiddleware } from "./common/middleware/request-id.middleware";
 import { IpRateLimitMiddleware } from "./common/rate-limit/ip-rate-limit.middleware";
 import { DatabaseModule } from "./database/database.module";
 import { HealthModule } from "./health/health.module";
+import { MetricsModule } from "./metrics/metrics.module";
+import { RequestMetricsMiddleware } from "./metrics/request-metrics.middleware";
 import { ModerationModule } from "./moderation/moderation.module";
 import { NotificationsModule } from "./notifications/notifications.module";
 import { OrdersModule } from "./orders/orders.module";
@@ -35,12 +37,15 @@ import { UsersModule } from "./users/users.module";
     PaymentsModule,
     AdminModule,
     NotificationsModule,
+    MetricsModule,
     HealthModule
   ],
   providers: [IpRateLimitMiddleware]
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(RequestIdMiddleware, IpRateLimitMiddleware).forRoutes("*");
+    consumer
+      .apply(RequestIdMiddleware, RequestMetricsMiddleware, IpRateLimitMiddleware)
+      .forRoutes("*");
   }
 }

@@ -1,6 +1,7 @@
 import Foundation
 
 enum BackendConfig {
+    /// Companions verified for backend chat/moderation sync (expand as API coverage grows).
     static let supportedCompanionIds: Set<String> = ["c1", "c2", "c3"]
     #if DEBUG
     static let defaultBaseURL = URL(string: "http://127.0.0.1:3000")!
@@ -25,7 +26,7 @@ enum BackendConfig {
     static var isEnabled: Bool { baseURL != nil }
 
     static func supportsChat(for companionId: String) -> Bool {
-        supportedCompanionIds.contains(companionId)
+        isEnabled && supportedCompanionIds.contains(companionId)
     }
 
     static func supportsChat(for target: ContactTarget) -> Bool {
