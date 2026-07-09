@@ -56,14 +56,16 @@ final class WeChatPayCoordinator: NSObject, ObservableObject {
         request.timeStamp = UInt32(params.timeStamp) ?? 0
         request.sign = params.sign
 
-        try await withCheckedThrowingContinuation { continuation in
-            payContinuation = continuation
-            WXApi.sendReq(request) { success in
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            self.payContinuation = continuation
+            WXApi.send(request) { [weak self] success in
                 Task { @MainActor in
-                    guard payContinuation != nil else { return }
+                    guard let self else { return }
+                    guard self.payContinuation != nil else { return }
                     guard success else {
-                        payContinuation = nil
+                        self.payContinuation = nil
                         continuation.resume(throwing: WeChatPayError.failed("无法调起微信支付"))
+                        return
                     }
                 }
             }
@@ -82,8 +84,8 @@ extension WeChatPayCoordinator: WXApiDelegate {
         let errMessage = (resp as? PayResp)?.errStr ?? ""
 
         Task { @MainActor in
-            guard let continuation = payContinuation else { return }
-            payContinuation = nil
+            guard let continuation = self.payContinuation else { return }
+            self.payContinuation = nil
 
             guard isPayResponse else {
                 continuation.resume(throwing: WeChatPayError.failed("未知微信支付响应"))

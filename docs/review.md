@@ -1,10 +1,12 @@
-# Talk&Talk iOS Demo 代码总览
+# Talk&Talk iOS 代码总览（历史笔记）
 
-> **架构与「AI 识别干什么」请以 [GUIDE.md](./GUIDE.md) 为准。** 本文档侧重 iOS 逐文件说明；当前 Phase 1 只连接正式后端 health，聊天与审核仍由 App 本地逻辑兜底。
+> **STALE — 勿作 v0.1 验收依据。**  
+> 产品边界、后端能力与启动方式以 [GUIDE.md](./GUIDE.md)、根 [README.md](../README.md)、[NEXT_PHASE.md](../NEXT_PHASE.md) 为准。  
+> 下文可能仍描述早期「纯本地演示」状态，与当前正式后端 + 登录门控不一致。
 
 ## 1. 项目概述
 
-Talk&Talk 是一个面向 iOS 18+ 的 SwiftUI 前端演示应用，模拟“女性友好的线上陪伴服务”平台。当前版本完全本地运行，不连接真实后端、不采集真实身份、不发起真实支付。
+Talk&Talk 是面向 iOS 18+ 的 SwiftUI 应用。当前主工程连接 NestJS `/api/v1`（登录、发现、订单、聊天审核等）；社区等能力仍可能本地。详见 GUIDE。
 
 核心功能：
 - 发现陪伴者（按主题、距离、价格、在线状态筛选）

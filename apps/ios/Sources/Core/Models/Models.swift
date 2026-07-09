@@ -224,6 +224,25 @@ struct AgreementPrompt: Identifiable, Equatable {
     let strikeNumber: Int
 }
 
+enum LegalURLs {
+    /// Hosted copies for App Store Connect and in-app “在浏览器打开”.
+    /// Resolved against the active backend host when possible.
+    static var privacyPolicy: URL {
+        url(path: "/legal/privacy.html")
+    }
+
+    static var userAgreement: URL {
+        url(path: "/legal/terms.html")
+    }
+
+    private static func url(path: String) -> URL {
+        if let base = BackendConfig.baseURL {
+            return base.appending(path: path)
+        }
+        return URL(string: "https://api.talkandtalk.app\(path)")!
+    }
+}
+
 enum PlatformAgreement {
     static let title = "Talk&Talk 用户协议与安全规范"
     static let sections: [(String, String)] = [

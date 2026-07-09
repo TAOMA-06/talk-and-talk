@@ -103,7 +103,7 @@ struct OrderView: View {
                     case .cancelled:
                         errorMessage = "已取消支付"
                     case .notConfigured:
-                        errorMessage = "微信支付未配置"
+                        errorMessage = "微信支付未配置。请在 Config/Shared.xcconfig 填写 WECHAT_APP_ID，或使用已配置微信的正式构建。"
                     case .failed(let message):
                         errorMessage = message
                     }

@@ -8,7 +8,8 @@ This is the production NestJS backend for Talk&Talk. The old Node demo backend h
 cd services/api
 cp .env.example .env
 npm install
-npx prisma migrate deploy
+# Postgres + Redis must be reachable (e.g. docker compose up -d postgres redis)
+npm run prisma:migrate
 npm run start:dev
 ```
 
@@ -60,7 +61,7 @@ Errors use:
 ```bash
 npm run prisma:generate
 npm run prisma:migrate   # dev: create/apply migrations
-npm run prisma:deploy    # prod/docker: apply migrations
+npm run prisma:deploy    # prod/docker: apply committed migrations only
 ```
 
 ## Docker
@@ -79,27 +80,42 @@ Compose starts:
 
 ```bash
 npm run build
-npm test
-npm run test:e2e
+npm test                 # unit
+npm run test:e2e         # integration-level HTTP tests (alias: test:integration)
+npm run test:integration
 ```
 
-E2E auth tests require Postgres and Redis. Start dependencies with `docker compose up postgres redis` before running `npm run test:e2e`.
+E2E/integration tests require Postgres and Redis. Start dependencies with `docker compose up postgres redis` before running them.
+
+Acceptance smoke:
+
+```bash
+./scripts/acceptance-smoke.sh http://127.0.0.1:3000
+```
+
+## API contract (frozen v1)
+
+Machine-readable OpenAPI: [packages/contracts/openapi/v1.yaml](../../packages/contracts/openapi/v1.yaml)  
+Rules: [packages/contracts/README.md](../../packages/contracts/README.md)
 
 ## Current Capability
 
-Completed:
+Completed (v0.1 ship scope):
 
 - NestJS application entrypoint under `services/api`
 - Global `/api/v1` prefix, request ID, response envelopes
 - Environment validation, including JWT secrets in production
 - `GET /api/v1/health` with Postgres and Redis dependency checks
 - Prisma: users/auth, companions, conversations/messages, moderation cases/evidence/action logs, audit logs, labels
-- Auth: phone SMS login (mock provider), Apple login, JWT refresh/logout, `GET /users/me`
+- Auth: phone SMS login (mock provider), Apple login, JWT refresh/logout, `GET /users/me` / `/me`
 - RBAC: `admin` for companions management; `moderator`/`admin` for moderation ops
 - Chat send with RuleEngine + optional DeepSeek; case creation on non-allow
 - Admin Moderation API: overview, filtered queue, detail, conversation evidence, actions, labels export
 - User reports: `POST /moderation/reports`
+- Orders + WeChat prepay path (mock on staging/dev)
+- Notifications + account deletion request
 - Web ops console at `/admin/` (static)
+- Legal pages: `/legal/privacy.html`, `/legal/terms.html`
 
 Deployment:
 
@@ -108,11 +124,13 @@ Deployment:
 - `GET /api/v1/metrics` Prometheus 文本格式
 - `docker compose -f ../../docker-compose.prod.yml` + `deploy/nginx/` 示例
 - `scripts/db-backup.sh`、`scripts/acceptance-smoke.sh`
+- Production checklist: [docs/production-checklist.md](../../docs/production-checklist.md)
 
-Not implemented yet:
+Not implemented yet (see [NEXT_PHASE.md](../../NEXT_PHASE.md)):
 
 - Real SMS (Aliyun/Tencent) production providers
-- WeChat Pay 生产验签证书自动化挂载
+- WeChat Pay production prepay + platform-cert verification end-to-end
+- WeChat cert automation mount in compose
 
 Web 审核后台：启动后打开 `http://localhost:3000/admin/`。Seed 账号见 [docs/admin-moderation-api.md](../../docs/admin-moderation-api.md)。
 

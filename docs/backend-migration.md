@@ -77,39 +77,38 @@ Every JSON response must use:
 
 ## iOS Current Dependencies
 
-The iOS app currently depends on:
+Frozen contract: [packages/contracts/openapi/v1.yaml](../packages/contracts/openapi/v1.yaml).
 
 | Client | Route | Status |
 |---|---|---|
 | `AuthSession` / `BackendAuthClient` | Auth endpoints | Active — login required before main app |
 | `BackendClient.health()` | `GET /api/v1/health` | Active |
-| `BackendClient.fetchMessages(conversationId:)` | `GET /api/v1/conversations/:id/messages` | Backend may 404; App falls back locally |
-| `BackendClient.sendMessage(...)` | `POST /api/v1/conversations/:id/messages` | Backend may 404; App falls back locally |
-| `BackendClient.fetchModerationCases()` | `GET /api/v1/moderation/cases` | Active |
+| Companions / orders / payments / notifications | `/companions`, `/orders`, `/payments`, `/notifications` | Active |
+| `BackendClient.fetchMessages` / `sendMessage` | `/conversations/*` | Active for `c1`–`c3`; Release 失败不覆盖服务端决策；DEBUG 可本地兜底 |
+| Reports | `POST /moderation/reports` | Active |
+| `BackendClient.fetchModerationCases()` | `GET /api/v1/moderation/cases` | Staff only |
 
-Auth details: see [docs/auth-api.md](./auth-api.md).
+Auth details: [docs/auth-api.md](./auth-api.md).
 
-`BackendConfig.supportedCompanionIds` is `["c1", "c2", "c3"]`. These IDs are backend-capable from the iOS point of view, but local fallback remains required until compatibility routes exist.
+`BackendConfig.supportedCompanionIds` is `["c1", "c2", "c3"]`. Community square remains largely local (see [NEXT_PHASE.md](../NEXT_PHASE.md)).
 
-## Day 4 Compatibility Target
+## Compatibility shapes (implemented)
 
-Implement these before removing iOS local chat fallback:
-
-| Route | Request | Response data shape required by iOS |
+| Route | Request | Response data shape used by iOS |
 |---|---|---|
-| `GET /api/v1/conversations` | none | `{ conversations: [...] }` |
-| `GET /api/v1/conversations/:id/messages` | path `id` | `{ conversation, messages: BackendMessageDTO[] }` |
-| `POST /api/v1/conversations/:id/messages` | `{ content: string, senderId: string }` | `{ moderation, message, safetyMessage, companionReply, moderationCase, conversation }` |
-| `POST /api/v1/moderation/check` | `{ text: string, source?: string, conversationId?: string }` | `{ moderation }` |
-| `GET /api/v1/moderation/cases` | none | `{ cases: BackendModerationCaseDTO[] }` |
+| `GET /api/v1/conversations` | none | conversations list |
+| `GET /api/v1/conversations/:id/messages` | path `id` | conversation + messages |
+| `POST /api/v1/conversations/:id/messages` | `{ content, senderId? }` | moderation + message + safety/companion fields |
+| `POST /api/v1/moderation/check` | `{ text, source?, conversationId? }` | moderation |
+| `GET /api/v1/moderation/cases` | staff JWT | cases |
 
-Required DTO compatibility:
+DTO fields (stable for v1):
 
-- Message fields: `id`, `conversationId`, `senderId`, `senderName?`, `content`, `type`, `timestamp`
-- Moderation fields: `decision`, `riskLevel`, `score`, `reasons`, `matchedRules`, `usedAI`
-- Case fields: `id`, `title`, `category`, `riskLevel`, `status`, `source`, `content`, `targetId?`, `aiScore`, `aiReason`, `decision`, `matchedRules`, `usedAI`, `resolvedAt?`
+- Message: `id`, `conversationId`, `senderId`, `senderName?`, `content`, `type`, `timestamp`
+- Moderation: `decision`, `riskLevel`, `score`, `reasons`, `matchedRules`, `usedAI`
+- Case: `id`, `title`, `category`, `riskLevel`, `status`, `source`, `content`, `targetId?`, `aiScore`, `aiReason`, `decision`, `matchedRules`, `usedAI`, `resolvedAt?`
 
-The old demo used in-memory state. The production version must persist conversations, messages, and moderation cases in Postgres.
+Conversations, messages, and moderation cases persist in Postgres.
 
 ## Moderation pipeline
 

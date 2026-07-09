@@ -1,0 +1,999 @@
+openapi: 3.0.3
+info:
+  title: Talk&Talk API
+  version: 0.1.0
+  description: |
+    Frozen public contract for `/api/v1`.
+    All JSON responses use a uniform envelope (see components.schemas.SuccessEnvelope / ErrorEnvelope).
+    Breaking changes require `/api/v2` or coordinated release notes.
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Local development
+  - url: https://api-staging.talkandtalk.app/api/v1
+    description: Staging
+  - url: https://api.talkandtalk.app/api/v1
+    description: Production
+tags:
+  - name: health
+  - name: metrics
+  - name: auth
+  - name: users
+  - name: companions
+  - name: orders
+  - name: payments
+  - name: conversations
+  - name: moderation
+  - name: notifications
+  - name: admin
+  - name: admin-moderation
+paths:
+  /health:
+    get:
+      tags: [health]
+      summary: Service health
+      operationId: getHealth
+      security: []
+      responses:
+        "200":
+          description: Health snapshot (ok | degraded)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /metrics:
+    get:
+      tags: [metrics]
+      summary: Prometheus metrics text
+      operationId: getMetrics
+      security: []
+      responses:
+        "200":
+          description: Prometheus exposition format (text/plain)
+  /auth/sms/send-code:
+    post:
+      tags: [auth]
+      summary: Send SMS verification code
+      operationId: sendSmsCode
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone]
+              properties:
+                phone:
+                  type: string
+                  example: "13800138000"
+      responses:
+        "200":
+          description: Code sent (mock logs code in development/staging)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          expiresInSeconds:
+                            type: integer
+        "429":
+          $ref: "#/components/responses/Error"
+  /auth/phone/login:
+    post:
+      tags: [auth]
+      summary: Phone + code login
+      operationId: phoneLogin
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, code]
+              properties:
+                phone: { type: string }
+                code: { type: string }
+      responses:
+        "200":
+          description: Token pair + user
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/AuthSession"
+        "401":
+          $ref: "#/components/responses/Error"
+  /auth/apple:
+    post:
+      tags: [auth]
+      summary: Apple Sign-In
+      operationId: appleLogin
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [identityToken]
+              properties:
+                identityToken: { type: string }
+      responses:
+        "200":
+          description: Token pair + user
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/AuthSession"
+  /auth/refresh:
+    post:
+      tags: [auth]
+      summary: Rotate access/refresh tokens
+      operationId: refreshTokens
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken: { type: string }
+      responses:
+        "200":
+          description: New token pair
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /auth/logout:
+    post:
+      tags: [auth]
+      summary: Revoke refresh token
+      operationId: logout
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken: { type: string }
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /users/me:
+    get:
+      tags: [users]
+      summary: Current user (legacy path)
+      operationId: getUsersMe
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: User
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /me:
+    get:
+      tags: [users]
+      summary: Current user
+      operationId: getMe
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: User
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+    patch:
+      tags: [users]
+      summary: Update profile (displayName, gender, etc.)
+      operationId: patchMe
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                displayName: { type: string }
+                gender: { type: string, enum: [female, male, other, undisclosed] }
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /me/deletion-request:
+    post:
+      tags: [users]
+      summary: Request account deletion
+      operationId: requestDeletion
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Deletion request accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /companions/status:
+    get:
+      tags: [companions]
+      summary: Companions module status
+      operationId: companionsStatus
+      responses:
+        "200":
+          description: Status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /companions:
+    get:
+      tags: [companions]
+      summary: List companions
+      operationId: listCompanions
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1 }
+        - in: query
+          name: pageSize
+          schema: { type: integer, minimum: 1, maximum: 100 }
+        - in: query
+          name: tag
+          schema: { type: string }
+        - in: query
+          name: availability
+          schema: { type: string }
+        - in: query
+          name: isOnline
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: Companion list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /companions/{id}:
+    get:
+      tags: [companions]
+      summary: Companion detail
+      operationId: getCompanion
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Companion
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+        "404":
+          $ref: "#/components/responses/Error"
+  /orders/status:
+    get:
+      tags: [orders]
+      summary: Orders module status
+      operationId: ordersStatus
+      responses:
+        "200":
+          description: Status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /orders:
+    get:
+      tags: [orders]
+      summary: List current user orders
+      operationId: listOrders
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Orders
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+    post:
+      tags: [orders]
+      summary: Create pending order
+      operationId: createOrder
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [companionId, themeId, durationMinutes]
+              properties:
+                companionId: { type: string }
+                themeId: { type: string }
+                durationMinutes: { type: integer, minimum: 30, maximum: 240 }
+      responses:
+        "200":
+          description: Created order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /orders/{id}:
+    get:
+      tags: [orders]
+      summary: Order detail
+      operationId: getOrder
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /orders/{id}/cancel:
+    post:
+      tags: [orders]
+      summary: Cancel pending/paying order
+      operationId: cancelOrder
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Cancelled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /orders/{id}/prepay:
+    post:
+      tags: [orders]
+      summary: WeChat App prepay
+      operationId: prepayOrder
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Prepay params (mock=true on staging when using mock provider)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /orders/{id}/refund:
+    post:
+      tags: [orders]
+      summary: Create refund skeleton
+      operationId: refundOrder
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Refund transaction
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /payments/status:
+    get:
+      tags: [payments]
+      summary: Payments module status
+      operationId: paymentsStatus
+      responses:
+        "200":
+          description: Status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /payments/wechat/notify:
+    post:
+      tags: [payments]
+      summary: WeChat Pay notify callback
+      operationId: wechatNotify
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Notify accepted
+  /payments/wechat/mock-notify:
+    post:
+      tags: [payments]
+      summary: Simulate successful payment (non-production)
+      operationId: wechatMockNotify
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [outTradeNo]
+              properties:
+                outTradeNo: { type: string }
+      responses:
+        "200":
+          description: Mock notify applied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /conversations/status:
+    get:
+      tags: [conversations]
+      summary: Conversations module status
+      operationId: conversationsStatus
+      responses:
+        "200":
+          description: Status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /conversations:
+    get:
+      tags: [conversations]
+      summary: List user conversations
+      operationId: listConversations
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Conversations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /conversations/{id}/messages:
+    get:
+      tags: [conversations]
+      summary: List messages
+      operationId: listMessages
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - in: query
+          name: cursor
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Messages page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+    post:
+      tags: [conversations]
+      summary: Send message (moderation pipeline)
+      operationId: sendMessage
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content: { type: string, maxLength: 2000 }
+                senderId: { type: string }
+      responses:
+        "200":
+          description: Message + moderation decision
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /moderation/status:
+    get:
+      tags: [moderation]
+      summary: Moderation module status
+      operationId: moderationStatus
+      responses:
+        "200":
+          description: Status including aiConfigured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /moderation/check:
+    post:
+      tags: [moderation]
+      summary: Standalone text moderation
+      operationId: moderationCheck
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text: { type: string }
+                source: { type: string }
+                conversationId: { type: string }
+      responses:
+        "200":
+          description: Moderation result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /moderation/reports:
+    post:
+      tags: [moderation]
+      summary: User report
+      operationId: createReport
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string }
+                conversationId: { type: string }
+                recentContext: { type: string }
+      responses:
+        "200":
+          description: Report case created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /moderation/cases:
+    get:
+      tags: [moderation]
+      summary: List cases (staff)
+      operationId: listModerationCases
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Cases
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+        "403":
+          $ref: "#/components/responses/Error"
+  /notifications/status:
+    get:
+      tags: [notifications]
+      summary: Notifications module status
+      operationId: notificationsStatus
+      responses:
+        "200":
+          description: Status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /notifications:
+    get:
+      tags: [notifications]
+      summary: List notifications
+      operationId: listNotifications
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: unreadOnly
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: Notifications
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /notifications/unread-count:
+    get:
+      tags: [notifications]
+      summary: Unread count
+      operationId: unreadCount
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Count
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /notifications/read-all:
+    post:
+      tags: [notifications]
+      summary: Mark all read
+      operationId: markAllNotificationsRead
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /notifications/{id}/read:
+    post:
+      tags: [notifications]
+      summary: Mark one read
+      operationId: markNotificationRead
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /admin/status:
+    get:
+      tags: [admin]
+      summary: Admin module status
+      operationId: adminStatus
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Status (admin only)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /admin/companions:
+    post:
+      tags: [admin]
+      summary: Create companion (admin)
+      operationId: adminCreateCompanion
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /admin/companions/{id}:
+    patch:
+      tags: [admin]
+      summary: Update companion (admin)
+      operationId: adminUpdateCompanion
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /admin/companions/{id}/publish:
+    post:
+      tags: [admin]
+      summary: Publish companion
+      operationId: adminPublishCompanion
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Published
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /admin/companions/{id}/unpublish:
+    post:
+      tags: [admin]
+      summary: Unpublish companion
+      operationId: adminUnpublishCompanion
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Unpublished
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /admin/moderation/overview:
+    get:
+      tags: [admin-moderation]
+      summary: Staff moderation overview
+      operationId: adminModerationOverview
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Stats + queue
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /admin/moderation/cases:
+    get:
+      tags: [admin-moderation]
+      summary: Staff case list
+      operationId: adminListCases
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string }
+        - in: query
+          name: riskLevel
+          schema: { type: string }
+        - in: query
+          name: source
+          schema: { type: string }
+        - in: query
+          name: keyword
+          schema: { type: string }
+        - in: query
+          name: from
+          schema: { type: string, format: date-time }
+        - in: query
+          name: to
+          schema: { type: string, format: date-time }
+        - in: query
+          name: page
+          schema: { type: integer }
+        - in: query
+          name: pageSize
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Case page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /admin/moderation/cases/{id}:
+    get:
+      tags: [admin-moderation]
+      summary: Case detail
+      operationId: adminGetCase
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Case + evidences + actionLog
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /admin/moderation/cases/{id}/conversation:
+    get:
+      tags: [admin-moderation]
+      summary: Conversation evidence
+      operationId: adminCaseConversation
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Messages for case
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /admin/moderation/cases/{id}/actions:
+    post:
+      tags: [admin-moderation]
+      summary: Case action
+      operationId: adminCaseAction
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action:
+                  type: string
+                  enum: [confirmViolation, dismiss, escalate]
+                note: { type: string }
+      responses:
+        "200":
+          description: Updated case
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /admin/moderation/labels:
+    post:
+      tags: [admin-moderation]
+      summary: Create training label
+      operationId: adminCreateLabel
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Label created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /admin/moderation/labels/export:
+    get:
+      tags: [admin-moderation]
+      summary: Export labels
+      operationId: adminExportLabels
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Label export
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    IdPath:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+  responses:
+    Error:
+      description: Envelope error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+  schemas:
+    Meta:
+      type: object
+      required: [requestId, timestamp]
+      properties:
+        requestId: { type: string }
+        timestamp: { type: string, format: date-time }
+    SuccessEnvelope:
+      type: object
+      required: [data, meta]
+      properties:
+        data: {}
+        meta:
+          $ref: "#/components/schemas/Meta"
+    ErrorEnvelope:
+      type: object
+      required: [error, meta]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details: {}
+        meta:
+          $ref: "#/components/schemas/Meta"
+    AuthSession:
+      type: object
+      properties:
+        accessToken: { type: string }
+        refreshToken: { type: string }
+        expiresIn: { type: integer }
+        user:
+          type: object
+          properties:
+            id: { type: string }
+            role:
+              type: string
+              enum: [user, companion, moderator, admin]
+            profile:
+              type: object
+              properties:
+                displayName: { type: string, nullable: true }
+                phone: { type: string, nullable: true }
+                gender: { type: string, nullable: true }
+                isVerified: { type: boolean }
+                safetyScore: { type: integer }

@@ -16,10 +16,11 @@ DEPLOY_ENV_FILE=./services/api/.env.staging \
 
 `DEPLOY_ENV_FILE` 控制 API 容器加载的配置文件（默认 production 使用 `.env.production`）。
 
-或本地：
+或本地（需 Postgres + Redis）：
 
 ```bash
-npx prisma migrate deploy
+cd services/api
+npm run prisma:migrate
 npm run db:seed
 npm run start:dev
 ```
@@ -28,7 +29,7 @@ npm run start:dev
 
 | # | 步骤 | 期望 |
 |---|------|------|
-| 1 | `migrate deploy` + `seed` | 5 陪伴者；admin `13800000001`、moderator `13800000002` |
+| 1 | `prisma:migrate` + `seed` | 5 陪伴者；admin `13800000001`、moderator `13800000002` |
 | 2 | `POST /api/v1/auth/sms/send-code` + `phone/login` | 返回 access/refresh token |
 | 3 | `GET /api/v1/companions` | 返回 seed 陪伴者列表 |
 | 4 | `POST /api/v1/orders` → `prepay` | `payment.mock=true`（staging） |
@@ -44,9 +45,40 @@ npm run start:dev
 ./services/api/scripts/acceptance-smoke.sh http://127.0.0.1:3000
 ```
 
-## iOS（Release / TestFlight 前）
+## iOS 完整回归（Release / TestFlight 前）
 
-1. Archive Release（`BACKEND_BASE_URL` 指向 staging 或 production）。
-2. 登录 → 发现页拉陪伴者 → 下单 → 微信支付沙箱 → 进入聊天。
-3. 发送正常消息、违规消息，确认服务端拦截与提示。
-4. Release 构建不出现「开发模式」「本地保护」「安全工作台」入口。
+前置：API 已 seed；App 指向对应环境（Debug 本地 / Staging URL / Release 生产 URL）。  
+仅使用 `apps/ios/TalkAndTalk.xcodeproj`（不要打开 `TalkAndTalk 2.xcodeproj`）。
+
+| # | 场景 | 期望 |
+|---|------|------|
+| 1 | 登录（SMS mock 或 Apple） | 进入主 Tab；token 进 Keychain |
+| 2 | 发现列表 | 出现 seed 陪伴者；空/错态可重试 |
+| 3 | 详情 | 主题、价格、可下单入口正常 |
+| 4 | 下单 → prepay | 订单进入 paying/paid 路径 |
+| 5 | 支付状态 | mock/沙箱成功后 paid；失败/取消有文案；未确认时引导订单页 |
+| 6 | 聊天（c1–c3） | 正常文案 allow；违规 block/review 有反馈 |
+| 7 | 审核反馈 | 用户可见提示与安全分逻辑不崩溃 |
+| 8 | 订单列表 | 状态文案正确；空态友好 |
+| 9 | 通知 | 列表/未读/标已读 |
+| 10 | 设置 | 协议/隐私可打开；含外链 URL |
+| 11 | 退出登录 | 回登录页；需重新验证 |
+
+额外检查：
+
+1. Archive Release 成功（Team + 版本号已配置）。
+2. Release 无「开发模式 / 安全工作台 / Admin」入口。
+3. 隐私政策 / 用户协议 HTTPS 可打开。
+4. `WECHAT_APP_ID` 未配置时支付错误文案清晰（非崩溃）。
+
+单元测试：
+
+```bash
+xcodebuild test \
+  -project apps/ios/TalkAndTalk.xcodeproj \
+  -scheme TalkAndTalk \
+  -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.5' \
+  -only-testing:TalkAndTalkTests
+```
+
+UITests 未纳入 v0.1 门禁（与登录门控有漂移）；见 NEXT_PHASE。

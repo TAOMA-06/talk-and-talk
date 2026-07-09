@@ -83,7 +83,7 @@ Phase 3（聊天/审核）：
 cd services/api
 cp .env.example .env
 npm install
-npm run prisma:migrate   # 或 prisma:deploy
+npm run prisma:migrate
 npm run prisma:seed      # companions + admin/moderator 账号
 npm run start:dev
 ```
@@ -136,7 +136,8 @@ open apps/ios/TalkAndTalk.xcodeproj
 ```bash
 cd services/api
 npm test
-npm run test:e2e
+npm run test:e2e         # 同 npm run test:integration；需 Postgres + Redis
+./scripts/acceptance-smoke.sh http://127.0.0.1:3000
 ```
 
 iOS：
@@ -148,6 +149,13 @@ xcodebuild test \
   -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.5' \
   -only-testing:TalkAndTalkTests
 ```
+
+发行前手工回归与生产检查：
+
+- [staging-acceptance.md](./staging-acceptance.md)
+- [production-checklist.md](./production-checklist.md)
+- 契约冻结：[packages/contracts](../packages/contracts)
+- 未交付范围：[NEXT_PHASE.md](../NEXT_PHASE.md)
 
 ## 7. 常见误区
 

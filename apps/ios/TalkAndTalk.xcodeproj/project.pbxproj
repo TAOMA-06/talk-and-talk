@@ -23,6 +23,7 @@
 		4AE49DFC612BF88AC5997434 /* CreditService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 062507A80BCACC829F743FAE /* CreditService.swift */; };
 		5187A08AA93DBCA5C80A0AAC /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 30E1C8C508469734A60262FC /* Assets.xcassets */; };
 		567779000564DDCCA22F448F /* AppStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6E3835F343B22384B2A21A2 /* AppStore.swift */; };
+		589F09C8F9BEE9D33DC2CD19 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 027081F075D8356896A749D3 /* PrivacyInfo.xcprivacy */; };
 		5A9F47B2F8BDA522C73C25D8 /* TokenStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13E17E67BD70A4FD39C8A2DC /* TokenStoreTests.swift */; };
 		5D04CD58F3A70B98A7C5AD2A /* WechatOpenSDK in Frameworks */ = {isa = PBXBuildFile; productRef = B988DC50DABD932218177FF2 /* WechatOpenSDK */; };
 		6CFADD99C309A52C6B425C75 /* BackendClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8049AC3D2DA38FB7C6FAD82 /* BackendClientTests.swift */; };
@@ -79,6 +80,7 @@
 
 /* Begin PBXFileReference section */
 		007F9F5619ED56C144799B00 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		027081F075D8356896A749D3 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		02811E1FB9FE0F48E87C6ED9 /* HybridModerationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HybridModerationService.swift; sourceTree = "<group>"; };
 		062507A80BCACC829F743FAE /* CreditService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreditService.swift; sourceTree = "<group>"; };
 		0D8CCF9F4F5456AC8E94630E /* APIModerationClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIModerationClient.swift; sourceTree = "<group>"; };
@@ -185,6 +187,7 @@
 				30E1C8C508469734A60262FC /* Assets.xcassets */,
 				FCB553A9D165F3912587BB17 /* LaunchScreen.storyboard */,
 				5F2CEA87CEF6D8015A2B2E77 /* ModerationConfig.example.plist */,
+				027081F075D8356896A749D3 /* PrivacyInfo.xcprivacy */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -530,6 +533,7 @@
 				5187A08AA93DBCA5C80A0AAC /* Assets.xcassets in Resources */,
 				FF9D7B1BADCE9B22E67CAA88 /* LaunchScreen.storyboard in Resources */,
 				1BDA7B82C2D97AE2B0CDE6C7 /* ModerationConfig.example.plist in Resources */,
+				589F09C8F9BEE9D33DC2CD19 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -724,9 +728,11 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = TalkAndTalk.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Resources/Info-Supplement.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Talk&Talk";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSCameraUsageDescription = "用于拍摄并上传广场封面图，仅在你主动拍照时访问。";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "用于语音陪伴通话，仅在你主动发起或接听时使用麦克风。";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "用于在广场发布图片时选择相册内容，仅在你主动选择图片时访问。";
@@ -736,6 +742,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.talkandtalk.app;
 				PRODUCT_NAME = TalkAndTalk;
 				SDKROOT = iphoneos;
@@ -845,9 +852,11 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = TalkAndTalk.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Resources/Info-Supplement.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Talk&Talk";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSCameraUsageDescription = "用于拍摄并上传广场封面图，仅在你主动拍照时访问。";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "用于语音陪伴通话，仅在你主动发起或接听时使用麦克风。";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "用于在广场发布图片时选择相册内容，仅在你主动选择图片时访问。";
@@ -857,6 +866,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.talkandtalk.app;
 				PRODUCT_NAME = TalkAndTalk;
 				SDKROOT = iphoneos;

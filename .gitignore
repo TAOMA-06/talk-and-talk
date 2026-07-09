@@ -12,6 +12,13 @@ archive/**/node_modules/
 archive/**/dist/
 archive/legacy/root-build-cache/
 services/api/.env
+services/api/.env.staging
+services/api/.env.production
 services/api/node_modules/
 services/api/dist/
 services/api/coverage/
+services/api/backups/
+deploy/nginx/certs/
+*.pem
+apps/ios/build/
+**/TalkAndTalk 2.xcodeproj/

@@ -105,6 +105,7 @@ struct SettingsView: View {
 struct LegalDocumentView: View {
     let title: String
     let sections: [(String, String)]
+    var externalURL: URL? = nil
 
     var body: some View {
         AppScaffold(title: title, spacing: DS.Space.lg) {
@@ -123,6 +124,14 @@ struct LegalDocumentView: View {
                                 .foregroundStyle(Color.dsTextSecondary)
                                 .lineSpacing(3)
                         }
+                    }
+                    if let externalURL {
+                        Link(destination: externalURL) {
+                            Label("在浏览器打开完整页面", systemImage: "safari")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(Color.dsPrimary)
+                        }
+                        .accessibilityIdentifier("legalExternalLink")
                     }
                 }
             }

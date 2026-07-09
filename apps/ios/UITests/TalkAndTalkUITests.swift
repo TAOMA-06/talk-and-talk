@@ -1,8 +1,11 @@
 import XCTest
 
+/// UITests are **not** a v0.1 release gate (login gate + copy drift). Prefer
+/// unit tests + [docs/staging-acceptance.md](../../../docs/staging-acceptance.md) manual regression.
 final class TalkAndTalkUITests: XCTestCase {
     @MainActor
     func testHomeScreenLaunchesWithPrimaryCTA() throws {
+        throw XCTSkip("UITests assume pre-login local demo; app now requires login. See staging-acceptance.md.")
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launch()

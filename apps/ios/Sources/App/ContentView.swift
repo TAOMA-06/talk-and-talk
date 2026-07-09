@@ -142,9 +142,17 @@ private extension View {
                 case .settings:
                     SettingsView()
                 case .privacyPolicy:
-                    LegalDocumentView(title: PrivacyPolicy.title, sections: PrivacyPolicy.sections)
+                    LegalDocumentView(
+                        title: PrivacyPolicy.title,
+                        sections: PrivacyPolicy.sections,
+                        externalURL: LegalURLs.privacyPolicy
+                    )
                 case .userAgreement:
-                    LegalDocumentView(title: PlatformAgreement.title, sections: PlatformAgreement.sections)
+                    LegalDocumentView(
+                        title: PlatformAgreement.title,
+                        sections: PlatformAgreement.sections,
+                        externalURL: LegalURLs.userAgreement
+                    )
                 case .accountDeletion:
                     AccountDeletionView()
 #if DEBUG

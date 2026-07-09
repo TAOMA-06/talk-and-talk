@@ -24,5 +24,7 @@
 		<string>weixin</string>
 		<string>weixinULAPI</string>
 	</array>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>
