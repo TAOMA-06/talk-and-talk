@@ -1,7 +1,7 @@
 services:
   api:
     build:
-      context: ./services/api
+      context: ../backend/api
     environment:
       NODE_ENV: production
       PORT: 3000

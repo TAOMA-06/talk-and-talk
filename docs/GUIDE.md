@@ -12,7 +12,7 @@
 - 禁止引导私联、线下见面、私下转账。
 - 需要内容安全审查，保护用户不被骚扰、诱骗或引流到平台外。
 
-当前仓库正在从演示工程迁移到正式后端。旧 Node demo 后端已移除，正式后端位于 `services/api`。
+当前仓库正在从演示工程迁移到正式后端。旧 Node demo 后端已移除，正式后端位于 `backend/api`。
 
 ## 2. AI 内容识别做什么
 
@@ -33,11 +33,16 @@ AI 内容识别是平台内容安全员，不是陪用户聊天的机器人。
 
 ```text
 talk-and-talk/
-├── apps/ios/          # iOS SwiftUI App
-├── services/api/      # NestJS + TypeScript 正式后端
-├── docs/              # 项目文档
-└── archive/           # 旧实验，非主工程
+├── frontend/ios/          # iOS SwiftUI App，App Store/TestFlight 分发
+├── backend/api/           # NestJS + TypeScript 正式后端
+├── shared/contracts/      # OpenAPI v1，前后端共同契约
+├── infra/                 # Docker Compose、nginx、secrets
+├── docs/                  # 项目文档
+├── README.md
+└── NEXT_PHASE.md
 ```
+
+旧 demo / 实验代码已从主分支移除；需要历史请查 git history。
 
 | 模块 | 技术 | 当前状态 |
 |------|------|----------|
@@ -80,7 +85,7 @@ Phase 3（聊天/审核）：
 ### 后端
 
 ```bash
-cd services/api
+cd backend/api
 cp .env.example .env
 npm install
 npm run prisma:migrate
@@ -105,28 +110,28 @@ http://localhost:3000/admin/
 Docker（本地）：
 
 ```bash
-docker compose up --build
+docker compose -f infra/docker-compose.yml up --build
 ```
 
 Staging 部署：
 
 ```bash
-cp services/api/.env.staging.example services/api/.env.staging
-DEPLOY_ENV_FILE=./services/api/.env.staging \
-  docker compose -f docker-compose.prod.yml --env-file services/api/.env.staging up -d --build
-./services/api/scripts/acceptance-smoke.sh https://api-staging.talkandtalk.app
+cp backend/api/.env.staging.example backend/api/.env.staging
+DEPLOY_ENV_FILE=../backend/api/.env.staging \
+  docker compose -f infra/docker-compose.prod.yml --env-file backend/api/.env.staging up -d --build
+./backend/api/scripts/acceptance-smoke.sh https://api-staging.talkandtalk.app
 ```
 
-生产部署默认加载 `services/api/.env.production`（见 `docker-compose.prod.yml` 中 `DEPLOY_ENV_FILE`）。
+生产部署默认加载 `backend/api/.env.production`（见 `infra/docker-compose.prod.yml` 中 `DEPLOY_ENV_FILE`，路径相对 `infra/`）。
 
 环境变量：`APP_ENV`（development/staging/production）控制 mock 支付与 seed；`GET /api/v1/health` 返回 metrics 快照。
 
-iOS：Debug 默认 `http://127.0.0.1:3000`（[`Config/Debug.xcconfig`](../apps/ios/Config/Debug.xcconfig)）；Release 默认 `https://api.talkandtalk.app`。TestFlight 前在 `Config/Shared.xcconfig` 填写 `WECHAT_APP_ID` 与 Apple Team。
+iOS：Debug 默认 `http://127.0.0.1:3000`（[`Config/Debug.xcconfig`](../frontend/ios/Config/Debug.xcconfig)）；Release 默认 `https://api.talkandtalk.app`。TestFlight 前在 `Config/Shared.xcconfig` 填写 `WECHAT_APP_ID` 与 Apple Team。
 
 ### iOS
 
 ```bash
-open apps/ios/TalkAndTalk.xcodeproj
+open frontend/ios/TalkAndTalk.xcodeproj
 ```
 
 模拟器默认后端地址：`http://127.0.0.1:3000`。真机调试时使用 `BACKEND_BASE_URL` 指向 Mac 局域网 IP。
@@ -134,7 +139,7 @@ open apps/ios/TalkAndTalk.xcodeproj
 ## 6. 测试
 
 ```bash
-cd services/api
+cd backend/api
 npm test
 npm run test:e2e         # 同 npm run test:integration；需 Postgres + Redis
 ./scripts/acceptance-smoke.sh http://127.0.0.1:3000
@@ -144,7 +149,7 @@ iOS：
 
 ```bash
 xcodebuild test \
-  -project apps/ios/TalkAndTalk.xcodeproj \
+  -project frontend/ios/TalkAndTalk.xcodeproj \
   -scheme TalkAndTalk \
   -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.5' \
   -only-testing:TalkAndTalkTests
@@ -154,31 +159,31 @@ xcodebuild test \
 
 - [staging-acceptance.md](./staging-acceptance.md)
 - [production-checklist.md](./production-checklist.md)
-- 契约冻结：[packages/contracts](../packages/contracts)
+- 契约冻结：[shared/contracts](../shared/contracts)
 - 未交付范围：[NEXT_PHASE.md](../NEXT_PHASE.md)
 
 ## 7. 常见误区
 
 | 误区 | 正确理解 |
 |------|----------|
-| “旧 demo 后端还在” | 已移除，正式后端在 `services/api` |
+| “旧 demo 后端还在” | 已从主分支移除；正式后端在 `backend/api`；历史见 git history |
 | “聊天已经完全接正式后端” | `c1`–`c3` 聊天与审核已走正式后端；举报已接 `POST /moderation/reports`；社区仍本地；DEBUG 失败可本地兜底 |
 | “AI 是陪聊” | AI/审核逻辑只负责内容安全 |
-| “在根目录 npm start” | 后端命令在 `services/api` 执行 |
-| “审核后台还是旧 demo” | 已迁到 `services/api/public/admin` + `/api/v1/admin/moderation/*` |
+| “在根目录 npm start” | 后端命令在 `backend/api` 执行 |
+| “审核后台还是旧 demo” | 运维控制台在 `backend/api/public/admin` + `/api/v1/admin/moderation/*` |
 
 ## 8. 改代码建议
 
 | 需求 | 建议位置 |
 |------|----------|
 | Auth API 契约 | `docs/auth-api.md` |
-| 后端 Auth / JWT | `services/api/src/auth` |
-| iOS 登录与 token | `apps/ios/Sources/Data/Auth` |
-| 后端基础设施 / health | `services/api/src` |
-| iOS 后端地址与开关 | `apps/ios/Sources/Data/API/BackendConfig.swift` |
-| iOS API client | `apps/ios/Sources/Data/API/BackendClient.swift` |
-| 本地内容审核规则（DEBUG/非后端会话） | `apps/ios/Sources/Data/Moderation/RuleBasedModerationEngine.swift` |
-| 正式审核 API（RuleEngine + DeepSeek） | `services/api/src/moderation` |
-| Admin 审核 API / 处置 / 样本 | `services/api/src/admin/moderation` |
-| Web 审核后台 | `services/api/public/admin` |
+| 后端 Auth / JWT | `backend/api/src/auth` |
+| iOS 登录与 token | `frontend/ios/Sources/Data/Auth` |
+| 后端基础设施 / health | `backend/api/src` |
+| iOS 后端地址与开关 | `frontend/ios/Sources/Data/API/BackendConfig.swift` |
+| iOS API client | `frontend/ios/Sources/Data/API/BackendClient.swift` |
+| 本地内容审核规则（DEBUG/非后端会话） | `frontend/ios/Sources/Data/Moderation/RuleBasedModerationEngine.swift` |
+| 正式审核 API（RuleEngine + DeepSeek） | `backend/api/src/moderation` |
+| Admin 审核 API / 处置 / 样本 | `backend/api/src/admin/moderation` |
+| Web 审核后台 | `backend/api/public/admin` |
 | Admin 审核契约 | `docs/admin-moderation-api.md` |

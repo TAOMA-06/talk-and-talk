@@ -3,32 +3,44 @@
 女性友好的线上陪伴服务工程（iOS App + NestJS 正式后端）。
 
 - 新人请先读 [docs/GUIDE.md](./docs/GUIDE.md)
-- **v0.1 已冻结 `/api/v1` 契约**：[packages/contracts](./packages/contracts)
+- **v0.1 已冻结 `/api/v1` 契约**：[shared/contracts](./shared/contracts)
 - 未交付能力见 [NEXT_PHASE.md](./NEXT_PHASE.md)（不在本发行范围）
 
 ## 仓库结构
 
+```text
+talk-and-talk/
+├── frontend/ios/          # iOS SwiftUI App（App Store / TestFlight）
+├── backend/api/           # NestJS API（Docker 可部署）
+├── shared/contracts/      # OpenAPI v1 前后端共同契约
+├── infra/                 # Docker Compose、nginx、secrets
+├── docs/
+├── README.md
+└── NEXT_PHASE.md
+```
+
 | 路径 | 说明 |
 |------|------|
 | [docs/GUIDE.md](./docs/GUIDE.md) | 项目总指引 |
-| [packages/contracts](./packages/contracts) | OpenAPI v1 冻结契约 |
+| [shared/contracts](./shared/contracts) | OpenAPI v1 冻结契约 |
 | [docs/auth-api.md](./docs/auth-api.md) | Auth API 说明 |
 | [docs/admin-moderation-api.md](./docs/admin-moderation-api.md) | 审核后台 API |
 | [docs/staging-acceptance.md](./docs/staging-acceptance.md) | Staging 联调与 iOS 回归 |
 | [docs/deploy-rollback.md](./docs/deploy-rollback.md) | 部署与回滚 |
 | [docs/production-checklist.md](./docs/production-checklist.md) | 生产检查清单 |
 | [docs/app-store-metadata.md](./docs/app-store-metadata.md) | App Store Connect 元数据 |
-| [apps/ios/](./apps/ios/) | iOS SwiftUI App（**仅使用** `TalkAndTalk.xcodeproj`） |
-| [services/api/](./services/api/) | NestJS 后端 |
-| [deploy/nginx/](./deploy/nginx/) | TLS 反代示例 |
-| [archive/](./archive/) | 旧实验，非主工程 |
+| [frontend/ios/](./frontend/ios/) | iOS SwiftUI App（**仅使用** `TalkAndTalk.xcodeproj`） |
+| [backend/api/](./backend/api/) | NestJS 后端 |
+| [infra/](./infra/) | Docker Compose、nginx TLS 示例、secrets 挂载 |
+
+旧 demo / 实验代码已从主分支移除；需要历史请查 git history。
 
 ## 快速开始
 
 ### 后端
 
 ```bash
-cd services/api
+cd backend/api
 cp .env.example .env
 npm install
 # 本地开发：创建并应用 migration（见下方 Migration）；需 Postgres + Redis 可达
@@ -50,13 +62,13 @@ Web 审核后台：`http://localhost:3000/admin/`
 Docker（本地 API + Postgres + Redis）：
 
 ```bash
-docker compose up --build
+docker compose -f infra/docker-compose.yml up --build
 ```
 
 ### iOS
 
 ```bash
-cd apps/ios
+cd frontend/ios
 xcodegen generate   # 修改 project.yml 后
 open TalkAndTalk.xcodeproj
 ```
@@ -70,9 +82,9 @@ open TalkAndTalk.xcodeproj
 
 完整示例见：
 
-- 开发：`services/api/.env.example`
-- Staging：`services/api/.env.staging.example`
-- 生产：`services/api/.env.production.example`
+- 开发：`backend/api/.env.example`
+- Staging：`backend/api/.env.staging.example`
+- 生产：`backend/api/.env.production.example`
 
 | 变量 | 说明 | 生产 |
 |------|------|------|
@@ -101,7 +113,7 @@ open TalkAndTalk.xcodeproj
 ## Migration
 
 ```bash
-cd services/api
+cd backend/api
 npm run prisma:migrate   # 开发：创建并应用（改 schema 时用）
 npm run prisma:deploy    # 生产 / Docker entrypoint：只应用已有 migration
 ```
@@ -113,7 +125,7 @@ Docker entrypoint 在启动 API 前执行 `prisma migrate deploy`。
 ## Seed
 
 ```bash
-cd services/api
+cd backend/api
 npm run prisma:seed
 # 或
 npm run db:seed
@@ -124,7 +136,7 @@ npm run db:seed
 ## 测试
 
 ```bash
-cd services/api
+cd backend/api
 npm test                 # unit（src/**/*.spec.ts）
 npm run test:e2e         # HTTP 集成级 e2e（需 Postgres + Redis）
 npm run test:integration # 同 test:e2e 别名
@@ -135,7 +147,7 @@ iOS：
 
 ```bash
 xcodebuild test \
-  -project apps/ios/TalkAndTalk.xcodeproj \
+  -project frontend/ios/TalkAndTalk.xcodeproj \
   -scheme TalkAndTalk \
   -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.5' \
   -only-testing:TalkAndTalkTests
@@ -146,25 +158,26 @@ xcodebuild test \
 ## 部署（Staging / Production）
 
 ```bash
-# Production（默认加载 services/api/.env.production）
-cp services/api/.env.production.example services/api/.env.production
+# Production（默认加载 backend/api/.env.production）
+cp backend/api/.env.production.example backend/api/.env.production
 # 填写密钥后：
-docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f infra/docker-compose.prod.yml up -d --build
 
 # Staging
-cp services/api/.env.staging.example services/api/.env.staging
-DEPLOY_ENV_FILE=./services/api/.env.staging \
-  docker compose -f docker-compose.prod.yml --env-file services/api/.env.staging up -d --build
+cp backend/api/.env.staging.example backend/api/.env.staging
+# DEPLOY_ENV_FILE 路径相对 infra/（compose 文件所在目录）
+DEPLOY_ENV_FILE=../backend/api/.env.staging \
+  docker compose -f infra/docker-compose.prod.yml --env-file backend/api/.env.staging up -d --build
 ```
 
-- Nginx TLS 示例：`deploy/nginx/talk-and-talk.conf.example`，证书目录 `deploy/nginx/certs/`
+- Nginx TLS 示例：`infra/nginx/talk-and-talk.conf.example`，证书目录 `infra/nginx/certs/`
 - 回滚： [docs/deploy-rollback.md](./docs/deploy-rollback.md)
 - 上线勾选： [docs/production-checklist.md](./docs/production-checklist.md)
 
 ## 备份
 
 ```bash
-DATABASE_URL=postgres://... ./services/api/scripts/db-backup.sh
+DATABASE_URL=postgres://... ./backend/api/scripts/db-backup.sh
 ```
 
 建议 cron 每日执行，发布前再跑一次。恢复步骤见 deploy-rollback 文档。

@@ -4,11 +4,11 @@ on:
   push:
     branches: [main]
     paths:
-      - "apps/ios/**"
+      - "frontend/ios/**"
       - ".github/workflows/ios.yml"
   pull_request:
     paths:
-      - "apps/ios/**"
+      - "frontend/ios/**"
       - ".github/workflows/ios.yml"
 
 jobs:
@@ -20,7 +20,7 @@ jobs:
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app
       - name: Unit tests
-        working-directory: apps/ios
+        working-directory: frontend/ios
         run: |
           set -euo pipefail
           xcodebuild test \

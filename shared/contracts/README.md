@@ -58,10 +58,11 @@ Errors:
 
 ```bash
 # Optional: validate YAML syntax
-python3 -c "import yaml; yaml.safe_load(open('packages/contracts/openapi/v1.yaml'))"
+# From repo root:
+python3 -c "import yaml; yaml.safe_load(open('shared/contracts/openapi/v1.yaml'))"
 
 # Contract smoke (integration / e2e)
-cd services/api && npm run test:integration
+cd backend/api && npm run test:integration
 ```
 
 Static admin UI at `/admin/` is **outside** the OpenAPI surface (HTML + staff JWT).

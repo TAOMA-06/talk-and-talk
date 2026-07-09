@@ -1,6 +1,6 @@
 # Backend Migration
 
-Talk&Talk has moved from the old local Node demo backend to the production NestJS backend in `services/api`. The old demo is deleted and must not be used as a runtime entrypoint.
+Talk&Talk has moved from the old local Node demo backend to the production NestJS backend in `backend/api`. The old demo is deleted and must not be used as a runtime entrypoint.
 
 ## Old Demo API
 
@@ -77,7 +77,7 @@ Every JSON response must use:
 
 ## iOS Current Dependencies
 
-Frozen contract: [packages/contracts/openapi/v1.yaml](../packages/contracts/openapi/v1.yaml).
+Frozen contract: [shared/contracts/openapi/v1.yaml](../shared/contracts/openapi/v1.yaml).
 
 | Client | Route | Status |
 |---|---|---|

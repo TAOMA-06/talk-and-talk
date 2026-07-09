@@ -4,16 +4,16 @@ on:
   push:
     branches: [main]
     paths:
-      - "services/api/**"
+      - "backend/api/**"
       - ".github/workflows/api.yml"
   pull_request:
     paths:
-      - "services/api/**"
+      - "backend/api/**"
       - ".github/workflows/api.yml"
 
 defaults:
   run:
-    working-directory: services/api
+    working-directory: backend/api
 
 jobs:
   test:
@@ -60,7 +60,7 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: services/api/package-lock.json
+          cache-dependency-path: backend/api/package-lock.json
       - name: Install
         run: npm ci
       - name: Build

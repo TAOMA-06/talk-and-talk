@@ -59,7 +59,7 @@
 | | |
 |--|--|
 | **影响** | 配置齐全仍无法真实预支付/验签回调；商业不可收款。 |
-| **证据** | `services/api/src/payments/wechat/real-wechat-pay.provider.ts`：`createAppPrepay` 抛 `WECHAT_PAY_NOT_IMPLEMENTED`；`verifyNotifySignature` 结构占位后 **恒 `return false`**；资源解密未接 `apiV3Key`。`NEXT_PHASE.md` / `docs/production-checklist.md` 已承认。 |
+| **证据** | `backend/api/src/payments/wechat/real-wechat-pay.provider.ts`：`createAppPrepay` 抛 `WECHAT_PAY_NOT_IMPLEMENTED`；`verifyNotifySignature` 结构占位后 **恒 `return false`**；资源解密未接 `apiV3Key`。`NEXT_PHASE.md` / `docs/production-checklist.md` 已承认。 |
 | **修复建议** | 实现微信 App 下单 HTTP 客户端、平台证书拉取与验签、回调解密；集成测试用沙箱；失败勿静默回 mock。 |
 
 #### B2. 生产未配微信时回落 Mock 提供商（支付伪造面）
@@ -82,12 +82,12 @@
 
 ### Critical
 
-#### C1. `docker-compose.prod.yml` 默认 `SEED_ON_STARTUP=true`
+#### C1. `infra/docker-compose.prod.yml` 默认 `SEED_ON_STARTUP=true`
 
 | | |
 |--|--|
 | **影响** | `environment: SEED_ON_STARTUP: ${SEED_ON_STARTUP:-true}` 在宿主机未 export 变量时覆盖 `.env.production` 中的 `false`，生产可能反复 seed、默认 staff 手机号残留。 |
-| **证据** | `docker-compose.prod.yml` L20–21 vs `services/api/.env.production.example` `SEED_ON_STARTUP=false`。 |
+| **证据** | `infra/docker-compose.prod.yml` L20–21 vs `backend/api/.env.production.example` `SEED_ON_STARTUP=false`。 |
 | **修复建议** | 默认改为 `false`；仅 staging 显式 true；首次上线 runbook 单独 seed。 |
 
 #### C2. Metrics / Admin 无网络层隔离
@@ -95,7 +95,7 @@
 | | |
 |--|--|
 | **影响** | `GET /api/v1/metrics` 无鉴权；nginx 示例全量反代 `/`，metrics 与 `/admin/` Web 可对公网。Admin **API** 有 JWT+Roles，但 UI 与指标仍暴露。 |
-| **证据** | `metrics.controller.ts`；`deploy/nginx/talk-and-talk.conf.example`；`docs/production-checklist.md` 要求内网。 |
+| **证据** | `metrics.controller.ts`；`infra/nginx/talk-and-talk.conf.example`；`docs/production-checklist.md` 要求内网。 |
 | **修复建议** | nginx 对 `/api/v1/metrics`、`/admin/` 限制内网/VPN 或 basic auth；或应用层 token。 |
 
 #### C3. Redis 无默认密码；微信私钥未挂载
@@ -103,7 +103,7 @@
 | | |
 |--|--|
 | **影响** | 生产 compose 注释要求手工 `requirepass`；私钥路径示例有、volume 无。依赖部署者自觉。 |
-| **证据** | `docker-compose.prod.yml` redis 段注释；`.env.production.example` `WECHAT_PAY_PRIVATE_KEY_PATH`。 |
+| **证据** | `infra/docker-compose.prod.yml` redis 段注释；`.env.production.example` `WECHAT_PAY_PRIVATE_KEY_PATH`。 |
 | **修复建议** | compose 强制 redis 密码与 `REDIS_URL` 一致；secrets volume 模板化。 |
 
 #### C4. iOS 发行配置未填
@@ -111,7 +111,7 @@
 | | |
 |--|--|
 | **影响** | TestFlight/真机微信无法完成；Archive 需 Team。 |
-| **证据** | `apps/ios/Config/Shared.xcconfig`：`WECHAT_APP_ID` 空；`DEVELOPMENT_TEAM` 注释。Debug Info.plist 实测 `WECHAT_APP_ID=""`，`BACKEND_BASE_URL=http://127.0.0.1:3000`。 |
+| **证据** | `frontend/ios/Config/Shared.xcconfig`：`WECHAT_APP_ID` 空；`DEVELOPMENT_TEAM` 注释。Debug Info.plist 实测 `WECHAT_APP_ID=""`，`BACKEND_BASE_URL=http://127.0.0.1:3000`。 |
 | **修复建议** | 提交前填 Team + 微信 AppID；Staging 构建指向 `api-staging`（`Staging.xcconfig` 已有 URL，但 `project.yml` 未挂 Staging 配置）。 |
 
 #### C5. 依赖漏洞（npm audit）
@@ -134,7 +134,7 @@
 | M4 | UITests 未进门禁 | 手工回归成本 | staging-acceptance | 对齐登录门控后纳入 |
 | M5 | `docs/review.md` STALE | 易误导 | 文件头声明 | 归档或删除链接 |
 | M6 | e2e/smoke 本机未跑通 | v0.1 不能完全 Go | 无 Postgres/Redis/Docker | 在有依赖环境补跑 |
-| M7 | 证书目录缺失 | 无法按示例起 TLS | `deploy/nginx/certs` 不存在 | 部署时 ACME/自签 |
+| M7 | 证书目录缺失 | 无法按示例起 TLS | `infra/nginx/certs` 不存在 | 部署时 ACME/自签 |
 
 ### Minor
 
@@ -151,9 +151,9 @@
 
 | 命令 | 结果 | 备注 |
 |------|------|------|
-| `cd services/api && npm run build` | **PASS** | prisma generate + tsc |
-| `cd services/api && npm test` | **PASS** | 22 suites / **84** tests |
-| `cd services/api && npm audit --omit=dev` | **FAIL（有漏洞）** | 13 条，见 C5；未阻断 unit |
+| `cd backend/api && npm run build` | **PASS** | prisma generate + tsc |
+| `cd backend/api && npm test` | **PASS** | 22 suites / **84** tests |
+| `cd backend/api && npm audit --omit=dev` | **FAIL（有漏洞）** | 13 条，见 C5；未阻断 unit |
 | iOS `xcodebuild test … -only-testing:TalkAndTalkTests` | **PASS** | **40** tests，0 failures；destination `iPhone 17, OS 26.5`；xcresult `DerivedData/Logs/Test/Test-TalkAndTalk-2026.07.09_16-40-09-+0800.xcresult` |
 | 配置单元测试（JWT/CORS/SMS mock 拒绝） | **PASS**（含在 unit） | `configuration.spec.ts` |
 | 支付 mock 履约 / 幂等 unit | **PASS** | `payments.service.spec.ts` |
@@ -180,8 +180,8 @@
 |----|------|
 | `npm run test:e2e` | 本机无 Postgres/Redis；进程挂起后终止。e2e 套件代码存在（7 个 `*.e2e-spec.ts`）。 |
 | `./scripts/acceptance-smoke.sh` | API 未监听；`curl :3000` 失败。 |
-| `docker compose -f docker-compose.prod.yml config/up` | **Docker CLI 不可用**（`docker` / `docker-compose` / colima / orbstack 均无）。 |
-| 生产 HTTPS health / 证书 | 无域名、无 `deploy/nginx/certs`。 |
+| `docker compose -f infra/docker-compose.prod.yml config/up` | **Docker CLI 不可用**（`docker` / `docker-compose` / colima / orbstack 均无）。 |
+| 生产 HTTPS health / 证书 | 无域名、无 `infra/nginx/certs`。 |
 | 真实微信 / 短信沙箱联调 | 无商户号与厂商账号（且代码为壳）。 |
 | iOS Archive / TestFlight 上传 | 无 `DEVELOPMENT_TEAM`；审查不代签。 |
 | 手工 UI 全链路（登录→下单→聊天→注销） | 需运行中后端 + 真机/模拟器人工；本报告以自动化 + 静态为准。 |
@@ -234,7 +234,7 @@
 
 ```text
 1. 启动 Postgres + Redis + API（docker compose 或本地）
-2. services/api: npm test && npm run test:e2e && acceptance-smoke
+2. backend/api: npm test && npm run test:e2e && acceptance-smoke
 3. iOS: TalkAndTalkTests + staging-acceptance 手工清单
 4. 配置 Apple Team；可选 WECHAT_APP_ID
 5. Staging 部署：.env.staging + compose.prod + smoke

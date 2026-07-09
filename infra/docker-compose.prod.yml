@@ -8,15 +8,15 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./deploy/nginx/talk-and-talk.conf.example:/etc/nginx/conf.d/default.conf:ro
-      - ./deploy/nginx/certs:/etc/nginx/certs:ro
+      - ./nginx/talk-and-talk.conf.example:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
     restart: unless-stopped
 
   api:
     build:
-      context: ./services/api
+      context: ../backend/api
     env_file:
-      - ${DEPLOY_ENV_FILE:-./services/api/.env.production}
+      - ${DEPLOY_ENV_FILE:-../backend/api/.env.production}
     environment:
       # Default false so missing host SEED_ON_STARTUP cannot override .env.production.
       # Staging: export SEED_ON_STARTUP=true or set in .env.staging.

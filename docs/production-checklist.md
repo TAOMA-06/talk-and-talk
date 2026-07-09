@@ -5,7 +5,7 @@
 
 ## 网络与 TLS
 
-- [ ] HTTPS 已启用（`deploy/nginx/talk-and-talk.conf.example` 或等价反向代理）
+- [ ] HTTPS 已启用（`infra/nginx/talk-and-talk.conf.example` 或等价反向代理）
 - [ ] HTTP → HTTPS 301 跳转正常
 - [ ] 证书未过期；续期流程已知（ACME 或手动）
 - [ ] `curl -fsS https://api.talkandtalk.app/api/v1/health` 返回 `ok` 或可接受的 `degraded`
@@ -53,11 +53,11 @@
 ## 日志脱敏
 
 - [ ] 确认生产日志无完整手机号、验证码、JWT、微信支付签名原文
-- [ ] 实现：`services/api/src/common/logging/redact.ts`（单元测试覆盖）
+- [ ] 实现：`backend/api/src/common/logging/redact.ts`（单元测试覆盖）
 
 ## 备份与回滚
 
-- [ ] 定时任务调用 `services/api/scripts/db-backup.sh`（建议每日 + 发布前）
+- [ ] 定时任务调用 `backend/api/scripts/db-backup.sh`（建议每日 + 发布前）
 - [ ] 备份落盘路径与保留天数已知
 - [ ] 已演练一次 restore（见 [deploy-rollback.md](./deploy-rollback.md)）
 - [ ] 发布前记录 git tag / 镜像 digest
@@ -84,7 +84,7 @@
 ## 发布后冒烟
 
 ```bash
-./services/api/scripts/acceptance-smoke.sh https://api.talkandtalk.app
+./backend/api/scripts/acceptance-smoke.sh https://api.talkandtalk.app
 ```
 
 生产若禁用 mock 支付/SMS，冒烟脚本中相关步骤可能失败——按环境裁剪或仅跑 health + Apple/登录可达性检查。

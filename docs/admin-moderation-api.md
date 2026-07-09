@@ -94,14 +94,14 @@ Content-Type: application/json
 http://localhost:3000/admin/
 ```
 
-静态页位于 `services/api/public/admin/index.html`。
+静态页位于 `backend/api/public/admin/index.html`。
 
 能力：登录、概览、队列筛选、详情处置、会话证据、样本标注与导出。
 
 ## 测试
 
 ```bash
-cd services/api
+cd backend/api
 npm test
 npm run test:e2e
 ```

@@ -10,8 +10,8 @@
 
 | 命令 | 结果 |
 |------|------|
-| `cd services/api && npm test` | **PASS** — 24 suites / **93** tests |
-| `cd services/api && npm run build` | **PASS** |
+| `cd backend/api && npm test` | **PASS** — 24 suites / **93** tests |
+| `cd backend/api && npm run build` | **PASS** |
 | iOS `xcodebuild test … -only-testing:TalkAndTalkTests` | **PASS** — **40** tests（含 phone-login Debug 断言） |
 | `xcodegen generate`（Staging scheme） | **PASS** — 生成 `TalkAndTalk` + `TalkAndTalk-Staging` |
 
@@ -22,7 +22,7 @@
 | `npm run test:e2e` | 本机无 Postgres + Redis；需在有依赖环境补跑 |
 | `acceptance-smoke.sh` | API 未部署监听 |
 | `production-smoke.sh` | 无公网 production 端点 |
-| `docker compose -f docker-compose.prod.yml up` | Docker CLI 不可用 |
+| `docker compose -f infra/docker-compose.prod.yml up` | Docker CLI 不可用 |
 | `npm audit --omit=dev` 清零 | 残留 13 条（10 moderate / 3 high：lodash/multer 经 Nest 传递）；**禁止** `audit fix --force`；待 Nest 大版本升级评估 |
 
 ## 代码侧已完成（相对发行审查）

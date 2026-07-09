@@ -1,5 +1,5 @@
 # Replace server_name and certificate paths before production use.
-# For local TLS testing, place self-signed certs in deploy/nginx/certs/.
+# For local TLS testing, place self-signed certs in infra/nginx/certs/.
 #
 # Metrics and Admin UI are restricted to private networks by default.
 # Adjust allow CIDRs for your VPC / VPN. Remove auth_basic if using network-only.
@@ -9,7 +9,7 @@ upstream talk_api {
     keepalive 16;
 }
 
-# Optional basic auth for admin (htpasswd -c deploy/nginx/.htpasswd admin).
+# Optional basic auth for admin (htpasswd -c infra/nginx/.htpasswd admin).
 # Uncomment auth_basic lines under /admin/ when the file is mounted.
 # map $remote_addr $admin_ok { ... }  # alternative allowlists
 

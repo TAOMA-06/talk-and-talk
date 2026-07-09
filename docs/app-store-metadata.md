@@ -106,7 +106,7 @@ Talk&Talk 是线上陪伴沟通 App。审核账号请使用「Sign in with Apple
 
 ## Archive 操作说明
 
-1. 仅打开 `apps/ios/TalkAndTalk.xcodeproj`（修改 `project.yml` 后先 `xcodegen generate`）。
+1. 仅打开 `frontend/ios/TalkAndTalk.xcodeproj`（修改 `project.yml` 后先 `xcodegen generate`）。
 2. Xcode → Signing & Capabilities → 选择 **Team**（`DEVELOPMENT_TEAM` 可写在 `Config/Shared.xcconfig`）。
 3. 确认 `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION`（当前 0.1.0 / 1）。
 4. 填写 `WECHAT_APP_ID`（Shared.xcconfig）后 Product → Archive。

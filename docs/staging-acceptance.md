@@ -7,19 +7,20 @@
 从仓库根目录：
 
 ```bash
-cp services/api/.env.staging.example services/api/.env.staging
+cp backend/api/.env.staging.example backend/api/.env.staging
 # 配置 DATABASE_URL / JWT / WECHAT_PAY_*（沙箱）
 
-DEPLOY_ENV_FILE=./services/api/.env.staging \
-  docker compose -f docker-compose.prod.yml --env-file services/api/.env.staging up -d --build
+# DEPLOY_ENV_FILE 路径相对 infra/（compose 文件所在目录）
+DEPLOY_ENV_FILE=../backend/api/.env.staging \
+  docker compose -f infra/docker-compose.prod.yml --env-file backend/api/.env.staging up -d --build
 ```
 
-`DEPLOY_ENV_FILE` 控制 API 容器加载的配置文件（默认 production 使用 `.env.production`）。
+`DEPLOY_ENV_FILE` 控制 API 容器加载的配置文件（默认 production 使用 `../backend/api/.env.production`，路径相对 `infra/`）。
 
 或本地（需 Postgres + Redis）：
 
 ```bash
-cd services/api
+cd backend/api
 npm run prisma:migrate
 npm run db:seed
 npm run start:dev
@@ -42,14 +43,14 @@ npm run start:dev
 ## 自动化冒烟
 
 ```bash
-./services/api/scripts/acceptance-smoke.sh http://127.0.0.1:3000
+./backend/api/scripts/acceptance-smoke.sh http://127.0.0.1:3000
 ```
 
 ## iOS 完整回归（TestFlight / Staging 前）
 
 前置：API 已 seed；**TestFlight 使用 scheme `TalkAndTalk-Staging`**（`BACKEND_BASE_URL=https://api-staging.talkandtalk.app`，`ENABLE_PHONE_LOGIN=YES`）。  
 生产 Archive 使用 scheme `TalkAndTalk`（Release，仅 Apple 登录）。  
-仅使用 `apps/ios/TalkAndTalk.xcodeproj`（不要打开 `TalkAndTalk 2.xcodeproj`）。
+仅使用 `frontend/ios/TalkAndTalk.xcodeproj`（不要打开 `TalkAndTalk 2.xcodeproj`）。
 
 | # | 场景 | 期望 |
 |---|------|------|
@@ -67,7 +68,7 @@ npm run start:dev
 
 额外检查：
 
-1. 在 `apps/ios` 执行 `xcodegen generate` 后，Archive **TalkAndTalk-Staging** 成功（Team + 版本号已配置）。
+1. 在 `frontend/ios` 执行 `xcodegen generate` 后，Archive **TalkAndTalk-Staging** 成功（Team + 版本号已配置）。
 2. Staging/Release 均无「开发模式 / 安全工作台 / Admin」入口（Admin 仅 `#if DEBUG`）。
 3. 隐私政策 / 用户协议 HTTPS 可打开。
 4. `WECHAT_APP_ID` 未配置时支付错误文案清晰（非崩溃）。
@@ -77,10 +78,10 @@ npm run start:dev
 
 ```bash
 # 生成工程（修改 project.yml 后）
-cd apps/ios && xcodegen generate
+cd frontend/ios && xcodegen generate
 
 xcodebuild test \
-  -project apps/ios/TalkAndTalk.xcodeproj \
+  -project frontend/ios/TalkAndTalk.xcodeproj \
   -scheme TalkAndTalk \
   -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.5' \
   -only-testing:TalkAndTalkTests

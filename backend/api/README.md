@@ -5,10 +5,10 @@ This is the production NestJS backend for Talk&Talk. The old Node demo backend h
 ## Local Development
 
 ```bash
-cd services/api
+cd backend/api
 cp .env.example .env
 npm install
-# Postgres + Redis must be reachable (e.g. docker compose up -d postgres redis)
+# Postgres + Redis must be reachable (e.g. docker compose -f ../../infra/docker-compose.yml up -d postgres redis)
 npm run prisma:migrate
 npm run start:dev
 ```
@@ -66,8 +66,10 @@ npm run prisma:deploy    # prod/docker: apply committed migrations only
 
 ## Docker
 
+From repo root:
+
 ```bash
-docker compose up --build
+docker compose -f infra/docker-compose.yml up --build
 ```
 
 Compose starts:
@@ -85,7 +87,7 @@ npm run test:e2e         # integration-level HTTP tests (alias: test:integration
 npm run test:integration
 ```
 
-E2E/integration tests require Postgres and Redis. Start dependencies with `docker compose up postgres redis` before running them.
+E2E/integration tests require Postgres and Redis. Start dependencies with `docker compose -f infra/docker-compose.yml up postgres redis` (from repo root) before running them.
 
 Acceptance smoke:
 
@@ -95,14 +97,14 @@ Acceptance smoke:
 
 ## API contract (frozen v1)
 
-Machine-readable OpenAPI: [packages/contracts/openapi/v1.yaml](../../packages/contracts/openapi/v1.yaml)  
-Rules: [packages/contracts/README.md](../../packages/contracts/README.md)
+Machine-readable OpenAPI: [shared/contracts/openapi/v1.yaml](../../shared/contracts/openapi/v1.yaml)  
+Rules: [shared/contracts/README.md](../../shared/contracts/README.md)
 
 ## Current Capability
 
 Completed (v0.1 ship scope):
 
-- NestJS application entrypoint under `services/api`
+- NestJS application entrypoint under `backend/api`
 - Global `/api/v1` prefix, request ID, response envelopes
 - Environment validation, including JWT secrets in production
 - `GET /api/v1/health` with Postgres and Redis dependency checks
@@ -122,7 +124,7 @@ Deployment:
 - `APP_ENV`：`development` / `staging` / `production`（控制 mock 支付、SMS、seed）
 - `GET /api/v1/health` 含依赖状态与运行时 metrics
 - `GET /api/v1/metrics` Prometheus 文本格式
-- `docker compose -f ../../docker-compose.prod.yml` + `deploy/nginx/` 示例
+- `docker compose -f ../../infra/docker-compose.prod.yml` + `infra/nginx/` 示例
 - `scripts/db-backup.sh`、`scripts/acceptance-smoke.sh`
 - Production checklist: [docs/production-checklist.md](../../docs/production-checklist.md)
 

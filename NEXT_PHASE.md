@@ -22,8 +22,8 @@
 |----|------|
 | e2e / smoke 在依赖环境证明 | CI 已加；本机无 Docker/Postgres 时需换环境补跑 |
 | Nest 传递依赖 audit 清零 | lodash/multer 等需 major 升级评估；禁止盲目 `audit fix --force` |
-| OpenAPI 装饰器化 | 当前为手写 `packages/contracts/openapi/v1.yaml` |
-| 微信证书 Docker secret 默认挂载 | 见 `secrets/README.md`；compose 中 volume 默认注释，生产部署时启用 |
+| OpenAPI 装饰器化 | 当前为手写 `shared/contracts/openapi/v1.yaml` |
+| 微信证书 Docker secret 默认挂载 | 见 `infra/secrets/README.md`；compose 中 volume 默认注释，生产部署时启用 |
 | 托管 DB / Redis | 现为 compose 容器形态 |
 | UITests 全量对齐登录门控 | 单元测试为主；UI 回归以手工清单为准 |
 | APNs / 监控告警接入 | 见 production-checklist |
