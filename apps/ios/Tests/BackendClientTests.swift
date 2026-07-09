@@ -50,6 +50,54 @@ final class BackendClientTests: XCTestCase {
         XCTAssertEqual(messages[0].type, .text)
     }
 
+    func testFetchConversationsMapsBackendPayload() async throws {
+        StubURLProtocol.nextResponse = (
+            """
+            {
+              "data": {
+                "conversations": [
+                  {
+                    "id": "c1",
+                    "participant": {
+                      "id": "c1",
+                      "name": "林屿",
+                      "role": "温柔倾听者",
+                      "initials": "LY",
+                      "isOnline": true,
+                      "isVerified": true,
+                      "availability": "online",
+                      "responseTime": "约30秒"
+                    },
+                    "lastMessage": {
+                      "id": "m1",
+                      "conversationId": "c1",
+                      "senderId": "c1",
+                      "senderName": "林屿",
+                      "content": "我在，先慢慢说。",
+                      "type": "text",
+                      "timestamp": "2026-07-07T02:00:00.000Z"
+                    },
+                    "unreadCount": 1,
+                    "updatedAt": "2026-07-07T02:00:00.000Z"
+                  }
+                ]
+              },
+              "meta": { "timestamp": "2026-07-07T02:00:00.000Z", "requestId": "req-conversations" }
+            }
+            """,
+            200
+        )
+
+        let client = BackendClient(baseURL: URL(string: "http://127.0.0.1:3000")!, session: session)
+        let conversations = try await client.fetchConversations()
+
+        XCTAssertEqual(conversations.count, 1)
+        XCTAssertEqual(conversations[0].id, "c1")
+        XCTAssertEqual(conversations[0].displayName, "林屿")
+        XCTAssertEqual(conversations[0].lastMessage?.content, "我在，先慢慢说。")
+        XCTAssertEqual(conversations[0].unreadCount, 1)
+    }
+
     func testSendMessageMapsModerationAndCompanionReply() async throws {
         StubURLProtocol.nextResponse = (
             """
@@ -98,6 +146,62 @@ final class BackendClientTests: XCTestCase {
         XCTAssertEqual(response.messages.count, 2)
         XCTAssertEqual(response.messages.last?.senderId, "c1")
         XCTAssertNil(response.moderationCase)
+    }
+
+    func testSendMessageMapsBlockedSafetyPayloadWithoutOriginalMessage() async throws {
+        StubURLProtocol.nextResponse = (
+            """
+            {
+              "data": {
+                "moderation": {
+                  "decision": "block",
+                  "riskLevel": "high",
+                  "score": 0.92,
+                  "reasons": ["疑似引导私下联系"],
+                  "matchedRules": ["contact.wechat"],
+                  "usedAI": false
+                },
+                "message": null,
+                "safetyMessage": {
+                  "id": "m-safety",
+                  "conversationId": "c1",
+                  "senderId": "system",
+                  "senderName": "系统",
+                  "content": "安全提醒：平台不支持线下邀约。",
+                  "type": "safety",
+                  "timestamp": "2026-07-07T02:00:01.000Z"
+                },
+                "companionReply": null,
+                "moderationCase": {
+                  "id": "mc1",
+                  "title": "聊天拦截：加微信",
+                  "category": "实时风控",
+                  "riskLevel": "high",
+                  "status": "humanReview",
+                  "source": "chat",
+                  "content": "加微信",
+                  "targetId": "c1",
+                  "aiScore": 0.92,
+                  "aiReason": "疑似引导私下联系",
+                  "decision": "block",
+                  "matchedRules": ["contact.wechat"],
+                  "usedAI": false,
+                  "resolvedAt": null
+                }
+              },
+              "meta": { "timestamp": "2026-07-07T02:00:02.000Z", "requestId": "req-block" }
+            }
+            """,
+            201
+        )
+
+        let client = BackendClient(baseURL: URL(string: "http://127.0.0.1:3000")!, session: session)
+        let response = try await client.sendMessage(conversationId: "c1", content: "加微信", senderId: "u1")
+
+        XCTAssertEqual(response.moderation.decision, .block)
+        XCTAssertEqual(response.messages.count, 1)
+        XCTAssertEqual(response.messages[0].type, .safety)
+        XCTAssertEqual(response.moderationCase?.decision, .block)
     }
 
     func testFetchModerationCasesMapsBackendPayload() async throws {
@@ -375,6 +479,33 @@ final class BackendClientTests: XCTestCase {
         XCTAssertEqual(store.companionDetailLoadState(for: "c-test"), .loaded)
         XCTAssertEqual(store.companion(by: "c-test")?.name, "测试陪伴者")
     }
+
+    @MainActor
+    func testBackendChatSuccessAppendsReturnedMessages() async {
+        let store = AppStore(backendClientFactory: { _ in ChatBackendAPIClient(mode: .allow) })
+        store.messages.removeAll { $0.conversationId == "c1" }
+
+        let decision = await store.sendTrialMessage("今天有点累", to: "c1")
+        let messages = store.messages(for: "c1")
+
+        XCTAssertEqual(decision, .allow)
+        XCTAssertEqual(messages.map(\.content), ["今天有点累", "我在，先慢慢说。"])
+        XCTAssertNil(store.sendFailureText(for: .companion(id: "c1")))
+    }
+
+    @MainActor
+    func testBackendBlockDoesNotAppendOriginalMessage() async {
+        let store = AppStore(backendClientFactory: { _ in ChatBackendAPIClient(mode: .block) })
+        store.messages.removeAll { $0.conversationId == "c1" }
+
+        let decision = await store.sendTrialMessage("加微信", to: "c1")
+        let messages = store.messages(for: "c1")
+
+        XCTAssertEqual(decision, .block)
+        XCTAssertFalse(messages.contains { $0.content == "加微信" })
+        XCTAssertTrue(messages.contains { $0.type == .safety })
+        XCTAssertEqual(store.moderationCases.first?.decision, .block)
+    }
 }
 
 private struct FailingBackendAPIClient: BackendAPIClient, Sendable {
@@ -398,7 +529,11 @@ private struct FailingBackendAPIClient: BackendAPIClient, Sendable {
         throw BackendError.unavailable
     }
 
-    func fetchMessages(conversationId: String) async throws -> [Message] {
+    func fetchConversations() async throws -> [ConversationSummary] {
+        throw BackendError.unavailable
+    }
+
+    func fetchMessages(conversationId: String, cursor: String?, limit: Int?) async throws -> [Message] {
         throw BackendError.unavailable
     }
 
@@ -432,7 +567,11 @@ private struct SuccessfulBackendAPIClient: BackendAPIClient, Sendable {
         MockData.user
     }
 
-    func fetchMessages(conversationId: String) async throws -> [Message] {
+    func fetchConversations() async throws -> [ConversationSummary] {
+        []
+    }
+
+    func fetchMessages(conversationId: String, cursor: String?, limit: Int?) async throws -> [Message] {
         []
     }
 
@@ -465,6 +604,84 @@ private struct SuccessfulBackendAPIClient: BackendAPIClient, Sendable {
         availability: .online,
         cityDistrict: "平台内"
     )
+}
+
+private struct ChatBackendAPIClient: BackendAPIClient, Sendable {
+    enum Mode: Sendable {
+        case allow
+        case block
+    }
+
+    let mode: Mode
+
+    func health() async throws -> BackendServiceStatus {
+        BackendServiceStatus(connected: true, version: "0.1.0", status: "ok")
+    }
+
+    func fetchCompanions(page: Int, pageSize: Int, tag: String?, availability: AvailabilityStatus?, isOnline: Bool?) async throws -> [Companion] {
+        []
+    }
+
+    func fetchCompanion(id: String) async throws -> Companion {
+        MockData.companions[0]
+    }
+
+    func fetchMe() async throws -> User {
+        MockData.user
+    }
+
+    func updateMe(displayName: String?, gender: UserGender?, age: Int?) async throws -> User {
+        MockData.user
+    }
+
+    func fetchConversations() async throws -> [ConversationSummary] {
+        []
+    }
+
+    func fetchMessages(conversationId: String, cursor: String?, limit: Int?) async throws -> [Message] {
+        []
+    }
+
+    func fetchModerationCases() async throws -> [ModerationCase] {
+        []
+    }
+
+    func sendMessage(conversationId: String, content: String, senderId: String) async throws -> BackendSendMessageResponse {
+        switch mode {
+        case .allow:
+            return BackendSendMessageResponse(
+                moderation: ModerationResult(decision: .allow, riskLevel: .low, score: 0.05, reasons: ["内容正常"], matchedRules: [], usedAI: false),
+                messages: [
+                    Message(id: "m-user", conversationId: conversationId, senderId: senderId, content: content, type: .text, timestamp: Date(timeIntervalSince1970: 1)),
+                    Message(id: "m-reply", conversationId: conversationId, senderId: conversationId, content: "我在，先慢慢说。", type: .text, timestamp: Date(timeIntervalSince1970: 2))
+                ],
+                moderationCase: nil
+            )
+        case .block:
+            return BackendSendMessageResponse(
+                moderation: ModerationResult(decision: .block, riskLevel: .high, score: 0.92, reasons: ["疑似引导私下联系"], matchedRules: ["contact.wechat"], usedAI: false),
+                messages: [
+                    Message(id: "m-safety", conversationId: conversationId, senderId: "system", content: "安全提醒：平台不支持线下邀约。", type: .safety, timestamp: Date(timeIntervalSince1970: 1))
+                ],
+                moderationCase: ModerationCase(
+                    id: "mc1",
+                    title: "聊天拦截：加微信",
+                    category: "实时风控",
+                    riskLevel: .high,
+                    status: .humanReview,
+                    source: .chat,
+                    content: content,
+                    targetId: conversationId,
+                    aiScore: 0.92,
+                    aiReason: "疑似引导私下联系",
+                    decision: .block,
+                    matchedRules: ["contact.wechat"],
+                    usedAI: false,
+                    resolvedAt: nil
+                )
+            )
+        }
+    }
 }
 
 private func companionEnvelope(id: String, name: String) -> String {

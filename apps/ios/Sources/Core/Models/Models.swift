@@ -391,6 +391,15 @@ struct Message: Identifiable, Codable, Hashable {
     }
 }
 
+struct ConversationSummary: Identifiable, Hashable {
+    let id: String
+    let target: ContactTarget
+    let displayName: String
+    let lastMessage: Message?
+    let unreadCount: Int
+    let updatedAt: Date
+}
+
 enum MessageType: String, Codable {
     case text
     case system

@@ -52,6 +52,10 @@ describe("Auth (e2e)", () => {
 
   beforeEach(async () => {
     await prisma.refreshToken.deleteMany();
+    await prisma.messageReadState.deleteMany();
+    await prisma.message.deleteMany();
+    await prisma.conversation.deleteMany();
+    await prisma.moderationCase.deleteMany();
     await prisma.verificationCode.deleteMany();
     await prisma.authIdentity.deleteMany();
     await prisma.userProfile.deleteMany();
@@ -60,6 +64,10 @@ describe("Auth (e2e)", () => {
 
   afterAll(async () => {
     await prisma.refreshToken.deleteMany();
+    await prisma.messageReadState.deleteMany();
+    await prisma.message.deleteMany();
+    await prisma.conversation.deleteMany();
+    await prisma.moderationCase.deleteMany();
     await prisma.verificationCode.deleteMany();
     await prisma.authIdentity.deleteMany();
     await prisma.userProfile.deleteMany();

@@ -38,9 +38,16 @@ protocol BackendAPIClient: Sendable {
     func fetchCompanion(id: String) async throws -> Companion
     func fetchMe() async throws -> User
     func updateMe(displayName: String?, gender: UserGender?, age: Int?) async throws -> User
-    func fetchMessages(conversationId: String) async throws -> [Message]
+    func fetchConversations() async throws -> [ConversationSummary]
+    func fetchMessages(conversationId: String, cursor: String?, limit: Int?) async throws -> [Message]
     func fetchModerationCases() async throws -> [ModerationCase]
     func sendMessage(conversationId: String, content: String, senderId: String) async throws -> BackendSendMessageResponse
+}
+
+extension BackendAPIClient {
+    func fetchMessages(conversationId: String) async throws -> [Message] {
+        try await fetchMessages(conversationId: conversationId, cursor: nil, limit: nil)
+    }
 }
 
 struct BackendClient: BackendAPIClient, Sendable {
@@ -117,9 +124,24 @@ struct BackendClient: BackendAPIClient, Sendable {
         return AuthDTOMapper.user(from: data)
     }
 
-    func fetchMessages(conversationId: String) async throws -> [Message] {
+    func fetchConversations() async throws -> [ConversationSummary] {
+        let data: BackendConversationsData = try await request(path: "/api/v1/conversations")
+        return data.conversations.map(BackendDTOMapper.conversation(from:))
+    }
+
+    func fetchMessages(conversationId: String, cursor: String? = nil, limit: Int? = nil) async throws -> [Message] {
         let encoded = conversationId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? conversationId
-        let data: BackendMessagesData = try await request(path: "/api/v1/conversations/\(encoded)/messages")
+        var queryItems: [URLQueryItem] = []
+        if let cursor {
+            queryItems.append(URLQueryItem(name: "cursor", value: cursor))
+        }
+        if let limit {
+            queryItems.append(URLQueryItem(name: "limit", value: String(limit)))
+        }
+        let path = queryItems.isEmpty
+            ? "/api/v1/conversations/\(encoded)/messages"
+            : queryPath("/api/v1/conversations/\(encoded)/messages", queryItems: queryItems)
+        let data: BackendMessagesData = try await request(path: path)
         return data.messages.compactMap(BackendDTOMapper.message(from:))
     }
 

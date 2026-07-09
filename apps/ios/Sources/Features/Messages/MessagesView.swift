@@ -6,6 +6,27 @@ struct MessagesView: View {
     @State private var showingNewConversation = false
 
     private var conversations: [ContactTarget] {
+        let sortedTargets = baseConversations
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return sortedTargets }
+
+        return sortedTargets.filter { target in
+            let summary = store.backendConversationSummary(for: target)
+            let displayName = summary?.displayName ?? store.displayName(for: target)
+            let lastMessage = summary?.lastMessage ?? store.latestMessage(for: target)
+            return displayName.localizedStandardContains(query)
+                || (lastMessage?.content.localizedStandardContains(query) ?? false)
+        }
+    }
+
+    private var baseConversations: [ContactTarget] {
+        if store.backendConversationLoadState == .loaded || store.backendConversationLoadState == .empty {
+            let backendTargets = store.backendConversations.map(\.target)
+            if !backendTargets.isEmpty || store.backendConversationLoadState == .empty {
+                return backendTargets
+            }
+        }
+
         let companionTargets = store.companions
             .filter { store.latestMessage(for: $0.id) != nil }
             .map { ContactTarget.companion(id: $0.id) }
@@ -21,18 +42,10 @@ struct MessagesView: View {
             return .communityUser(id: id, name: post.authorName, initials: post.authorInitials)
         }
 
-        let sortedTargets = (companionTargets + communityTargets).sorted {
+        return (companionTargets + communityTargets).sorted {
             let lhsDate = store.latestMessage(for: $0)?.timestamp ?? .distantPast
             let rhsDate = store.latestMessage(for: $1)?.timestamp ?? .distantPast
             return lhsDate > rhsDate
-        }
-
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return sortedTargets }
-
-        return sortedTargets.filter { target in
-            store.displayName(for: target).localizedStandardContains(query)
-                || (store.latestMessage(for: target)?.content.localizedStandardContains(query) ?? false)
         }
     }
 
@@ -60,7 +73,10 @@ struct MessagesView: View {
                             Button {
                                 store.navigate(.chat(target))
                             } label: {
-                                SecureConversationRow(target: target)
+                                SecureConversationRow(
+                                    target: target,
+                                    summary: store.backendConversationSummary(for: target)
+                                )
                             }
                             .buttonStyle(.plain)
                             .accessibilityLabel("打开与\(store.displayName(for: target))的会话")
@@ -90,6 +106,9 @@ struct MessagesView: View {
         .sheet(isPresented: $showingNewConversation) {
             NewConversationSheet()
                 .presentationDetents([.medium, .large])
+        }
+        .task {
+            await store.loadBackendConversations()
         }
     }
 }
@@ -267,10 +286,11 @@ private struct MessageSearchBar: View {
 
 private struct SecureConversationRow: View {
     let target: ContactTarget
+    let summary: ConversationSummary?
     @EnvironmentObject private var store: AppStore
 
     private var lastMessage: Message? {
-        store.latestMessage(for: target)
+        summary?.lastMessage ?? store.latestMessage(for: target)
     }
 
     private var companion: Companion? {
@@ -285,7 +305,7 @@ private struct SecureConversationRow: View {
 
                 VStack(alignment: .leading, spacing: DS.Space.sm) {
                     HStack(alignment: .firstTextBaseline, spacing: DS.Space.sm) {
-                        Text(store.displayName(for: target))
+                        Text(summary?.displayName ?? store.displayName(for: target))
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(Color.dsTextPrimary)
                             .lineLimit(1)
@@ -362,6 +382,7 @@ private struct SecureConversationRow: View {
     }
 
     private var statusText: String {
+        if let unreadCount = summary?.unreadCount, unreadCount > 0 { return "\(unreadCount) 未读" }
         if lastMessage?.type == .safety { return "安全提醒" }
         guard let companion else { return "平台内" }
         if store.hasActivePaidChat(with: companion.id) { return "付费沟通" }
@@ -369,6 +390,7 @@ private struct SecureConversationRow: View {
     }
 
     private var statusTone: DSBadge.Tone {
+        if let unreadCount = summary?.unreadCount, unreadCount > 0 { return .primary }
         if lastMessage?.type == .safety { return .warning }
         guard let companion else { return .neutral }
         if store.hasActivePaidChat(with: companion.id) { return .success }

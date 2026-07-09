@@ -31,6 +31,40 @@ enum Availability {
   busy
 }
 
+enum MessageType {
+  text
+  system
+  safety
+}
+
+enum ModerationDecision {
+  allow
+  warn
+  block
+  review
+}
+
+enum RiskLevel {
+  low
+  medium
+  high
+}
+
+enum ModerationSource {
+  chat
+  community
+  report
+  profile
+}
+
+enum ModerationCaseStatus {
+  pending
+  autoReviewing
+  humanReview
+  resolved
+  dismissed
+}
+
 model User {
   id            String        @id @default(uuid())
   role          UserRole      @default(user)
@@ -40,6 +74,8 @@ model User {
   identities    AuthIdentity[]
   profile       UserProfile?
   refreshTokens RefreshToken[]
+  conversations Conversation[]
+  readStates    MessageReadState[]
 }
 
 model AuthIdentity {
@@ -89,9 +125,78 @@ model CompanionProfile {
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
   serviceTags      CompanionServiceTag[]
+  conversations    Conversation[]
 
   @@index([isPublished, availability])
   @@index([isOnline])
+}
+
+model Conversation {
+  id          String   @id @default(uuid())
+  externalId  String
+  userId      String
+  companionId String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companion CompanionProfile   @relation(fields: [companionId], references: [id], onDelete: Cascade)
+  messages  Message[]
+  readStates MessageReadState[]
+
+  @@unique([userId, externalId])
+  @@unique([userId, companionId])
+  @@index([userId, updatedAt])
+  @@index([companionId])
+}
+
+model Message {
+  id             String      @id @default(uuid())
+  conversationId String
+  senderId       String
+  senderName     String?
+  content        String
+  type           MessageType @default(text)
+  createdAt      DateTime    @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt, id])
+  @@index([senderId])
+}
+
+model MessageReadState {
+  id             String   @id @default(uuid())
+  conversationId String
+  userId         String
+  readAt         DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+}
+
+model ModerationCase {
+  id           String               @id @default(uuid())
+  title        String
+  category     String
+  riskLevel    RiskLevel
+  status       ModerationCaseStatus @default(pending)
+  source       ModerationSource
+  content      String
+  targetId     String?
+  aiScore      Float
+  aiReason     String
+  decision     ModerationDecision
+  matchedRules String[]
+  usedAI       Boolean              @default(false)
+  resolvedAt   DateTime?
+  createdAt    DateTime             @default(now())
+
+  @@index([source, status])
+  @@index([targetId])
 }
 
 model ServiceTag {

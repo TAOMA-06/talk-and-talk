@@ -52,6 +52,10 @@ describe("Companions and me (e2e)", () => {
 
   async function cleanup() {
     if (!prisma) return;
+    await prisma.messageReadState.deleteMany();
+    await prisma.message.deleteMany();
+    await prisma.conversation.deleteMany();
+    await prisma.moderationCase.deleteMany();
     await prisma.companionServiceTag.deleteMany();
     await prisma.serviceTag.deleteMany();
     await prisma.companionProfile.deleteMany();

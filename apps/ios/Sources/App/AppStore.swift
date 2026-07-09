@@ -37,6 +37,9 @@ final class AppStore: ObservableObject {
     @Published var isBackendConnected = false
     @Published var backendModerationModel = ""
     @Published var backendChatSyncingCompanionId: String?
+    @Published var backendConversations: [ConversationSummary] = []
+    @Published var backendConversationLoadState: BackendLoadState = .idle
+    @Published var failedSendTextByConversationId: [String: String] = [:]
     @Published var companionListLoadState: BackendLoadState = .idle
     @Published var companionDetailLoadStateById: [String: BackendLoadState] = [:]
 
@@ -155,6 +158,14 @@ final class AppStore: ObservableObject {
         latestMessage(for: .companion(id: companionId))
     }
 
+    func backendConversationSummary(for target: ContactTarget) -> ConversationSummary? {
+        backendConversations.first { $0.target == target }
+    }
+
+    func sendFailureText(for target: ContactTarget) -> String? {
+        failedSendTextByConversationId[target.conversationId]
+    }
+
     func remainingTrialMessages(for companionId: String) -> Int {
         max(0, freeTrialMessageLimit - (trialMessageCountsByCompanionId[companionId] ?? 0))
     }
@@ -238,6 +249,29 @@ final class AppStore: ObservableObject {
         companionDetailLoadStateById[id] ?? .idle
     }
 
+    func loadBackendConversations() async {
+        guard BackendConfig.isEnabled, let client = backendClient() else {
+            applyBackendConversationFallback(message: "后端未配置")
+            return
+        }
+
+        backendConversationLoadState = .loading
+        do {
+            let fetched = try await client.fetchConversations()
+            backendConversations = fetched
+            for summary in fetched {
+                if let message = summary.lastMessage {
+                    appendMessage(message)
+                }
+            }
+            isBackendConnected = true
+            backendConversationLoadState = fetched.isEmpty ? .empty : .loaded
+        } catch {
+            isBackendConnected = false
+            applyBackendConversationFallback(message: userFacingMessage(for: error))
+        }
+    }
+
     func syncBackendChat(for companionId: String) async {
         guard BackendConfig.supportsChat(for: companionId), let client = backendClient() else { return }
 
@@ -255,6 +289,9 @@ final class AppStore: ObservableObject {
             let fetched = try await client.fetchMessages(conversationId: companionId)
             messages.removeAll { $0.conversationId == companionId }
             messages.append(contentsOf: fetched)
+            isBackendConnected = true
+            failedSendTextByConversationId[companionId] = nil
+            upsertBackendConversationSummary(for: .companion(id: companionId))
         } catch {
             isBackendConnected = false
             lastModerationFeedback = "消息同步失败，已切换本地聊天保护。"
@@ -297,6 +334,16 @@ final class AppStore: ObservableObject {
         }
 #endif
         companionDetailLoadStateById[id] = .failed(message)
+    }
+
+    private func applyBackendConversationFallback(message: String) {
+#if DEBUG
+        backendConversationLoadState = .loaded
+        lastModerationFeedback = "开发模式：\(message)，已使用本地消息列表。"
+#else
+        backendConversations = []
+        backendConversationLoadState = .failed(message)
+#endif
     }
 
     private func upsertCompanion(_ companion: Companion) {
@@ -429,7 +476,11 @@ final class AppStore: ObservableObject {
                 return try await sendMessageViaBackend(trimmed, to: target, client: client)
             } catch {
                 isBackendConnected = false
-                lastModerationFeedback = nil
+                failedSendTextByConversationId[target.conversationId] = trimmed
+                lastModerationFeedback = userFacingMessage(for: error)
+#if !DEBUG
+                return .block
+#endif
             }
         }
 
@@ -444,6 +495,7 @@ final class AppStore: ObservableObject {
         )
         let service = moderationService
         let result = await service.moderate(text: trimmed, source: .chat, context: context)
+        failedSendTextByConversationId[target.conversationId] = nil
 
         switch result.decision {
         case .block:
@@ -751,10 +803,12 @@ final class AppStore: ObservableObject {
         )
 
         isBackendConnected = true
+        failedSendTextByConversationId[target.conversationId] = nil
 
         for message in response.messages {
             appendMessage(message)
         }
+        upsertBackendConversationSummary(for: target)
 
         if let moderationCase = response.moderationCase {
             insertBackendModerationCase(moderationCase)
@@ -782,6 +836,23 @@ final class AppStore: ObservableObject {
         }
 
         return result.decision
+    }
+
+    private func upsertBackendConversationSummary(for target: ContactTarget) {
+        guard BackendConfig.supportsChat(for: target), let latest = latestMessage(for: target) else { return }
+        let summary = ConversationSummary(
+            id: target.conversationId,
+            target: target,
+            displayName: displayName(for: target),
+            lastMessage: latest,
+            unreadCount: 0,
+            updatedAt: latest.timestamp
+        )
+        backendConversations.removeAll { $0.id == summary.id }
+        backendConversations.insert(summary, at: 0)
+        if backendConversationLoadState == .idle || backendConversationLoadState == .empty {
+            backendConversationLoadState = .loaded
+        }
     }
 
     private func insertBackendModerationCase(_ item: ModerationCase) {

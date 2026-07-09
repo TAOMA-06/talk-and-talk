@@ -51,6 +51,10 @@ struct ChatView: View {
         store.accountRestrictions.canSendMessages ? nil : store.accountRestrictions.summary
     }
 
+    private var sendFailureText: String? {
+        store.sendFailureText(for: target)
+    }
+
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
@@ -130,6 +134,7 @@ struct ChatView: View {
                 text: $inputText,
                 isSending: isSending,
                 disabledReason: disabledReason,
+                sendFailureText: sendFailureText,
                 hasPaidChat: hasPaidChat,
                 showsPaidControls: target.allowsPaidActions,
                 canSendRecommendationCard: canSendRecommendationCard,
@@ -717,6 +722,7 @@ private struct SecureComposerBar: View {
     @Binding var text: String
     var isSending: Bool
     var disabledReason: String?
+    var sendFailureText: String?
     var hasPaidChat: Bool
     var showsPaidControls: Bool
     var canSendRecommendationCard: Bool
@@ -735,6 +741,27 @@ private struct SecureComposerBar: View {
 
     var body: some View {
         VStack(spacing: DS.Space.sm) {
+            if let sendFailureText {
+                HStack(spacing: DS.Space.sm) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.dsWarning)
+                    Text(sendFailureText)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Color.dsTextSecondary)
+                        .lineLimit(2)
+                    Spacer(minLength: DS.Space.sm)
+                    Button("重试", action: send)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.dsPrimary)
+                        .disabled(isSending || trimmedText.isEmpty || isDisabled)
+                }
+                .padding(.horizontal, DS.Space.md)
+                .padding(.vertical, DS.Space.xxs)
+                .background(Color.dsWarning.opacity(0.10), in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
+                .accessibilityIdentifier("sendFailureRetryBar")
+            }
+
             HStack(alignment: .bottom, spacing: DS.Space.sm) {
                 Menu {
                     if canSendRecommendationCard {

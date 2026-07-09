@@ -67,6 +67,29 @@ struct BackendMessagesData: Decodable {
     let messages: [BackendMessageDTO]
 }
 
+struct BackendConversationsData: Decodable {
+    let conversations: [BackendConversationDTO]
+}
+
+struct BackendConversationDTO: Decodable {
+    let id: String
+    let participant: BackendConversationParticipantDTO
+    let lastMessage: BackendMessageDTO?
+    let unreadCount: Int
+    let updatedAt: String
+}
+
+struct BackendConversationParticipantDTO: Decodable {
+    let id: String
+    let name: String
+    let role: String?
+    let initials: String?
+    let isOnline: Bool?
+    let isVerified: Bool?
+    let availability: String?
+    let responseTime: String?
+}
+
 struct BackendModerationCasesData: Decodable {
     let cases: [BackendModerationCaseDTO]
 }
@@ -137,6 +160,17 @@ enum BackendDTOMapper {
             content: dto.content,
             type: type,
             timestamp: parseDate(dto.timestamp)
+        )
+    }
+
+    static func conversation(from dto: BackendConversationDTO) -> ConversationSummary {
+        ConversationSummary(
+            id: dto.id,
+            target: .companion(id: dto.participant.id),
+            displayName: dto.participant.name,
+            lastMessage: dto.lastMessage.flatMap(message(from:)),
+            unreadCount: dto.unreadCount,
+            updatedAt: parseDate(dto.updatedAt)
         )
     }
 
