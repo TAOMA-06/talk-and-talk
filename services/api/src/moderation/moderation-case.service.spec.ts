@@ -3,17 +3,17 @@ import { ModerationResult } from "./moderation.service";
 
 describe("ModerationCaseService", () => {
   const create = jest.fn();
-  const auditCreate = jest.fn();
   const prisma = {
-    moderationCase: { create },
-    auditLog: { create: auditCreate }
+    moderationCase: { create }
   } as any;
+  const audit = { record: jest.fn().mockResolvedValue({}) } as any;
+  const notifications = { create: jest.fn().mockResolvedValue({}) } as any;
 
   let service: ModerationCaseService;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new ModerationCaseService(prisma);
+    service = new ModerationCaseService(prisma, audit, notifications);
   });
 
   it("uses the provided transaction client when creating a case", async () => {
@@ -135,7 +135,6 @@ describe("ModerationCaseService", () => {
   it("force-creates report cases even for allow decisions", async () => {
     const created = { id: "report-1", status: "pending", source: "report" };
     create.mockResolvedValue(created);
-    auditCreate.mockResolvedValue({ id: "audit-1" });
 
     const output = await service.createReportCase({
       result: {
@@ -162,13 +161,11 @@ describe("ModerationCaseService", () => {
         })
       })
     );
-    expect(auditCreate).toHaveBeenCalledWith(
+    expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({
-          action: "create_report",
-          resourceType: "moderation_case",
-          resourceId: "report-1"
-        })
+        action: "create_report",
+        resourceType: "moderation_case",
+        resourceId: "report-1"
       })
     );
   });

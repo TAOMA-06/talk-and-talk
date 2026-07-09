@@ -1,6 +1,8 @@
 import { Injectable } from "@nestjs/common";
 
+import { AuditService } from "../common/audit/audit.service";
 import { PrismaService } from "../database/prisma.service";
+import { NotificationsService } from "../notifications/notifications.service";
 import { ModerationResult, ModerationSource } from "./moderation.service";
 
 export interface CreateModerationCaseInput {
@@ -28,7 +30,11 @@ export interface CreateReportCaseInput {
 
 @Injectable()
 export class ModerationCaseService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+    private readonly notifications: NotificationsService
+  ) {}
 
   async createFromResult(input: CreateModerationCaseInput) {
     const { result, source, content, targetId, messageId, actorId, title, status, forceCreate, db } =
@@ -38,7 +44,7 @@ export class ModerationCaseService {
     }
 
     const client = db ?? this.prisma;
-    return client.moderationCase.create({
+    const created = await client.moderationCase.create({
       data: {
         title: title ?? this.caseTitle(result, content),
         category: this.categoryFor(source),
@@ -71,6 +77,16 @@ export class ModerationCaseService {
         actionLogs: true
       }
     } as any);
+
+    // Outside interactive tx is fine for notification/audit side effects.
+    if (!db) {
+      await this.afterCaseCreated(created, result, actorId);
+    } else if (actorId) {
+      // When inside chat transaction, notify after commit asynchronously.
+      void this.afterCaseCreated(created, result, actorId).catch(() => undefined);
+    }
+
+    return created;
   }
 
   async createReportCase(input: CreateReportCaseInput) {
@@ -92,22 +108,43 @@ export class ModerationCaseService {
     }
 
     if (actorId) {
-      await this.prisma.auditLog.create({
-        data: {
-          actorId,
-          action: "create_report",
-          resourceType: "moderation_case",
-          resourceId: created.id,
-          metadata: {
-            reason: reason.slice(0, 200),
-            source: "report",
-            decision: result.decision
-          }
+      await this.audit.record({
+        actorId,
+        action: "create_report",
+        resourceType: "moderation_case",
+        resourceId: created.id,
+        metadata: {
+          reason: reason.slice(0, 200),
+          source: "report",
+          decision: result.decision
         }
-      } as any);
+      });
     }
 
     return created;
+  }
+
+  private async afterCaseCreated(
+    created: { id: string },
+    result: ModerationResult,
+    actorId?: string | null
+  ) {
+    if (actorId) {
+      await this.notifications.create(
+        actorId,
+        "moderationAlert",
+        "内容安全提醒",
+        "你的内容已触发平台安全机制，请继续在平台内合规沟通。",
+        { caseId: created.id, decision: result.decision }
+      );
+    }
+    await this.audit.record({
+      actorId: actorId ?? "system",
+      action: "moderation.case_created",
+      resourceType: "moderation_case",
+      resourceId: created.id,
+      metadata: { decision: result.decision, riskLevel: result.riskLevel }
+    });
   }
 
   private buildEvidences(result: ModerationResult, content: string) {

@@ -23,6 +23,8 @@ interface Environment {
   WECHAT_PAY_CERT_SERIAL_NO: string;
   APPLE_SIGN_IN_BUNDLE_ID: string;
   SMS_PROVIDER: string;
+  RATE_LIMIT_PER_MINUTE: number;
+  BODY_SIZE_LIMIT: string;
 }
 
 const DEFAULT_DATABASE_URL = "postgres://talk:talk@localhost:5432/talk_and_talk";
@@ -122,7 +124,9 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     WECHAT_PAY_PRIVATE_KEY_PATH: optionalString(env.WECHAT_PAY_PRIVATE_KEY_PATH),
     WECHAT_PAY_CERT_SERIAL_NO: optionalString(env.WECHAT_PAY_CERT_SERIAL_NO),
     APPLE_SIGN_IN_BUNDLE_ID: optionalString(env.APPLE_SIGN_IN_BUNDLE_ID),
-    SMS_PROVIDER: env.SMS_PROVIDER?.trim() || (nodeEnv === "production" ? "none" : "mock")
+    SMS_PROVIDER: env.SMS_PROVIDER?.trim() || (nodeEnv === "production" ? "none" : "mock"),
+    RATE_LIMIT_PER_MINUTE: parseInt(env.RATE_LIMIT_PER_MINUTE ?? "120", 10) || 120,
+    BODY_SIZE_LIMIT: env.BODY_SIZE_LIMIT?.trim() || "1mb"
   };
 }
 

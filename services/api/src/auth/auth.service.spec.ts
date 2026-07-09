@@ -4,8 +4,9 @@ import { Test } from "@nestjs/testing";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 
-import { AuthService } from "./auth.service";
+import { AuditService } from "../common/audit/audit.service";
 import { PrismaService } from "../database/prisma.service";
+import { AuthService } from "./auth.service";
 import { SMS_PROVIDER } from "./sms/sms-provider.interface";
 import { MockSmsProvider } from "./sms/mock-sms.provider";
 
@@ -72,7 +73,8 @@ describe("AuthService", () => {
             })
           }
         },
-        { provide: SMS_PROVIDER, useClass: MockSmsProvider }
+        { provide: SMS_PROVIDER, useClass: MockSmsProvider },
+        { provide: AuditService, useValue: { record: jest.fn().mockResolvedValue({}) } }
       ]
     }).compile();
 
@@ -154,7 +156,8 @@ describe("AuthService", () => {
               getOrThrow: jest.fn(() => "secret")
             }
           },
-          { provide: SMS_PROVIDER, useValue: new MockSmsProvider() }
+          { provide: SMS_PROVIDER, useValue: new MockSmsProvider() },
+          { provide: AuditService, useValue: { record: jest.fn().mockResolvedValue({}) } }
         ]
       }).compile();
 

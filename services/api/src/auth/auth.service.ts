@@ -8,8 +8,10 @@ import Redis from "ioredis";
 import { parsePhoneNumberFromString } from "libphonenumber-js";
 import * as jose from "jose";
 
-import { PrismaService } from "../database/prisma.service";
+import { AuditService } from "../common/audit/audit.service";
 import { AppException } from "../common/errors/app.exception";
+import { maskPhone as maskPhoneUtil } from "../common/logging/redact";
+import { PrismaService } from "../database/prisma.service";
 import { SMS_PROVIDER, SmsProvider } from "./sms/sms-provider.interface";
 
 export interface AuthTokens {
@@ -37,8 +39,7 @@ export interface UserWithProfile {
 }
 
 function maskPhone(phone: string): string {
-  if (phone.length <= 7) return phone;
-  return phone.slice(0, 3) + "****" + phone.slice(-4);
+  return maskPhoneUtil(phone);
 }
 
 @Injectable()
@@ -50,7 +51,8 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
-    @Inject(SMS_PROVIDER) private readonly sms: SmsProvider
+    @Inject(SMS_PROVIDER) private readonly sms: SmsProvider,
+    private readonly audit: AuditService
   ) {}
 
   private getRedis(): Redis {
@@ -138,6 +140,7 @@ export class AuthService {
     const user = await this.findOrCreateByPhone(e164);
     const tokens = await this.issueTokens(user);
     const profile = await this.getUserWithProfile(user.id);
+    await this.recordLoginAudit(user.id, user.role, "phone", { phone: e164 });
 
     return { ...tokens, user: profile };
   }
@@ -163,6 +166,7 @@ export class AuthService {
     const user = await this.findOrCreateByApple(sub);
     const tokens = await this.issueTokens(user);
     const profile = await this.getUserWithProfile(user.id);
+    await this.recordLoginAudit(user.id, user.role, "apple");
 
     return { ...tokens, user: profile };
   }
@@ -225,6 +229,22 @@ export class AuthService {
           }
         : null
     };
+  }
+
+  private async recordLoginAudit(
+    userId: string,
+    role: string,
+    provider: string,
+    metadata: Record<string, unknown> = {}
+  ) {
+    const isStaff = role === "admin" || role === "moderator";
+    await this.audit.record({
+      actorId: userId,
+      action: isStaff ? "admin.login" : "user.login",
+      resourceType: "auth",
+      resourceId: userId,
+      metadata: { role, provider, ...metadata }
+    });
   }
 
   private async findOrCreateByPhone(phone: string) {

@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 
+import { NotificationsModule } from "../notifications/notifications.module";
 import { AI_PROVIDER } from "./ai/ai-provider.interface";
 import { DeepSeekAIProvider } from "./ai/deepseek.provider";
 import { MockAIProvider } from "./ai/mock-ai.provider";
@@ -10,7 +11,7 @@ import { ModerationService } from "./moderation.service";
 import { RuleEngine } from "./rule-engine";
 
 @Module({
-  imports: [ConfigModule],
+  imports: [ConfigModule, NotificationsModule],
   controllers: [ModerationController],
   providers: [
     RuleEngine,

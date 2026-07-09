@@ -138,7 +138,6 @@ private struct SafetyScorePanel: View {
 private struct MenuPanel: View {
     @EnvironmentObject private var store: AppStore
     @State private var showingGenderSettings = false
-    @State private var showingAgreement = false
 
     private let creditService = CreditService()
 
@@ -150,13 +149,24 @@ private struct MenuPanel: View {
         VStack(alignment: .leading, spacing: DS.Space.lg) {
             menuGroup(title: "账户与身份") {
                 DSListRow(
-                    title: "退出登录",
-                    subtitle: "清除本机登录状态",
-                    symbol: "rectangle.portrait.and.arrow.right"
+                    title: "账号设置",
+                    subtitle: "通知、协议、隐私与退出登录",
+                    symbol: "gearshape"
                 ) {
-                    Task { await store.logout() }
+                    store.navigate(.settings)
                 }
-                .accessibilityIdentifier("logoutRow")
+                .accessibilityIdentifier("profileSettingsRow")
+                menuDivider()
+                DSListRow(
+                    title: "消息通知",
+                    subtitle: store.notificationUnreadCount > 0
+                        ? "\(store.notificationUnreadCount) 条未读"
+                        : "支付与安全提醒",
+                    symbol: "bell"
+                ) {
+                    store.navigate(.notifications)
+                }
+                .accessibilityIdentifier("profileNotificationsRow")
                 menuDivider()
                 DSListRow(
                     title: "身份设置",
@@ -175,6 +185,15 @@ private struct MenuPanel: View {
                     store.navigate(.verify)
                 }
                 .accessibilityIdentifier("profileVerifyRow")
+                menuDivider()
+                DSListRow(
+                    title: "退出登录",
+                    subtitle: "清除本机登录状态",
+                    symbol: "rectangle.portrait.and.arrow.right"
+                ) {
+                    Task { await store.logout() }
+                }
+                .accessibilityIdentifier("logoutRow")
             }
 
             menuGroup(title: "安全与信任") {
@@ -190,13 +209,22 @@ private struct MenuPanel: View {
 
             menuGroup(title: "帮助与规范") {
                 DSListRow(
-                    title: "平台规范",
+                    title: "用户协议",
                     subtitle: "服务边界与沟通规则",
                     symbol: "doc.text"
                 ) {
-                    showingAgreement = true
+                    store.navigate(.userAgreement)
                 }
                 .accessibilityIdentifier("profileAgreementRow")
+                menuDivider()
+                DSListRow(
+                    title: "隐私政策",
+                    subtitle: "信息如何被使用与保护",
+                    symbol: "hand.raised"
+                ) {
+                    store.navigate(.privacyPolicy)
+                }
+                .accessibilityIdentifier("profilePrivacyRow")
             }
 
 #if DEBUG
@@ -217,8 +245,8 @@ private struct MenuPanel: View {
                 .presentationDetents([.height(300)])
                 .presentationDragIndicator(.visible)
         }
-        .sheet(isPresented: $showingAgreement) {
-            PlatformAgreementSheet()
+        .task {
+            await store.loadNotifications()
         }
     }
 
@@ -239,44 +267,6 @@ private struct MenuPanel: View {
 
     private func menuDivider() -> some View {
         Divider().padding(.leading, 52)
-    }
-}
-
-private struct PlatformAgreementSheet: View {
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: DS.Space.lg) {
-                    Text(PlatformAgreement.title)
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(Color.dsTextPrimary)
-
-                    ForEach(Array(PlatformAgreement.sections.enumerated()), id: \.offset) { _, section in
-                        VStack(alignment: .leading, spacing: DS.Space.xxs) {
-                            Text(section.0)
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(Color.dsTextPrimary)
-                            Text(section.1)
-                                .font(.system(size: 13))
-                                .foregroundStyle(Color.dsTextSecondary)
-                                .lineSpacing(3)
-                        }
-                    }
-                }
-                .padding(DS.Space.lg)
-            }
-            .background(Color.dsBackground)
-            .navigationTitle("平台规范")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("完成") { dismiss() }
-                        .accessibilityIdentifier("agreementDoneButton")
-                }
-            }
-        }
     }
 }
 

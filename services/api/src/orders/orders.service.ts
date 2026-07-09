@@ -1,8 +1,10 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 
+import { AuditService } from "../common/audit/audit.service";
 import { AppException } from "../common/errors/app.exception";
 import { PrismaService } from "../database/prisma.service";
+import { NotificationsService } from "../notifications/notifications.service";
 import { CreateOrderDto } from "./dto/create-order.dto";
 import { CreateRefundDto } from "./dto/create-refund.dto";
 
@@ -26,7 +28,11 @@ type OrderRecord = {
 
 @Injectable()
 export class OrdersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+    private readonly audit: AuditService
+  ) {}
 
   async create(userId: string, dto: CreateOrderDto) {
     const durationMinutes = dto.durationMinutes;
@@ -114,6 +120,14 @@ export class OrdersService {
       });
     });
 
+    await this.notifications.create(
+      userId,
+      "orderStatus",
+      "订单已取消",
+      "你的订单已取消，如需服务可重新下单。",
+      { orderId, status: "cancelled" }
+    );
+
     return this.toDto(updated);
   }
 
@@ -165,6 +179,22 @@ export class OrdersService {
         reason: dto.reason?.trim() || null
       }
     } as any);
+
+    await this.audit.record({
+      actorId: userId,
+      action: "refund.requested",
+      resourceType: "order",
+      resourceId: orderId,
+      metadata: { refundId: refund.id, amountCents: order.amountCents }
+    });
+
+    await this.notifications.create(
+      userId,
+      "orderStatus",
+      "退款申请已提交",
+      "我们已收到你的退款申请，将尽快处理。",
+      { orderId, refundId: refund.id, status: "pending" }
+    );
 
     return {
       refund: this.toRefundDto(refund),

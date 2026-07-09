@@ -137,6 +137,16 @@ private extension View {
                     VerifyView()
                 case .safetyCenter:
                     SafetyCenterView()
+                case .notifications:
+                    NotificationsView()
+                case .settings:
+                    SettingsView()
+                case .privacyPolicy:
+                    LegalDocumentView(title: PrivacyPolicy.title, sections: PrivacyPolicy.sections)
+                case .userAgreement:
+                    LegalDocumentView(title: PlatformAgreement.title, sections: PlatformAgreement.sections)
+                case .accountDeletion:
+                    AccountDeletionView()
 #if DEBUG
                 case .admin:
                     AdminView()

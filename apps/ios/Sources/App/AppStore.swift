@@ -42,6 +42,8 @@ final class AppStore: ObservableObject {
     @Published var failedSendTextByConversationId: [String: String] = [:]
     @Published var companionListLoadState: BackendLoadState = .idle
     @Published var companionDetailLoadStateById: [String: BackendLoadState] = [:]
+    @Published var notifications: [AppNotification] = []
+    @Published var notificationUnreadCount = 0
 
     let freeTrialMessageLimit = 5
 
@@ -877,6 +879,79 @@ final class AppStore: ObservableObject {
 
     func logout() async {
         await authSession?.logout()
+        clearSessionLocalState()
+    }
+
+    func loadNotifications() async {
+        guard BackendConfig.isEnabled, let client = backendClient() else { return }
+        do {
+            async let list = client.fetchNotifications(unreadOnly: false)
+            async let count = client.fetchNotificationUnreadCount()
+            notifications = try await list
+            notificationUnreadCount = try await count
+        } catch {
+            // Keep existing list; surface soft feedback only in DEBUG.
+#if DEBUG
+            lastModerationFeedback = "通知同步失败：\(userFacingMessage(for: error))"
+#endif
+        }
+    }
+
+    func markNotificationRead(id: String) async {
+        if let index = notifications.firstIndex(where: { $0.id == id }), notifications[index].isUnread {
+            notifications[index].readAt = Date()
+            notificationUnreadCount = max(0, notificationUnreadCount - 1)
+        }
+        guard BackendConfig.isEnabled, let client = backendClient() else { return }
+        do {
+            let updated = try await client.markNotificationRead(id: id)
+            if let index = notifications.firstIndex(where: { $0.id == updated.id }) {
+                notifications[index] = updated
+            }
+            notificationUnreadCount = try await client.fetchNotificationUnreadCount()
+        } catch {
+#if DEBUG
+            lastModerationFeedback = userFacingMessage(for: error)
+#endif
+        }
+    }
+
+    func markAllNotificationsRead() async {
+        for index in notifications.indices where notifications[index].isUnread {
+            notifications[index].readAt = Date()
+        }
+        notificationUnreadCount = 0
+        guard BackendConfig.isEnabled, let client = backendClient() else { return }
+        do {
+            try await client.markAllNotificationsRead()
+        } catch {
+#if DEBUG
+            lastModerationFeedback = userFacingMessage(for: error)
+#endif
+        }
+    }
+
+    func requestAccountDeletion() async throws -> String {
+        if BackendConfig.isEnabled, let client = backendClient() {
+            return try await client.requestAccountDeletion()
+        }
+        return "我们已收到你的注销申请，将在 15 个工作日内处理。"
+    }
+
+    private func clearSessionLocalState() {
+        orders = []
+        messages = []
+        backendConversations = []
+        notifications = []
+        notificationUnreadCount = 0
+        activeOrderId = nil
+        trialMessageCountsByCompanionId = [:]
+        failedSendTextByConversationId = [:]
+        moderationCases = []
+        lastModerationFeedback = nil
+        agreementPrompt = nil
+        isBackendConnected = false
+        popToRoot()
     }
 
     /// 在正式 warn 扣分前给予两次协议提醒。返回 true 表示本次走了提醒流程。

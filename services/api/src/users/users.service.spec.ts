@@ -10,11 +10,12 @@ describe("UsersService", () => {
     }
   } as any;
 
+  const audit = { record: jest.fn().mockResolvedValue({}) } as any;
   let service: UsersService;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new UsersService(prisma);
+    service = new UsersService(prisma, audit);
   });
 
   it("updates only safe profile fields", async () => {

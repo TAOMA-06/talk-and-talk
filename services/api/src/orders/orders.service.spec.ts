@@ -25,11 +25,13 @@ describe("OrdersService", () => {
     $transaction: jest.fn()
   } as any;
 
+  const notifications = { create: jest.fn().mockResolvedValue({}) } as any;
+  const audit = { record: jest.fn().mockResolvedValue({}) } as any;
   let service: OrdersService;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new OrdersService(prisma);
+    service = new OrdersService(prisma, notifications, audit);
   });
 
   it("creates a pending order with server-side pricing in cents", async () => {

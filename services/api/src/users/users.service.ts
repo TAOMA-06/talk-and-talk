@@ -1,12 +1,17 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
 
+import { AuditService } from "../common/audit/audit.service";
 import { AppException } from "../common/errors/app.exception";
+import { maskPhone } from "../common/logging/redact";
 import { PrismaService } from "../database/prisma.service";
 import { UpdateMeDto } from "./dto/update-me.dto";
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService
+  ) {}
 
   async getMe(userId: string) {
     const user = await this.prisma.user.findUnique({
@@ -24,7 +29,7 @@ export class UsersService {
       profile: user.profile
         ? {
             displayName: user.profile.displayName,
-            phone: user.profile.phone ? this.maskPhone(user.profile.phone) : null,
+            phone: user.profile.phone ? maskPhone(user.profile.phone) : null,
             age: user.profile.age,
             gender: user.profile.gender,
             isVerified: user.profile.isVerified,
@@ -70,8 +75,39 @@ export class UsersService {
     return this.getMe(userId);
   }
 
-  private maskPhone(phone: string): string {
-    if (phone.length <= 7) return phone;
-    return phone.slice(0, 3) + "****" + phone.slice(-4);
+  async requestDeletion(userId: string) {
+    const existing = await this.prisma.accountDeletionRequest.findFirst({
+      where: { userId, status: { in: ["pending", "processing"] } },
+      orderBy: { createdAt: "desc" }
+    } as any);
+
+    if (existing) {
+      return {
+        id: existing.id,
+        status: existing.status,
+        message: "我们已收到你的注销申请，将在 15 个工作日内处理。"
+      };
+    }
+
+    const created = await this.prisma.accountDeletionRequest.create({
+      data: {
+        userId,
+        status: "pending"
+      }
+    } as any);
+
+    await this.audit.record({
+      actorId: userId,
+      action: "account.deletion_requested",
+      resourceType: "user",
+      resourceId: userId,
+      metadata: { requestId: created.id }
+    });
+
+    return {
+      id: created.id,
+      status: created.status,
+      message: "我们已收到你的注销申请，将在 15 个工作日内处理。"
+    };
   }
 }

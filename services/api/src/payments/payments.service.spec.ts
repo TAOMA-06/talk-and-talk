@@ -35,6 +35,14 @@ describe("PaymentsService", () => {
     }))
   } as any;
 
+  const notifications = {
+    create: jest.fn().mockResolvedValue({})
+  } as any;
+
+  const audit = {
+    record: jest.fn().mockResolvedValue({})
+  } as any;
+
   const wechat = new MockWeChatPayProvider();
   let service: PaymentsService;
 
@@ -69,7 +77,7 @@ describe("PaymentsService", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new PaymentsService(prisma, config, ordersService, wechat);
+    service = new PaymentsService(prisma, config, ordersService, wechat, notifications, audit);
   });
 
   it("fulfills mock notify: paying -> paid and activates conversation once", async () => {
@@ -113,6 +121,20 @@ describe("PaymentsService", () => {
     expect(result.data.alreadyProcessed).toBe(false);
     expect(result.data.orderStatus).toBe("paid");
     expect(result.data.conversationCreated).toBe(true);
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actorId: "u1",
+        action: "payment.fulfilled",
+        resourceId: "o1"
+      })
+    );
+    expect(notifications.create).toHaveBeenCalledWith(
+      "u1",
+      "paymentSuccess",
+      "支付成功",
+      "订单已支付，平台担保沟通已开启。",
+      { orderId: "o1", status: "paid" }
+    );
   });
 
   it("is idempotent on duplicate notify", async () => {
@@ -151,6 +173,8 @@ describe("PaymentsService", () => {
 
     expect(result.data.alreadyProcessed).toBe(true);
     expect(result.data.conversationCreated).toBe(false);
+    expect(audit.record).not.toHaveBeenCalled();
+    expect(notifications.create).not.toHaveBeenCalled();
   });
 
   it("rejects amount mismatch", async () => {

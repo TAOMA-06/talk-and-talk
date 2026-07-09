@@ -89,6 +89,20 @@ enum RefundTxnStatus {
   failed
 }
 
+enum NotificationType {
+  paymentSuccess
+  orderStatus
+  moderationAlert
+  safetyAlert
+}
+
+enum DeletionRequestStatus {
+  pending
+  processing
+  completed
+  cancelled
+}
+
 model User {
   id            String        @id @default(uuid())
   role          UserRole      @default(user)
@@ -101,6 +115,8 @@ model User {
   conversations Conversation[]
   readStates    MessageReadState[]
   orders        Order[]
+  notifications Notification[]
+  deletionRequests AccountDeletionRequest[]
 }
 
 model AuthIdentity {
@@ -338,6 +354,36 @@ model AuditLog {
 
   @@index([resourceType, resourceId])
   @@index([actorId, createdAt])
+  @@index([createdAt])
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  type      NotificationType
+  title     String
+  body      String
+  data      Json?
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, readAt])
+}
+
+model AccountDeletionRequest {
+  id        String                @id @default(uuid())
+  userId    String
+  status    DeletionRequestStatus @default(pending)
+  note      String?
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
   @@index([createdAt])
 }
 

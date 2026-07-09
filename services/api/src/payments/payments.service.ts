@@ -2,13 +2,25 @@ import { forwardRef, HttpStatus, Inject, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { randomUUID } from "node:crypto";
 
+import { AuditService } from "../common/audit/audit.service";
 import { AppException } from "../common/errors/app.exception";
 import { PrismaService } from "../database/prisma.service";
+import { NotificationsService } from "../notifications/notifications.service";
 import { OrdersService } from "../orders/orders.service";
 import {
   WECHAT_PAY_PROVIDER,
   WeChatPayProvider
 } from "./wechat/wechat-pay.provider";
+
+type FulfillPaymentTxResult = {
+  alreadyProcessed: boolean;
+  orderId: string;
+  conversationCreated: boolean;
+  orderStatus: string;
+  userId: string;
+  amountCents: number;
+  paymentId: string;
+};
 
 @Injectable()
 export class PaymentsService {
@@ -16,7 +28,9 @@ export class PaymentsService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     @Inject(forwardRef(() => OrdersService)) private readonly ordersService: OrdersService,
-    @Inject(WECHAT_PAY_PROVIDER) private readonly wechat: WeChatPayProvider
+    @Inject(WECHAT_PAY_PROVIDER) private readonly wechat: WeChatPayProvider,
+    private readonly notifications: NotificationsService,
+    private readonly audit: AuditService
   ) {}
 
   async prepay(userId: string, orderId: string) {
@@ -217,8 +231,11 @@ export class PaymentsService {
           alreadyProcessed: true,
           orderId: order.id,
           conversationCreated: false,
-          orderStatus: order.status
-        };
+          orderStatus: order.status,
+          userId: order.userId,
+          amountCents: order.amountCents,
+          paymentId: payment.id
+        } satisfies FulfillPaymentTxResult;
       }
 
       if (!["pending", "paying"].includes(order.status)) {
@@ -228,8 +245,11 @@ export class PaymentsService {
             alreadyProcessed: true,
             orderId: order.id,
             conversationCreated: false,
-            orderStatus: order.status
-          };
+            orderStatus: order.status,
+            userId: order.userId,
+            amountCents: order.amountCents,
+            paymentId: payment.id
+          } satisfies FulfillPaymentTxResult;
         }
         throw new AppException(
           "ORDER_INVALID_STATE",
@@ -303,14 +323,43 @@ export class PaymentsService {
         alreadyProcessed: false,
         orderId: order.id,
         conversationCreated,
-        orderStatus: "paid"
-      };
+        orderStatus: "paid",
+        userId: order.userId,
+        amountCents: order.amountCents,
+        paymentId: payment.id
+      } satisfies FulfillPaymentTxResult;
     });
+
+    if (!result.alreadyProcessed) {
+      await this.audit.record({
+        actorId: result.userId,
+        action: "payment.fulfilled",
+        resourceType: "order",
+        resourceId: result.orderId,
+        metadata: {
+          paymentId: result.paymentId,
+          amountCents: result.amountCents,
+          outTradeNo: payload.outTradeNo
+        }
+      });
+      await this.notifications.create(
+        result.userId,
+        "paymentSuccess",
+        "支付成功",
+        "订单已支付，平台担保沟通已开启。",
+        { orderId: result.orderId, status: "paid" }
+      );
+    }
 
     return {
       code: "SUCCESS" as const,
       message: "成功",
-      data: result
+      data: {
+        alreadyProcessed: result.alreadyProcessed,
+        orderId: result.orderId,
+        conversationCreated: result.conversationCreated,
+        orderStatus: result.orderStatus
+      }
     };
   }
 

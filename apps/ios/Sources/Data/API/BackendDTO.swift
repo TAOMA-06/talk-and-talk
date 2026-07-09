@@ -157,6 +157,33 @@ struct BackendMockNotifyInnerDTO: Decodable {
     let orderStatus: String?
 }
 
+struct BackendNotificationsData: Decodable {
+    let items: [BackendNotificationDTO]
+}
+
+struct BackendNotificationDTO: Decodable {
+    let id: String
+    let type: String
+    let title: String
+    let body: String
+    let readAt: String?
+    let createdAt: String
+}
+
+struct BackendUnreadCountData: Decodable {
+    let count: Int
+}
+
+struct BackendReadAllData: Decodable {
+    let updated: Int?
+}
+
+struct BackendDeletionRequestData: Decodable {
+    let id: String?
+    let status: String?
+    let message: String
+}
+
 struct BackendReportSummaryDTO: Decodable {
     let id: String
     let status: String
@@ -293,6 +320,18 @@ enum BackendDTOMapper {
             nonceStr: dto.nonceStr,
             timeStamp: dto.timeStamp,
             sign: dto.sign
+        )
+    }
+
+    static func notification(from dto: BackendNotificationDTO) -> AppNotification? {
+        guard let type = AppNotificationType(rawValue: dto.type) else { return nil }
+        return AppNotification(
+            id: dto.id,
+            type: type,
+            title: dto.title,
+            body: dto.body,
+            readAt: dto.readAt.map(parseDate),
+            createdAt: parseDate(dto.createdAt)
         )
     }
 

@@ -51,6 +51,8 @@ describe("Auth (e2e)", () => {
   });
 
   beforeEach(async () => {
+    await prisma.notification.deleteMany();
+    await prisma.accountDeletionRequest.deleteMany();
     await prisma.refundTransaction.deleteMany();
     await prisma.paymentTransaction.deleteMany();
     await prisma.order.deleteMany();
@@ -70,6 +72,8 @@ describe("Auth (e2e)", () => {
   });
 
   afterAll(async () => {
+    await prisma.notification.deleteMany();
+    await prisma.accountDeletionRequest.deleteMany();
     await prisma.refundTransaction.deleteMany();
     await prisma.paymentTransaction.deleteMany();
     await prisma.order.deleteMany();

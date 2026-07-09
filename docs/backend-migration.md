@@ -59,7 +59,12 @@ Day 1 routes currently available:
 | `POST /api/v1/payments/wechat/notify` | WeChat notify (signature verify, idempotent, amount/status checks; activates conversation on first success) |
 | `POST /api/v1/payments/wechat/mock-notify` | Dev/test only: simulate successful notify (JWT) |
 | `GET /api/v1/admin/status` | Admin module skeleton status (`admin` only) |
-| `GET /api/v1/notifications/status` | Notifications module skeleton status |
+| `GET /api/v1/notifications/status` | Notifications module status (`active`) |
+| `GET /api/v1/notifications` | List notifications (JWT); optional `unreadOnly` |
+| `GET /api/v1/notifications/unread-count` | Unread count (JWT) |
+| `POST /api/v1/notifications/:id/read` | Mark one read (JWT) |
+| `POST /api/v1/notifications/read-all` | Mark all read (JWT) |
+| `POST /api/v1/me/deletion-request` | Account deletion request (JWT) → AuditLog |
 
 Web 运营后台：`http://localhost:3000/admin/`（静态页，需 staff JWT）。详见 [admin-moderation-api.md](./admin-moderation-api.md)。
 

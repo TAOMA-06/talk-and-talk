@@ -11,11 +11,17 @@ enum BackendError: Error, Equatable {
         switch self {
         case .apiError(let code, let message, _):
             switch code {
-            case "RATE_LIMITED": return "验证码发送太频繁，请稍后再试"
+            case "RATE_LIMITED": return "操作过于频繁，请稍后再试"
             case "INVALID_VERIFICATION_CODE": return "验证码错误或已过期"
             case "INVALID_PHONE": return "请输入正确的手机号"
             case "UNAUTHORIZED": return "登录已过期，请重新登录"
             case "FORBIDDEN": return "没有权限执行此操作"
+            case "PAYMENT_AMOUNT_MISMATCH", "PAYMENT_NOT_SUCCESS", "PAYMENT_INVALID":
+                return "支付校验失败，请稍后重试或联系客服"
+            case "ORDER_INVALID_STATE": return "订单状态已变化，请刷新后重试"
+            case "ORDER_NOT_FOUND": return "订单不存在或无权查看"
+            case "WECHAT_SIGN_INVALID": return "支付回调验证失败，请勿重复支付"
+            case "MOCK_PAY_DISABLED": return "当前环境不支持模拟支付"
             default: return message.isEmpty ? "操作失败，请稍后重试" : message
             }
         case .unavailable: return "无法连接服务器，请检查网络后重试"
@@ -56,6 +62,11 @@ protocol BackendAPIClient: Sendable {
     func cancelOrder(id: String) async throws -> Order
     func prepayOrder(id: String) async throws -> BackendPrepayResult
     func mockWechatNotify(outTradeNo: String, amountCents: Int?) async throws
+    func fetchNotifications(unreadOnly: Bool) async throws -> [AppNotification]
+    func fetchNotificationUnreadCount() async throws -> Int
+    func markNotificationRead(id: String) async throws -> AppNotification
+    func markAllNotificationsRead() async throws
+    func requestAccountDeletion() async throws -> String
 }
 
 extension BackendAPIClient {
@@ -298,6 +309,50 @@ struct BackendClient: BackendAPIClient, Sendable {
             method: "POST",
             body: body
         )
+    }
+
+    func fetchNotifications(unreadOnly: Bool = false) async throws -> [AppNotification] {
+        var path = "/api/v1/notifications"
+        if unreadOnly {
+            path = queryPath(path, queryItems: [URLQueryItem(name: "unreadOnly", value: "true")])
+        }
+        let data: BackendNotificationsData = try await request(path: path)
+        return data.items.compactMap(BackendDTOMapper.notification(from:))
+    }
+
+    func fetchNotificationUnreadCount() async throws -> Int {
+        let data: BackendUnreadCountData = try await request(path: "/api/v1/notifications/unread-count")
+        return data.count
+    }
+
+    func markNotificationRead(id: String) async throws -> AppNotification {
+        let encoded = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
+        let data: BackendNotificationDTO = try await request(
+            path: "/api/v1/notifications/\(encoded)/read",
+            method: "POST",
+            body: [:]
+        )
+        guard let item = BackendDTOMapper.notification(from: data) else {
+            throw BackendError.decodingFailed
+        }
+        return item
+    }
+
+    func markAllNotificationsRead() async throws {
+        let _: BackendReadAllData = try await request(
+            path: "/api/v1/notifications/read-all",
+            method: "POST",
+            body: [:]
+        )
+    }
+
+    func requestAccountDeletion() async throws -> String {
+        let data: BackendDeletionRequestData = try await request(
+            path: "/api/v1/me/deletion-request",
+            method: "POST",
+            body: [:]
+        )
+        return data.message
     }
 
     private func request<T: Decodable>(

@@ -623,6 +623,26 @@ private struct FailingBackendAPIClient: BackendAPIClient, Sendable {
     func mockWechatNotify(outTradeNo: String, amountCents: Int?) async throws {
         throw BackendError.unavailable
     }
+
+    func fetchNotifications(unreadOnly: Bool) async throws -> [AppNotification] {
+        throw BackendError.unavailable
+    }
+
+    func fetchNotificationUnreadCount() async throws -> Int {
+        throw BackendError.unavailable
+    }
+
+    func markNotificationRead(id: String) async throws -> AppNotification {
+        throw BackendError.unavailable
+    }
+
+    func markAllNotificationsRead() async throws {
+        throw BackendError.unavailable
+    }
+
+    func requestAccountDeletion() async throws -> String {
+        throw BackendError.unavailable
+    }
 }
 
 private struct SuccessfulBackendAPIClient: BackendAPIClient, Sendable {
@@ -743,6 +763,31 @@ private struct SuccessfulBackendAPIClient: BackendAPIClient, Sendable {
 
     func mockWechatNotify(outTradeNo: String, amountCents: Int?) async throws {}
 
+    func fetchNotifications(unreadOnly: Bool) async throws -> [AppNotification] {
+        []
+    }
+
+    func fetchNotificationUnreadCount() async throws -> Int {
+        0
+    }
+
+    func markNotificationRead(id: String) async throws -> AppNotification {
+        AppNotification(
+            id: id,
+            type: .paymentSuccess,
+            title: "支付成功",
+            body: "订单已支付",
+            readAt: Date(),
+            createdAt: Date()
+        )
+    }
+
+    func markAllNotificationsRead() async throws {}
+
+    func requestAccountDeletion() async throws -> String {
+        "我们已收到你的注销申请，将在 15 个工作日内处理。"
+    }
+
     private static let companion = Companion(
         id: "c-test",
         name: "测试陪伴者",
@@ -832,6 +877,24 @@ private struct ChatBackendAPIClient: BackendAPIClient, Sendable {
     }
 
     func mockWechatNotify(outTradeNo: String, amountCents: Int?) async throws {
+        throw BackendError.unavailable
+    }
+
+    func fetchNotifications(unreadOnly: Bool) async throws -> [AppNotification] {
+        []
+    }
+
+    func fetchNotificationUnreadCount() async throws -> Int {
+        0
+    }
+
+    func markNotificationRead(id: String) async throws -> AppNotification {
+        throw BackendError.unavailable
+    }
+
+    func markAllNotificationsRead() async throws {}
+
+    func requestAccountDeletion() async throws -> String {
         throw BackendError.unavailable
     }
 

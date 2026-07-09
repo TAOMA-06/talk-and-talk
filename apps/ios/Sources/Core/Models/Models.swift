@@ -43,6 +43,11 @@ enum AppRoute: Hashable {
     case review(String)
     case verify
     case safetyCenter
+    case notifications
+    case settings
+    case privacyPolicy
+    case userAgreement
+    case accountDeletion
 #if DEBUG
     case admin
 #endif
@@ -228,6 +233,44 @@ enum PlatformAgreement {
         ("信用与处置", "首次与再次轻度违规将收到协议提醒；累计违规将扣减安全分并限制发帖或沟通权限。"),
         ("申诉与举报", "如遇不适可立即结束沟通并举报；误报经核实后可恢复信用分。")
     ]
+}
+
+enum PrivacyPolicy {
+    static let title = "Talk&Talk 隐私政策"
+    static let sections: [(String, String)] = [
+        ("我们收集的信息", "为提供登录、匹配与客服支持，我们可能处理手机号、设备标识、订单与聊天记录等必要信息。"),
+        ("信息如何使用", "用于账号安全、服务交付、支付对账、内容审核与改进产品体验，不会出售你的个人信息。"),
+        ("信息共享", "仅在法律要求、支付清算或经你同意的情况下与必要合作方共享；内容审核可能使用机审服务。"),
+        ("存储与安全", "数据加密传输与访问控制；日志对手机号、验证码、令牌等敏感字段脱敏。"),
+        ("你的权利", "你可查询、更正信息，并在设置中申请注销账号；注销申请将在 15 个工作日内处理。")
+    ]
+}
+
+enum AppNotificationType: String, Codable, Hashable {
+    case paymentSuccess
+    case orderStatus
+    case moderationAlert
+    case safetyAlert
+
+    var displayName: String {
+        switch self {
+        case .paymentSuccess: "支付"
+        case .orderStatus: "订单"
+        case .moderationAlert: "审核"
+        case .safetyAlert: "安全"
+        }
+    }
+}
+
+struct AppNotification: Identifiable, Codable, Hashable {
+    let id: String
+    let type: AppNotificationType
+    let title: String
+    let body: String
+    var readAt: Date?
+    let createdAt: Date
+
+    var isUnread: Bool { readAt == nil }
 }
 
 struct User: Identifiable, Codable, Hashable {

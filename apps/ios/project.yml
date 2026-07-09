@@ -14,6 +14,8 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: Talk&Talk
         INFOPLIST_KEY_UILaunchStoryboardName: LaunchScreen
         INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking: YES
+        INFOPLIST_KEY_NSPhotoLibraryUsageDescription: 用于在广场发布图片时选择相册内容，仅在你主动选择图片时访问。
+        INFOPLIST_KEY_NSCameraUsageDescription: 用于拍摄并上传广场封面图，仅在你主动拍照时访问。
         SWIFT_VERSION: "6.0"
         TARGETED_DEVICE_FAMILY: "1,2"
         SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
