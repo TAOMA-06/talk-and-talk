@@ -13,14 +13,19 @@ describe("ConversationsService.ensureConversation", () => {
   } as any;
 
   const moderation = {
-    moderate: jest.fn()
+    moderate: jest.fn(),
+    moderateAsync: jest.fn()
+  } as any;
+
+  const moderationCases = {
+    createFromResult: jest.fn()
   } as any;
 
   let service: ConversationsService;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new ConversationsService(prisma, moderation);
+    service = new ConversationsService(prisma, moderation, moderationCases);
   });
 
   it("returns an existing conversation even when the companion is unpublished", async () => {

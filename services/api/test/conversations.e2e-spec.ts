@@ -55,6 +55,8 @@ describe("Conversations (e2e)", () => {
     await prisma.messageReadState.deleteMany();
     await prisma.message.deleteMany();
     await prisma.conversation.deleteMany();
+    await prisma.moderationActionLog.deleteMany();
+    await prisma.moderationEvidence.deleteMany();
     await prisma.moderationCase.deleteMany();
     await prisma.companionServiceTag.deleteMany();
     await prisma.serviceTag.deleteMany();
@@ -140,6 +142,34 @@ describe("Conversations (e2e)", () => {
         const contents = body.data.messages.map((item: { content: string }) => item.content);
         expect(contents).not.toContain("我们加微信线下见面吧");
         expect(contents.some((content: string) => content.includes("安全提醒"))).toBe(true);
+      });
+  });
+
+  it("blocks wechat solicitation and exposes the case via moderation cases", async () => {
+    const { token } = await createUser();
+
+    await request(app.getHttpServer())
+      .post("/api/v1/conversations/c1/messages")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ content: "我们加微信聊吧", senderId: "client-user" })
+      .expect(201)
+      .expect(({ body }) => {
+        expect(body.data.moderation.decision).toBe("block");
+        expect(body.data.message).toBeNull();
+        expect(body.data.safetyMessage.type).toBe("safety");
+        expect(body.data.companionReply).toBeNull();
+        expect(body.data.moderationCase.decision).toBe("block");
+        expect(body.data.moderationCase.source).toBe("chat");
+      });
+
+    await request(app.getHttpServer())
+      .get("/api/v1/moderation/cases")
+      .set("Authorization", `Bearer ${token}`)
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body.data.cases.some((item: { content: string; decision: string }) =>
+          item.content === "我们加微信聊吧" && item.decision === "block"
+        )).toBe(true);
       });
   });
 

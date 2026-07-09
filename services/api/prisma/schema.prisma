@@ -187,6 +187,7 @@ model ModerationCase {
   source       ModerationSource
   content      String
   targetId     String?
+  messageId    String?
   aiScore      Float
   aiReason     String
   decision     ModerationDecision
@@ -194,9 +195,36 @@ model ModerationCase {
   usedAI       Boolean              @default(false)
   resolvedAt   DateTime?
   createdAt    DateTime             @default(now())
+  evidences    ModerationEvidence[]
+  actionLogs   ModerationActionLog[]
 
   @@index([source, status])
   @@index([targetId])
+}
+
+model ModerationEvidence {
+  id        String   @id @default(uuid())
+  caseId    String
+  type      String
+  payload   Json
+  createdAt DateTime @default(now())
+
+  case ModerationCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+}
+
+model ModerationActionLog {
+  id        String   @id @default(uuid())
+  caseId    String
+  actorId   String?
+  action    String
+  note      String?
+  createdAt DateTime @default(now())
+
+  case ModerationCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
 }
 
 model ServiceTag {

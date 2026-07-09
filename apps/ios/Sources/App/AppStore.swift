@@ -831,7 +831,9 @@ final class AppStore: ObservableObject {
                 }
                 lastModerationFeedback = nil
             }
-        case .review, .allow:
+        case .review:
+            lastModerationFeedback = "内容已进入平台复核"
+        case .allow:
             lastModerationFeedback = nil
         }
 

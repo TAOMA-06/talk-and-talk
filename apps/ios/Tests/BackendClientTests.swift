@@ -504,7 +504,24 @@ final class BackendClientTests: XCTestCase {
         XCTAssertEqual(decision, .block)
         XCTAssertFalse(messages.contains { $0.content == "加微信" })
         XCTAssertTrue(messages.contains { $0.type == .safety })
+        XCTAssertEqual(store.lastModerationFeedback, "消息未发送：疑似违规内容")
         XCTAssertEqual(store.moderationCases.first?.decision, .block)
+    }
+
+    @MainActor
+    func testBackendReviewSetsPlatformReviewFeedback() async {
+        let store = AppStore(backendClientFactory: { _ in ChatBackendAPIClient(mode: .review) })
+        store.messages.removeAll { $0.conversationId == "c1" }
+
+        let decision = await store.sendTrialMessage("代理兼职赚钱", to: "c1")
+        let messages = store.messages(for: "c1")
+
+        XCTAssertEqual(decision, .review)
+        XCTAssertTrue(messages.contains { $0.content == "代理兼职赚钱" })
+        XCTAssertTrue(messages.contains { $0.type == .safety })
+        XCTAssertEqual(store.lastModerationFeedback, "内容已进入平台复核")
+        XCTAssertEqual(store.moderationCases.first?.decision, .review)
+        XCTAssertFalse(messages.contains { $0.senderId == "c1" && $0.type == .text })
     }
 }
 
@@ -610,6 +627,7 @@ private struct ChatBackendAPIClient: BackendAPIClient, Sendable {
     enum Mode: Sendable {
         case allow
         case block
+        case review
     }
 
     let mode: Mode
@@ -676,6 +694,30 @@ private struct ChatBackendAPIClient: BackendAPIClient, Sendable {
                     aiReason: "疑似引导私下联系",
                     decision: .block,
                     matchedRules: ["contact.wechat"],
+                    usedAI: false,
+                    resolvedAt: nil
+                )
+            )
+        case .review:
+            return BackendSendMessageResponse(
+                moderation: ModerationResult(decision: .review, riskLevel: .low, score: 0.42, reasons: ["疑似广告或引流"], matchedRules: ["ads.promo"], usedAI: false),
+                messages: [
+                    Message(id: "m-user", conversationId: conversationId, senderId: senderId, content: content, type: .text, timestamp: Date(timeIntervalSince1970: 1)),
+                    Message(id: "m-safety", conversationId: conversationId, senderId: "system", content: "安全提醒：这条消息已进入平台复核，请继续保持平台内沟通。", type: .safety, timestamp: Date(timeIntervalSince1970: 2))
+                ],
+                moderationCase: ModerationCase(
+                    id: "mc-review",
+                    title: "聊天待复核：代理兼职赚钱",
+                    category: "实时风控",
+                    riskLevel: .low,
+                    status: .pending,
+                    source: .chat,
+                    content: content,
+                    targetId: conversationId,
+                    aiScore: 0.42,
+                    aiReason: "疑似广告或引流",
+                    decision: .review,
+                    matchedRules: ["ads.promo"],
                     usedAI: false,
                     resolvedAt: nil
                 )

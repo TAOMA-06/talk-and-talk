@@ -13,8 +13,8 @@ Recovered from git history:
 | `GET /api/conversations` | List demo conversations | Day 4 compatibility required |
 | `GET /api/conversations/:id/messages` | List messages in demo conversation | Day 4 compatibility required |
 | `POST /api/conversations/:id/messages` | Send chat message and run moderation | Day 4 compatibility required |
-| `POST /api/moderate` | Standalone text moderation | Replaced by planned `POST /api/v1/moderation/check` |
-| `GET /api/moderation-cases` | List moderation cases | Replaced by planned `GET /api/v1/moderation/cases` |
+| `POST /api/moderate` | Standalone text moderation | Replaced by `POST /api/v1/moderation/check` |
+| `GET /api/moderation-cases` | List moderation cases | Replaced by `GET /api/v1/moderation/cases` |
 | `POST /api/moderation-cases/:id/actions` | Resolve/escalate/dismiss case | Not migrated |
 | `GET /api/violation-examples` | Demo examples for admin UI | Not migrated |
 | `POST /api/labels` | Demo training label creation | Not migrated |
@@ -37,7 +37,9 @@ Day 1 routes currently available:
 | `GET /api/v1/admin/status` | Admin status (requires `admin` role) |
 | `GET /api/v1/companions/status` | Companions module skeleton status |
 | `GET /api/v1/conversations/status` | Conversations module skeleton status |
-| `GET /api/v1/moderation/status` | Moderation module skeleton status |
+| `GET /api/v1/moderation/status` | Moderation module status (`active`, includes `aiConfigured`) |
+| `POST /api/v1/moderation/check` | Standalone text moderation (JWT); RuleEngine + optional DeepSeek |
+| `GET /api/v1/moderation/cases` | List moderation cases (JWT) |
 | `GET /api/v1/orders/status` | Orders module skeleton status |
 | `GET /api/v1/payments/status` | Payments module skeleton status |
 | `GET /api/v1/admin/status` | Admin module skeleton status |
@@ -60,7 +62,7 @@ The iOS app currently depends on:
 | `BackendClient.health()` | `GET /api/v1/health` | Active |
 | `BackendClient.fetchMessages(conversationId:)` | `GET /api/v1/conversations/:id/messages` | Backend may 404; App falls back locally |
 | `BackendClient.sendMessage(...)` | `POST /api/v1/conversations/:id/messages` | Backend may 404; App falls back locally |
-| `BackendClient.fetchModerationCases()` | `GET /api/v1/moderation/cases` | Planned |
+| `BackendClient.fetchModerationCases()` | `GET /api/v1/moderation/cases` | Active |
 
 Auth details: see [docs/auth-api.md](./auth-api.md).
 
@@ -85,3 +87,15 @@ Required DTO compatibility:
 - Case fields: `id`, `title`, `category`, `riskLevel`, `status`, `source`, `content`, `targetId?`, `aiScore`, `aiReason`, `decision`, `matchedRules`, `usedAI`, `resolvedAt?`
 
 The old demo used in-memory state. The production version must persist conversations, messages, and moderation cases in Postgres.
+
+## Moderation pipeline
+
+Chat send (`POST /conversations/:id/messages`) and `POST /moderation/check` share the same pipeline:
+
+1. **RuleEngine** — private contact, offline meetup, transfers, privacy asks, ads, harassment (with normalization for spaces / `vx` / `加v` / 谐音).
+2. If rule result is `block` + `high` risk → **skip AI**.
+3. Otherwise call **DeepSeek** when `DEEPSEEK_API_KEY` is set; on failure / timeout / missing key → **rule result fallback**.
+4. Merge scores with `max(rule, ai)`; `usedAI` is true only when AI returns successfully.
+5. Non-`allow` decisions create `ModerationCase` plus `ModerationEvidence` and `ModerationActionLog(action: created)`.
+
+User-facing `safetyMessage` text stays generic (no rule IDs or raw AI dumps). Without an API key the service still starts and moderates with rules only.

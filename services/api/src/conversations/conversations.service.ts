@@ -2,6 +2,7 @@ import { HttpStatus, Injectable } from "@nestjs/common";
 
 import { AppException } from "../common/errors/app.exception";
 import { PrismaService } from "../database/prisma.service";
+import { ModerationCaseService } from "../moderation/moderation-case.service";
 import { ModerationService, ModerationResult } from "../moderation/moderation.service";
 import { ListMessagesQueryDto } from "./dto/list-messages.dto";
 import { SendMessageDto } from "./dto/send-message.dto";
@@ -12,7 +13,8 @@ type Db = any;
 export class ConversationsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly moderation: ModerationService
+    private readonly moderation: ModerationService,
+    private readonly moderationCases: ModerationCaseService
   ) {}
 
   async list(userId: string) {
@@ -135,7 +137,7 @@ export class ConversationsService {
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: 4
     } as any);
-    const moderation = this.moderation.moderate(content, "chat", {
+    const moderation = await this.moderation.moderateAsync(content, "chat", {
       recentMessages: recentMessages.map((message: any) => message.content),
       safetyScore: user.profile?.safetyScore ?? 80,
       isVerified: user.profile?.isVerified ?? false
@@ -147,7 +149,6 @@ export class ConversationsService {
       let message: any | null = null;
       let safetyMessage: any | null = null;
       let companionReply: any | null = null;
-      let moderationCase: any | null = null;
 
       if (moderation.decision !== "block") {
         message = await db.message.create({
@@ -188,24 +189,15 @@ export class ConversationsService {
         });
       }
 
-      if (moderation.decision !== "allow") {
-        moderationCase = await db.moderationCase.create({
-          data: {
-            title: this.caseTitle(moderation, content),
-            category: "实时风控",
-            riskLevel: moderation.riskLevel,
-            status: moderation.decision === "review" ? "pending" : "humanReview",
-            source: "chat",
-            content,
-            targetId: conversation.externalId,
-            aiScore: moderation.score,
-            aiReason: moderation.reasons.join("；"),
-            decision: moderation.decision,
-            matchedRules: moderation.matchedRules,
-            usedAI: moderation.usedAI
-          }
-        });
-      }
+      const moderationCase = await this.moderationCases.createFromResult({
+        result: moderation,
+        source: "chat",
+        content,
+        targetId: conversation.externalId,
+        messageId: message?.id ?? null,
+        actorId: userId,
+        db
+      });
 
       await db.conversation.update({
         where: { id: conversation.id },
@@ -216,7 +208,7 @@ export class ConversationsService {
     });
 
     return {
-      moderation,
+      moderation: this.toPublicModeration(moderation),
       message: result.message ? this.toMessageDto(result.message, conversation.externalId) : null,
       safetyMessage: result.safetyMessage ? this.toMessageDto(result.safetyMessage, conversation.externalId) : null,
       companionReply: result.companionReply ? this.toMessageDto(result.companionReply, conversation.externalId) : null,
@@ -303,6 +295,17 @@ export class ConversationsService {
     };
   }
 
+  private toPublicModeration(result: ModerationResult) {
+    return {
+      decision: result.decision,
+      riskLevel: result.riskLevel,
+      score: result.score,
+      reasons: result.reasons,
+      matchedRules: result.matchedRules,
+      usedAI: result.usedAI
+    };
+  }
+
   private safetyContent(result: ModerationResult): string {
     switch (result.decision) {
       case "block":
@@ -314,10 +317,5 @@ export class ConversationsService {
       case "allow":
         return "";
     }
-  }
-
-  private caseTitle(result: ModerationResult, content: string): string {
-    const prefix = result.decision === "block" ? "聊天拦截" : result.decision === "warn" ? "聊天预警" : "聊天待复核";
-    return `${prefix}：${content.slice(0, 32)}`;
   }
 }

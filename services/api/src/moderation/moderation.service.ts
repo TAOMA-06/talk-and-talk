@@ -1,14 +1,15 @@
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 
-export type ModerationDecision = "allow" | "warn" | "block" | "review";
-export type RiskLevel = "low" | "medium" | "high";
-export type ModerationSource = "chat" | "community" | "report" | "profile";
+import { AI_PROVIDER, AIProvider } from "./ai/ai-provider.interface";
+import {
+  ModerationContext,
+  ModerationDecision,
+  ModerationSource,
+  RiskLevel,
+  RuleEngine
+} from "./rule-engine";
 
-export interface ModerationContext {
-  recentMessages?: string[];
-  safetyScore?: number;
-  isVerified?: boolean;
-}
+export type { ModerationContext, ModerationDecision, ModerationSource, RiskLevel };
 
 export interface ModerationResult {
   decision: ModerationDecision;
@@ -19,103 +20,69 @@ export interface ModerationResult {
   usedAI: boolean;
 }
 
-interface Rule {
-  id: string;
-  patterns: string[];
-  score: number;
-  reason: string;
-}
-
 @Injectable()
 export class ModerationService {
-  private readonly blockRules: Rule[] = [
-    { id: "contact.wechat", patterns: ["加微信", "加v", "加V", "vx", "wx", "v信", "薇信", "微信号", "私加"], score: 0.92, reason: "疑似引导私下联系" },
-    { id: "contact.offline", patterns: ["线下", "见面", "见个面", "出来见", "酒店", "宾馆"], score: 0.9, reason: "疑似线下邀约" },
-    { id: "finance.transfer", patterns: ["转账", "打款", "红包", "支付宝", "收款码"], score: 0.93, reason: "疑似私下交易" },
-    { id: "sexual.explicit", patterns: ["裸聊", "色情", "开房"], score: 0.95, reason: "疑似低俗或越界内容" }
-  ];
+  constructor(
+    private readonly ruleEngine: RuleEngine,
+    @Inject(AI_PROVIDER) private readonly aiProvider: AIProvider
+  ) {}
 
-  private readonly warnRules: Rule[] = [
-    { id: "harass.pua", patterns: ["听话", "乖一点", "别装", "你不行"], score: 0.62, reason: "疑似不尊重或 PUA 表达" },
-    { id: "privacy.request", patterns: ["住址", "身份证", "真实姓名", "你在哪"], score: 0.58, reason: "疑似索要隐私信息" },
-    { id: "offline.implicit", patterns: ["今晚见", "能不能见", "出来聊"], score: 0.6, reason: "疑似变相线下邀约" }
-  ];
-
-  private readonly reviewRules: Rule[] = [
-    { id: "ads.promo", patterns: ["代理", "兼职赚钱", "加我了解", "推广"], score: 0.42, reason: "疑似广告或引流" },
-    { id: "conflict.bait", patterns: ["滚", "废物", "傻"], score: 0.38, reason: "疑似引战或攻击性表达" }
-  ];
-
+  /** Sync rule-only path for callers that cannot await (prefer moderateAsync). */
   moderate(text: string, source: ModerationSource, context?: ModerationContext): ModerationResult {
-    const normalized = this.normalize(text);
-    const reasons: string[] = [];
-    const matchedRules: string[] = [];
-    let score = 0.05;
-
-    for (const rule of [...this.blockRules, ...this.warnRules, ...this.reviewRules]) {
-      if (this.matches(rule, normalized)) {
-        score = Math.max(score, rule.score);
-        reasons.push(rule.reason);
-        matchedRules.push(rule.id);
-      }
-    }
-
-    const contextScore = this.contextualRiskScore(normalized, context?.recentMessages ?? []);
-    if (contextScore > 0) {
-      score = Math.max(score, contextScore);
-      reasons.push("近期会话存在连续风险表达");
-      matchedRules.push("context.accumulation");
-    }
-
-    if (source === "community" && (normalized.includes("广告") || normalized.includes("引流"))) {
-      score = Math.max(score, 0.7);
-      reasons.push("社区内容疑似广告引流");
-      matchedRules.push("community.ads");
-    }
-
+    const rule = this.ruleEngine.moderate(text, source, context);
     return {
-      decision: this.decisionFor(score),
-      riskLevel: this.riskLevelFor(score),
-      score,
-      reasons: reasons.length ? [...new Set(reasons)] : ["内容正常"],
-      matchedRules,
+      decision: rule.decision,
+      riskLevel: rule.riskLevel,
+      score: rule.score,
+      reasons: rule.reasons,
+      matchedRules: rule.matchedRules,
       usedAI: false
     };
   }
 
-  private matches(rule: Rule, text: string): boolean {
-    return rule.patterns.some((pattern) => text.includes(this.normalize(pattern)));
+  async moderateAsync(
+    text: string,
+    source: ModerationSource,
+    context?: ModerationContext
+  ): Promise<ModerationResult> {
+    const rule = this.ruleEngine.moderate(text, source, context);
+
+    if (rule.decision === "block" && rule.riskLevel === "high") {
+      return {
+        decision: rule.decision,
+        riskLevel: rule.riskLevel,
+        score: rule.score,
+        reasons: rule.reasons,
+        matchedRules: rule.matchedRules,
+        usedAI: false
+      };
+    }
+
+    const ai = await this.aiProvider.moderate(text, context);
+    if (!ai.available) {
+      return {
+        decision: rule.decision,
+        riskLevel: rule.riskLevel,
+        score: rule.score,
+        reasons: rule.reasons,
+        matchedRules: rule.matchedRules,
+        usedAI: false
+      };
+    }
+
+    const score = Math.max(rule.score, ai.score);
+    const reasons = [...new Set([...rule.reasons.filter((r) => r !== "内容正常"), ...ai.reasons])];
+    return {
+      decision: this.ruleEngine.decisionFor(score),
+      riskLevel: this.ruleEngine.riskLevelFor(score),
+      score,
+      reasons: reasons.length ? reasons : ["内容正常"],
+      matchedRules: rule.matchedRules,
+      usedAI: true
+    };
   }
 
-  private contextualRiskScore(current: string, history: string[]): number {
-    const riskyHistory = history
-      .slice(-2)
-      .map((item) => this.moderate(item, "chat"))
-      .filter((result) => result.score >= 0.35);
-    if (!riskyHistory.length) return 0;
-
-    const currentResult = this.moderate(current, "chat");
-    return currentResult.score >= 0.35 ? Math.min(1, currentResult.score + 0.15) : 0;
-  }
-
-  private normalize(text: string): string {
-    let value = text.toLowerCase();
-    value = value.replaceAll(" ", "").replaceAll("　", "").replaceAll("＋", "+");
-    value = value.replaceAll("vx", "微信").replaceAll("wx", "微信").replaceAll("加v", "加微");
-    value = value.replaceAll("薇", "微").replaceAll("v", "微");
-    return value;
-  }
-
-  private decisionFor(score: number): ModerationDecision {
-    if (score >= 0.85) return "block";
-    if (score >= 0.55) return "warn";
-    if (score >= 0.35) return "review";
-    return "allow";
-  }
-
-  private riskLevelFor(score: number): RiskLevel {
-    if (score >= 0.85) return "high";
-    if (score >= 0.55) return "medium";
-    return "low";
+  isAIConfigured(): boolean {
+    return process.env.DEEPSEEK_API_KEY?.trim() !== undefined && process.env.DEEPSEEK_API_KEY.trim() !== "";
   }
 }

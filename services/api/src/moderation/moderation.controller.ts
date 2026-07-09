@@ -1,15 +1,43 @@
-import { Controller, Get, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Post, UseGuards } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { PrismaService } from "../database/prisma.service";
+import { CheckModerationDto } from "./dto/check-moderation.dto";
+import { ModerationService } from "./moderation.service";
 
 @Controller("moderation")
 export class ModerationController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly moderation: ModerationService,
+    private readonly config: ConfigService
+  ) {}
 
   @Get("status")
   status() {
-    return { module: "moderation", status: "planned" };
+    const apiKey = this.config.get<string>("DEEPSEEK_API_KEY")?.trim();
+    return {
+      module: "moderation",
+      status: "active",
+      aiConfigured: Boolean(apiKey)
+    };
+  }
+
+  @Post("check")
+  @UseGuards(JwtAuthGuard)
+  async check(@Body() dto: CheckModerationDto) {
+    const moderation = await this.moderation.moderateAsync(dto.text, dto.source ?? "chat");
+    return {
+      moderation: {
+        decision: moderation.decision,
+        riskLevel: moderation.riskLevel,
+        score: moderation.score,
+        reasons: moderation.reasons,
+        matchedRules: moderation.matchedRules,
+        usedAI: moderation.usedAI
+      }
+    };
   }
 
   @Get("cases")
