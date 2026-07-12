@@ -18,14 +18,15 @@ final class AppStore: ObservableObject {
     @Published var profilePath = NavigationPath()
 
     #if DEBUG
-    @Published var user = MockData.user
-    @Published var companions = MockData.companions
-    @Published var themes = MockData.themes
-    @Published var orders = MockData.orders
-    @Published var reviews = MockData.reviews
-    @Published var messages = MockData.messages
-    @Published var communityPosts = MockData.communityPosts
-    @Published var creditEvents: [CreditEvent] = MockData.initialCreditEvents
+    /// Offline demo identity only — marketplace/social feeds start empty (product-ready shell).
+    @Published var user = FrontendDemoIdentity.user
+    @Published var companions: [Companion] = []
+    @Published var themes = AppCatalog.themes
+    @Published var orders: [Order] = []
+    @Published var reviews: [Review] = []
+    @Published var messages: [Message] = []
+    @Published var communityPosts: [CommunityPost] = []
+    @Published var creditEvents: [CreditEvent] = []
     #else
     @Published var user = AppCatalog.placeholderUser
     @Published var companions: [Companion] = []
@@ -302,36 +303,24 @@ final class AppStore: ObservableObject {
     }
 
     private func applyCompanionListFallback(message: String) {
-#if DEBUG
-        if companions.isEmpty {
-            companions = MockData.companions
-        }
-        companionListLoadState = companions.isEmpty ? .empty : .loaded
-        lastModerationFeedback = "开发模式：\(message)，已使用本地陪伴者数据。"
-#else
+        // Never seed fake companions — empty product shell for offline demo and Release alike.
         companions = []
+#if DEBUG
+        companionListLoadState = FrontendDemoMode.isEnabled ? .empty : .failed(message)
+#else
         companionListLoadState = .failed(message)
 #endif
     }
 
     private func applyCompanionDetailFallback(id: String, message: String) {
-#if DEBUG
-        if let fallback = MockData.companions.first(where: { $0.id == id }) {
-            upsertCompanion(fallback)
-            companionDetailLoadStateById[id] = .loaded
-            lastModerationFeedback = "开发模式：\(message)，已使用本地陪伴者详情。"
-            return
-        }
-#endif
         companionDetailLoadStateById[id] = .failed(message)
     }
 
     private func applyBackendConversationFallback(message: String) {
-#if DEBUG
-        backendConversationLoadState = .loaded
-        lastModerationFeedback = "开发模式：\(message)，已使用本地消息列表。"
-#else
         backendConversations = []
+#if DEBUG
+        backendConversationLoadState = FrontendDemoMode.isEnabled ? .empty : .failed(message)
+#else
         backendConversationLoadState = .failed(message)
 #endif
     }
@@ -398,11 +387,7 @@ final class AppStore: ObservableObject {
 
     func loadOrders() async {
         guard BackendConfig.isEnabled, let client = backendClient() else {
-#if DEBUG
-            if orders.isEmpty {
-                orders = MockData.orders
-            }
-#endif
+            // Offline / unconfigured: keep empty orders (no seed marketplace history).
             return
         }
 
@@ -1186,49 +1171,33 @@ final class AppStore: ObservableObject {
 }
 
 #if DEBUG
+/// Unit-test fixtures only. Never seed into runtime UI / marketplace feeds.
 enum MockData {
     static let user = FrontendDemoIdentity.user
 
-    static let initialCreditEvents: [CreditEvent] = [
-        CreditEvent(id: "ce1", delta: 0, reason: "账号已创建", createdAt: .now.addingTimeInterval(-86400))
-    ]
-
-    static let themes: [Theme] = [
-        Theme(id: "t1", name: "情绪倾听", icon: "heart.text.square", description: "有人认真听你说完今天", tintName: "teal"),
-        Theme(id: "t2", name: "职场减压", icon: "briefcase", description: "拆解压力、复盘沟通", tintName: "coral"),
-        Theme(id: "t3", name: "学习陪伴", icon: "book.closed", description: "番茄钟式专注陪跑", tintName: "lilac"),
-        Theme(id: "t4", name: "睡前语音", icon: "moon.stars", description: "低刺激、安静的晚间陪伴", tintName: "gold"),
-        Theme(id: "t5", name: "兴趣聊天", icon: "sparkles", description: "电影、旅行、美食、摄影", tintName: "teal"),
-        Theme(id: "t6", name: "运动鼓励", icon: "figure.run", description: "计划、打卡、正反馈", tintName: "coral")
-    ]
-
+    /// Minimal companion shape for API client tests — not product demo content.
     static let companions: [Companion] = [
-        Companion(id: "c1", name: "林屿", role: "温柔倾听者", initials: "LY", tags: ["心理学背景", "深夜在线", ], rating: 4.9, reviewCount: 168, pricePerHalfHour: 39, isOnline: true, isVerified: true, bio: "擅长倾听和梳理情绪，尊重边界，仅平台内沟通。", availableTimes: ["20:00", "21:30", "23:00"], languages: ["中文", "英语"], specialties: ["情绪倾听", "睡前语音"], completedOrders: 426, responseTime: "约30秒", distanceKm: 1.2, availability: .online, cityDistrict: "南山区"),
-        Companion(id: "c2", name: "许澈", role: "职场沟通陪伴", initials: "XC", tags: ["职业沟通", "疏解压力", "高效"], rating: 4.8, reviewCount: 116, pricePerHalfHour: 49, isOnline: true, isVerified: true, bio: "聊职场压力和沟通卡点，帮你理清下一步。", availableTimes: ["12:30", "19:00", "22:00"], languages: ["中文"], specialties: ["职场减压", "学习陪伴"], completedOrders: 318, responseTime: "约1分钟", distanceKm: 2.8, availability: .available, cityDistrict: "宝安区"),
-        Companion(id: "c3", name: "周映", role: "睡前声音陪伴", initials: "ZY", tags: ["情绪稳定", "慢节奏", ], rating: 4.9, reviewCount: 204, pricePerHalfHour: 45, isOnline: false, isVerified: true, bio: "晚间轻声陪伴，适合想慢慢聊、整理一天的时候。", availableTimes: ["22:30", "23:30", "00:30"], languages: ["中文", "粤语"], specialties: ["睡前语音", "情绪倾听"], completedOrders: 512, responseTime: "约5分钟", distanceKm: 4.5, availability: .busy, cityDistrict: "前海"),
-        Companion(id: "c4", name: "沈一", role: "专注陪跑伙伴", initials: "SY", tags: ["互相监督", "考研陪伴", ], rating: 4.7, reviewCount: 92, pricePerHalfHour: 29, isOnline: true, isVerified: true, bio: "陪你定小目标、打卡复盘，不鸡血不施压。", availableTimes: ["08:00", "14:00", "20:00"], languages: ["中文"], specialties: ["学习陪伴", "运动鼓励"], completedOrders: 180, responseTime: "约45秒", distanceKm: 0.8, availability: .online, cityDistrict: "南山区"),
-        Companion(id: "c5", name: "闻舟", role: "兴趣聊天搭子", initials: "WZ", tags: ["电影", "旅行", "摄影"], rating: 4.6, reviewCount: 74, pricePerHalfHour: 35, isOnline: true, isVerified: false, bio: "聊电影、旅行和摄影，轻松交换想法，仅线上交流。", availableTimes: ["10:00", "16:00", "21:00"], languages: ["中文", "日语"], specialties: ["兴趣聊天", "情绪倾听"], completedOrders: 139, responseTime: "约2分钟", distanceKm: 3.1, availability: .available, cityDistrict: "西城区")
-    ]
-
-    static let orders: [Order] = [
-        Order(id: "o1", companionId: "c1", themeId: "t1", durationMinutes: 30, totalPrice: 39, status: .completed, createdAt: .now.addingTimeInterval(-86400), scheduledAt: .now.addingTimeInterval(-82800)),
-        Order(id: "o2", companionId: "c3", themeId: "t4", durationMinutes: 60, totalPrice: 90, status: .paid, createdAt: .now.addingTimeInterval(-3600), scheduledAt: .now.addingTimeInterval(1800)),
-        Order(id: "o3", companionId: "self-u1", themeId: "t2", durationMinutes: 30, totalPrice: 39, status: .paid, createdAt: .now.addingTimeInterval(-1800), scheduledAt: .now.addingTimeInterval(2400), customerTarget: .communityUser(id: "u3", name: "木子", initials: "木子"))
-    ]
-
-    static let reviews: [Review] = [
-        Review(id: "r1", companionId: "c1", userName: "晚风", rating: 5, content: "聊完心里松了很多，没有被说教。", createdAt: .now.addingTimeInterval(-7200)),
-        Review(id: "r2", companionId: "c1", userName: "阿宁", rating: 5, content: "晚上情绪上来的时候找他很合适，流程也清楚。", createdAt: .now.addingTimeInterval(-172800)),
-        Review(id: "r3", companionId: "c2", userName: "小鹿", rating: 5, content: "帮我把汇报的事拆成了几步，实用。", createdAt: .now.addingTimeInterval(-54000))
-    ]
-
-    static let messages: [Message] = []
-
-    static let communityPosts: [CommunityPost] = [
-        CommunityPost(id: "p1", authorId: "u2", authorName: "晚风", authorInitials: "晚风", contactTarget: .communityUser(id: "u2", name: "晚风", initials: "晚风"), kind: .femaleRequest, topic: "情绪倾听", content: "昨晚聊完一整晚，终于把委屈说出来了。有人听，真的不一样。", coverImageData: nil, coverAspectRatio: 0.82, likeCount: 47, moderationStatus: .approved, createdAt: .now.addingTimeInterval(-7200)),
-        CommunityPost(id: "p2", authorId: "u3", authorName: "木子", authorInitials: "木子", contactTarget: .communityUser(id: "u3", name: "木子", initials: "木子"), kind: .femaleRequest, topic: "睡前聊天", content: "睡前十分钟有人陪着说说话，比刷手机安心多了。", coverImageData: nil, coverAspectRatio: 1.0, likeCount: 31, moderationStatus: .approved, createdAt: .now.addingTimeInterval(-14400)),
-        CommunityPost(id: "p4", authorId: "c1", authorName: "林屿", authorInitials: "LY", contactTarget: .companion(id: "c1"), kind: .malePromotion, topic: "职场减压", content: "已实名，擅长稳定倾听。希望匹配需要安静沟通的人。", coverImageData: nil, coverAspectRatio: 0.72, likeCount: 89, moderationStatus: .approved, createdAt: .now.addingTimeInterval(-28800)),
-        CommunityPost(id: "p5", authorId: "c2", authorName: "许澈", authorInitials: "XC", contactTarget: .companion(id: "c2"), kind: .malePromotion, topic: "陪伴故事", content: "喜欢聊电影和旅行，节奏轻松，只在平台内交流。", coverImageData: nil, coverAspectRatio: 1.18, likeCount: 52, moderationStatus: .approved, createdAt: .now.addingTimeInterval(-36000))
+        Companion(
+            id: "c1",
+            name: "测试陪伴者",
+            role: "单元测试",
+            initials: "测",
+            tags: ["测试"],
+            rating: 5.0,
+            reviewCount: 0,
+            pricePerHalfHour: 39,
+            isOnline: true,
+            isVerified: true,
+            bio: "仅用于单元测试，不会进入演示数据。",
+            availableTimes: ["20:00"],
+            languages: ["中文"],
+            specialties: ["情绪倾听"],
+            completedOrders: 0,
+            responseTime: "约1分钟",
+            distanceKm: 1.0,
+            availability: .online,
+            cityDistrict: "测试区"
+        )
     ]
 }
 #endif

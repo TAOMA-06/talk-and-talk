@@ -423,14 +423,31 @@ final class BackendClientTests: XCTestCase {
     }
 
     @MainActor
-    func testLoadCompanionsFailureFallsBackToLocalMockInDebug() async {
+    func testLoadCompanionsFailureDoesNotSeedFakeCompanions() async {
         let store = AppStore(backendClientFactory: { _ in FailingBackendAPIClient() })
         store.companions = []
 
         await store.loadCompanions(pageSize: 50)
 
-        XCTAssertEqual(store.companionListLoadState, .loaded)
-        XCTAssertTrue(store.companions.contains { $0.id == "c1" })
+        // Product-ready: no fake marketplace users on backend failure / offline demo.
+        XCTAssertTrue(store.companions.isEmpty)
+        switch store.companionListLoadState {
+        case .empty, .failed:
+            break
+        default:
+            XCTFail("Expected empty or failed load state, got \(store.companionListLoadState)")
+        }
+    }
+
+    @MainActor
+    func testAppStoreStartsWithoutSeededMarketplaceUsers() {
+        let store = AppStore()
+        XCTAssertTrue(store.companions.isEmpty)
+        XCTAssertTrue(store.orders.isEmpty)
+        XCTAssertTrue(store.reviews.isEmpty)
+        XCTAssertTrue(store.communityPosts.isEmpty)
+        XCTAssertTrue(store.messages.isEmpty)
+        XCTAssertFalse(store.themes.isEmpty)
     }
 
     @MainActor

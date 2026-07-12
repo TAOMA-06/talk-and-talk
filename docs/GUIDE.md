@@ -55,8 +55,8 @@ talk-and-talk/
 
 Phase 1：
 
-- iOS Debug 默认运行前端离线演示：使用本地 MockData，不连接后端且不要求登录；首次启动仍展示身份选择。
-- Debug 需要本地 API 联调时，在 Run Scheme 环境变量中设置 `FRONTEND_DEMO_MODE=NO`，再使用 `http://127.0.0.1:3000`。
+- iOS Debug 默认运行前端离线演示：不连接后端且不要求登录；使用本地演示身份进入完整 App 壳，**不预填虚假陪伴者/广场用户/订单**（空状态与上架产物一致）；首次启动仍展示身份选择。
+- Debug 需要本地 API 联调时，在 Run Scheme 环境变量中设置 `FRONTEND_DEMO_MODE=NO`，再使用 `http://127.0.0.1:3000`（列表数据来自后端 seed/真实写入）。
 - Staging/Release 维持后端连接；App 启动时调用 `GET /api/v1/health` 检查后端状态。
 - Debug 的本地人物、消息和支付闭环只在 `#if DEBUG` 中编译；Release 后端失败只显示空状态或错误。
 - Release 聊天只写入后端已存在的正式会话，不生成自动陪伴者回复。
@@ -67,7 +67,7 @@ Phase 1：
 Phase 2（Auth）：
 
 - 正式账号体系：手机号验证码登录、Apple 登录、JWT access/refresh、logout、`GET /users/me`。
-- iOS 启动门控：Debug 离线演示直接进入本地演示身份；Staging/Release 未登录显示 `LoginView`，已登录进入主 App。
+- iOS 启动门控：Debug 离线演示直接进入本地演示身份（市场数据为空壳）；Staging/Release 未登录显示 `LoginView`，已登录进入主 App。
 - Token 持久化在 Keychain；401 时自动 refresh 并重试。
 - Release 使用 `Config/Release.xcconfig` 中的生产 `BACKEND_BASE_URL`，CI 会扫描产物并拒绝 Demo/Mock 标记。
 - 详见 [docs/auth-api.md](./auth-api.md)。

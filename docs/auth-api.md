@@ -162,7 +162,7 @@ Talk&Talk 正式账号体系 API，前缀均为 `/api/v1`。所有 JSON 响应�
 
 | 配置项 | 说明 |
 |---|---|
-| `FRONTEND_DEMO_MODE` | 仅 Debug 生效；默认 `YES` 时使用本地演示数据并禁用所有后端请求。Run Scheme 设为 `NO` 可恢复 Debug 本地 API 联调 |
+| `FRONTEND_DEMO_MODE` | 仅 Debug 生效；默认 `YES` 时禁用所有后端请求，以本地演示身份进入 App 壳（**不注入虚假陪伴者/广场等市场数据**）。Run Scheme 设为 `NO` 可恢复 Debug 本地 API 联调 |
 | `BACKEND_BASE_URL` | 后端地址；Debug 在关闭演示模式后默认 `http://127.0.0.1:3000`，Release 必须显式配置 |
 | Keychain | access/refresh token 持久化 |
 | Sign in with Apple | 需启用 `TalkAndTalk.entitlements` |

@@ -73,8 +73,8 @@ xcodegen generate   # 修改 project.yml 后
 open TalkAndTalk.xcodeproj
 ```
 
-- Debug 默认启动前端离线演示：使用本地 MockData，不连接后端且不要求登录。
-- 需要本地 API 联调时，在 Xcode 的 Run Scheme 环境变量中设置 `FRONTEND_DEMO_MODE=NO`；随后 Debug 使用 `http://127.0.0.1:3000`。
+- Debug 默认启动前端离线演示（`FRONTEND_DEMO_MODE` 默认开启）：**不连接后端、不要求登录**，以本地演示身份进入完整 App 壳；**不注入虚假陪伴者/广场用户/订单**，发现与广场显示正式空状态，便于老板演示与上架观感对齐。
+- 需要本地 API 联调时，在 Xcode 的 Run Scheme 环境变量中设置 `FRONTEND_DEMO_MODE=NO`；随后 Debug 使用 `http://127.0.0.1:3000`，列表数据来自后端（可用 `prisma:seed`）。
 - Staging 使用远程 staging 后端并保留真实登录流程。
 - Release 默认：`https://api.talkandtalk.app`
 - 真机调试：Scheme / `BACKEND_BASE_URL` 指向 Mac 局域网 IP
