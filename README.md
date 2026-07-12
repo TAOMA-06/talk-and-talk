@@ -73,10 +73,15 @@ xcodegen generate   # 修改 project.yml 后
 open TalkAndTalk.xcodeproj
 ```
 
-- Debug 默认后端：`http://127.0.0.1:3000`
+- Debug 默认启动前端离线演示：使用本地 MockData，不连接后端且不要求登录。
+- 需要本地 API 联调时，在 Xcode 的 Run Scheme 环境变量中设置 `FRONTEND_DEMO_MODE=NO`；随后 Debug 使用 `http://127.0.0.1:3000`。
+- Staging 使用远程 staging 后端并保留真实登录流程。
 - Release 默认：`https://api.talkandtalk.app`
 - 真机调试：Scheme / `BACKEND_BASE_URL` 指向 Mac 局域网 IP
 - TestFlight 前在 `Config/Shared.xcconfig` 填写 `WECHAT_APP_ID` 与 Apple Team
+- iOS 只承载普通用户与陪伴者双角色业务，不包含任何运营审核入口；审核、退款处置等管理员能力仅通过独立 Web 后台和 staff API 使用。
+
+Release 数据安全规则：正式构建不会编译 `MockData` 或离线身份；陪伴者、社区、评价、消息、订单及退款失败时只显示空状态/错误。CI 会构建 Release 并运行 `frontend/ios/Scripts/check_release_artifact.sh`，测试姓名或 Demo/Mock 标记进入产物会直接失败。生产环境同时拒绝 `SEED_ON_STARTUP=true`。
 
 ## 环境变量
 

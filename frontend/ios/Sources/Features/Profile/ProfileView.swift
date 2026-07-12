@@ -227,18 +227,6 @@ private struct MenuPanel: View {
                 .accessibilityIdentifier("profilePrivacyRow")
             }
 
-#if DEBUG
-            menuGroup(title: "内容安全") {
-                DSListRow(
-                    title: "安全工作台",
-                    subtitle: "\(store.moderationCases.count) 条待查看",
-                    symbol: "shield.lefthalf.filled"
-                ) {
-                    store.navigate(.admin)
-                }
-                .accessibilityIdentifier("profileSafetyWorkspaceRow")
-            }
-#endif
         }
         .sheet(isPresented: $showingGenderSettings) {
             GenderSettingsSheet()

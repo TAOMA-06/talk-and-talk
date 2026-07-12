@@ -42,7 +42,9 @@ struct CompanionDetailView: View {
                 .presentationDetents([.medium])
         }
         .task(id: companionId) {
-            await store.loadCompanionDetail(id: companionId)
+            async let detail: Void = store.loadCompanionDetail(id: companionId)
+            async let reviews: Void = store.loadReviews(companionId: companionId)
+            _ = await (detail, reviews)
         }
     }
 

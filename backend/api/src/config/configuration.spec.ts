@@ -42,6 +42,18 @@ describe("validateEnvironment", () => {
     ).toThrow("SMS_PROVIDER=mock");
   });
 
+  it("rejects demo seed in production app env", () => {
+    expect(() => validateEnvironment({
+      NODE_ENV: "production",
+      APP_ENV: "production",
+      CORS_ORIGINS: "https://api.example.com",
+      JWT_ACCESS_SECRET: "prod-access",
+      JWT_REFRESH_SECRET: "prod-refresh",
+      SMS_PROVIDER: "none",
+      SEED_ON_STARTUP: "true"
+    })).toThrow("SEED_ON_STARTUP");
+  });
+
   it("rejects invalid ports", () => {
     expect(() => validateEnvironment({ PORT: "nope" })).toThrow("PORT");
   });

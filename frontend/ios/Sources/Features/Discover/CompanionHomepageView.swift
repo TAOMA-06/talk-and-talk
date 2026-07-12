@@ -51,6 +51,12 @@ struct CompanionHomepageView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Color.dsBackground.opacity(0.96), for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
+        .task(id: companionId) {
+            async let detail: Void = store.loadCompanionDetail(id: companionId)
+            async let reviews: Void = store.loadReviews(companionId: companionId)
+            async let posts: Void = store.loadCommunityPosts()
+            _ = await (detail, reviews, posts)
+        }
     }
 }
 

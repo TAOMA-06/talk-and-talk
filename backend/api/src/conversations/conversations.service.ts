@@ -148,7 +148,6 @@ export class ConversationsService {
       const now = Date.now();
       let message: any | null = null;
       let safetyMessage: any | null = null;
-      let companionReply: any | null = null;
 
       if (moderation.decision !== "block") {
         message = await db.message.create({
@@ -176,20 +175,7 @@ export class ConversationsService {
         });
       }
 
-      if (moderation.decision === "allow" || moderation.decision === "warn") {
-        companionReply = await db.message.create({
-          data: {
-            conversationId: conversation.id,
-            senderId: conversation.companionId,
-            senderName: conversation.companion.name,
-            content: "我在，先慢慢说。我们可以继续在平台内沟通。",
-            type: "text",
-            createdAt: new Date(now + 2)
-          }
-        });
-      }
-
-      const moderationCase = await this.moderationCases.createFromResult({
+      await this.moderationCases.createFromResult({
         result: moderation,
         source: "chat",
         content,
@@ -204,15 +190,14 @@ export class ConversationsService {
         data: { updatedAt: new Date(now + 3) }
       });
 
-      return { message, safetyMessage, companionReply, moderationCase };
+      return { message, safetyMessage };
     });
 
     return {
       moderation: this.toPublicModeration(moderation),
       message: result.message ? this.toMessageDto(result.message, conversation.externalId) : null,
       safetyMessage: result.safetyMessage ? this.toMessageDto(result.safetyMessage, conversation.externalId) : null,
-      companionReply: result.companionReply ? this.toMessageDto(result.companionReply, conversation.externalId) : null,
-      moderationCase: result.moderationCase ? this.toModerationCaseDto(result.moderationCase) : null
+      companionReply: null
     };
   }
 
@@ -276,33 +261,10 @@ export class ConversationsService {
     };
   }
 
-  private toModerationCaseDto(item: any) {
-    return {
-      id: item.id,
-      title: item.title,
-      category: item.category,
-      riskLevel: item.riskLevel,
-      status: item.status,
-      source: item.source,
-      content: item.content,
-      targetId: item.targetId,
-      aiScore: item.aiScore,
-      aiReason: item.aiReason,
-      decision: item.decision,
-      matchedRules: item.matchedRules,
-      usedAI: item.usedAI,
-      resolvedAt: item.resolvedAt?.toISOString() ?? null
-    };
-  }
-
   private toPublicModeration(result: ModerationResult) {
     return {
       decision: result.decision,
-      riskLevel: result.riskLevel,
-      score: result.score,
-      reasons: result.reasons,
-      matchedRules: result.matchedRules,
-      usedAI: result.usedAI
+      riskLevel: result.riskLevel
     };
   }
 

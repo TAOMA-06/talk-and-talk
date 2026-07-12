@@ -69,7 +69,7 @@ npm run start:dev
 额外检查：
 
 1. 在 `frontend/ios` 执行 `xcodegen generate` 后，Archive **TalkAndTalk-Staging** 成功（Team + 版本号已配置）。
-2. Staging/Release 均无「开发模式 / 安全工作台 / Admin」入口（Admin 仅 `#if DEBUG`）。
+2. Debug/Staging/Release 均无「安全工作台 / Admin」入口；管理员能力只存在于独立 Web 后台。
 3. 隐私政策 / 用户协议 HTTPS 可打开。
 4. `WECHAT_APP_ID` 未配置时支付错误文案清晰（非崩溃）。
 5. Staging 显示手机号登录；生产 Release 仅显示 Apple 登录。

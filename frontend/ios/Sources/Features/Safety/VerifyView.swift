@@ -97,8 +97,11 @@ struct VerifyView: View {
         if step < 2 {
             withAnimation(.easeOut(duration: DS.Motion.fast)) { step += 1 }
         } else {
-            store.verifyUser(name: name, phone: phone, age: Int(age) ?? 18)
-            dismiss()
+            Task {
+                if await store.verifyUser(name: name, phone: phone, age: Int(age) ?? 18) {
+                    dismiss()
+                }
+            }
         }
     }
 

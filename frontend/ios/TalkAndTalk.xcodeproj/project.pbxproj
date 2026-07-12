@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		08A0FBEADD63691CDE0E3F7E /* BackendClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94AE3452117FD865A7B356C3 /* BackendClient.swift */; };
+		0AA1C6B5FB48C04D299BA15D /* FrontendDemoIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 706F6908DD1813A46278F066 /* FrontendDemoIdentity.swift */; };
 		0F6A83A8D71C42BF7B920BE1 /* RuleBasedModerationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90EF9BE3F4A4A62F105AB39C /* RuleBasedModerationEngine.swift */; };
 		1B73BA6EE285CF894B83DD89 /* SafetyCenterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E17DB3F34D66843B81E8D28 /* SafetyCenterView.swift */; };
 		25B34EEF8CC9F5B4A6A292B7 /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FDE97C9E3513D57ACBA94D1 /* ChatView.swift */; };
@@ -29,7 +30,7 @@
 		70EB8E37D12BAF7511AD14EA /* LoginStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4C7B5A8F5944B691DC285D3 /* LoginStateTests.swift */; };
 		7B2DD2E0120B8B7122D32607 /* MessagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3218FC9B8690CE90A5813155 /* MessagesView.swift */; };
 		90D5149301AC6B2CB0EDEEFA /* BackendDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = F24991E535E69FA9B1E3B397 /* BackendDTO.swift */; };
-		98047900BEEF7A46AB44DCBE /* AdminView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C896E2DA7B23DAE646765221 /* AdminView.swift */; };
+		942D3A0CE9E9DA97B5EBD6BE /* FrontendDemoMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5F1FCF29D68D0B26154E1B6 /* FrontendDemoMode.swift */; };
 		9F3D0B716BF413F45951128A /* CommunityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BBD6E81DCCC74A0100E6A34 /* CommunityView.swift */; };
 		A18EF3449F68A24100E7D2ED /* ReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C940FDF0D6D4B02E03CFD7E /* ReviewView.swift */; };
 		B23779AE4B101CF005715ECA /* VerifyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F878EB904DAF2776F1CB6ED3 /* VerifyView.swift */; };
@@ -102,6 +103,7 @@
 		5E605DC8006E9FCCFE36D0FD /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 		5F8594D88502ACE4A36106DD /* LocalModerationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalModerationService.swift; sourceTree = "<group>"; };
 		6E17DB3F34D66843B81E8D28 /* SafetyCenterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafetyCenterView.swift; sourceTree = "<group>"; };
+		706F6908DD1813A46278F066 /* FrontendDemoIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrontendDemoIdentity.swift; sourceTree = "<group>"; };
 		7A4A0A03B99D6635E239AD23 /* TalkAndTalkUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = TalkAndTalkUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7B637A4D9A771D3580A47473 /* BackendAuthClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendAuthClient.swift; sourceTree = "<group>"; };
 		90EF9BE3F4A4A62F105AB39C /* RuleBasedModerationEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuleBasedModerationEngine.swift; sourceTree = "<group>"; };
@@ -113,8 +115,8 @@
 		A6E3835F343B22384B2A21A2 /* AppStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStore.swift; sourceTree = "<group>"; };
 		A8049AC3D2DA38FB7C6FAD82 /* BackendClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendClientTests.swift; sourceTree = "<group>"; };
 		BC62D953D307AB680378E63A /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		C5F1FCF29D68D0B26154E1B6 /* FrontendDemoMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrontendDemoMode.swift; sourceTree = "<group>"; };
 		C764869353423E79178BB4E3 /* WeChatPayClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeChatPayClient.swift; sourceTree = "<group>"; };
-		C896E2DA7B23DAE646765221 /* AdminView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminView.swift; sourceTree = "<group>"; };
 		D4C7B5A8F5944B691DC285D3 /* LoginStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginStateTests.swift; sourceTree = "<group>"; };
 		D9D33707B48743328A9E03D2 /* OrdersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrdersView.swift; sourceTree = "<group>"; };
 		DDA3918A52F3CD3042DA07B2 /* NotificationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsView.swift; sourceTree = "<group>"; };
@@ -189,6 +191,7 @@
 		0B2F10B85FCF66CE82DA8056 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				706F6908DD1813A46278F066 /* FrontendDemoIdentity.swift */,
 				007F9F5619ED56C144799B00 /* Models.swift */,
 			);
 			path = Models;
@@ -285,7 +288,6 @@
 		76ECF49344C9B0310BAE7C5F /* Features */ = {
 			isa = PBXGroup;
 			children = (
-				C599FC385531A14C61F8A222 /* Admin */,
 				2A75B914D540EBE13BD55424 /* Auth */,
 				02EF283EF3B62E316D7D7D18 /* Community */,
 				68E8521C4F5C91295221E37F /* Discover */,
@@ -345,14 +347,6 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		C599FC385531A14C61F8A222 /* Admin */ = {
-			isa = PBXGroup;
-			children = (
-				C896E2DA7B23DAE646765221 /* AdminView.swift */,
-			);
-			path = Admin;
-			sourceTree = "<group>";
-		};
 		CB5E473394CE5EA664A8B122 /* Orders */ = {
 			isa = PBXGroup;
 			children = (
@@ -408,6 +402,7 @@
 			isa = PBXGroup;
 			children = (
 				13D9DF7A81F40BC52D080F2C /* AppCatalog.swift */,
+				C5F1FCF29D68D0B26154E1B6 /* FrontendDemoMode.swift */,
 			);
 			path = Catalog;
 			sourceTree = "<group>";
@@ -559,7 +554,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				98047900BEEF7A46AB44DCBE /* AdminView.swift in Sources */,
 				E94DD7288271F6A9C47FA5B3 /* AppCatalog.swift in Sources */,
 				567779000564DDCCA22F448F /* AppStore.swift in Sources */,
 				F6F3CAAB6B61BE508526C263 /* AppleSignInCoordinator.swift in Sources */,
@@ -577,6 +571,8 @@
 				4793219FE63077EEA4450925 /* ContentView.swift in Sources */,
 				4AE49DFC612BF88AC5997434 /* CreditService.swift in Sources */,
 				EA414DFDDA89D7FCA486C2CF /* DesignSystem.swift in Sources */,
+				0AA1C6B5FB48C04D299BA15D /* FrontendDemoIdentity.swift in Sources */,
+				942D3A0CE9E9DA97B5EBD6BE /* FrontendDemoMode.swift in Sources */,
 				C9A2FB0AC8EFAFC384F611BE /* HomeView.swift in Sources */,
 				31A57330611897758F3C6D9E /* LocalModerationService.swift in Sources */,
 				2939C42D4A2DA69B96983162 /* LoginView.swift in Sources */,

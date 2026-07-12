@@ -83,10 +83,23 @@ enum PaymentTxnStatus {
 }
 
 enum RefundTxnStatus {
+  pendingReview
   pending
   processing
   success
   failed
+  rejected
+}
+
+enum CommunityPostKind {
+  femaleRequest
+  malePromotion
+}
+
+enum CommunityPostStatus {
+  pending
+  approved
+  rejected
 }
 
 enum NotificationType {
@@ -117,6 +130,10 @@ model User {
   orders        Order[]
   notifications Notification[]
   deletionRequests AccountDeletionRequest[]
+  companionProfile CompanionProfile? @relation("CompanionOwner")
+  communityPosts CommunityPost[]
+  communityLikes CommunityLike[]
+  reviews Review[]
 }
 
 model AuthIdentity {
@@ -145,6 +162,7 @@ model UserProfile {
 
 model CompanionProfile {
   id               String       @id
+  ownerUserId      String?      @unique
   name             String
   role             String
   initials         String
@@ -168,9 +186,12 @@ model CompanionProfile {
   serviceTags      CompanionServiceTag[]
   conversations    Conversation[]
   orders           Order[]
+  owner            User?        @relation("CompanionOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  reviews          Review[]
 
   @@index([isPublished, availability])
   @@index([isOnline])
+  @@index([ownerUserId])
 }
 
 model Conversation {
@@ -202,6 +223,11 @@ model Order {
   amountCents     Int
   currency        String      @default("CNY")
   status          OrderStatus @default(pending)
+  scheduledAt     DateTime
+  companionNameSnapshot String
+  companionRoleSnapshot String
+  companionInitialsSnapshot String
+  themeNameSnapshot String
   conversationId  String?
   paidAt          DateTime?
   cancelledAt     DateTime?
@@ -214,6 +240,7 @@ model Order {
   conversation Conversation?        @relation(fields: [conversationId], references: [id], onDelete: SetNull)
   payments     PaymentTransaction[]
   refunds      RefundTransaction[]
+  reviews      Review[]
 
   @@index([userId, createdAt])
   @@index([companionId, status])
@@ -253,6 +280,10 @@ model RefundTransaction {
   status           RefundTxnStatus @default(pending)
   reason           String?
   providerRefundId String?
+  reviewedById     String?
+  reviewedAt       DateTime?
+  reviewNote       String?
+  failureReason    String?
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
 
@@ -261,6 +292,54 @@ model RefundTransaction {
 
   @@index([orderId])
   @@index([paymentId])
+}
+
+model CommunityPost {
+  id               String              @id @default(uuid())
+  authorId         String
+  kind             CommunityPostKind
+  topic            String
+  content          String
+  coverImageUrl    String?
+  coverAspectRatio Float?
+  status           CommunityPostStatus @default(pending)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  author User            @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  likes  CommunityLike[]
+
+  @@index([status, createdAt])
+  @@index([authorId, createdAt])
+}
+
+model CommunityLike {
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  post CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([postId, userId])
+  @@index([userId])
+}
+
+model Review {
+  id          String   @id @default(uuid())
+  orderId     String   @unique
+  userId      String
+  companionId String
+  rating      Int
+  content     String
+  createdAt   DateTime @default(now())
+
+  order     Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companion CompanionProfile @relation(fields: [companionId], references: [id], onDelete: Restrict)
+
+  @@index([companionId, createdAt])
+  @@index([userId, createdAt])
 }
 
 model Message {

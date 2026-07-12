@@ -5,23 +5,21 @@ struct OrdersView: View {
 
     var body: some View {
         AppScaffold(title: "订单", spacing: DS.Space.lg) {
-            SectionHeader(title: sectionTitle, subtitle: sectionSubtitle)
-            if store.user.gender == .male {
+            SectionHeader(title: "我的订单", subtitle: "查看预约与沟通记录")
+            customerOrdersContent
+            if store.orders.contains(where: { $0.customerTarget != nil }) {
+                SectionHeader(title: "待服务订单", subtitle: "用户预约的服务订单")
                 serviceOrdersContent
-            } else {
-                customerOrdersContent
             }
         }
         .toolbar {
-            if store.user.gender != .male {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        store.selectedTab = .discover
-                    } label: {
-                        Image(systemName: "plus")
-                    }
-                    .accessibilityLabel("创建订单")
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    store.selectedTab = .discover
+                } label: {
+                    Image(systemName: "plus")
                 }
+                .accessibilityLabel("创建订单")
             }
         }
         .task {
@@ -32,22 +30,13 @@ struct OrdersView: View {
         }
     }
 
-    private var sectionTitle: String {
-        store.user.gender == .male ? "待服务订单" : "我的订单"
-    }
-
-    private var sectionSubtitle: String {
-        store.user.gender == .male
-            ? "以下为用户预约你的服务，按状态处理即可。"
-            : "查看预约与沟通记录"
-    }
-
     @ViewBuilder
     private var customerOrdersContent: some View {
-        let activeOrders = store.orders.filter { $0.status.isActive }
-        let historyOrders = store.orders.filter { !$0.status.isActive }
+        let customerOrders = store.orders.filter { $0.customerTarget == nil }
+        let activeOrders = customerOrders.filter { $0.status.isActive }
+        let historyOrders = customerOrders.filter { !$0.status.isActive }
 
-        if store.orders.isEmpty {
+        if customerOrders.isEmpty {
             EmptyStateView(symbol: "calendar.badge.clock", title: "暂无订单", subtitle: "去发现页选择陪伴者，开始第一次沟通。")
         } else {
             LazyVStack(spacing: DS.Space.lg) {
@@ -168,6 +157,7 @@ private struct OrderDetailsSection: View {
 private struct OrderCard: View {
     let order: Order
     @EnvironmentObject private var store: AppStore
+    @State private var showingRefund = false
 
     private var companion: Companion? {
         store.companion(by: order.companionId)
@@ -199,7 +189,7 @@ private struct OrderCard: View {
                 }
 
                 OrderDetailsSection(
-                    themeName: theme?.name ?? "线上沟通",
+                    themeName: order.themeNameSnapshot ?? theme?.name ?? "线上沟通",
                     durationMinutes: order.durationMinutes,
                     totalPrice: order.totalPrice,
                     scheduledAt: order.scheduledAt,
@@ -220,16 +210,28 @@ private struct OrderCard: View {
                         Task { await store.cancelOrder(id: order.id) }
                     }
                 }
+
+                if let refund = order.refund {
+                    StatusPill(text: refund.status.displayName, symbol: "arrow.uturn.backward.circle", color: refund.status == .success ? Color.dsSuccess : Color.dsWarning)
+                } else if [.paid, .inService, .completed].contains(order.status) {
+                    DSButton(title: "申请退款 / 售后", systemImage: "arrow.uturn.backward.circle", variant: .secondary, height: 40) {
+                        showingRefund = true
+                    }
+                }
             }
+        }
+        .sheet(isPresented: $showingRefund) {
+            RefundRequestSheet(order: order)
+                .environmentObject(store)
         }
     }
 
     private func companionTitle(_ companion: Companion?) -> some View {
         VStack(alignment: .leading, spacing: DS.Space.xxs) {
-            Text(companion?.name ?? "未知陪伴者")
+            Text(order.companionNameSnapshot ?? companion?.name ?? "陪伴服务")
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(Color.dsTextPrimary)
-            Text(companion?.role ?? "线上沟通")
+            Text(order.companionRoleSnapshot ?? companion?.role ?? "线上沟通")
                 .font(.system(size: 13))
                 .foregroundStyle(Color.dsTextSecondary)
         }
@@ -252,6 +254,59 @@ private struct OrderCard: View {
 
     private var conversationEntryIcon: String {
         order.status == .completed ? "headphones" : "bubble.left.and.bubble.right"
+    }
+}
+
+private struct RefundRequestSheet: View {
+    let order: Order
+    @EnvironmentObject private var store: AppStore
+    @Environment(\.dismiss) private var dismiss
+    @State private var reason = "行程有变，服务尚未开始"
+    @State private var isSubmitting = false
+    @State private var resultMessage: String?
+    private let reasons = ["行程有变，服务尚未开始", "重复下单", "无法联系陪伴者", "服务体验问题", "其他原因"]
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("退款金额") {
+                    Text("¥\(order.totalPrice)（全额原路退回）")
+                    Text(order.status == .paid ? "服务未开始时将自动申请全额退款。" : "服务中或已完成的订单将进入人工售后审核。")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                Section("申请原因") {
+                    Picker("原因", selection: $reason) {
+                        ForEach(reasons, id: \.self) { Text($0).tag($0) }
+                    }
+                }
+                if let resultMessage {
+                    Section { Text(resultMessage) }
+                }
+                Section {
+                    Button(isSubmitting ? "正在提交…" : "确认提交退款申请") {
+                        submit()
+                    }
+                    .disabled(isSubmitting)
+                }
+            }
+            .navigationTitle("退款 / 售后")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("关闭") { dismiss() } } }
+        }
+    }
+
+    private func submit() {
+        isSubmitting = true
+        Task {
+            do {
+                let updated = try await store.requestRefund(orderId: order.id, reason: reason)
+                resultMessage = updated.refund?.status.displayName ?? "申请已提交"
+            } catch {
+                resultMessage = (error as? BackendError)?.userFacingMessage ?? "提交失败，请稍后重试"
+            }
+            isSubmitting = false
+        }
     }
 }
 

@@ -7,6 +7,7 @@ struct ReviewView: View {
     @State private var rating = 5
     @State private var content = ""
     @State private var submitted = false
+    @State private var isSubmitting = false
 
     private var companion: Companion? { store.companion(by: companionId) }
 
@@ -19,7 +20,7 @@ struct ReviewView: View {
                     CompanionOrderHeader(companion: companion)
                     RatingPicker(rating: $rating)
                     ReviewEditor(content: $content)
-                    DSPrimaryButton(title: "提交评价", systemImage: "star.fill", action: submitReview)
+                    DSPrimaryButton(title: isSubmitting ? "正在提交…" : "提交评价", systemImage: "star.fill", isEnabled: !isSubmitting, action: submitReview)
                     DSSecondaryButton(title: "稍后评价", action: { dismiss() })
                 } else {
                     EmptyStateView(symbol: "star.slash", title: "评价对象不存在", subtitle: "请返回订单页查看状态。")
@@ -49,9 +50,13 @@ struct ReviewView: View {
 
     private func submitReview() {
         guard store.orders.contains(where: { $0.companionId == companionId && $0.status == .completed }) else { return }
-        store.submitReview(companionId: companionId, rating: rating, content: content)
-        withAnimation(.easeOut(duration: DS.Motion.fast)) {
-            submitted = true
+        isSubmitting = true
+        Task {
+            let succeeded = await store.submitReview(companionId: companionId, rating: rating, content: content)
+            isSubmitting = false
+            if succeeded {
+                withAnimation(.easeOut(duration: DS.Motion.fast)) { submitted = true }
+            }
         }
     }
 

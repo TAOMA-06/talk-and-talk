@@ -21,19 +21,33 @@ final class AuthSession: ObservableObject {
 
     private let tokenStore: TokenStoring
     private let clientFactory: (URL) -> any AuthAPIClient
+    private let usesOfflineIdentity: Bool
     private var isRefreshing = false
 
     init(
         tokenStore: TokenStoring = KeychainTokenStore(),
-        clientFactory: @escaping (URL) -> any AuthAPIClient = { BackendAuthClient(baseURL: $0) }
+        clientFactory: @escaping (URL) -> any AuthAPIClient = { BackendAuthClient(baseURL: $0) },
+        offlineIdentityEnabled: Bool? = nil
     ) {
         self.tokenStore = tokenStore
         self.clientFactory = clientFactory
+        #if DEBUG
+        self.usesOfflineIdentity = offlineIdentityEnabled ?? FrontendDemoMode.isEnabled
+        #else
+        self.usesOfflineIdentity = false
+        #endif
     }
 
-    var accessToken: String? { tokenStore.getAccessToken() }
+    var accessToken: String? { usesOfflineIdentity ? nil : tokenStore.getAccessToken() }
 
     func bootstrap() async {
+        guard !usesOfflineIdentity else {
+            #if DEBUG
+            state = .authenticated(FrontendDemoIdentity.user)
+            #endif
+            return
+        }
+
         guard tokenStore.getAccessToken() != nil else {
             state = .unauthenticated
             return
@@ -112,6 +126,13 @@ final class AuthSession: ObservableObject {
     }
 
     func logout() async {
+        guard !usesOfflineIdentity else {
+            #if DEBUG
+            state = .authenticated(FrontendDemoIdentity.user)
+            #endif
+            return
+        }
+
         if let refreshToken = tokenStore.getRefreshToken(),
            let accessToken = tokenStore.getAccessToken(),
            let client = makeClient() {
@@ -121,6 +142,13 @@ final class AuthSession: ObservableObject {
     }
 
     func refreshIfNeeded() async {
+        guard !usesOfflineIdentity else {
+            #if DEBUG
+            state = .authenticated(FrontendDemoIdentity.user)
+            #endif
+            return
+        }
+
         guard !isRefreshing else { return }
         isRefreshing = true
         defer { isRefreshing = false }

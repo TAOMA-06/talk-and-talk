@@ -164,7 +164,7 @@
 
 - 生产 JWT / CORS 强制校验；生产禁 `SMS_PROVIDER=mock`。
 - `APP_ENV=production` 时 `mock-notify` → `MOCK_PAY_DISABLED`。
-- iOS Admin / 安全工作台 / 开发模式本地兜底均 `#if DEBUG`（`AdminView.swift`、`ContentView.swift`、`AppStore.swift`、`ProfileView.swift`）。
+- iOS 已彻底删除 Admin / 安全工作台；用户安全中心只展示本人状态，运营审核仅由独立 Web 后台和 staff API 承载。
 - Bundle ID `com.talkandtalk.app`；版本 `0.1.0`；Release `BACKEND_BASE_URL=https://api.talkandtalk.app`。
 - Sign in with Apple + associated domains（api / staging）。
 - 法律页静态资源：`public/legal/privacy.html`、`terms.html`；Admin Web：`public/admin/index.html`。

@@ -159,6 +159,10 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
   if (appEnv === "production" && smsProvider === "mock") {
     throw new Error("SMS_PROVIDER=mock is not allowed when APP_ENV=production");
   }
+  const seedOnStartup = parseBoolean(env.SEED_ON_STARTUP, appEnv === "staging");
+  if (appEnv === "production" && seedOnStartup) {
+    throw new Error("SEED_ON_STARTUP is not allowed when APP_ENV=production");
+  }
 
   return {
     NODE_ENV: nodeEnv,
@@ -187,7 +191,7 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     SMS_PROVIDER: smsProvider,
     RATE_LIMIT_PER_MINUTE: parseInt(env.RATE_LIMIT_PER_MINUTE ?? "120", 10) || 120,
     BODY_SIZE_LIMIT: env.BODY_SIZE_LIMIT?.trim() || "1mb",
-    SEED_ON_STARTUP: parseBoolean(env.SEED_ON_STARTUP, appEnv === "staging")
+    SEED_ON_STARTUP: seedOnStartup
   };
 }
 

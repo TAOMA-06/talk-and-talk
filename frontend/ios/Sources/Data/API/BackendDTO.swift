@@ -91,8 +91,7 @@ struct BackendConversationParticipantDTO: Decodable {
 }
 
 struct BackendReportData: Decodable {
-    let report: BackendReportSummaryDTO?
-    let moderationCase: BackendModerationCaseDTO
+    let report: BackendReportSummaryDTO
 }
 
 struct BackendOrdersData: Decodable {
@@ -115,6 +114,30 @@ struct BackendOrderDTO: Decodable {
     let completedAt: String?
     let createdAt: String
     let updatedAt: String?
+    let scheduledAt: String?
+    let companionSnapshot: BackendOrderCompanionSnapshotDTO?
+    let themeNameSnapshot: String?
+    let customer: BackendOrderCustomerDTO?
+    let refund: BackendRefundDTO?
+}
+
+struct BackendOrderCompanionSnapshotDTO: Decodable { let name: String; let role: String; let initials: String }
+struct BackendOrderCustomerDTO: Decodable { let id: String; let name: String; let initials: String }
+struct BackendRefundDTO: Decodable {
+    let id: String; let outRefundNo: String; let amountCents: Int; let status: String
+    let reason: String?; let reviewNote: String?; let failureReason: String?
+}
+struct BackendRefundData: Decodable { let refund: BackendRefundDTO; let order: BackendOrderDTO }
+struct BackendCommunityPostsData: Decodable { let items: [BackendCommunityPostDTO] }
+struct BackendCommunityPostDTO: Decodable {
+    let id: String; let authorId: String; let authorName: String; let authorInitials: String
+    let companionId: String?; let kind: String; let topic: String; let content: String
+    let likeCount: Int; let moderationStatus: String; let createdAt: String
+}
+struct BackendReviewsData: Decodable { let items: [BackendReviewDTO] }
+struct BackendReviewDTO: Decodable {
+    let id: String; let orderId: String?; let companionId: String; let userName: String
+    let rating: Int; let content: String; let createdAt: String
 }
 
 struct BackendWeChatAppParamsDTO: Decodable {
@@ -201,33 +224,11 @@ struct BackendSendMessageData: Decodable {
     let message: BackendMessageDTO?
     let safetyMessage: BackendMessageDTO?
     let companionReply: BackendMessageDTO?
-    let moderationCase: BackendModerationCaseDTO?
 }
 
 struct BackendModerationDTO: Decodable {
     let decision: String
     let riskLevel: String
-    let score: Double
-    let reasons: [String]
-    let matchedRules: [String]
-    let usedAI: Bool
-}
-
-struct BackendModerationCaseDTO: Decodable {
-    let id: String
-    let title: String
-    let category: String
-    let riskLevel: String
-    let status: String
-    let source: String
-    let content: String
-    let targetId: String?
-    let aiScore: Double
-    let aiReason: String
-    let decision: String
-    let matchedRules: [String]
-    let usedAI: Bool
-    let resolvedAt: String?
 }
 
 enum BackendDTOMapper {
@@ -302,9 +303,30 @@ enum BackendDTOMapper {
             totalPrice: totalPrice,
             status: status,
             createdAt: createdAt,
-            scheduledAt: createdAt,
-            conversationId: dto.conversationId
+            scheduledAt: dto.scheduledAt.map(parseDate) ?? createdAt,
+            customerTarget: dto.customer.map { .communityUser(id: $0.id, name: $0.name, initials: $0.initials) },
+            conversationId: dto.conversationId,
+            companionNameSnapshot: dto.companionSnapshot?.name,
+            companionRoleSnapshot: dto.companionSnapshot?.role,
+            companionInitialsSnapshot: dto.companionSnapshot?.initials,
+            themeNameSnapshot: dto.themeNameSnapshot,
+            refund: dto.refund.flatMap(refund(from:))
         )
+    }
+
+    static func refund(from dto: BackendRefundDTO) -> RefundSummary? {
+        guard let status = RefundStatus(rawValue: dto.status) else { return nil }
+        return RefundSummary(id: dto.id, outRefundNo: dto.outRefundNo, amountCents: dto.amountCents, status: status, reason: dto.reason, reviewNote: dto.reviewNote, failureReason: dto.failureReason)
+    }
+
+    static func communityPost(from dto: BackendCommunityPostDTO) -> CommunityPost? {
+        guard let kind = CommunityPostKind(rawValue: dto.kind), let status = CommunityModerationStatus(rawValue: dto.moderationStatus) else { return nil }
+        let target: ContactTarget? = dto.companionId.map { .companion(id: $0) } ?? .communityUser(id: dto.authorId, name: dto.authorName, initials: dto.authorInitials)
+        return CommunityPost(id: dto.id, authorId: dto.authorId, authorName: dto.authorName, authorInitials: dto.authorInitials, contactTarget: target, kind: kind, topic: dto.topic, content: dto.content, coverImageData: nil, coverAspectRatio: nil, likeCount: dto.likeCount, moderationStatus: status, createdAt: parseDate(dto.createdAt))
+    }
+
+    static func review(from dto: BackendReviewDTO) -> Review {
+        Review(id: dto.id, companionId: dto.companionId, userName: dto.userName, rating: dto.rating, content: dto.content, createdAt: parseDate(dto.createdAt))
     }
 
     static func wechatParams(from dto: BackendWeChatAppParamsDTO) -> WeChatAppPayParams {
@@ -332,40 +354,14 @@ enum BackendDTOMapper {
     }
 
     static func moderationResult(from dto: BackendModerationDTO) -> ModerationResult {
-        ModerationResult(
-            decision: ModerationDecision(rawValue: dto.decision) ?? .allow,
-            riskLevel: riskLevel(from: dto.riskLevel),
-            score: dto.score,
-            reasons: dto.reasons,
-            matchedRules: dto.matchedRules,
-            usedAI: dto.usedAI
-        )
-    }
-
-    static func moderationCase(from dto: BackendModerationCaseDTO) -> ModerationCase? {
-        guard
-            let status = ModerationCaseStatus(rawValue: dto.status),
-            let source = ModerationSource(rawValue: dto.source),
-            let decision = ModerationDecision(rawValue: dto.decision)
-        else {
-            return nil
-        }
-
-        return ModerationCase(
-            id: dto.id,
-            title: dto.title,
-            category: dto.category,
-            riskLevel: riskLevel(from: dto.riskLevel),
-            status: status,
-            source: source,
-            content: dto.content,
-            targetId: dto.targetId,
-            aiScore: dto.aiScore,
-            aiReason: dto.aiReason,
+        let decision = ModerationDecision(rawValue: dto.decision) ?? .allow
+        return ModerationResult(
             decision: decision,
-            matchedRules: dto.matchedRules,
-            usedAI: dto.usedAI,
-            resolvedAt: dto.resolvedAt.map(parseDate)
+            riskLevel: riskLevel(from: dto.riskLevel),
+            score: 0,
+            reasons: [],
+            matchedRules: [],
+            usedAI: false
         )
     }
 

@@ -14,6 +14,7 @@ import {
   WeChatPayProvider,
   WeChatPrepayInput,
   WeChatPrepayResult
+  , WeChatRefundInput, WeChatRefundNotifyPayload, WeChatRefundResult
 } from "./wechat-pay.provider";
 
 export type RealWeChatPayConfig = {
@@ -191,6 +192,40 @@ export class RealWeChatPayProvider implements WeChatPayProvider {
     };
   }
 
+  async createRefund(input: WeChatRefundInput): Promise<WeChatRefundResult> {
+    const response = await this.requestJson<any>("POST", "/v3/refund/domestic/refunds", {
+      transaction_id: input.transactionId,
+      out_refund_no: input.outRefundNo,
+      reason: input.reason.slice(0, 80),
+      notify_url: input.notifyUrl,
+      amount: { refund: input.refundAmountCents, total: input.totalAmountCents, currency: "CNY" }
+    });
+    return this.refundResult(response);
+  }
+
+  async queryRefund(outRefundNo: string): Promise<WeChatRefundResult> {
+    const encoded = encodeURIComponent(outRefundNo);
+    const response = await this.requestJson<any>("GET", `/v3/refund/domestic/refunds/${encoded}`);
+    return this.refundResult(response);
+  }
+
+  parseRefundNotifyPayload(rawBody: string): WeChatRefundNotifyPayload {
+    const parsed = JSON.parse(rawBody) as Record<string, unknown>;
+    const resource = (parsed.resource as Record<string, unknown> | undefined) ?? {};
+    const decrypted = typeof resource.ciphertext === "string" && resource.ciphertext
+      ? decryptResource(this.config.apiV3Key, {
+          ciphertext: String(resource.ciphertext), nonce: String(resource.nonce ?? ""),
+          associatedData: String(resource.associated_data ?? "")
+        })
+      : ((resource as any).plaintext ?? resource);
+    const amount = (decrypted.amount as Record<string, unknown> | undefined) ?? {};
+    return {
+      ...this.refundResult(decrypted),
+      refundAmountCents: Number(amount.refund ?? 0),
+      raw: parsed
+    };
+  }
+
   /** Warm platform cert cache (call on boot or before first notify). */
   async ensurePlatformCertificates(): Promise<void> {
     const stale =
@@ -299,6 +334,14 @@ export class RealWeChatPayProvider implements WeChatPayProvider {
         HttpStatus.BAD_GATEWAY
       );
     }
+  }
+
+  private refundResult(value: Record<string, unknown>): WeChatRefundResult {
+    return {
+      outRefundNo: String(value.out_refund_no ?? ""),
+      refundId: String(value.refund_id ?? ""),
+      status: String(value.status ?? "")
+    };
   }
 
   private buildAuthorization(method: string, path: string, body: string): string {

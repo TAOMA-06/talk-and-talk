@@ -55,28 +55,32 @@ talk-and-talk/
 
 Phase 1：
 
-- iOS 默认连接 `http://127.0.0.1:3000`。
-- App 启动时调用 `GET /api/v1/health` 检查正式后端状态。
-- `BackendConfig.supportsChat` 对 `c1` / `c2` / `c3` 返回 true；这些会话优先走正式后端聊天与审核。
-- DEBUG 下后端聊天失败可回退本地聊天与本地审核；Release 失败则提示重试，不以本地规则覆盖服务端决策。
-- 订单/微信支付闭环已接正式后端（创建 → 预支付 → 回调/mock 回调 → paid 并激活会话）；社区发帖等仍可有本地逻辑。
+- iOS Debug 默认运行前端离线演示：使用本地 MockData，不连接后端且不要求登录；首次启动仍展示身份选择。
+- Debug 需要本地 API 联调时，在 Run Scheme 环境变量中设置 `FRONTEND_DEMO_MODE=NO`，再使用 `http://127.0.0.1:3000`。
+- Staging/Release 维持后端连接；App 启动时调用 `GET /api/v1/health` 检查后端状态。
+- Debug 的本地人物、消息和支付闭环只在 `#if DEBUG` 中编译；Release 后端失败只显示空状态或错误。
+- Release 聊天只写入后端已存在的正式会话，不生成自动陪伴者回复。
+- 订单、社区、评价、陪伴者申请和服务方订单均由后端持久化；订单保存预约时间与人物/主题快照。
+- 退款只有微信回调或主动查询确认成功后才更新订单为“已退款”；服务中/已完成订单先进入人工审核。
 - 通知中心（支付/订单/审核/安全）、账号注销申请、安全加固（helmet、限流、日志脱敏、审计）已具备发行前基础。
 
 Phase 2（Auth）：
 
 - 正式账号体系：手机号验证码登录、Apple 登录、JWT access/refresh、logout、`GET /users/me`。
-- iOS 启动门控：未登录显示 `LoginView`，已登录进入主 App。
+- iOS 启动门控：Debug 离线演示直接进入本地演示身份；Staging/Release 未登录显示 `LoginView`，已登录进入主 App。
 - Token 持久化在 Keychain；401 时自动 refresh 并重试。
-- Release 构建必须在 Info.plist 或 Scheme 中配置 `BACKEND_BASE_URL`。
+- Release 使用 `Config/Release.xcconfig` 中的生产 `BACKEND_BASE_URL`，CI 会扫描产物并拒绝 Demo/Mock 标记。
 - 详见 [docs/auth-api.md](./auth-api.md)。
 
 Phase 3（聊天/审核）：
 
 - 正式聊天与审核 API 已接入：`POST /conversations/:id/messages`、`POST /moderation/check`、`GET /moderation/cases`（staff）。
+- iOS 是用户/陪伴者客户端，不编译管理员页面、审核队列或处置动作；用户只能查看本人安全状态并提交举报。
+- 聊天响应只返回用户可理解的审核决定与风险等级，举报响应只返回回执；规则命中、AI 原因和完整案件仅 staff API 可见。
 - 审核流水线：RuleEngine →（高风险 block 跳过）可选 DeepSeek → Case/Evidence/ActionLog。
 - Admin Moderation：概览、筛选队列、详情、会话证据、人工处置、样本标注/导出；动作写 `ModerationActionLog` + `AuditLog`。
 - 用户举报：`POST /moderation/reports`；iOS 举报入口优先提交后端。
-- Web 运营后台：`http://localhost:3000/admin/`。
+- Web 运营后台与 iOS 完全分离：本地工具入口为 `http://localhost:3000/admin/`，生产部署需独立访问控制。
 - iOS `c1`–`c3` 以服务端 decision 为准（含 `review` 反馈「内容已进入平台复核」）。
 - 会话、消息、审核工单持久化到 Postgres。
 

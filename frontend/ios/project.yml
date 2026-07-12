@@ -85,6 +85,8 @@ schemes:
       config: Debug
     test:
       config: Debug
+      environmentVariables:
+        FRONTEND_DEMO_MODE: NO
       targets:
         - TalkAndTalkTests
     profile:

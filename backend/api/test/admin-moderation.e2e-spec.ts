@@ -281,8 +281,10 @@ describe("Admin Moderation (e2e)", () => {
       })
       .expect(201);
 
-    expect(report.body.data.moderationCase.source).toBe("report");
-    expect(report.body.data.moderationCase.status).toMatch(/pending|humanReview/);
+    expect(report.body.data.report.id).toBeTruthy();
+    expect(report.body.data.report.source).toBe("report");
+    expect(report.body.data.report.status).toMatch(/pending|humanReview/);
+    expect(report.body.data.moderationCase).toBeUndefined();
 
     await request(app.getHttpServer())
       .get("/api/v1/moderation/cases")
@@ -296,6 +298,28 @@ describe("Admin Moderation (e2e)", () => {
       .expect(200);
 
     expect(staffList.body.data.cases.length).toBeGreaterThanOrEqual(1);
+
+    await request(app.getHttpServer())
+      .post("/api/v1/moderation/check")
+      .set("Authorization", `Bearer ${userToken}`)
+      .send({ text: "测试内容", source: "chat" })
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .post("/api/v1/moderation/check")
+      .set("Authorization", `Bearer ${modToken}`)
+      .send({ text: "测试内容", source: "chat" })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .get("/api/v1/payments/refunds/review-queue")
+      .set("Authorization", `Bearer ${userToken}`)
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .get("/api/v1/payments/refunds/review-queue")
+      .set("Authorization", `Bearer ${modToken}`)
+      .expect(200);
   });
 
   it("returns conversation evidence when message is linked", async () => {

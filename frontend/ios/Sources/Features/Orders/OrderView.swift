@@ -6,6 +6,7 @@ struct OrderView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var selectedThemeId = ""
     @State private var selectedDuration = 30
+    @State private var scheduledAt = Date().addingTimeInterval(3600)
     @State private var agreedToRules = false
     @State private var isSubmitting = false
     @State private var errorMessage: String?
@@ -26,6 +27,10 @@ struct OrderView: View {
                 VerificationGate()
                 ThemePicker(selectedThemeId: $selectedThemeId)
                 DurationPicker(selectedDuration: $selectedDuration, durations: durations)
+                SoftCard {
+                    DatePicker("预约时间", selection: $scheduledAt, in: Date().addingTimeInterval(300)..., displayedComponents: [.date, .hourAndMinute])
+                        .font(.system(size: 15, weight: .medium))
+                }
                 PricePanel(
                     unitPrice: companion.pricePerHalfHour,
                     duration: selectedDuration,
@@ -85,7 +90,8 @@ struct OrderView: View {
                 let order = try await store.createAndPayOrder(
                     companionId: companionId,
                     themeId: selectedThemeId,
-                    durationMinutes: selectedDuration
+                    durationMinutes: selectedDuration,
+                    scheduledAt: scheduledAt
                 )
                 isSubmitting = false
                 guard order.status == .paid || order.status == .inService else {

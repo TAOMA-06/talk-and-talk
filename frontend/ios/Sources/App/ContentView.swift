@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject private var store: AppStore
+    @State private var isInitialGenderSelectionPresented = false
 
     var body: some View {
         TabView(selection: $store.selectedTab) {
@@ -38,7 +39,11 @@ struct ContentView: View {
         .tint(Color.dsPrimary)
         .background(Color.dsBackground)
         .task {
+            isInitialGenderSelectionPresented = store.user.gender == nil
             await store.refreshBackendConnection()
+        }
+        .onChange(of: store.user.gender) { _, gender in
+            isInitialGenderSelectionPresented = gender == nil
         }
         .sheet(item: $store.agreementPrompt) { prompt in
             UserAgreementSheet(prompt: prompt) {
@@ -47,10 +52,7 @@ struct ContentView: View {
             .interactiveDismissDisabled(prompt.requiredReadSeconds > 0)
         }
         .fullScreenCover(
-            isPresented: Binding(
-                get: { store.user.gender == nil },
-                set: { _ in }
-            )
+            isPresented: $isInitialGenderSelectionPresented
         ) {
             InitialGenderSelectionView()
                 .interactiveDismissDisabled()
@@ -155,10 +157,6 @@ private extension View {
                     )
                 case .accountDeletion:
                     AccountDeletionView()
-#if DEBUG
-                case .admin:
-                    AdminView()
-#endif
                 }
             }
         }

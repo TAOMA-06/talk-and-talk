@@ -24,7 +24,6 @@ final class AppStore: ObservableObject {
     @Published var orders = MockData.orders
     @Published var reviews = MockData.reviews
     @Published var messages = MockData.messages
-    @Published var moderationCases = MockData.moderationCases
     @Published var communityPosts = MockData.communityPosts
     @Published var creditEvents: [CreditEvent] = MockData.initialCreditEvents
     #else
@@ -34,7 +33,6 @@ final class AppStore: ObservableObject {
     @Published var orders: [Order] = []
     @Published var reviews: [Review] = []
     @Published var messages: [Message] = []
-    @Published var moderationCases: [ModerationCase] = []
     @Published var communityPosts: [CommunityPost] = []
     @Published var creditEvents: [CreditEvent] = []
     #endif
@@ -72,9 +70,11 @@ final class AppStore: ObservableObject {
         user = authenticatedUser
     }
 
+    #if DEBUG
     var currentUserCompanionId: String {
         "self-\(user.id)"
     }
+    #endif
 
     var accountRestrictions: AccountRestrictions {
         creditService.restrictions(for: user)
@@ -86,17 +86,6 @@ final class AppStore: ObservableObject {
 
     var availableCompanionCount: Int {
         companions.filter { $0.availability != .busy }.count
-    }
-
-    var pendingModerationCount: Int {
-        moderationCases.filter { $0.status == .pending || $0.status == .humanReview || $0.status == .autoReviewing }.count
-    }
-
-    var blockedTodayCount: Int {
-        moderationCases.filter {
-            guard $0.decision == .block, let resolvedAt = $0.resolvedAt else { return false }
-            return Calendar.current.isDateInToday(resolvedAt)
-        }.count
     }
 
     func navigate(_ route: AppRoute) {
@@ -366,11 +355,40 @@ final class AppStore: ObservableObject {
         communityPosts.filter { $0.moderationStatus == .approved }
     }
 
+    func loadCommunityPosts() async {
+        guard BackendConfig.isEnabled, let client = backendClient() else {
+            #if !DEBUG
+            communityPosts = []
+            #endif
+            return
+        }
+        do {
+            communityPosts = try await client.fetchCommunityPosts()
+        } catch {
+            #if !DEBUG
+            communityPosts = []
+            #endif
+            lastModerationFeedback = userFacingMessage(for: error)
+        }
+    }
+
+    func loadReviews(companionId: String) async {
+        guard BackendConfig.isEnabled, let client = backendClient() else { return }
+        do {
+            let fetched = try await client.fetchReviews(companionId: companionId)
+            reviews.removeAll { $0.companionId == companionId }
+            reviews.append(contentsOf: fetched)
+        } catch {
+            #if !DEBUG
+            reviews.removeAll { $0.companionId == companionId }
+            #endif
+        }
+    }
+
     func pendingServiceOrdersForCurrentCompanion() -> [Order] {
-        guard user.gender == .male else { return [] }
         return orders
             .filter { order in
-                order.companionId == currentUserCompanionId
+                order.customerTarget != nil
                     && order.status != .completed
                     && order.status != .refunded
                     && order.status != .cancelled
@@ -389,8 +407,11 @@ final class AppStore: ObservableObject {
         }
 
         do {
-            let fetched = try await client.fetchOrders()
-            orders = fetched
+            async let customerOrders = client.fetchOrders()
+            async let providerOrders = client.fetchServiceOrders()
+            let (customer, provider) = try await (customerOrders, providerOrders)
+            let fetched = customer + provider
+            orders = Dictionary(grouping: fetched, by: \.id).compactMap { $0.value.first }.sorted { $0.createdAt > $1.createdAt }
             isBackendConnected = true
         } catch {
             isBackendConnected = false
@@ -404,13 +425,15 @@ final class AppStore: ObservableObject {
     func createAndPayOrder(
         companionId: String,
         themeId: String,
-        durationMinutes: Int
+        durationMinutes: Int,
+        scheduledAt: Date = Date().addingTimeInterval(3600)
     ) async throws -> Order {
         if BackendConfig.isEnabled, let client = backendClient() {
             var order = try await client.createOrder(
                 companionId: companionId,
                 themeId: themeId,
-                durationMinutes: durationMinutes
+                durationMinutes: durationMinutes,
+                scheduledAt: scheduledAt
             )
             upsertOrder(order)
 
@@ -455,6 +478,21 @@ final class AppStore: ObservableObject {
 #endif
     }
 
+    func requestRefund(orderId: String, reason: String) async throws -> Order {
+        guard BackendConfig.isEnabled, let client = backendClient() else { throw BackendError.unavailable }
+        let order = try await client.requestRefund(orderId: orderId, reason: reason)
+        upsertOrder(order)
+        return order
+    }
+
+    func syncRefund(orderId: String) async throws -> Order {
+        guard BackendConfig.isEnabled, let client = backendClient() else { throw BackendError.unavailable }
+        let order = try await client.syncRefund(orderId: orderId)
+        upsertOrder(order)
+        return order
+    }
+
+    #if DEBUG
     private func createLocalPaidOrder(
         companionId: String,
         themeId: String,
@@ -480,6 +518,7 @@ final class AppStore: ObservableObject {
         insertSystemMessage("订单已由平台担保，沟通开始前请勿交换私人联系方式。", target: .companion(id: companionId), type: .system)
         return order
     }
+    #endif
 
     func cancelOrder(id: String) async {
         if BackendConfig.isEnabled, let client = backendClient() {
@@ -491,31 +530,59 @@ final class AppStore: ObservableObject {
                 lastModerationFeedback = userFacingMessage(for: error)
             }
         }
+        #if DEBUG
         guard let index = orders.firstIndex(where: { $0.id == id }), orders[index].status.canCancel else { return }
         orders[index].status = .cancelled
+        #else
+        lastModerationFeedback = "订单取消失败，请检查网络后重试。"
+        #endif
     }
 
     func startActiveOrder(with companionId: String) {
+        #if DEBUG
         guard let index = orderIndex(for: companionId, allowedStatuses: [.paid]) else { return }
         orders[index].status = .inService
         activeOrderId = orders[index].id
+        #else
+        guard let order = orders.first(where: { $0.companionId == companionId && $0.customerTarget != nil && $0.status == .paid }), let client = backendClient() else { return }
+        Task {
+            do { upsertOrder(try await client.startServiceOrder(id: order.id)) }
+            catch { lastModerationFeedback = userFacingMessage(for: error) }
+        }
+        #endif
     }
 
     func completeActiveOrder(with companionId: String) {
+        #if DEBUG
         guard let index = orderIndex(for: companionId, allowedStatuses: [.inService, .paid]) else { return }
         orders[index].status = .completed
         activeOrderId = nil
         if let event = creditService.applyOrderCompletion(to: &user) {
             creditEvents.insert(event, at: 0)
         }
+        #else
+        guard let order = orders.first(where: { $0.companionId == companionId && $0.customerTarget != nil && $0.status == .inService }), let client = backendClient() else { return }
+        Task {
+            do { upsertOrder(try await client.completeServiceOrder(id: order.id)) }
+            catch { lastModerationFeedback = userFacingMessage(for: error) }
+        }
+        #endif
     }
 
     func completeOrder(id: String) {
+        #if DEBUG
         guard let index = orders.firstIndex(where: { $0.id == id }) else { return }
         orders[index].status = .completed
         if activeOrderId == id {
             activeOrderId = nil
         }
+        #else
+        guard let order = orders.first(where: { $0.id == id && $0.customerTarget != nil }), let client = backendClient() else { return }
+        Task {
+            do { upsertOrder(try await client.completeServiceOrder(id: order.id)) }
+            catch { lastModerationFeedback = userFacingMessage(for: error) }
+        }
+        #endif
     }
 
     private func upsertOrder(_ order: Order) {
@@ -535,16 +602,36 @@ final class AppStore: ObservableObject {
     }
 
     func setUserGender(_ gender: UserGender) {
+        #if DEBUG
         user.gender = gender
+        #else
+        guard BackendConfig.isEnabled, let client = backendClient() else {
+            lastModerationFeedback = "身份保存失败，请检查网络后重试。"
+            return
+        }
+        Task {
+            do {
+                user = try await client.updateCurrentUser(displayName: nil, gender: gender, age: nil)
+            } catch {
+                lastModerationFeedback = userFacingMessage(for: error)
+            }
+        }
+        #endif
     }
 
-    func verifyUser(name: String, phone: String, age: Int) {
+    func verifyUser(name: String, phone: String, age: Int) async -> Bool {
+        #if DEBUG
         user.name = name.isEmpty ? user.name : name
         user.phone = phone.isEmpty ? user.phone : Self.maskedPhone(phone)
         user.age = max(age, 18)
         user.isVerified = true
         let event = creditService.applyVerification(to: &user)
         creditEvents.insert(event, at: 0)
+        return true
+        #else
+        lastModerationFeedback = "实名认证需由服务器审核确认。"
+        return false
+        #endif
     }
 
     private static func maskedPhone(_ phone: String) -> String {
@@ -574,6 +661,22 @@ final class AppStore: ObservableObject {
             return .block
         }
 
+        #if !DEBUG
+        guard BackendConfig.supportsChat(for: target), BackendConfig.isEnabled, let client = backendClient() else {
+            failedSendTextByConversationId[target.conversationId] = trimmed
+            lastModerationFeedback = "网络不可用，消息未发送，内容已为你保留。"
+            return .block
+        }
+        do {
+            return try await sendMessageViaBackend(trimmed, to: target, client: client)
+        } catch {
+            isBackendConnected = false
+            failedSendTextByConversationId[target.conversationId] = trimmed
+            lastModerationFeedback = userFacingMessage(for: error)
+            return .block
+        }
+        #else
+
         if BackendConfig.supportsChat(for: target), BackendConfig.isEnabled, let client = backendClient() {
             do {
                 return try await sendMessageViaBackend(trimmed, to: target, client: client)
@@ -581,9 +684,6 @@ final class AppStore: ObservableObject {
                 isBackendConnected = false
                 failedSendTextByConversationId[target.conversationId] = trimmed
                 lastModerationFeedback = userFacingMessage(for: error)
-#if !DEBUG
-                return .block
-#endif
             }
         }
 
@@ -604,7 +704,6 @@ final class AppStore: ObservableObject {
         case .block:
             lastModerationFeedback = "消息未发送：疑似违规内容"
             insertSystemMessage("安全提醒：平台不支持线下邀约、私下转账或敏感交易，请在平台内完成沟通。", target: target, type: .safety)
-            insertModerationCase(from: result, title: "聊天拦截：\(trimmed)", source: .chat, content: trimmed, targetId: target.conversationId, status: .humanReview)
             if let event = creditService.applyModerationResult(result, to: &user) {
                 creditEvents.insert(event, at: 0)
             }
@@ -616,7 +715,6 @@ final class AppStore: ObservableObject {
             } else {
                 appendUserMessage(trimmed, target: target)
                 insertSystemMessage("安全提醒：请保持在平台内沟通，避免交换私人联系方式。", target: target, type: .safety)
-                insertModerationCase(from: result, title: "聊天预警：\(trimmed)", source: .chat, content: trimmed, targetId: target.conversationId, status: .humanReview)
                 if let event = creditService.applyModerationResult(result, to: &user) {
                     creditEvents.insert(event, at: 0)
                 }
@@ -624,7 +722,6 @@ final class AppStore: ObservableObject {
             }
         case .review:
             appendUserMessage(trimmed, target: target)
-            insertModerationCase(from: result, title: "聊天待复核：\(trimmed)", source: .chat, content: trimmed, targetId: target.conversationId, status: .pending)
             lastModerationFeedback = nil
         case .allow:
             appendUserMessage(trimmed, target: target)
@@ -643,6 +740,7 @@ final class AppStore: ObservableObject {
         }
 
         return result.decision
+        #endif
     }
 
     @discardableResult
@@ -663,6 +761,7 @@ final class AppStore: ObservableObject {
         guard user.gender == .male, user.isVerified else { return }
         guard case .communityUser = target else { return }
 
+        #if DEBUG
         let companion = ensureCurrentUserCompanion()
         messages.append(Message(
             id: UUID().uuidString,
@@ -673,6 +772,9 @@ final class AppStore: ObservableObject {
             timestamp: Date(),
             companionCardId: companion.id
         ))
+        #else
+        lastModerationFeedback = "推荐卡片发送失败，请检查网络后重试。"
+        #endif
     }
 
     @discardableResult
@@ -697,6 +799,21 @@ final class AppStore: ObservableObject {
             return .rejected
         }
 
+        #if !DEBUG
+        guard BackendConfig.isEnabled, let client = backendClient() else {
+            lastModerationFeedback = "发布失败，请检查网络后重试。"
+            return .rejected
+        }
+        do {
+            let post = try await client.createCommunityPost(kind: kind, topic: trimmedTopic, content: trimmedContent)
+            communityPosts.insert(post, at: 0)
+            lastModerationFeedback = post.moderationStatus == .approved ? "已发布到广场" : "内容已提交审核"
+            return post.moderationStatus
+        } catch {
+            lastModerationFeedback = userFacingMessage(for: error)
+            return .rejected
+        }
+        #else
         let effectiveCoverImageData = kind == .femaleRequest ? nil : coverImageData
         let effectiveCoverAspectRatio = kind == .femaleRequest ? nil : coverAspectRatio
         let contactTarget: ContactTarget
@@ -736,14 +853,6 @@ final class AppStore: ObservableObject {
         switch result.decision {
         case .block, .review:
             communityPosts[index].moderationStatus = .rejected
-            insertModerationCase(
-                from: result,
-                title: "广场内容未通过：\(trimmedTopic)",
-                source: .community,
-                content: trimmedContent,
-                targetId: post.id,
-                status: result.decision == .block ? .resolved : .humanReview
-            )
             if result.decision == .block, let event = creditService.applyModerationResult(result, to: &user) {
                 creditEvents.insert(event, at: 0)
             }
@@ -757,14 +866,6 @@ final class AppStore: ObservableObject {
             }
             communityPosts[index].moderationStatus = .approved
             if result.decision == .warn {
-                insertModerationCase(
-                    from: result,
-                    title: "广场内容预警：\(trimmedTopic)",
-                    source: .community,
-                    content: trimmedContent,
-                    targetId: post.id,
-                    status: .pending
-                )
                 if let event = creditService.applyModerationResult(result, to: &user) {
                     creditEvents.insert(event, at: 0)
                 }
@@ -772,9 +873,11 @@ final class AppStore: ObservableObject {
             lastModerationFeedback = "已发布到广场"
             return .approved
         }
+        #endif
     }
 
-    func submitReview(companionId: String, rating: Int, content: String) {
+    func submitReview(companionId: String, rating: Int, content: String) async -> Bool {
+        #if DEBUG
         reviews.insert(Review(
             id: UUID().uuidString,
             companionId: companionId,
@@ -783,6 +886,22 @@ final class AppStore: ObservableObject {
             content: content.isEmpty ? "沟通过程很安心，平台流程清晰。" : content,
             createdAt: Date()
         ), at: 0)
+        return true
+        #else
+        guard let order = orders.first(where: { $0.companionId == companionId && $0.status == .completed }),
+              BackendConfig.isEnabled, let client = backendClient() else {
+            lastModerationFeedback = "评价提交失败，请检查网络后重试。"
+            return false
+        }
+        do {
+            let review = try await client.submitReview(orderId: order.id, rating: rating, content: content)
+            reviews.insert(review, at: 0)
+            return true
+        } catch {
+            lastModerationFeedback = userFacingMessage(for: error)
+            return false
+        }
+        #endif
     }
 
     func report(companionId: String, reason: String) {
@@ -790,70 +909,34 @@ final class AppStore: ObservableObject {
     }
 
     func report(target: ContactTarget, reason: String) {
-        let targetName = displayName(for: target)
         let recent = messages(for: target).suffix(4).map(\.content).joined(separator: " ")
-        let reportText = "\(reason) \(recent)"
-        lastModerationFeedback = "举报已提交，我们会尽快处理。"
-
-        Task { [moderationService] in
+        Task {
             if BackendConfig.isEnabled, let client = backendClient() {
                 do {
-                    let moderationCase = try await client.submitReport(
+                    _ = try await client.submitReport(
                         reason: reason,
                         conversationId: target.conversationId,
                         targetId: target.conversationId,
                         recentContext: recent.isEmpty ? nil : recent
                     )
-                    insertBackendModerationCase(moderationCase)
+                    lastModerationFeedback = "举报已提交，我们会尽快处理。"
                     return
                 } catch {
 #if DEBUG
                     // Fall through to local case creation for offline development.
 #else
+                    lastModerationFeedback = userFacingMessage(for: error)
                     return
 #endif
                 }
             }
 
-            let result = await moderationService.moderate(
-                text: reportText,
-                source: .report,
-                context: ModerationContext(safetyScore: user.safetyScore, isVerified: user.isVerified)
-            )
-            let status: ModerationCaseStatus = result.score >= 0.55 ? .humanReview : .pending
-            insertModerationCase(
-                from: result,
-                title: "\(targetName)：\(reason)",
-                source: .report,
-                content: reportText,
-                targetId: target.conversationId,
-                status: status
-            )
+            #if DEBUG
+            lastModerationFeedback = "举报已提交，我们会尽快处理。"
+            #else
+            lastModerationFeedback = "举报提交失败，请检查网络后重试。"
+            #endif
         }
-    }
-
-    func resolveModerationCase(id: String, action: AdminAction) {
-        guard let index = moderationCases.firstIndex(where: { $0.id == id }) else { return }
-        var item = moderationCases[index]
-
-        switch action {
-        case .confirmViolation:
-            item.status = .resolved
-            item.resolvedAt = Date()
-            if let event = creditService.applyAdminResolution(.confirmViolation, to: &user, caseDecision: item.decision) {
-                creditEvents.insert(event, at: 0)
-            }
-        case .dismiss:
-            item.status = .dismissed
-            item.resolvedAt = Date()
-            if let event = creditService.applyAdminResolution(.dismiss, to: &user, caseDecision: item.decision) {
-                creditEvents.insert(event, at: 0)
-            }
-        case .escalate:
-            item.status = .humanReview
-        }
-
-        moderationCases[index] = item
     }
 
     func dismissAgreementPrompt() {
@@ -881,6 +964,8 @@ final class AppStore: ObservableObject {
     }
 
     func markNotificationRead(id: String) async {
+        let previousNotifications = notifications
+        let previousUnreadCount = notificationUnreadCount
         if let index = notifications.firstIndex(where: { $0.id == id }), notifications[index].isUnread {
             notifications[index].readAt = Date()
             notificationUnreadCount = max(0, notificationUnreadCount - 1)
@@ -893,13 +978,15 @@ final class AppStore: ObservableObject {
             }
             notificationUnreadCount = try await client.fetchNotificationUnreadCount()
         } catch {
-#if DEBUG
+            notifications = previousNotifications
+            notificationUnreadCount = previousUnreadCount
             lastModerationFeedback = userFacingMessage(for: error)
-#endif
         }
     }
 
     func markAllNotificationsRead() async {
+        let previousNotifications = notifications
+        let previousUnreadCount = notificationUnreadCount
         for index in notifications.indices where notifications[index].isUnread {
             notifications[index].readAt = Date()
         }
@@ -908,9 +995,9 @@ final class AppStore: ObservableObject {
         do {
             try await client.markAllNotificationsRead()
         } catch {
-#if DEBUG
+            notifications = previousNotifications
+            notificationUnreadCount = previousUnreadCount
             lastModerationFeedback = userFacingMessage(for: error)
-#endif
         }
     }
 
@@ -918,7 +1005,11 @@ final class AppStore: ObservableObject {
         if BackendConfig.isEnabled, let client = backendClient() {
             return try await client.requestAccountDeletion()
         }
+        #if DEBUG
         return "我们已收到你的注销申请，将在 15 个工作日内处理。"
+        #else
+        throw BackendError.unavailable
+        #endif
     }
 
     private func clearSessionLocalState() {
@@ -930,7 +1021,6 @@ final class AppStore: ObservableObject {
         activeOrderId = nil
         trialMessageCountsByCompanionId = [:]
         failedSendTextByConversationId = [:]
-        moderationCases = []
         lastModerationFeedback = nil
         agreementPrompt = nil
         isBackendConnected = false
@@ -1005,10 +1095,6 @@ final class AppStore: ObservableObject {
         }
         upsertBackendConversationSummary(for: target)
 
-        if let moderationCase = response.moderationCase {
-            insertBackendModerationCase(moderationCase)
-        }
-
         let result = response.moderation
 
         switch result.decision {
@@ -1052,11 +1138,6 @@ final class AppStore: ObservableObject {
         }
     }
 
-    private func insertBackendModerationCase(_ item: ModerationCase) {
-        moderationCases.removeAll { $0.id == item.id }
-        moderationCases.insert(item, at: 0)
-    }
-
     private func insertSystemMessage(_ content: String, target: ContactTarget, type: MessageType = .safety) {
         messages.append(Message(
             id: UUID().uuidString,
@@ -1068,44 +1149,7 @@ final class AppStore: ObservableObject {
         ))
     }
 
-    private func insertModerationCase(
-        from result: ModerationResult,
-        title: String,
-        source: ModerationSource,
-        content: String,
-        targetId: String?,
-        status: ModerationCaseStatus
-    ) {
-        moderationCases.insert(
-            ModerationCase(
-                id: UUID().uuidString,
-                title: title,
-                category: category(for: source),
-                riskLevel: result.riskLevel,
-                status: status,
-                source: source,
-                content: content,
-                targetId: targetId,
-                aiScore: result.score,
-                aiReason: result.reasons.joined(separator: "；"),
-                decision: result.decision,
-                matchedRules: result.matchedRules,
-                usedAI: result.usedAI,
-                resolvedAt: nil
-            ),
-            at: 0
-        )
-    }
-
-    private func category(for source: ModerationSource) -> String {
-        switch source {
-        case .chat: "实时风控"
-        case .community: "广场内容"
-        case .report: "用户举报"
-        case .profile: "资料审核"
-        }
-    }
-
+    #if DEBUG
     @discardableResult
     private func ensureCurrentUserCompanion(promotionContent: String? = nil) -> Companion {
         let companionId = currentUserCompanionId
@@ -1138,22 +1182,12 @@ final class AppStore: ObservableObject {
         companions.insert(companion, at: 0)
         return companion
     }
+    #endif
 }
 
+#if DEBUG
 enum MockData {
-    static let user = User(
-        id: "u1",
-        name: "小楷",
-        phone: "183****0012",
-        age: 18,
-        gender: nil,
-        isVerified: false,
-        safetyScore: 72,
-        accountStatus: .active,
-        violationCount: 0,
-        lastViolationAt: nil,
-        warnGraceStrikeCount: 0
-    )
+    static let user = FrontendDemoIdentity.user
 
     static let initialCreditEvents: [CreditEvent] = [
         CreditEvent(id: "ce1", delta: 0, reason: "账号已创建", createdAt: .now.addingTimeInterval(-86400))
@@ -1190,27 +1224,6 @@ enum MockData {
 
     static let messages: [Message] = []
 
-    static let moderationCases: [ModerationCase] = [
-        ModerationCase(
-            id: "mc1", title: "头像审核：闻舟", category: "资料审核", riskLevel: .low,
-            status: .pending, source: .profile, content: "待补充人脸核验", targetId: "c5",
-            aiScore: 0.2, aiReason: "资料待补充", decision: .review, matchedRules: ["profile.pending"],
-            usedAI: false, resolvedAt: nil
-        ),
-        ModerationCase(
-            id: "mc2", title: "订单 o2 服务前提醒已发送", category: "安全流程", riskLevel: .low,
-            status: .resolved, source: .chat, content: "服务前提醒", targetId: "o2",
-            aiScore: 0.1, aiReason: "流程提醒", decision: .allow, matchedRules: [],
-            usedAI: false, resolvedAt: .now.addingTimeInterval(-3600)
-        ),
-        ModerationCase(
-            id: "mc3", title: "敏感词库：线下交易规则", category: "内容风控", riskLevel: .medium,
-            status: .autoReviewing, source: .chat, content: "规则引擎自动拦截中", targetId: nil,
-            aiScore: 0.45, aiReason: "规则引擎运行中", decision: .review, matchedRules: ["rules.offline"],
-            usedAI: false, resolvedAt: nil
-        )
-    ]
-
     static let communityPosts: [CommunityPost] = [
         CommunityPost(id: "p1", authorId: "u2", authorName: "晚风", authorInitials: "晚风", contactTarget: .communityUser(id: "u2", name: "晚风", initials: "晚风"), kind: .femaleRequest, topic: "情绪倾听", content: "昨晚聊完一整晚，终于把委屈说出来了。有人听，真的不一样。", coverImageData: nil, coverAspectRatio: 0.82, likeCount: 47, moderationStatus: .approved, createdAt: .now.addingTimeInterval(-7200)),
         CommunityPost(id: "p2", authorId: "u3", authorName: "木子", authorInitials: "木子", contactTarget: .communityUser(id: "u3", name: "木子", initials: "木子"), kind: .femaleRequest, topic: "睡前聊天", content: "睡前十分钟有人陪着说说话，比刷手机安心多了。", coverImageData: nil, coverAspectRatio: 1.0, likeCount: 31, moderationStatus: .approved, createdAt: .now.addingTimeInterval(-14400)),
@@ -1218,3 +1231,4 @@ enum MockData {
         CommunityPost(id: "p5", authorId: "c2", authorName: "许澈", authorInitials: "XC", contactTarget: .companion(id: "c2"), kind: .malePromotion, topic: "陪伴故事", content: "喜欢聊电影和旅行，节奏轻松，只在平台内交流。", coverImageData: nil, coverAspectRatio: 1.18, likeCount: 52, moderationStatus: .approved, createdAt: .now.addingTimeInterval(-36000))
     ]
 }
+#endif

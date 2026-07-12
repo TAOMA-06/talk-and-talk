@@ -16,6 +16,10 @@ export class CreateCompanionDto {
   @IsString()
   id?: string;
 
+  @IsOptional()
+  @IsString()
+  ownerUserId?: string;
+
   @IsString()
   name!: string;
 
@@ -90,6 +94,10 @@ export class CreateCompanionDto {
 }
 
 export class UpdateCompanionDto {
+  @IsOptional()
+  @IsString()
+  ownerUserId?: string;
+
   @IsOptional()
   @IsString()
   name?: string;

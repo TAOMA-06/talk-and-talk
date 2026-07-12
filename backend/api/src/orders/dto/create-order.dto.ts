@@ -1,4 +1,4 @@
-import { IsInt, IsString, Max, Min, MinLength } from "class-validator";
+import { IsDateString, IsInt, IsString, Max, Min, MinLength } from "class-validator";
 
 export class CreateOrderDto {
   @IsString()
@@ -13,4 +13,7 @@ export class CreateOrderDto {
   @Min(30)
   @Max(240)
   durationMinutes!: number;
+
+  @IsDateString()
+  scheduledAt!: string;
 }

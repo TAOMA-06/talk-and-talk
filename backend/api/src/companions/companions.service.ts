@@ -6,6 +6,7 @@ import { AppException } from "../common/errors/app.exception";
 import { PrismaService } from "../database/prisma.service";
 import { CreateCompanionDto, UpdateCompanionDto } from "./dto/companion-profile.dto";
 import { ListCompanionsQueryDto } from "./dto/list-companions.dto";
+import { ApplyCompanionDto, UpdateOwnCompanionDto } from "./dto/apply-companion.dto";
 
 type CompanionRecord = Awaited<ReturnType<CompanionsService["findRecordOrThrow"]>>;
 
@@ -54,7 +55,76 @@ export class CompanionsService {
       throw new AppException("COMPANION_NOT_FOUND", "Companion not found", HttpStatus.NOT_FOUND);
     }
 
-    return this.toDto(item);
+    return this.toDto(item as CompanionRecord);
+  }
+
+  async getOwn(userId: string) {
+    const item = await this.prisma.companionProfile.findUnique({
+      where: { ownerUserId: userId },
+      include: this.includeTags()
+    } as any);
+    if (!item) {
+      throw new AppException("COMPANION_PROFILE_NOT_FOUND", "Companion profile not found", HttpStatus.NOT_FOUND);
+    }
+    return this.toDto(item as CompanionRecord);
+  }
+
+  async apply(userId: string, dto: ApplyCompanionDto) {
+    const user: any = await this.prisma.user.findUnique({ where: { id: userId }, include: { profile: true } });
+    if (!user?.profile?.isVerified) {
+      throw new AppException("VERIFICATION_REQUIRED", "Real-name verification is required", HttpStatus.FORBIDDEN);
+    }
+    const existing = await this.prisma.companionProfile.findUnique({ where: { ownerUserId: userId } } as any);
+    if (existing) {
+      throw new AppException("APPLICATION_EXISTS", "Companion application already exists", HttpStatus.CONFLICT);
+    }
+    const name = user.profile.displayName?.trim() || "待审核用户";
+    const id = randomUUID();
+    await this.prisma.companionProfile.create({
+      data: {
+        id,
+        ownerUserId: userId,
+        name,
+        role: dto.role,
+        initials: name.slice(0, 2),
+        rating: 0,
+        reviewCount: 0,
+        pricePerHalfHour: dto.pricePerHalfHour,
+        isOnline: false,
+        isVerified: true,
+        bio: dto.bio,
+        availableTimes: dto.availableTimes,
+        languages: dto.languages,
+        specialties: dto.specialties,
+        completedOrders: 0,
+        responseTime: "暂无数据",
+        distanceKm: 0,
+        availability: "busy",
+        cityDistrict: dto.cityDistrict,
+        isPublished: false
+      }
+    } as any);
+    await this.replaceTags(id, dto.tags);
+    return this.getOwn(userId);
+  }
+
+  async updateOwn(userId: string, dto: UpdateOwnCompanionDto) {
+    const existing = await this.prisma.companionProfile.findUnique({ where: { ownerUserId: userId } } as any);
+    if (!existing) {
+      throw new AppException("COMPANION_PROFILE_NOT_FOUND", "Companion profile not found", HttpStatus.NOT_FOUND);
+    }
+    await this.prisma.companionProfile.update({
+      where: { id: existing.id },
+      data: {
+        ...(dto.bio !== undefined ? { bio: dto.bio } : {}),
+        ...(dto.availableTimes !== undefined ? { availableTimes: dto.availableTimes } : {}),
+        ...(dto.availability !== undefined ? {
+          availability: dto.availability,
+          isOnline: dto.availability === "online"
+        } : {})
+      }
+    } as any);
+    return this.getOwn(userId);
   }
 
   async create(dto: CreateCompanionDto) {
@@ -155,6 +225,7 @@ export class CompanionsService {
     const data: any = {};
     for (const key of [
       "name",
+      "ownerUserId",
       "role",
       "initials",
       "rating",

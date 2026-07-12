@@ -48,9 +48,6 @@ enum AppRoute: Hashable {
     case privacyPolicy
     case userAgreement
     case accountDeletion
-#if DEBUG
-    case admin
-#endif
 }
 
 enum AvailabilityStatus: String, Codable, Hashable {
@@ -79,24 +76,6 @@ enum ModerationDecision: String, Codable, Hashable {
     case warn
     case block
     case review
-}
-
-enum ModerationCaseStatus: String, Codable, Hashable {
-    case pending
-    case autoReviewing
-    case humanReview
-    case resolved
-    case dismissed
-
-    var displayName: String {
-        switch self {
-        case .pending: "待处理"
-        case .autoReviewing: "机审中"
-        case .humanReview: "人工复核"
-        case .resolved: "已处理"
-        case .dismissed: "已驳回"
-        }
-    }
 }
 
 enum AccountStatus: String, Codable, Hashable {
@@ -179,12 +158,6 @@ enum ContactTarget: Codable, Hashable, Identifiable {
         if case .communityUser(_, _, let initials) = self { return initials }
         return nil
     }
-}
-
-enum AdminAction: String, Codable, Hashable {
-    case confirmViolation
-    case dismiss
-    case escalate
 }
 
 struct ModerationResult: Hashable {
@@ -366,6 +339,11 @@ struct Order: Identifiable, Codable, Hashable {
     let customerTarget: ContactTarget?
     var conversationId: String?
     var outTradeNo: String?
+    let companionNameSnapshot: String?
+    let companionRoleSnapshot: String?
+    let companionInitialsSnapshot: String?
+    let themeNameSnapshot: String?
+    var refund: RefundSummary?
 
     init(
         id: String,
@@ -378,7 +356,12 @@ struct Order: Identifiable, Codable, Hashable {
         scheduledAt: Date,
         customerTarget: ContactTarget? = nil,
         conversationId: String? = nil,
-        outTradeNo: String? = nil
+        outTradeNo: String? = nil,
+        companionNameSnapshot: String? = nil,
+        companionRoleSnapshot: String? = nil,
+        companionInitialsSnapshot: String? = nil,
+        themeNameSnapshot: String? = nil,
+        refund: RefundSummary? = nil
     ) {
         self.id = id
         self.companionId = companionId
@@ -391,6 +374,40 @@ struct Order: Identifiable, Codable, Hashable {
         self.customerTarget = customerTarget
         self.conversationId = conversationId
         self.outTradeNo = outTradeNo
+        self.companionNameSnapshot = companionNameSnapshot
+        self.companionRoleSnapshot = companionRoleSnapshot
+        self.companionInitialsSnapshot = companionInitialsSnapshot
+        self.themeNameSnapshot = themeNameSnapshot
+        self.refund = refund
+    }
+}
+
+struct RefundSummary: Codable, Hashable {
+    let id: String
+    let outRefundNo: String
+    let amountCents: Int
+    let status: RefundStatus
+    let reason: String?
+    let reviewNote: String?
+    let failureReason: String?
+}
+
+enum RefundStatus: String, Codable, CaseIterable {
+    case pendingReview
+    case pending
+    case processing
+    case success
+    case failed
+    case rejected
+
+    var displayName: String {
+        switch self {
+        case .pendingReview: "审核中"
+        case .pending, .processing: "退款中"
+        case .success: "退款成功"
+        case .failed: "退款失败"
+        case .rejected: "申请未通过"
+        }
     }
 }
 
@@ -491,23 +508,6 @@ enum MessageType: String, Codable {
     case system
     case safety
     case recommendationCard
-}
-
-struct ModerationCase: Identifiable, Codable, Hashable {
-    let id: String
-    let title: String
-    let category: String
-    let riskLevel: RiskLevel
-    var status: ModerationCaseStatus
-    var source: ModerationSource
-    var content: String
-    var targetId: String?
-    var aiScore: Double
-    var aiReason: String
-    var decision: ModerationDecision
-    var matchedRules: [String]
-    var usedAI: Bool
-    var resolvedAt: Date?
 }
 
 enum RiskLevel: String, Codable {

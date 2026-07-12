@@ -35,7 +35,11 @@ enum BackendError: Error, Equatable {
 struct BackendSendMessageResponse: Sendable {
     let moderation: ModerationResult
     let messages: [Message]
-    let moderationCase: ModerationCase?
+}
+
+struct ReportReceipt: Sendable, Equatable {
+    let id: String
+    let status: String
 }
 
 struct BackendPrepayResult: Sendable {
@@ -52,13 +56,24 @@ protocol BackendAPIClient: Sendable {
     func fetchConversations() async throws -> [ConversationSummary]
     func fetchMessages(conversationId: String, cursor: String?, limit: Int?) async throws -> [Message]
     func sendMessage(conversationId: String, content: String, senderId: String) async throws -> BackendSendMessageResponse
-    func submitReport(reason: String, conversationId: String?, targetId: String?, recentContext: String?) async throws -> ModerationCase
+    func submitReport(reason: String, conversationId: String?, targetId: String?, recentContext: String?) async throws -> ReportReceipt
     func createOrder(companionId: String, themeId: String, durationMinutes: Int) async throws -> Order
+    func createOrder(companionId: String, themeId: String, durationMinutes: Int, scheduledAt: Date) async throws -> Order
     func fetchOrders() async throws -> [Order]
+    func fetchServiceOrders() async throws -> [Order]
+    func startServiceOrder(id: String) async throws -> Order
+    func completeServiceOrder(id: String) async throws -> Order
     func fetchOrder(id: String) async throws -> Order
     func cancelOrder(id: String) async throws -> Order
     func prepayOrder(id: String) async throws -> BackendPrepayResult
     func mockWechatNotify(outTradeNo: String, amountCents: Int?) async throws
+    func requestRefund(orderId: String, reason: String) async throws -> Order
+    func syncRefund(orderId: String) async throws -> Order
+    func fetchCommunityPosts() async throws -> [CommunityPost]
+    func createCommunityPost(kind: CommunityPostKind, topic: String, content: String) async throws -> CommunityPost
+    func fetchReviews(companionId: String) async throws -> [Review]
+    func submitReview(orderId: String, rating: Int, content: String) async throws -> Review
+    func updateCurrentUser(displayName: String?, gender: UserGender?, age: Int?) async throws -> User
     func fetchNotifications(unreadOnly: Bool) async throws -> [AppNotification]
     func fetchNotificationUnreadCount() async throws -> Int
     func markNotificationRead(id: String) async throws -> AppNotification
@@ -70,6 +85,21 @@ extension BackendAPIClient {
     func fetchMessages(conversationId: String) async throws -> [Message] {
         try await fetchMessages(conversationId: conversationId, cursor: nil, limit: nil)
     }
+
+    func createOrder(companionId: String, themeId: String, durationMinutes: Int, scheduledAt: Date) async throws -> Order {
+        try await createOrder(companionId: companionId, themeId: themeId, durationMinutes: durationMinutes)
+    }
+
+    func requestRefund(orderId: String, reason: String) async throws -> Order { throw BackendError.unavailable }
+    func syncRefund(orderId: String) async throws -> Order { throw BackendError.unavailable }
+    func fetchCommunityPosts() async throws -> [CommunityPost] { throw BackendError.unavailable }
+    func createCommunityPost(kind: CommunityPostKind, topic: String, content: String) async throws -> CommunityPost { throw BackendError.unavailable }
+    func fetchReviews(companionId: String) async throws -> [Review] { throw BackendError.unavailable }
+    func submitReview(orderId: String, rating: Int, content: String) async throws -> Review { throw BackendError.unavailable }
+    func updateCurrentUser(displayName: String?, gender: UserGender?, age: Int?) async throws -> User { throw BackendError.unavailable }
+    func fetchServiceOrders() async throws -> [Order] { [] }
+    func startServiceOrder(id: String) async throws -> Order { throw BackendError.unavailable }
+    func completeServiceOrder(id: String) async throws -> Order { throw BackendError.unavailable }
 }
 
 struct BackendClient: BackendAPIClient, Sendable {
@@ -153,7 +183,7 @@ struct BackendClient: BackendAPIClient, Sendable {
         conversationId: String?,
         targetId: String?,
         recentContext: String?
-    ) async throws -> ModerationCase {
+    ) async throws -> ReportReceipt {
         var body: [String: Any] = ["reason": reason]
         if let conversationId, !conversationId.isEmpty {
             body["conversationId"] = conversationId
@@ -170,10 +200,7 @@ struct BackendClient: BackendAPIClient, Sendable {
             method: "POST",
             body: body
         )
-        guard let moderationCase = BackendDTOMapper.moderationCase(from: data.moderationCase) else {
-            throw BackendError.decodingFailed
-        }
-        return moderationCase
+        return ReportReceipt(id: data.report.id, status: data.report.status)
     }
 
     func sendMessage(
@@ -205,16 +232,20 @@ struct BackendClient: BackendAPIClient, Sendable {
 
         return BackendSendMessageResponse(
             moderation: BackendDTOMapper.moderationResult(from: data.moderation),
-            messages: messages,
-            moderationCase: data.moderationCase.flatMap(BackendDTOMapper.moderationCase(from:))
+            messages: messages
         )
     }
 
     func createOrder(companionId: String, themeId: String, durationMinutes: Int) async throws -> Order {
+        try await createOrder(companionId: companionId, themeId: themeId, durationMinutes: durationMinutes, scheduledAt: Date().addingTimeInterval(3600))
+    }
+
+    func createOrder(companionId: String, themeId: String, durationMinutes: Int, scheduledAt: Date) async throws -> Order {
         let body: [String: Any] = [
             "companionId": companionId,
             "themeId": themeId,
-            "durationMinutes": durationMinutes
+            "durationMinutes": durationMinutes,
+            "scheduledAt": ISO8601DateFormatter().string(from: scheduledAt)
         ]
         let data: BackendOrderDTO = try await request(
             path: "/api/v1/orders",
@@ -230,6 +261,26 @@ struct BackendClient: BackendAPIClient, Sendable {
     func fetchOrders() async throws -> [Order] {
         let data: BackendOrdersData = try await request(path: "/api/v1/orders")
         return data.items.compactMap(BackendDTOMapper.order(from:))
+    }
+
+    func fetchServiceOrders() async throws -> [Order] {
+        let data: BackendOrdersData = try await request(path: "/api/v1/orders/service")
+        return data.items.compactMap(BackendDTOMapper.order(from:))
+    }
+
+    func startServiceOrder(id: String) async throws -> Order {
+        try await updateServiceOrder(id: id, action: "start")
+    }
+
+    func completeServiceOrder(id: String) async throws -> Order {
+        try await updateServiceOrder(id: id, action: "complete")
+    }
+
+    private func updateServiceOrder(id: String, action: String) async throws -> Order {
+        let encoded = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
+        let data: BackendOrderDTO = try await request(path: "/api/v1/orders/service/\(encoded)/\(action)", method: "POST", body: [:])
+        guard let order = BackendDTOMapper.order(from: data) else { throw BackendError.decodingFailed }
+        return order
     }
 
     func fetchOrder(id: String) async throws -> Order {
@@ -282,6 +333,53 @@ struct BackendClient: BackendAPIClient, Sendable {
             method: "POST",
             body: body
         )
+    }
+
+    func requestRefund(orderId: String, reason: String) async throws -> Order {
+        let encoded = orderId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? orderId
+        let data: BackendRefundData = try await request(path: "/api/v1/orders/\(encoded)/refund", method: "POST", body: ["reason": reason])
+        guard var order = BackendDTOMapper.order(from: data.order) else { throw BackendError.decodingFailed }
+        order.refund = BackendDTOMapper.refund(from: data.refund)
+        return order
+    }
+
+    func syncRefund(orderId: String) async throws -> Order {
+        let encoded = orderId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? orderId
+        let data: BackendRefundData = try await request(path: "/api/v1/orders/\(encoded)/refund/sync", method: "POST", body: [:])
+        guard var order = BackendDTOMapper.order(from: data.order) else { throw BackendError.decodingFailed }
+        order.refund = BackendDTOMapper.refund(from: data.refund)
+        return order
+    }
+
+    func fetchCommunityPosts() async throws -> [CommunityPost] {
+        let data: BackendCommunityPostsData = try await request(path: "/api/v1/community/posts")
+        return data.items.compactMap(BackendDTOMapper.communityPost(from:))
+    }
+
+    func createCommunityPost(kind: CommunityPostKind, topic: String, content: String) async throws -> CommunityPost {
+        let data: BackendCommunityPostDTO = try await request(path: "/api/v1/community/posts", method: "POST", body: ["kind": kind.rawValue, "topic": topic, "content": content])
+        guard let post = BackendDTOMapper.communityPost(from: data) else { throw BackendError.decodingFailed }
+        return post
+    }
+
+    func fetchReviews(companionId: String) async throws -> [Review] {
+        let encoded = companionId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? companionId
+        let data: BackendReviewsData = try await request(path: "/api/v1/reviews/companion/\(encoded)")
+        return data.items.map(BackendDTOMapper.review(from:))
+    }
+
+    func submitReview(orderId: String, rating: Int, content: String) async throws -> Review {
+        let data: BackendReviewDTO = try await request(path: "/api/v1/reviews", method: "POST", body: ["orderId": orderId, "rating": rating, "content": content])
+        return BackendDTOMapper.review(from: data)
+    }
+
+    func updateCurrentUser(displayName: String?, gender: UserGender?, age: Int?) async throws -> User {
+        var body: [String: Any] = [:]
+        if let displayName { body["displayName"] = displayName }
+        if let gender { body["gender"] = gender.rawValue }
+        if let age { body["age"] = age }
+        let data: AuthUserResponse = try await request(path: "/api/v1/me", method: "PATCH", body: body)
+        return AuthDTOMapper.user(from: data)
     }
 
     func fetchNotifications(unreadOnly: Bool = false) async throws -> [AppNotification] {

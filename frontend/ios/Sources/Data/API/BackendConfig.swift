@@ -10,6 +10,10 @@ enum BackendConfig {
     #endif
 
     static var baseURL: URL? {
+        #if DEBUG
+        guard !FrontendDemoMode.isEnabled else { return nil }
+        #endif
+
         if let env = ProcessInfo.processInfo.environment["BACKEND_BASE_URL"],
            !env.isEmpty,
            let url = URL(string: env) {
@@ -45,7 +49,12 @@ enum BackendConfig {
     }
 
     static func supportsChat(for companionId: String) -> Bool {
-        isEnabled && supportedCompanionIds.contains(companionId)
+        guard isEnabled else { return false }
+        #if DEBUG
+        return supportedCompanionIds.contains(companionId)
+        #else
+        return true
+        #endif
     }
 
     static func supportsChat(for target: ContactTarget) -> Bool {

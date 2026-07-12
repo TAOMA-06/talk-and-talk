@@ -158,6 +158,9 @@ export const seedStaffUsers = [
 ];
 
 export async function seedStaffAccounts(client: PrismaClient = prisma) {
+  if (environment.APP_ENV === "production") {
+    throw new Error("Demo/staff seed is disabled when APP_ENV=production");
+  }
   for (const staff of seedStaffUsers) {
     const e164 = `+86${staff.phone}`;
     const existing = await client.authIdentity.findUnique({
@@ -215,6 +218,9 @@ export async function seedStaffAccounts(client: PrismaClient = prisma) {
 }
 
 export async function seedDatabase(client: SeedClient = prisma) {
+  if (environment.APP_ENV === "production") {
+    throw new Error("Demo companion seed is disabled when APP_ENV=production");
+  }
   for (const companion of seedCompanions) {
     await client.companionProfile.upsert({
       where: { id: companion.id },

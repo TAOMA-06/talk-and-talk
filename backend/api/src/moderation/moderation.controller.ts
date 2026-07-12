@@ -32,7 +32,8 @@ export class ModerationController {
   }
 
   @Post("check")
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("moderator", "admin")
   async check(@Body() dto: CheckModerationDto) {
     const moderation = await this.moderation.moderateAsync(dto.text, dto.source ?? "chat");
     return {
@@ -73,8 +74,7 @@ export class ModerationController {
         id: moderationCase.id,
         status: moderationCase.status,
         source: moderationCase.source
-      },
-      moderationCase: this.toCaseDto(moderationCase)
+      }
     };
   }
 

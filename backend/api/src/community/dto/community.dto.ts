@@ -1,0 +1,25 @@
+import { IsBoolean, IsIn, IsOptional, IsString, MaxLength, MinLength } from "class-validator";
+
+export class CreateCommunityPostDto {
+  @IsIn(["femaleRequest", "malePromotion"])
+  kind!: "femaleRequest" | "malePromotion";
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  topic!: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(2000)
+  content!: string;
+
+  @IsOptional()
+  @IsString()
+  coverImageUrl?: string;
+}
+
+export class SetCommunityLikeDto {
+  @IsBoolean()
+  liked!: boolean;
+}

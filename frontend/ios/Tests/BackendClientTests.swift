@@ -176,10 +176,9 @@ final class BackendClientTests: XCTestCase {
         let response = try await client.sendMessage(conversationId: "c1", content: "今天有点累", senderId: "u1")
 
         XCTAssertEqual(response.moderation.decision, .allow)
-        XCTAssertTrue(response.moderation.usedAI)
+        XCTAssertFalse(response.moderation.usedAI)
         XCTAssertEqual(response.messages.count, 2)
         XCTAssertEqual(response.messages.last?.senderId, "c1")
-        XCTAssertNil(response.moderationCase)
     }
 
     func testSendMessageMapsBlockedSafetyPayloadWithoutOriginalMessage() async throws {
@@ -235,7 +234,6 @@ final class BackendClientTests: XCTestCase {
         XCTAssertEqual(response.moderation.decision, .block)
         XCTAssertEqual(response.messages.count, 1)
         XCTAssertEqual(response.messages[0].type, .safety)
-        XCTAssertEqual(response.moderationCase?.decision, .block)
     }
 
     func testHealthRequiresOkStatus() async {
@@ -471,7 +469,6 @@ final class BackendClientTests: XCTestCase {
         XCTAssertFalse(messages.contains { $0.content == "加微信" })
         XCTAssertTrue(messages.contains { $0.type == .safety })
         XCTAssertEqual(store.lastModerationFeedback, "消息未发送：疑似违规内容")
-        XCTAssertEqual(store.moderationCases.first?.decision, .block)
     }
 
     @MainActor
@@ -486,7 +483,6 @@ final class BackendClientTests: XCTestCase {
         XCTAssertTrue(messages.contains { $0.content == "代理兼职赚钱" })
         XCTAssertTrue(messages.contains { $0.type == .safety })
         XCTAssertEqual(store.lastModerationFeedback, "内容已进入平台复核")
-        XCTAssertEqual(store.moderationCases.first?.decision, .review)
         XCTAssertFalse(messages.contains { $0.senderId == "c1" && $0.type == .text })
     }
 }
@@ -516,7 +512,7 @@ private struct FailingBackendAPIClient: BackendAPIClient, Sendable {
         throw BackendError.unavailable
     }
 
-    func submitReport(reason: String, conversationId: String?, targetId: String?, recentContext: String?) async throws -> ModerationCase {
+    func submitReport(reason: String, conversationId: String?, targetId: String?, recentContext: String?) async throws -> ReportReceipt {
         throw BackendError.unavailable
     }
 
@@ -590,23 +586,8 @@ private struct SuccessfulBackendAPIClient: BackendAPIClient, Sendable {
         throw BackendError.unavailable
     }
 
-    func submitReport(reason: String, conversationId: String?, targetId: String?, recentContext: String?) async throws -> ModerationCase {
-        ModerationCase(
-            id: "report-1",
-            title: "举报：\(reason)",
-            category: "用户举报",
-            riskLevel: .medium,
-            status: .pending,
-            source: .report,
-            content: reason,
-            targetId: conversationId ?? targetId,
-            aiScore: 0.4,
-            aiReason: "用户举报",
-            decision: .review,
-            matchedRules: [],
-            usedAI: false,
-            resolvedAt: nil
-        )
+    func submitReport(reason: String, conversationId: String?, targetId: String?, recentContext: String?) async throws -> ReportReceipt {
+        ReportReceipt(id: "report-1", status: "pending")
     }
 
     func createOrder(companionId: String, themeId: String, durationMinutes: Int) async throws -> Order {
@@ -748,7 +729,7 @@ private struct ChatBackendAPIClient: BackendAPIClient, Sendable {
         []
     }
 
-    func submitReport(reason: String, conversationId: String?, targetId: String?, recentContext: String?) async throws -> ModerationCase {
+    func submitReport(reason: String, conversationId: String?, targetId: String?, recentContext: String?) async throws -> ReportReceipt {
         throw BackendError.unavailable
     }
 
@@ -802,31 +783,14 @@ private struct ChatBackendAPIClient: BackendAPIClient, Sendable {
                 messages: [
                     Message(id: "m-user", conversationId: conversationId, senderId: senderId, content: content, type: .text, timestamp: Date(timeIntervalSince1970: 1)),
                     Message(id: "m-reply", conversationId: conversationId, senderId: conversationId, content: "我在，先慢慢说。", type: .text, timestamp: Date(timeIntervalSince1970: 2))
-                ],
-                moderationCase: nil
+                ]
             )
         case .block:
             return BackendSendMessageResponse(
                 moderation: ModerationResult(decision: .block, riskLevel: .high, score: 0.92, reasons: ["疑似引导私下联系"], matchedRules: ["contact.wechat"], usedAI: false),
                 messages: [
                     Message(id: "m-safety", conversationId: conversationId, senderId: "system", content: "安全提醒：平台不支持线下邀约。", type: .safety, timestamp: Date(timeIntervalSince1970: 1))
-                ],
-                moderationCase: ModerationCase(
-                    id: "mc1",
-                    title: "聊天拦截：加微信",
-                    category: "实时风控",
-                    riskLevel: .high,
-                    status: .humanReview,
-                    source: .chat,
-                    content: content,
-                    targetId: conversationId,
-                    aiScore: 0.92,
-                    aiReason: "疑似引导私下联系",
-                    decision: .block,
-                    matchedRules: ["contact.wechat"],
-                    usedAI: false,
-                    resolvedAt: nil
-                )
+                ]
             )
         case .review:
             return BackendSendMessageResponse(
@@ -834,23 +798,7 @@ private struct ChatBackendAPIClient: BackendAPIClient, Sendable {
                 messages: [
                     Message(id: "m-user", conversationId: conversationId, senderId: senderId, content: content, type: .text, timestamp: Date(timeIntervalSince1970: 1)),
                     Message(id: "m-safety", conversationId: conversationId, senderId: "system", content: "安全提醒：这条消息已进入平台复核，请继续保持平台内沟通。", type: .safety, timestamp: Date(timeIntervalSince1970: 2))
-                ],
-                moderationCase: ModerationCase(
-                    id: "mc-review",
-                    title: "聊天待复核：代理兼职赚钱",
-                    category: "实时风控",
-                    riskLevel: .low,
-                    status: .pending,
-                    source: .chat,
-                    content: content,
-                    targetId: conversationId,
-                    aiScore: 0.42,
-                    aiReason: "疑似广告或引流",
-                    decision: .review,
-                    matchedRules: ["ads.promo"],
-                    usedAI: false,
-                    resolvedAt: nil
-                )
+                ]
             )
         }
     }

@@ -26,12 +26,11 @@ describe("OrdersService", () => {
   } as any;
 
   const notifications = { create: jest.fn().mockResolvedValue({}) } as any;
-  const audit = { record: jest.fn().mockResolvedValue({}) } as any;
   let service: OrdersService;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new OrdersService(prisma, notifications, audit);
+    service = new OrdersService(prisma, notifications);
   });
 
   it("creates a pending order with server-side pricing in cents", async () => {
@@ -60,7 +59,8 @@ describe("OrdersService", () => {
     const result = await service.create("u1", {
       companionId: "c1",
       themeId: "t1",
-      durationMinutes: 60
+      durationMinutes: 60,
+      scheduledAt: new Date(Date.now() + 3_600_000).toISOString()
     });
 
     expect(prisma.order.create).toHaveBeenCalledWith(
@@ -80,7 +80,7 @@ describe("OrdersService", () => {
     prisma.companionProfile.findFirst.mockResolvedValue(null);
 
     await expect(
-      service.create("u1", { companionId: "c9", themeId: "t1", durationMinutes: 30 })
+      service.create("u1", { companionId: "c9", themeId: "t1", durationMinutes: 30, scheduledAt: new Date(Date.now() + 3_600_000).toISOString() })
     ).rejects.toMatchObject({ code: "COMPANION_NOT_FOUND", status: HttpStatus.NOT_FOUND });
   });
 

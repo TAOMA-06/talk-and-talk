@@ -6,6 +6,7 @@ import {
   WeChatPayProvider,
   WeChatPrepayInput,
   WeChatPrepayResult
+  , WeChatRefundInput, WeChatRefundNotifyPayload, WeChatRefundResult
 } from "./wechat-pay.provider";
 
 /**
@@ -36,5 +37,13 @@ export class DisabledWeChatPayProvider implements WeChatPayProvider {
       "WeChat Pay is not configured for this environment",
       HttpStatus.SERVICE_UNAVAILABLE
     );
+  }
+
+  async createRefund(_input: WeChatRefundInput): Promise<WeChatRefundResult> { return this.unavailable(); }
+  async queryRefund(_outRefundNo: string): Promise<WeChatRefundResult> { return this.unavailable(); }
+  parseRefundNotifyPayload(_rawBody: string): WeChatRefundNotifyPayload { return this.unavailable(); }
+
+  private unavailable(): never {
+    throw new AppException("WECHAT_PAY_NOT_CONFIGURED", "WeChat Pay is not configured for this environment", HttpStatus.SERVICE_UNAVAILABLE);
   }
 }

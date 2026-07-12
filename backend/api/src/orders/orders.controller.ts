@@ -32,6 +32,24 @@ export class OrdersController {
     return this.ordersService.list(user.id);
   }
 
+  @Get("service")
+  @UseGuards(JwtAuthGuard)
+  listService(@CurrentUser() user: AuthenticatedUser) {
+    return this.ordersService.listForCompanion(user.id);
+  }
+
+  @Post("service/:id/start")
+  @UseGuards(JwtAuthGuard)
+  startService(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
+    return this.ordersService.startService(user.id, id);
+  }
+
+  @Post("service/:id/complete")
+  @UseGuards(JwtAuthGuard)
+  completeService(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
+    return this.ordersService.completeService(user.id, id);
+  }
+
   @Get(":id")
   @UseGuards(JwtAuthGuard)
   get(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
@@ -57,6 +75,12 @@ export class OrdersController {
     @Param("id") id: string,
     @Body() dto: CreateRefundDto
   ) {
-    return this.ordersService.createRefundSkeleton(user.id, id, dto);
+    return this.paymentsService.requestRefund(user.id, id, dto.reason);
+  }
+
+  @Post(":id/refund/sync")
+  @UseGuards(JwtAuthGuard)
+  syncRefund(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
+    return this.paymentsService.syncRefund(user.id, id);
   }
 }

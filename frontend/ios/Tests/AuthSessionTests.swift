@@ -6,9 +6,11 @@ import XCTest
 final class AuthSessionTests: XCTestCase {
     func testBootstrapWithoutTokenSetsUnauthenticated() async {
         let store = InMemoryTokenStore()
-        let session = AuthSession(tokenStore: store) { _ in
-            StubAuthClient()
-        }
+        let session = AuthSession(
+            tokenStore: store,
+            clientFactory: { _ in StubAuthClient() },
+            offlineIdentityEnabled: false
+        )
 
         await session.bootstrap()
 
@@ -19,20 +21,24 @@ final class AuthSessionTests: XCTestCase {
         let store = InMemoryTokenStore()
         store.save(accessToken: "access", refreshToken: "refresh", expiresAt: Date().addingTimeInterval(3600))
 
-        let session = AuthSession(tokenStore: store) { _ in
-            StubAuthClient(currentUser: AuthUserResponse(
-                id: "user-42",
-                role: "user",
-                profile: AuthUserProfileResponse(
-                    displayName: "测试用户",
-                    phone: "138****8000",
-                    age: 25,
-                    gender: nil,
-                    isVerified: false,
-                    safetyScore: 80
-                )
-            ))
-        }
+        let session = AuthSession(
+            tokenStore: store,
+            clientFactory: { _ in
+                StubAuthClient(currentUser: AuthUserResponse(
+                    id: "user-42",
+                    role: "user",
+                    profile: AuthUserProfileResponse(
+                        displayName: "测试用户",
+                        phone: "138****8000",
+                        age: 25,
+                        gender: nil,
+                        isVerified: false,
+                        safetyScore: 80
+                    )
+                ))
+            },
+            offlineIdentityEnabled: false
+        )
 
         await session.bootstrap()
 
@@ -47,13 +53,72 @@ final class AuthSessionTests: XCTestCase {
         let store = InMemoryTokenStore()
         store.save(accessToken: "access", refreshToken: "refresh", expiresAt: Date().addingTimeInterval(3600))
 
-        let session = AuthSession(tokenStore: store) { _ in StubAuthClient() }
+        let session = AuthSession(
+            tokenStore: store,
+            clientFactory: { _ in StubAuthClient() },
+            offlineIdentityEnabled: false
+        )
         await session.bootstrap()
         await session.logout()
 
         XCTAssertEqual(session.state, .unauthenticated)
         XCTAssertNil(store.getAccessToken())
         XCTAssertNil(store.getRefreshToken())
+    }
+
+    func testDemoModeAuthenticatesWithoutReadingTokensOrCreatingClient() async {
+        let store = InMemoryTokenStore()
+        var clientCreated = false
+        let session = AuthSession(
+            tokenStore: store,
+            clientFactory: { _ in
+                clientCreated = true
+                return StubAuthClient()
+            },
+            offlineIdentityEnabled: true
+        )
+
+        await session.bootstrap()
+
+        guard case .authenticated(let user) = session.state else {
+            return XCTFail("Expected demo authentication")
+        }
+        XCTAssertEqual(user.id, FrontendDemoIdentity.user.id)
+        XCTAssertEqual(user.gender, nil)
+        XCTAssertNil(session.accessToken)
+        XCTAssertFalse(clientCreated)
+    }
+
+    func testDemoModeRefreshAndLogoutPreserveTokensAndAvoidClient() async {
+        let store = InMemoryTokenStore()
+        store.save(accessToken: "access", refreshToken: "refresh", expiresAt: Date().addingTimeInterval(3600))
+        var clientCreated = false
+        let session = AuthSession(
+            tokenStore: store,
+            clientFactory: { _ in
+                clientCreated = true
+                return StubAuthClient()
+            },
+            offlineIdentityEnabled: true
+        )
+
+        await session.refreshIfNeeded()
+        await session.logout()
+
+        guard case .authenticated(let user) = session.state else {
+            return XCTFail("Expected demo authentication")
+        }
+        XCTAssertEqual(user.id, FrontendDemoIdentity.user.id)
+        XCTAssertEqual(store.getAccessToken(), "access")
+        XCTAssertEqual(store.getRefreshToken(), "refresh")
+        XCTAssertFalse(clientCreated)
+    }
+
+    func testDemoModeEnvironmentOverridesPlistValue() {
+#if DEBUG
+        XCTAssertTrue(FrontendDemoMode.isEnabled(environment: ["FRONTEND_DEMO_MODE": "YES"], plistValue: "NO"))
+        XCTAssertFalse(FrontendDemoMode.isEnabled(environment: ["FRONTEND_DEMO_MODE": "NO"], plistValue: "YES"))
+#endif
     }
 }
 

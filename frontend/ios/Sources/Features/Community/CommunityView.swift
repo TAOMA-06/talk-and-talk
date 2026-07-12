@@ -75,6 +75,8 @@ struct CommunityView: View {
                 content: $content
             )
         }
+        .task { await store.loadCommunityPosts() }
+        .refreshable { await store.loadCommunityPosts() }
     }
 
     @ViewBuilder

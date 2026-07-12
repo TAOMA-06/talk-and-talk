@@ -84,7 +84,9 @@ Content-Type: application/json
 | Path | 说明 |
 |------|------|
 | `GET /api/v1/moderation/cases` | 仍可用，需 `moderator`/`admin` |
-| `POST /api/v1/moderation/check` | 任意登录用户试审文本 |
+| `POST /api/v1/moderation/check` | 需 `moderator`/`admin`；返回内部审核详情 |
+
+用户端 `POST /moderation/reports` 只返回举报回执，不返回审核案件、规则命中或 AI 判断详情。
 
 ## Web 运营后台
 

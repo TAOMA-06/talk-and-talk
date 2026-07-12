@@ -1,12 +1,8 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
-import { randomUUID } from "node:crypto";
-
-import { AuditService } from "../common/audit/audit.service";
 import { AppException } from "../common/errors/app.exception";
 import { PrismaService } from "../database/prisma.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { CreateOrderDto } from "./dto/create-order.dto";
-import { CreateRefundDto } from "./dto/create-refund.dto";
 
 type OrderRecord = {
   id: string;
@@ -17,6 +13,11 @@ type OrderRecord = {
   amountCents: number;
   currency: string;
   status: string;
+  scheduledAt: Date;
+  companionNameSnapshot: string;
+  companionRoleSnapshot: string;
+  companionInitialsSnapshot: string;
+  themeNameSnapshot: string;
   conversationId: string | null;
   paidAt: Date | null;
   cancelledAt: Date | null;
@@ -24,14 +25,15 @@ type OrderRecord = {
   createdAt: Date;
   updatedAt: Date;
   conversation?: { externalId: string } | null;
+  user?: { profile: { displayName: string | null } | null };
+  refunds?: any[];
 };
 
 @Injectable()
 export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly notifications: NotificationsService,
-    private readonly audit: AuditService
+    private readonly notifications: NotificationsService
   ) {}
 
   async create(userId: string, dto: CreateOrderDto) {
@@ -54,6 +56,10 @@ export class OrdersService {
 
     const units = Math.max(1, Math.ceil(durationMinutes / 30));
     const amountCents = companion.pricePerHalfHour * units * 100;
+    const scheduledAt = new Date(dto.scheduledAt);
+    if (scheduledAt.getTime() <= Date.now()) {
+      throw new AppException("INVALID_SCHEDULE", "scheduledAt must be in the future", HttpStatus.BAD_REQUEST);
+    }
 
     const order = await this.prisma.order.create({
       data: {
@@ -63,7 +69,12 @@ export class OrdersService {
         durationMinutes,
         amountCents,
         currency: "CNY",
-        status: "pending"
+        status: "pending",
+        scheduledAt,
+        companionNameSnapshot: companion.name,
+        companionRoleSnapshot: companion.role,
+        companionInitialsSnapshot: companion.initials,
+        themeNameSnapshot: this.themeName(dto.themeId)
       }
     } as any);
 
@@ -73,13 +84,59 @@ export class OrdersService {
   async list(userId: string) {
     const orders = await this.prisma.order.findMany({
       where: { userId },
-      include: { conversation: { select: { externalId: true } } },
+      include: { conversation: { select: { externalId: true } }, refunds: { orderBy: { createdAt: "desc" }, take: 1 } },
       orderBy: { createdAt: "desc" }
     } as any);
 
     return {
       items: orders.map((order: OrderRecord) => this.toDto(order))
     };
+  }
+
+  async listForCompanion(userId: string) {
+    const companion = await this.prisma.companionProfile.findUnique({
+      where: { ownerUserId: userId }
+    } as any);
+    if (!companion) {
+      return { items: [] };
+    }
+    const orders = await this.prisma.order.findMany({
+      where: { companionId: companion.id },
+      include: {
+        conversation: { select: { externalId: true } },
+        user: { select: { profile: { select: { displayName: true } } } }
+      },
+      orderBy: { scheduledAt: "asc" }
+    } as any);
+    return { items: orders.map((order: OrderRecord) => this.toDto(order)) };
+  }
+
+  async startService(userId: string, orderId: string) {
+    const order = await this.findServiceOrderOrThrow(userId, orderId);
+    if (order.status !== "paid") {
+      throw new AppException("ORDER_INVALID_STATE", "Only paid orders can start", HttpStatus.CONFLICT);
+    }
+    const updated = await this.prisma.order.update({
+      where: { id: orderId },
+      data: { status: "inService" },
+      include: { conversation: { select: { externalId: true } } }
+    } as any);
+    await this.notifications.create(order.userId, "orderStatus", "服务已开始", "陪伴者已开始本次服务。", { orderId, status: "inService" });
+    return this.toDto(updated);
+  }
+
+  async completeService(userId: string, orderId: string) {
+    const order = await this.findServiceOrderOrThrow(userId, orderId);
+    if (order.status !== "inService") {
+      throw new AppException("ORDER_INVALID_STATE", "Only in-service orders can complete", HttpStatus.CONFLICT);
+    }
+    const updated = await this.prisma.order.update({
+      where: { id: orderId },
+      data: { status: "completed", completedAt: new Date() },
+      include: { conversation: { select: { externalId: true } } }
+    } as any);
+    await this.notifications.create(order.userId, "orderStatus", "服务已完成", "本次服务已完成，你现在可以提交评价。", { orderId, status: "completed" });
+    return this.toDto(updated);
   }
 
   async get(userId: string, orderId: string) {
@@ -131,77 +188,6 @@ export class OrdersService {
     return this.toDto(updated);
   }
 
-  async createRefundSkeleton(userId: string, orderId: string, dto: CreateRefundDto) {
-    const order = await this.findOwnedOrThrow(userId, orderId);
-
-    if (!["paid", "inService", "completed"].includes(order.status)) {
-      throw new AppException(
-        "ORDER_INVALID_STATE",
-        "Refund is only available for paid, inService, or completed orders",
-        HttpStatus.CONFLICT
-      );
-    }
-
-    const payment = await this.prisma.paymentTransaction.findFirst({
-      where: { orderId, status: "success" },
-      orderBy: { paidAt: "desc" }
-    } as any);
-
-    if (!payment) {
-      throw new AppException(
-        "PAYMENT_NOT_FOUND",
-        "No successful payment found for this order",
-        HttpStatus.NOT_FOUND
-      );
-    }
-
-    const existing = await this.prisma.refundTransaction.findFirst({
-      where: {
-        orderId,
-        status: { in: ["pending", "processing", "success"] }
-      }
-    } as any);
-
-    if (existing) {
-      return {
-        refund: this.toRefundDto(existing),
-        order: this.toDto(order)
-      };
-    }
-
-    const refund = await this.prisma.refundTransaction.create({
-      data: {
-        orderId,
-        paymentId: payment.id,
-        outRefundNo: `R${Date.now()}${randomUUID().replace(/-/g, "").slice(0, 10)}`,
-        amountCents: order.amountCents,
-        status: "pending",
-        reason: dto.reason?.trim() || null
-      }
-    } as any);
-
-    await this.audit.record({
-      actorId: userId,
-      action: "refund.requested",
-      resourceType: "order",
-      resourceId: orderId,
-      metadata: { refundId: refund.id, amountCents: order.amountCents }
-    });
-
-    await this.notifications.create(
-      userId,
-      "orderStatus",
-      "退款申请已提交",
-      "我们已收到你的退款申请，将尽快处理。",
-      { orderId, refundId: refund.id, status: "pending" }
-    );
-
-    return {
-      refund: this.toRefundDto(refund),
-      order: this.toDto(order)
-    };
-  }
-
   toDto(order: OrderRecord) {
     return {
       id: order.id,
@@ -213,6 +199,27 @@ export class OrdersService {
       amountYuan: Math.round(order.amountCents / 100),
       currency: order.currency,
       status: order.status,
+      scheduledAt: (order.scheduledAt ?? order.createdAt).toISOString(),
+      companionSnapshot: {
+        name: order.companionNameSnapshot ?? "",
+        role: order.companionRoleSnapshot ?? "",
+        initials: order.companionInitialsSnapshot ?? ""
+      },
+      themeNameSnapshot: order.themeNameSnapshot ?? this.themeName(order.themeId),
+      customer: order.user ? {
+        id: order.userId,
+        name: order.user.profile?.displayName ?? "用户",
+        initials: (order.user.profile?.displayName ?? "用户").slice(0, 2)
+      } : null,
+      refund: order.refunds?.[0] ? {
+        id: order.refunds[0].id,
+        outRefundNo: order.refunds[0].outRefundNo,
+        amountCents: order.refunds[0].amountCents,
+        status: order.refunds[0].status,
+        reason: order.refunds[0].reason,
+        reviewNote: order.refunds[0].reviewNote,
+        failureReason: order.refunds[0].failureReason
+      } : null,
       conversationId: order.conversation?.externalId ?? null,
       paidAt: order.paidAt?.toISOString() ?? null,
       cancelledAt: order.cancelledAt?.toISOString() ?? null,
@@ -222,25 +229,10 @@ export class OrdersService {
     };
   }
 
-  private toRefundDto(refund: any) {
-    return {
-      id: refund.id,
-      orderId: refund.orderId,
-      paymentId: refund.paymentId,
-      outRefundNo: refund.outRefundNo,
-      amountCents: refund.amountCents,
-      status: refund.status,
-      reason: refund.reason,
-      providerRefundId: refund.providerRefundId,
-      createdAt: refund.createdAt.toISOString(),
-      updatedAt: refund.updatedAt.toISOString()
-    };
-  }
-
   private async findOwnedOrThrow(userId: string, orderId: string): Promise<OrderRecord> {
-    const order = await this.prisma.order.findUnique({
+    const order: any = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { conversation: { select: { externalId: true } } }
+      include: { conversation: { select: { externalId: true } }, refunds: { orderBy: { createdAt: "desc" }, take: 1 } }
     } as any);
 
     if (!order || order.userId !== userId) {
@@ -248,5 +240,27 @@ export class OrdersService {
     }
 
     return order;
+  }
+
+  private async findServiceOrderOrThrow(userId: string, orderId: string): Promise<OrderRecord> {
+    const order: any = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { companion: { select: { ownerUserId: true } }, conversation: { select: { externalId: true } } }
+    } as any);
+    if (!order || order.companion.ownerUserId !== userId) {
+      throw new AppException("ORDER_NOT_FOUND", "Order not found", HttpStatus.NOT_FOUND);
+    }
+    return order;
+  }
+
+  private themeName(themeId: string) {
+    return ({
+      t1: "情绪倾听",
+      t2: "职场减压",
+      t3: "睡前语音",
+      t4: "学习陪伴",
+      t5: "运动鼓励",
+      t6: "兴趣聊天"
+    } as Record<string, string>)[themeId] ?? "线上沟通";
   }
 }

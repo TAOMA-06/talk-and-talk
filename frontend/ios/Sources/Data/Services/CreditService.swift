@@ -86,34 +86,6 @@ struct CreditService {
         return CreditEvent(id: UUID().uuidString, delta: delta, reason: reason, createdAt: Date())
     }
 
-    @discardableResult
-    func applyAdminResolution(_ action: AdminAction, to user: inout User, caseDecision: ModerationDecision) -> CreditEvent? {
-        switch action {
-        case .confirmViolation:
-            let delta = caseDecision == .block ? -15 : -10
-            user.safetyScore = max(0, user.safetyScore + delta)
-            user.lastViolationAt = Date()
-            refreshAccountStatus(for: &user)
-            return CreditEvent(
-                id: UUID().uuidString,
-                delta: delta,
-                reason: "平台确认违规",
-                createdAt: Date()
-            )
-        case .dismiss:
-            user.safetyScore = min(100, user.safetyScore + 5)
-            refreshAccountStatus(for: &user)
-            return CreditEvent(
-                id: UUID().uuidString,
-                delta: 5,
-                reason: "误报驳回，信用分恢复",
-                createdAt: Date()
-            )
-        case .escalate:
-            return nil
-        }
-    }
-
     func refreshAccountStatus(for user: inout User) {
         if user.safetyScore < 20 || user.violationCount >= 5 {
             user.accountStatus = .banned

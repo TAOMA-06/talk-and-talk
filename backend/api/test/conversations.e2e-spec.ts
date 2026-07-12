@@ -97,7 +97,7 @@ describe("Conversations (e2e)", () => {
     return { user, token };
   }
 
-  it("writes a normal user message and companion placeholder reply", async () => {
+  it("writes a normal user message without exposing internal moderation data", async () => {
     const { token } = await createUser();
 
     await request(app.getHttpServer())
@@ -107,10 +107,11 @@ describe("Conversations (e2e)", () => {
       .expect(201)
       .expect(({ body }) => {
         expect(body.data.moderation.decision).toBe("allow");
+        expect(Object.keys(body.data.moderation).sort()).toEqual(["decision", "riskLevel"]);
         expect(body.data.message.content).toBe("今天有点累，想有人听我说。");
         expect(body.data.safetyMessage).toBeNull();
-        expect(body.data.companionReply.senderId).toBe("c1");
-        expect(body.data.moderationCase).toBeNull();
+        expect(body.data.companionReply).toBeNull();
+        expect(body.data.moderationCase).toBeUndefined();
       });
 
     await request(app.getHttpServer())
@@ -119,8 +120,7 @@ describe("Conversations (e2e)", () => {
       .expect(200)
       .expect(({ body }) => {
         expect(body.data.messages.map((item: { content: string }) => item.content)).toEqual([
-          "今天有点累，想有人听我说。",
-          "我在，先慢慢说。我们可以继续在平台内沟通。"
+          "今天有点累，想有人听我说。"
         ]);
       });
   });
@@ -138,7 +138,7 @@ describe("Conversations (e2e)", () => {
         expect(body.data.message).toBeNull();
         expect(body.data.safetyMessage.type).toBe("safety");
         expect(body.data.companionReply).toBeNull();
-        expect(body.data.moderationCase.decision).toBe("block");
+        expect(body.data.moderationCase).toBeUndefined();
       });
 
     await request(app.getHttpServer())
@@ -152,7 +152,7 @@ describe("Conversations (e2e)", () => {
       });
   });
 
-  it("blocks wechat solicitation and exposes the case via moderation cases", async () => {
+  it("stores risky cases internally while denying the user access to the case queue", async () => {
     const { token } = await createUser();
 
     await request(app.getHttpServer())
@@ -165,19 +165,20 @@ describe("Conversations (e2e)", () => {
         expect(body.data.message).toBeNull();
         expect(body.data.safetyMessage.type).toBe("safety");
         expect(body.data.companionReply).toBeNull();
-        expect(body.data.moderationCase.decision).toBe("block");
-        expect(body.data.moderationCase.source).toBe("chat");
+        expect(body.data.moderationCase).toBeUndefined();
+        expect(body.data.moderation.matchedRules).toBeUndefined();
+        expect(body.data.moderation.reasons).toBeUndefined();
       });
 
     await request(app.getHttpServer())
       .get("/api/v1/moderation/cases")
       .set("Authorization", `Bearer ${token}`)
-      .expect(200)
-      .expect(({ body }) => {
-        expect(body.data.cases.some((item: { content: string; decision: string }) =>
-          item.content === "我们加微信聊吧" && item.decision === "block"
-        )).toBe(true);
-      });
+      .expect(403);
+
+    const internalCase = await prisma.moderationCase.findFirst({
+      where: { content: "我们加微信聊吧", decision: "block" }
+    });
+    expect(internalCase).not.toBeNull();
   });
 
   it("returns conversations with last message and unread count", async () => {

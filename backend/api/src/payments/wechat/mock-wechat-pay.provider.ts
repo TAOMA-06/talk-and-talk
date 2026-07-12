@@ -5,6 +5,7 @@ import {
   WeChatPayProvider,
   WeChatPrepayInput,
   WeChatPrepayResult
+  , WeChatRefundInput, WeChatRefundNotifyPayload, WeChatRefundResult
 } from "./wechat-pay.provider";
 
 export const MOCK_WECHAT_NOTIFY_TOKEN = "mock-wechat-notify";
@@ -64,6 +65,25 @@ export class MockWeChatPayProvider implements WeChatPayProvider {
       transactionId,
       tradeState,
       amountCents,
+      raw: parsed
+    };
+  }
+
+  async createRefund(input: WeChatRefundInput): Promise<WeChatRefundResult> {
+    return { outRefundNo: input.outRefundNo, refundId: `mock_refund_${input.outRefundNo}`, status: "SUCCESS" };
+  }
+
+  async queryRefund(outRefundNo: string): Promise<WeChatRefundResult> {
+    return { outRefundNo, refundId: `mock_refund_${outRefundNo}`, status: "SUCCESS" };
+  }
+
+  parseRefundNotifyPayload(rawBody: string): WeChatRefundNotifyPayload {
+    const parsed = JSON.parse(rawBody) as Record<string, unknown>;
+    return {
+      outRefundNo: String(parsed.outRefundNo ?? parsed.out_refund_no ?? ""),
+      refundId: String(parsed.refundId ?? parsed.refund_id ?? ""),
+      status: String(parsed.status ?? "SUCCESS"),
+      refundAmountCents: Number(parsed.refundAmountCents ?? 0),
       raw: parsed
     };
   }

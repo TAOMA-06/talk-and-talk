@@ -31,9 +31,32 @@ export type WeChatNotifyPayload = {
   raw: Record<string, unknown>;
 };
 
+export type WeChatRefundInput = {
+  transactionId: string;
+  outRefundNo: string;
+  reason: string;
+  refundAmountCents: number;
+  totalAmountCents: number;
+  notifyUrl: string;
+};
+
+export type WeChatRefundResult = {
+  outRefundNo: string;
+  refundId: string;
+  status: string;
+};
+
+export type WeChatRefundNotifyPayload = WeChatRefundResult & {
+  refundAmountCents: number;
+  raw: Record<string, unknown>;
+};
+
 export interface WeChatPayProvider {
   readonly isMock: boolean;
   createAppPrepay(input: WeChatPrepayInput): Promise<WeChatPrepayResult>;
   verifyNotifySignature(headers: Record<string, string | string[] | undefined>, rawBody: string): boolean;
   parseNotifyPayload(rawBody: string): WeChatNotifyPayload;
+  createRefund(input: WeChatRefundInput): Promise<WeChatRefundResult>;
+  queryRefund(outRefundNo: string): Promise<WeChatRefundResult>;
+  parseRefundNotifyPayload(rawBody: string): WeChatRefundNotifyPayload;
 }
