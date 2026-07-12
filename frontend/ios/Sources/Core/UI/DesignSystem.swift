@@ -508,31 +508,32 @@ struct DSSectionHeader: View {
     var action: (() -> Void)?
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: DS.Space.md) {
-            VStack(alignment: .leading, spacing: DS.Space.xxs) {
+        HStack(alignment: .center, spacing: DS.Space.md) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: DS.TypeScale.section, weight: .semibold))
+                    .font(.system(size: DS.TypeScale.body + 1, weight: .semibold))
                     .foregroundStyle(Color.dsTextPrimary)
                 if let subtitle {
                     Text(subtitle)
-                        .font(.system(size: DS.TypeScale.callout))
+                        .font(.system(size: DS.TypeScale.caption))
                         .foregroundStyle(Color.dsTextSecondary)
+                        .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
             Spacer(minLength: DS.Space.sm)
             if let actionTitle, let action {
                 Button(action: action) {
-                    HStack(spacing: DS.Space.xxs) {
+                    HStack(spacing: 2) {
                         Text(actionTitle)
-                            .font(.system(size: DS.TypeScale.callout, weight: .semibold))
+                            .font(.system(size: DS.TypeScale.caption, weight: .semibold))
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(.system(size: 9, weight: .bold))
                     }
                     .foregroundStyle(Color.dsPrimary)
-                    .padding(.horizontal, DS.Space.md)
-                    .frame(height: DS.ControlHeight.sm)
-                    .background(Color.dsPrimarySoft.opacity(0.58), in: Capsule())
+                    .padding(.horizontal, DS.Space.sm)
+                    .frame(height: 28)
+                    .background(Color.dsPrimarySoft.opacity(0.55), in: Capsule())
                 }
                 .buttonStyle(DSPressButtonStyle())
             }

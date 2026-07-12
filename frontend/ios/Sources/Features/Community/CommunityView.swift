@@ -49,7 +49,7 @@ struct CommunityView: View {
     }
 
     var body: some View {
-        AppScaffold(title: "广场", spacing: DS.Space.lg) {
+        AppScaffold(title: "广场", spacing: DS.Space.md) {
             SquareHeroHeader(
                 browsingText: browsingText,
                 publishTitle: publishTitle,
@@ -63,7 +63,7 @@ struct CommunityView: View {
                 SquareReviewSection(posts: reviewPosts)
             }
 
-            SectionHeader(title: "广场动态", subtitle: feedSubtitle)
+            SectionHeader(title: "动态", subtitle: feedSubtitle)
             CommunityTopicFilterBar(topics: topicFilters, selection: $selectedTopic)
 
             feedContent
@@ -413,40 +413,22 @@ private struct SquareHeroHeader: View {
     let action: () -> Void
 
     var body: some View {
-        DSCard {
-            VStack(alignment: .leading, spacing: DS.Space.lg) {
-                HStack(alignment: .top, spacing: DS.Space.md) {
-                    VStack(alignment: .leading, spacing: DS.Space.sm) {
-                        DSBadge(text: "广场", tone: .primary)
-                        Text("看看大家此刻想聊什么")
-                            .font(.system(size: 22, weight: .semibold))
+        DSCard(padding: DS.Space.md) {
+            VStack(alignment: .leading, spacing: DS.Space.md) {
+                HStack(alignment: .center, spacing: DS.Space.sm) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("看看大家想聊什么")
+                            .font(.system(size: DS.TypeScale.section, weight: .semibold))
                             .foregroundStyle(Color.dsTextPrimary)
-                            .fixedSize(horizontal: false, vertical: true)
-                        Text("只展示适合你身份的内容，沟通留在平台内。")
-                            .font(.system(size: 13))
+                        Text("\(browsingText) · 沟通留在平台内")
+                            .font(.system(size: DS.TypeScale.caption))
                             .foregroundStyle(Color.dsTextSecondary)
-                            .lineSpacing(3)
-                            .fixedSize(horizontal: false, vertical: true)
+                            .lineLimit(1)
                     }
-
-                    Spacer(minLength: DS.Space.md)
-
-                    DSInsetSurface(padding: DS.Space.md) {
-                        VStack(spacing: DS.Space.xxs) {
-                            Text("\(pendingCount)")
-                                .font(.system(size: 22, weight: .semibold))
-                                .foregroundStyle(Color.dsTextPrimary)
-                            Text("发布中")
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundStyle(Color.dsTextSecondary)
-                        }
+                    Spacer(minLength: DS.Space.sm)
+                    if pendingCount > 0 {
+                        DSBadge(text: "\(pendingCount) 条审核中", tone: .warning)
                     }
-                    .frame(width: 78)
-                }
-
-                HStack(spacing: DS.Space.sm) {
-                    StatusPill(text: browsingText, symbol: "person.2", color: Color.dsPrimary)
-                    StatusPill(text: "平台内沟通", symbol: "lock.shield", color: Color.dsTextSecondary)
                 }
 
                 if let restrictionText {
@@ -457,6 +439,7 @@ private struct SquareHeroHeader: View {
                     title: publishTitle,
                     systemImage: "square.and.pencil",
                     isEnabled: canPublish,
+                    height: DS.ControlHeight.md,
                     action: action
                 )
                 .accessibilityLabel(publishTitle)
@@ -488,40 +471,46 @@ private struct SquareEmptyState: View {
     let isPrimaryEnabled: Bool
 
     var body: some View {
-        DSCard(padding: DS.Space.xl, elevated: false) {
-            VStack(spacing: DS.Space.md) {
-                ZStack {
-                    Circle()
-                        .fill(Color.dsPrimarySoft.opacity(0.72))
-                        .frame(width: 64, height: 64)
+        DSCard(padding: DS.Space.md, elevated: false) {
+            VStack(alignment: .leading, spacing: DS.Space.md) {
+                HStack(spacing: DS.Space.md) {
                     Image(systemName: symbol)
-                        .font(.system(size: 24, weight: .regular))
+                        .font(.system(size: 16, weight: .medium))
                         .foregroundStyle(Color.dsPrimary)
-                        .symbolRenderingMode(.hierarchical)
-                }
+                        .frame(width: 36, height: 36)
+                        .background(Color.dsPrimarySoft.opacity(0.8), in: Circle())
 
-                VStack(spacing: DS.Space.sm) {
-                    Text(title)
-                        .font(.system(size: DS.TypeScale.section, weight: .semibold))
-                        .foregroundStyle(Color.dsTextPrimary)
-                        .multilineTextAlignment(.center)
-                    Text(subtitle)
-                        .font(.system(size: DS.TypeScale.callout))
-                        .foregroundStyle(Color.dsTextSecondary)
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: 280)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(title)
+                            .font(.system(size: DS.TypeScale.body, weight: .semibold))
+                            .foregroundStyle(Color.dsTextPrimary)
+                        Text(subtitle)
+                            .font(.system(size: DS.TypeScale.caption))
+                            .foregroundStyle(Color.dsTextSecondary)
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
 
                 HStack(spacing: DS.Space.sm) {
-                    DSButton(title: primaryTitle, isEnabled: isPrimaryEnabled, action: primaryAction)
+                    DSButton(
+                        title: primaryTitle,
+                        isEnabled: isPrimaryEnabled,
+                        height: DS.ControlHeight.md,
+                        action: primaryAction
+                    )
                     if let secondaryTitle, let secondaryAction {
-                        DSButton(title: secondaryTitle, variant: .secondary, maxWidth: 118, action: secondaryAction)
+                        DSButton(
+                            title: secondaryTitle,
+                            variant: .secondary,
+                            maxWidth: 110,
+                            height: DS.ControlHeight.md,
+                            action: secondaryAction
+                        )
                     }
                 }
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, DS.Space.sm)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }

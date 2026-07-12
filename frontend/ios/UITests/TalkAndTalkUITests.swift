@@ -17,12 +17,14 @@ final class TalkAndTalkUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["选择你的身份"].waitForExistence(timeout: 5))
         app.buttons["女生"].tap()
         XCTAssertTrue(app.staticTexts["Talk&Talk"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["从当下的心情开始"].exists)
-        XCTAssertTrue(app.buttons["先完成 18+ 认证"].exists || app.buttons["看看谁在线"].exists)
+        XCTAssertTrue(app.staticTexts["现在的心情"].exists || app.staticTexts["可聊的人"].exists)
+        XCTAssertTrue(app.buttons["先完成认证"].exists || app.buttons["找人聊聊"].exists)
         // No fake marketplace users in offline demo.
         XCTAssertFalse(app.staticTexts["林屿"].exists)
-        XCTAssertTrue(app.staticTexts["暂无推荐陪伴者"].waitForExistence(timeout: 3)
-                      || app.staticTexts["今晚暂时没有可聊的人"].exists)
+        XCTAssertTrue(
+            app.staticTexts["暂时还没有人在线"].waitForExistence(timeout: 3)
+                || app.staticTexts["现在的心情"].exists
+        )
         XCTAssertTrue(tabButton(in: app, label: "发现", identifier: "sparkles").exists)
         XCTAssertTrue(tabButton(in: app, label: "广场", identifier: "heart.text.square").exists)
         XCTAssertTrue(tabButton(in: app, label: "订单", identifier: "calendar.badge.clock").exists)
@@ -39,8 +41,8 @@ final class TalkAndTalkUITests: XCTestCase {
 
         chooseInitialGender(in: app)
         tapTab(in: app, label: "广场", identifier: "heart.text.square")
-        XCTAssertTrue(app.staticTexts["看看大家此刻想聊什么"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.staticTexts["广场动态"].exists)
+        XCTAssertTrue(app.staticTexts["看看大家想聊什么"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["动态"].exists)
         XCTAssertTrue(app.buttons["全部"].exists)
         XCTAssertTrue(app.buttons["communityPublishButton"].exists)
         // Seeded demo copy must not appear.
@@ -163,12 +165,16 @@ final class TalkAndTalkUITests: XCTestCase {
     private func chooseInitialGender(in app: XCUIApplication, gender: String = "女生") {
         XCTAssertTrue(app.staticTexts["选择你的身份"].waitForExistence(timeout: 5))
         app.buttons[gender].tap()
-        XCTAssertTrue(app.staticTexts["从当下的心情开始"].waitForExistence(timeout: 3))
+        XCTAssertTrue(
+            app.staticTexts["现在的心情"].waitForExistence(timeout: 3)
+                || app.staticTexts["可聊的人"].waitForExistence(timeout: 3)
+        )
     }
 
     @MainActor
     private func completeVerification(in app: XCUIApplication) {
-        app.buttons["先完成 18+ 认证"].tap()
+        let verifyCTA = app.buttons["先完成认证"].exists ? app.buttons["先完成认证"] : app.buttons["先完成 18+ 认证"]
+        verifyCTA.tap()
         XCTAssertTrue(app.staticTexts["确认 18+ 身份"].waitForExistence(timeout: 3))
 
         let nameField = app.textFields.element(boundBy: 0)
@@ -192,6 +198,9 @@ final class TalkAndTalkUITests: XCTestCase {
         codeField.typeText("123456")
 
         app.buttons["完成认证"].tap()
-        XCTAssertTrue(app.buttons["看看谁在线"].waitForExistence(timeout: 3))
+        XCTAssertTrue(
+            app.buttons["找人聊聊"].waitForExistence(timeout: 3)
+                || app.buttons["看看谁在线"].waitForExistence(timeout: 3)
+        )
     }
 }

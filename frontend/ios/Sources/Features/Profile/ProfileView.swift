@@ -4,7 +4,7 @@ struct ProfileView: View {
     @EnvironmentObject private var store: AppStore
 
     var body: some View {
-        AppScaffold(title: "我的", spacing: DS.Space.lg) {
+        AppScaffold(title: "我的", spacing: DS.Space.md) {
             UserPanel()
             SafetyScorePanel()
             MenuPanel()
@@ -16,33 +16,31 @@ private struct UserPanel: View {
     @EnvironmentObject private var store: AppStore
 
     var body: some View {
-        DSCard {
-            HStack(alignment: .top, spacing: DS.Space.lg) {
+        DSCard(padding: DS.Space.md) {
+            HStack(alignment: .center, spacing: DS.Space.md) {
                 DSInitialsAvatar(
-                    initials: String(store.user.name.prefix(2)),
+                    initials: String((store.user.name.isEmpty ? "用" : store.user.name).prefix(2)),
                     tone: .primary,
-                    size: 64
+                    size: 52
                 )
-                VStack(alignment: .leading, spacing: DS.Space.sm) {
+                VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: DS.Space.sm) {
                         Text(store.user.name.isEmpty ? "用户" : store.user.name)
-                            .font(.system(size: DS.TypeScale.section, weight: .semibold))
+                            .font(.system(size: DS.TypeScale.body + 1, weight: .semibold))
                             .foregroundStyle(Color.dsTextPrimary)
                         if store.user.isVerified {
                             Image(systemName: "checkmark.seal.fill")
+                                .font(.system(size: 14))
                                 .foregroundStyle(Color.dsPrimary)
                                 .accessibilityLabel("已实名")
                         }
                     }
                     Text(profileMetaLine)
-                        .font(.system(size: DS.TypeScale.callout))
-                        .foregroundStyle(Color.dsTextSecondary)
-                    Text("账号状态 · \(store.user.accountStatus.displayName)")
                         .font(.system(size: DS.TypeScale.caption))
                         .foregroundStyle(Color.dsTextSecondary)
-                    FlowLayout(spacing: DS.Space.sm) {
+                    HStack(spacing: DS.Space.sm) {
                         StatusPill(
-                            text: store.user.isVerified ? "已完成 18+ 实名" : "未完成实名",
+                            text: store.user.isVerified ? "已实名" : "未实名",
                             symbol: store.user.isVerified ? "checkmark.shield" : "person.badge.key",
                             color: store.user.isVerified ? Color.dsPrimary : Color.dsWarning
                         )

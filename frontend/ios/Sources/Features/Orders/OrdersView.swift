@@ -4,11 +4,11 @@ struct OrdersView: View {
     @EnvironmentObject private var store: AppStore
 
     var body: some View {
-        AppScaffold(title: "订单", spacing: DS.Space.lg) {
-            SectionHeader(title: "我的订单", subtitle: "查看预约与沟通记录")
+        AppScaffold(title: "订单", spacing: DS.Space.md) {
+            SectionHeader(title: "我的订单")
             customerOrdersContent
             if store.orders.contains(where: { $0.customerTarget != nil }) {
-                SectionHeader(title: "待服务订单", subtitle: "用户预约的服务订单")
+                SectionHeader(title: "待服务")
                 serviceOrdersContent
             }
         }
@@ -38,19 +38,10 @@ struct OrdersView: View {
 
         if customerOrders.isEmpty {
             let copy = MarketplaceEmptyCopy.content(for: .orders)
-            EmptyStateView(
+            EmptyStateCard(
                 content: copy,
-                action: { store.selectedTab = .discover },
-                compact: true
+                action: { store.selectedTab = .discover }
             )
-            .background(
-                Color.dsSurfaceElevated,
-                in: RoundedRectangle(cornerRadius: DS.Radius.lg, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: DS.Radius.lg, style: .continuous)
-                    .stroke(Color.dsBorder.opacity(0.68), lineWidth: DS.Stroke.hairline)
-            }
             .accessibilityIdentifier("ordersEmptyState")
         } else {
             LazyVStack(spacing: DS.Space.lg) {

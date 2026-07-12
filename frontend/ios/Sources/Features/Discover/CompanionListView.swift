@@ -215,24 +215,44 @@ private struct CompanionListEmptyState: View {
     let back: () -> Void
 
     var body: some View {
-        DSCard(padding: DS.Space.xl, elevated: false) {
-            VStack(spacing: DS.Space.md) {
-                EmptyStateView(
-                    symbol: content.symbol,
-                    title: content.title,
-                    subtitle: content.subtitle,
-                    compact: true
-                )
-                .padding(.vertical, 0)
+        DSCard(padding: DS.Space.md, elevated: false) {
+            VStack(alignment: .leading, spacing: DS.Space.md) {
+                HStack(spacing: DS.Space.md) {
+                    Image(systemName: content.symbol)
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(Color.dsPrimary)
+                        .frame(width: 36, height: 36)
+                        .background(Color.dsPrimarySoft.opacity(0.8), in: Circle())
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(content.title)
+                            .font(.system(size: DS.TypeScale.body, weight: .semibold))
+                            .foregroundStyle(Color.dsTextPrimary)
+                        Text(content.subtitle)
+                            .font(.system(size: DS.TypeScale.caption))
+                            .foregroundStyle(Color.dsTextSecondary)
+                            .lineLimit(2)
+                    }
+                }
 
                 HStack(spacing: DS.Space.sm) {
-                    DSButton(title: content.actionTitle ?? "放宽筛选", variant: .primary, action: reset)
-                        .accessibilityIdentifier("companionListResetFilters")
-                    DSButton(title: "返回发现", variant: .secondary, maxWidth: 120, action: back)
-                        .accessibilityIdentifier("companionListBackToDiscover")
+                    DSButton(
+                        title: content.actionTitle ?? "放宽筛选",
+                        variant: .primary,
+                        height: DS.ControlHeight.md,
+                        action: reset
+                    )
+                    .accessibilityIdentifier("companionListResetFilters")
+                    DSButton(
+                        title: "返回",
+                        variant: .secondary,
+                        maxWidth: 88,
+                        height: DS.ControlHeight.md,
+                        action: back
+                    )
+                    .accessibilityIdentifier("companionListBackToDiscover")
                 }
             }
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .accessibilityIdentifier("companionListEmptyState")
     }
@@ -245,32 +265,20 @@ private struct ListHeader: View {
     let availableCount: Int
 
     var body: some View {
-        DSCard(padding: DS.Space.md) {
-            VStack(alignment: .leading, spacing: DS.Space.md) {
-                HStack(alignment: .lastTextBaseline, spacing: DS.Space.md) {
-                    VStack(alignment: .leading, spacing: DS.Space.xxs) {
-                        Text(title)
-                            .font(.system(size: 22, weight: .semibold))
-                            .foregroundStyle(Color.dsTextPrimary)
-                        Text("仅展示平台内线上文字/语音服务")
-                            .font(.system(size: 12))
-                            .foregroundStyle(Color.dsTextSecondary)
-                    }
-
-                    Spacer()
-
-                    Text("\(count)人")
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(Color.dsTextPrimary)
-                }
-
-                HStack(spacing: DS.Space.sm) {
-                    StatusPill(text: "\(onlineCount) 在线", symbol: "dot.radiowaves.left.and.right", color: Color.dsPrimary)
-                    StatusPill(text: "\(availableCount) 可聊", symbol: "bubble.left.and.bubble.right", color: Color.dsSuccess)
-                    StatusPill(text: "平台内沟通", symbol: "lock.shield", color: Color.dsTextSecondary)
-                }
-            }
+        HStack(spacing: DS.Space.sm) {
+            Text("\(count) 人 · \(onlineCount) 在线 · \(availableCount) 可聊")
+                .font(.system(size: DS.TypeScale.caption, weight: .medium))
+                .foregroundStyle(Color.dsTextSecondary)
+            Spacer(minLength: 0)
+            Text("平台内沟通")
+                .font(.system(size: DS.TypeScale.micro, weight: .semibold))
+                .foregroundStyle(Color.dsPrimary)
+                .padding(.horizontal, DS.Space.sm)
+                .padding(.vertical, DS.Space.xxs)
+                .background(Color.dsPrimarySoft.opacity(0.7), in: Capsule())
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title)，\(count)人，\(onlineCount)在线")
     }
 }
 

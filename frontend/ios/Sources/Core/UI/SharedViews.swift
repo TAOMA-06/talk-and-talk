@@ -20,10 +20,10 @@ struct AppBackground: View {
 
 struct AppScaffold<Content: View>: View {
     let title: String
-    var spacing: CGFloat = DS.Space.xl
+    var spacing: CGFloat = DS.Space.lg
     var horizontalPadding: CGFloat = DS.Space.lg
-    var topPadding: CGFloat = DS.Space.md
-    var bottomPadding: CGFloat = 104
+    var topPadding: CGFloat = DS.Space.sm
+    var bottomPadding: CGFloat = 88
     var showsIndicators = false
     @ViewBuilder var content: Content
 
@@ -156,60 +156,54 @@ struct CompanionSummaryCard: View {
     let companion: Companion
 
     var body: some View {
-        DSCard(padding: DS.Space.lg) {
-            VStack(alignment: .leading, spacing: DS.Space.md) {
-                HStack(alignment: .top, spacing: DS.Space.md) {
-                    CompanionAvatar(companion: companion, size: 52)
+        DSCard(padding: DS.Space.md) {
+            HStack(alignment: .center, spacing: DS.Space.md) {
+                CompanionAvatar(companion: companion, size: 44)
 
-                    VStack(alignment: .leading, spacing: DS.Space.xxs) {
-                        HStack(alignment: .center, spacing: DS.Space.sm) {
-                            Text(companion.name)
-                                .font(.system(size: DS.TypeScale.body + 1, weight: .semibold))
-                                .foregroundStyle(Color.dsTextPrimary)
-                                .lineLimit(1)
-                            AvailabilityBadge(status: companion.availability)
-                            if companion.isVerified {
-                                TrustMicroBadge()
-                            }
-                        }
-
-                        Text(companion.role)
-                            .font(.system(size: DS.TypeScale.caption))
-                            .foregroundStyle(Color.dsTextSecondary)
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: DS.Space.sm) {
+                        Text(companion.name)
+                            .font(.system(size: DS.TypeScale.body, weight: .semibold))
+                            .foregroundStyle(Color.dsTextPrimary)
                             .lineLimit(1)
+                        AvailabilityBadge(status: companion.availability)
+                        if companion.isVerified {
+                            TrustMicroBadge()
+                        }
+                    }
 
-                        HStack(spacing: DS.Space.sm) {
-                            Label(companion.responseTime, systemImage: "bolt.fill")
-                            if companion.rating > 0 {
-                                Label(String(format: "%.1f", companion.rating), systemImage: "star.fill")
-                            }
-                            if companion.completedOrders > 0 {
-                                Text("\(companion.completedOrders)单")
+                    Text(companion.role)
+                        .font(.system(size: DS.TypeScale.caption))
+                        .foregroundStyle(Color.dsTextSecondary)
+                        .lineLimit(1)
+
+                    HStack(spacing: DS.Space.sm) {
+                        Text(companion.responseTime)
+                        if companion.rating > 0 {
+                            HStack(spacing: 2) {
+                                Image(systemName: "star.fill")
+                                    .font(.system(size: 9))
+                                Text(String(format: "%.1f", companion.rating))
                             }
                         }
-                        .font(.system(size: DS.TypeScale.micro, weight: .medium))
-                        .foregroundStyle(Color.dsTextSecondary)
-                        .padding(.top, DS.Space.xxs)
+                        if let tag = companion.tags.first {
+                            Text(tag)
+                                .lineLimit(1)
+                        }
                     }
-
-                    Spacer(minLength: DS.Space.sm)
-
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text("¥\(companion.pricePerHalfHour)")
-                            .font(.system(size: DS.TypeScale.section, weight: .semibold))
-                            .foregroundStyle(Color.dsPrimary)
-                        Text("/30分钟")
-                            .font(.system(size: DS.TypeScale.micro, weight: .medium))
-                            .foregroundStyle(Color.dsTextSecondary)
-                    }
+                    .font(.system(size: DS.TypeScale.micro, weight: .medium))
+                    .foregroundStyle(Color.dsTextSecondary)
                 }
 
-                if !companion.tags.isEmpty {
-                    FlowLayout(spacing: DS.Space.sm) {
-                        ForEach(companion.tags.prefix(3), id: \.self) { tag in
-                            TagChip(title: tag)
-                        }
-                    }
+                Spacer(minLength: DS.Space.sm)
+
+                VStack(alignment: .trailing, spacing: 1) {
+                    Text("¥\(companion.pricePerHalfHour)")
+                        .font(.system(size: DS.TypeScale.body, weight: .semibold))
+                        .foregroundStyle(Color.dsPrimary)
+                    Text("30分钟")
+                        .font(.system(size: DS.TypeScale.micro))
+                        .foregroundStyle(Color.dsTextSecondary)
                 }
             }
         }
@@ -295,40 +289,47 @@ struct EmptyStateView: View {
     }
 
     var body: some View {
-        VStack(spacing: DS.Space.md) {
+        VStack(spacing: DS.Space.sm) {
             ZStack {
                 Circle()
                     .fill(Color.dsPrimarySoft.opacity(0.72))
-                    .frame(width: compact ? 56 : 68, height: compact ? 56 : 68)
+                    .frame(width: compact ? 40 : 48, height: compact ? 40 : 48)
                 Image(systemName: symbol)
-                    .font(.system(size: compact ? 22 : 26, weight: .regular))
+                    .font(.system(size: compact ? 16 : 20, weight: .regular))
                     .foregroundStyle(Color.dsPrimary)
                     .symbolRenderingMode(.hierarchical)
             }
             .accessibilityHidden(true)
 
-            VStack(spacing: DS.Space.sm) {
+            VStack(spacing: DS.Space.xxs) {
                 Text(title)
-                    .font(.system(size: DS.TypeScale.section, weight: .semibold))
+                    .font(.system(size: DS.TypeScale.body, weight: .semibold))
                     .foregroundStyle(Color.dsTextPrimary)
                     .multilineTextAlignment(.center)
                 Text(subtitle)
-                    .font(.system(size: DS.TypeScale.callout))
+                    .font(.system(size: DS.TypeScale.caption))
                     .foregroundStyle(Color.dsTextSecondary)
                     .multilineTextAlignment(.center)
-                    .lineSpacing(2)
+                    .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: 280)
+                    .frame(maxWidth: 260)
             }
 
             if let actionTitle, let action {
-                DSButton(title: actionTitle, systemImage: "arrow.right", variant: .secondary, maxWidth: 200, action: action)
-                    .padding(.top, DS.Space.xxs)
+                DSButton(
+                    title: actionTitle,
+                    systemImage: "arrow.right",
+                    variant: .secondary,
+                    maxWidth: 180,
+                    height: DS.ControlHeight.sm + 6,
+                    action: action
+                )
+                .padding(.top, DS.Space.xxs)
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, compact ? DS.Space.xl : DS.Space.xxl)
-        .padding(.horizontal, DS.Space.md)
+        .padding(.vertical, compact ? DS.Space.md : DS.Space.lg)
+        .padding(.horizontal, DS.Space.sm)
     }
 }
 
@@ -340,18 +341,23 @@ struct EmptyStateCard: View {
     var secondaryAction: (() -> Void)?
 
     var body: some View {
-        DSCard(padding: DS.Space.xl, elevated: false) {
-            VStack(spacing: DS.Space.md) {
+        DSCard(padding: DS.Space.md, elevated: false) {
+            VStack(spacing: DS.Space.sm) {
                 EmptyStateView(content: content, action: nil, compact: true)
-                    .padding(.vertical, 0)
 
                 if content.actionTitle != nil || secondaryTitle != nil {
                     HStack(spacing: DS.Space.sm) {
                         if let actionTitle = content.actionTitle, let action {
-                            DSButton(title: actionTitle, variant: .primary, action: action)
+                            DSButton(title: actionTitle, variant: .primary, height: DS.ControlHeight.md, action: action)
                         }
                         if let secondaryTitle, let secondaryAction {
-                            DSButton(title: secondaryTitle, variant: .secondary, maxWidth: 120, action: secondaryAction)
+                            DSButton(
+                                title: secondaryTitle,
+                                variant: .secondary,
+                                maxWidth: 110,
+                                height: DS.ControlHeight.md,
+                                action: secondaryAction
+                            )
                         }
                     }
                 }

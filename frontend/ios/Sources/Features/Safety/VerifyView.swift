@@ -18,9 +18,9 @@ struct VerifyView: View {
 
     private var canContinue: Bool {
         switch step {
-        case 0: Int(age).map { $0 >= 18 } == true && !name.isEmpty
+        case 0: Int(age).map { $0 >= 18 } == true && !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         case 1: faceScanComplete
-        default: phone.count >= 11 && code.count >= 4
+        default: phone.filter(\.isNumber).count >= 11 && code.filter(\.isNumber).count >= 4
         }
     }
 
@@ -29,7 +29,7 @@ struct VerifyView: View {
             VStack(alignment: .leading, spacing: DS.Space.lg) {
                 DSBanner(
                     title: "完成认证后即可下单与试聊",
-                    message: "信息仅用于年龄核验。",
+                    message: "信息仅用于年龄核验，可离线完成演示流程。",
                     systemImage: "person.badge.key",
                     tone: .primary
                 )
@@ -76,6 +76,25 @@ struct VerifyView: View {
             ToolbarItem(placement: .topBarLeading) {
                 Button("关闭") { dismiss() }
                     .accessibilityIdentifier("verifyCloseButton")
+            }
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("完成") { focusedField = nil }
+            }
+        }
+        .onAppear {
+            // Ensure first field can take focus after navigation push.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                if step == 0 { focusedField = .name }
+            }
+        }
+        .onChange(of: step) { _, newStep in
+            DispatchQueue.main.async {
+                switch newStep {
+                case 0: focusedField = .name
+                case 2: focusedField = .phone
+                default: focusedField = nil
+                }
             }
         }
     }
@@ -150,42 +169,42 @@ private struct IdentityStep: View {
     @Binding var age: String
     var focusedField: FocusState<VerifyField?>.Binding
 
+    private var ageOK: Bool {
+        Int(age).map { $0 >= 18 } == true
+    }
+
     var body: some View {
         SoftCard {
-            VStack(alignment: .leading, spacing: DS.Space.lg) {
-                StepTitle(symbol: "person.text.rectangle", title: "确认 18+ 身份", subtitle: "用于确认年满 18 岁")
-                verifyTextField(placeholder: "姓名", text: $name, field: .name)
-                verifyTextField(placeholder: "年龄", text: $age, field: .age, keyboard: .numberPad)
+            VStack(alignment: .leading, spacing: DS.Space.md) {
+                StepTitle(symbol: "person.text.rectangle", title: "确认 18+ 身份", subtitle: "用于确认年满 18 岁（演示可本地完成）")
+
+                VerifyLabeledField(title: "姓名", isFocused: focusedField.wrappedValue == .name) {
+                    TextField("请输入姓名", text: $name)
+                        .textContentType(.name)
+                        .textInputAutocapitalization(.words)
+                        .autocorrectionDisabled()
+                        .submitLabel(.next)
+                        .focused(focusedField, equals: .name)
+                        .onSubmit { focusedField.wrappedValue = .age }
+                        .accessibilityIdentifier("verifyNameField")
+                }
+
+                VerifyLabeledField(title: "年龄", isFocused: focusedField.wrappedValue == .age) {
+                    TextField("请输入年龄，如 24", text: $age)
+                        .keyboardType(.numberPad)
+                        .textContentType(.none)
+                        .autocorrectionDisabled()
+                        .focused(focusedField, equals: .age)
+                        .accessibilityIdentifier("verifyAgeField")
+                }
+
                 StatusPill(
-                    text: Int(age).map { $0 >= 18 } == true ? "年龄符合" : "需年满18岁",
+                    text: ageOK ? "年龄符合" : "需年满 18 岁",
                     symbol: "18.circle",
-                    color: Int(age).map { $0 >= 18 } == true ? Color.dsSuccess : Color.dsWarning
+                    color: ageOK ? Color.dsSuccess : Color.dsWarning
                 )
             }
         }
-    }
-
-    private func verifyTextField(
-        placeholder: String,
-        text: Binding<String>,
-        field: VerifyField,
-        keyboard: UIKeyboardType = .default
-    ) -> some View {
-        TextField(placeholder, text: text)
-            .keyboardType(keyboard)
-            .textInputAutocapitalization(field == .name ? .words : .never)
-            .autocorrectionDisabled()
-            .focused(focusedField, equals: field)
-            .font(.system(size: 15))
-            .padding(.horizontal, DS.Space.md)
-            .padding(.vertical, DS.Space.md)
-            .background(Color.dsBackground, in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous)
-                    .stroke(Color.dsBorder, lineWidth: 1)
-            }
-            .accessibilityLabel(placeholder)
-            .accessibilityIdentifier("verify\(String(describing: field).capitalized)Field")
     }
 }
 
@@ -195,7 +214,7 @@ private struct FaceStep: View {
     var body: some View {
         SoftCard {
             VStack(spacing: DS.Space.lg) {
-                StepTitle(symbol: "faceid", title: "人脸识别", subtitle: "正对屏幕完成检测")
+                StepTitle(symbol: "faceid", title: "人脸识别", subtitle: "演示流程：点一下即可通过")
                 Button {
                     withAnimation(.easeOut(duration: DS.Motion.fast)) { isComplete = true }
                 } label: {
@@ -203,10 +222,10 @@ private struct FaceStep: View {
                         RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous)
                             .stroke(style: StrokeStyle(lineWidth: 1, dash: [6]))
                             .foregroundStyle(isComplete ? Color.dsSuccess : Color.dsBorder)
-                            .frame(height: 200)
+                            .frame(height: 160)
                         VStack(spacing: DS.Space.md) {
                             Image(systemName: isComplete ? "checkmark.seal.fill" : "faceid")
-                                .font(.system(size: 48, weight: .regular))
+                                .font(.system(size: 44, weight: .regular))
                                 .foregroundStyle(isComplete ? Color.dsSuccess : Color.dsTextPrimary)
                             Text(isComplete ? "活体检测已通过" : "开始检测")
                                 .font(.system(size: 15, weight: .semibold))
@@ -230,41 +249,62 @@ private struct PhoneStep: View {
 
     var body: some View {
         SoftCard {
-            VStack(alignment: .leading, spacing: DS.Space.lg) {
-                StepTitle(symbol: "iphone.gen3", title: "绑定手机号", subtitle: "用于接收验证码")
-                verifyTextField(placeholder: "手机号", text: $phone, field: .phone, keyboard: .phonePad)
-                VStack(alignment: .leading, spacing: DS.Space.sm) {
-                    verifyTextField(placeholder: "验证码", text: $code, field: .code, keyboard: .numberPad)
-                    Button("重新发送") {}
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Color.dsPrimary)
-                        .frame(minHeight: DS.ControlHeight.sm, alignment: .leading)
-                        .accessibilityIdentifier("verifyResendCodeButton")
+            VStack(alignment: .leading, spacing: DS.Space.md) {
+                StepTitle(symbol: "iphone.gen3", title: "绑定手机号", subtitle: "演示模式任意 11 位手机号 + 4 位验证码即可")
+
+                VerifyLabeledField(title: "手机号", isFocused: focusedField.wrappedValue == .phone) {
+                    TextField("请输入 11 位手机号", text: $phone)
+                        .keyboardType(.phonePad)
+                        .textContentType(.telephoneNumber)
+                        .autocorrectionDisabled()
+                        .focused(focusedField, equals: .phone)
+                        .accessibilityIdentifier("verifyPhoneField")
                 }
+
+                VerifyLabeledField(title: "验证码", isFocused: focusedField.wrappedValue == .code) {
+                    TextField("请输入验证码（演示填 1234）", text: $code)
+                        .keyboardType(.numberPad)
+                        .textContentType(.oneTimeCode)
+                        .autocorrectionDisabled()
+                        .focused(focusedField, equals: .code)
+                        .accessibilityIdentifier("verifyCodeField")
+                }
+
+                Text("离线演示不会真正发短信，任意满足位数即可完成。")
+                    .font(.system(size: DS.TypeScale.caption))
+                    .foregroundStyle(Color.dsTextSecondary)
             }
         }
     }
+}
 
-    private func verifyTextField(
-        placeholder: String,
-        text: Binding<String>,
-        field: VerifyField,
-        keyboard: UIKeyboardType
-    ) -> some View {
-        TextField(placeholder, text: text)
-            .keyboardType(keyboard)
-            .autocorrectionDisabled()
-            .focused(focusedField, equals: field)
-            .font(.system(size: 15))
-            .padding(.horizontal, DS.Space.md)
-            .padding(.vertical, DS.Space.md)
-            .background(Color.dsBackground, in: RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: DS.Radius.sm, style: .continuous)
-                    .stroke(Color.dsBorder, lineWidth: 1)
-            }
-            .accessibilityLabel(placeholder)
-            .accessibilityIdentifier("verify\(String(describing: field).capitalized)Field")
+/// Visually clear, always-tappable field chrome (avoids pale “disabled” look).
+private struct VerifyLabeledField<Content: View>: View {
+    let title: String
+    var isFocused: Bool
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: DS.Space.xxs) {
+            Text(title)
+                .font(.system(size: DS.TypeScale.caption, weight: .medium))
+                .foregroundStyle(Color.dsTextSecondary)
+            content
+                .font(.system(size: DS.TypeScale.body))
+                .foregroundStyle(Color.dsTextPrimary)
+                .padding(.horizontal, DS.Space.md)
+                .frame(minHeight: DS.ControlHeight.lg, alignment: .center)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.dsSurfaceElevated, in: RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous)
+                        .stroke(
+                            isFocused ? Color.dsPrimary.opacity(0.55) : Color.dsBorder.opacity(0.9),
+                            lineWidth: isFocused ? DS.Stroke.regular : DS.Stroke.hairline
+                        )
+                }
+                .contentShape(Rectangle())
+        }
     }
 }
 
@@ -276,14 +316,15 @@ struct StepTitle: View {
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Space.sm) {
             Image(systemName: symbol)
-                .font(.system(size: 28))
+                .font(.system(size: 26))
                 .foregroundStyle(Color.dsPrimary)
             Text(title)
-                .font(.system(size: 22, weight: .semibold))
+                .font(.system(size: DS.TypeScale.title - 2, weight: .semibold))
                 .foregroundStyle(Color.dsTextPrimary)
             Text(subtitle)
-                .font(.system(size: 13))
+                .font(.system(size: DS.TypeScale.callout))
                 .foregroundStyle(Color.dsTextSecondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

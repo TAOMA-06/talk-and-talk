@@ -55,14 +55,13 @@ struct MessagesView: View {
 
     var body: some View {
         ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: DS.Space.lg) {
+            VStack(alignment: .leading, spacing: DS.Space.md) {
                 MessagesInboxHeader(conversationCount: conversations.count)
                 MessageSearchBar(text: $searchText)
 
                 if conversations.isEmpty {
                     let copy = MarketplaceEmptyCopy.content(for: .messages(isSearching: isSearching))
-                    EmptyStateView(content: copy, compact: false)
-                        .padding(.top, DS.Space.md)
+                    EmptyStateView(content: copy, compact: true)
                         .background(
                             Color.dsSurfaceElevated,
                             in: RoundedRectangle(cornerRadius: DS.Radius.lg, style: .continuous)
@@ -73,7 +72,7 @@ struct MessagesView: View {
                         }
                         .accessibilityIdentifier(isSearching ? "messagesSearchEmptyState" : "messagesEmptyState")
                 } else {
-                    LazyVStack(spacing: DS.Space.md) {
+                    LazyVStack(spacing: DS.Space.sm) {
                         ForEach(conversations) { target in
                             Button {
                                 store.navigate(.chat(target))
@@ -91,8 +90,9 @@ struct MessagesView: View {
                     .accessibilityIdentifier("conversationList")
                 }
             }
-            .padding(DS.Space.lg)
-            .padding(.bottom, 96)
+            .padding(.horizontal, DS.Space.lg)
+            .padding(.top, DS.Space.sm)
+            .padding(.bottom, 88)
         }
         .background(AppBackground())
         .navigationTitle("消息")
@@ -122,60 +122,22 @@ private struct MessagesInboxHeader: View {
     let conversationCount: Int
 
     var body: some View {
-        DSCard {
-            VStack(alignment: .leading, spacing: DS.Space.lg) {
-                HStack(alignment: .top, spacing: DS.Space.md) {
-                    Image(systemName: "lock.shield.fill")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(Color.dsPrimary)
-                        .frame(width: 44, height: 44)
-                        .background(Color.dsPrimarySoft.opacity(0.82), in: RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous))
-
-                    VStack(alignment: .leading, spacing: DS.Space.sm) {
-                        Text("平台内安全沟通")
-                            .font(.system(size: DS.TypeScale.section + 2, weight: .semibold))
-                            .foregroundStyle(Color.dsTextPrimary)
-                        Text("聊天、试聊和订单沟通都留在这里，遇到不适可以随时举报。")
-                            .font(.system(size: DS.TypeScale.callout))
-                            .foregroundStyle(Color.dsTextSecondary)
-                            .lineSpacing(3)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-
-                    Spacer(minLength: DS.Space.sm)
-                }
-
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: DS.Space.sm) {
-                        InboxTrustPill(title: "平台内沟通", systemImage: "bubble.left.and.bubble.right")
-                        InboxTrustPill(title: "内容保护", systemImage: "checkmark.shield")
-                        InboxTrustPill(title: "可举报", systemImage: "exclamationmark.bubble")
-                    }
-                }
-
-                Text(conversationCount == 0 ? "还没有会话" : "\(conversationCount) 个正在进行的会话")
-                    .font(.system(size: DS.TypeScale.caption, weight: .medium))
-                    .foregroundStyle(Color.dsTextSecondary)
-            }
+        HStack(spacing: DS.Space.sm) {
+            Image(systemName: "lock.shield.fill")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Color.dsPrimary)
+            Text("平台内沟通 · 可举报")
+                .font(.system(size: DS.TypeScale.caption, weight: .medium))
+                .foregroundStyle(Color.dsTextSecondary)
+            Spacer(minLength: DS.Space.sm)
+            Text(conversationCount == 0 ? "暂无会话" : "\(conversationCount) 个会话")
+                .font(.system(size: DS.TypeScale.caption, weight: .semibold))
+                .foregroundStyle(Color.dsTextPrimary)
         }
+        .padding(.horizontal, DS.Space.md)
+        .padding(.vertical, DS.Space.sm)
+        .background(Color.dsPrimarySoft.opacity(0.55), in: Capsule())
         .accessibilityIdentifier("messagesInboxHeader")
-    }
-}
-
-private struct InboxTrustPill: View {
-    let title: String
-    let systemImage: String
-
-    var body: some View {
-        Label(title, systemImage: systemImage)
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(Color.dsPrimary)
-            .lineLimit(1)
-            .minimumScaleFactor(0.82)
-            .padding(.horizontal, DS.Space.sm)
-            .padding(.vertical, DS.Space.xxs)
-            .background(Color.dsPrimarySoft.opacity(0.72), in: Capsule())
-            .overlay(Capsule().stroke(Color.dsPrimary.opacity(0.12), lineWidth: DS.Stroke.hairline))
     }
 }
 

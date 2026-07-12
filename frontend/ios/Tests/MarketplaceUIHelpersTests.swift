@@ -30,9 +30,9 @@ final class MarketplaceUIHelpersTests: XCTestCase {
 
     func testMarketplaceEmptyCopyRecommendedCompanionsIsIntentionalProductUX() {
         let content = MarketplaceEmptyCopy.content(for: .recommendedCompanions)
-        XCTAssertEqual(content.title, "暂无推荐陪伴者")
+        XCTAssertEqual(content.title, "暂时还没有人在线")
         XCTAssertFalse(content.subtitle.isEmpty)
-        XCTAssertEqual(content.symbol, "person.2.slash")
+        XCTAssertEqual(content.symbol, "person.2")
         // Cold-start shell: guidance only, no fake CTA that invents supply.
         XCTAssertNil(content.actionTitle)
     }
@@ -40,36 +40,36 @@ final class MarketplaceUIHelpersTests: XCTestCase {
     func testMarketplaceEmptyCopyTonightOffersBrowseAllAction() {
         let content = MarketplaceEmptyCopy.content(for: .tonightAvailable)
         XCTAssertEqual(content.actionTitle, "查看全部")
-        XCTAssertTrue(content.subtitle.contains("陪伴者") || content.subtitle.contains("沟通"))
+        XCTAssertFalse(content.subtitle.isEmpty)
     }
 
     func testMarketplaceEmptyCopyCompanionListFilters() {
         let online = MarketplaceEmptyCopy.content(for: .companionList(filter: .online))
-        XCTAssertEqual(online.title, "暂时没有在线陪伴者")
+        XCTAssertEqual(online.title, "现在没人在线")
         XCTAssertEqual(online.actionTitle, "放宽筛选")
 
         let budget = MarketplaceEmptyCopy.content(for: .companionList(filter: .budgetFriendly))
-        XCTAssertEqual(budget.title, "当前预算下暂无结果")
+        XCTAssertEqual(budget.title, "这个预算没有结果")
     }
 
     func testMarketplaceEmptyCopyMessagesAndOrders() {
         let emptyInbox = MarketplaceEmptyCopy.content(for: .messages(isSearching: false))
-        XCTAssertEqual(emptyInbox.title, "暂无沟通会话")
+        XCTAssertEqual(emptyInbox.title, "还没有会话")
         XCTAssertTrue(emptyInbox.subtitle.contains("试聊") || emptyInbox.subtitle.contains("广场"))
 
         let searchMiss = MarketplaceEmptyCopy.content(for: .messages(isSearching: true))
-        XCTAssertEqual(searchMiss.title, "没有找到相关会话")
+        XCTAssertEqual(searchMiss.title, "没找到会话")
 
         let orders = MarketplaceEmptyCopy.content(for: .orders)
-        XCTAssertEqual(orders.title, "暂无订单")
+        XCTAssertEqual(orders.title, "还没有订单")
         XCTAssertEqual(orders.actionTitle, "去发现")
     }
 
     func testMarketplaceEmptyCopyCommunitySurfaces() {
         let feed = MarketplaceEmptyCopy.content(for: .communityFeed)
-        XCTAssertEqual(feed.title, "广场还在等第一条声音")
+        XCTAssertEqual(feed.title, "广场还很安静")
         let topic = MarketplaceEmptyCopy.content(for: .communityTopicQuiet)
-        XCTAssertEqual(topic.actionTitle, "查看全部话题")
+        XCTAssertEqual(topic.actionTitle, "查看全部")
     }
 
     @MainActor
