@@ -132,7 +132,7 @@
 | M2 | 无 APNs | 仅应用内通知 | `NEXT_PHASE.md` | 商业运营前规划 |
 | M3 | 社区/评价未服务端契约 | 产品不完整 | GUIDE / NEXT_PHASE | 排期 |
 | M4 | UITests 未进门禁 | 手工回归成本 | staging-acceptance | 对齐登录门控后纳入 |
-| M5 | `docs/review.md` STALE | 易误导 | 文件头声明 | 归档或删除链接 |
+| M5（已处理 2026-07-10） | `docs/review.md` STALE | 已消除 | 已删除历史笔记 | 无需后续操作 |
 | M6 | e2e/smoke 本机未跑通 | v0.1 不能完全 Go | 无 Postgres/Redis/Docker | 在有依赖环境补跑 |
 | M7 | 证书目录缺失 | 无法按示例起 TLS | `infra/nginx/certs` 不存在 | 部署时 ACME/自签 |
 
@@ -140,7 +140,7 @@
 
 | ID | 问题 | 建议 |
 |----|------|------|
-| m1 | `TalkAndTalk 2.xcodeproj` 并存 | 文档已警告；可移入 archive |
+| m1（已处理 2026-07-10） | `TalkAndTalk 2.xcodeproj` 并存 | 已删除旧工程副本，仅保留 XcodeGen 生成的 `TalkAndTalk.xcodeproj` |
 | m2 | Staging.xcconfig 未进 project.yml | 增加 Staging 配置或文档说明用 Scheme 覆盖 |
 | m3 | OpenAPI 手写不同步风险 | 契约变更 checklist |
 | m4 | Release 模拟器构建偶发 codesign xattr | 清理 DerivedData xattr；非逻辑缺陷 |

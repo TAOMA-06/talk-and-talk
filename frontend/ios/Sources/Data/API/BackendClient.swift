@@ -49,11 +49,8 @@ protocol BackendAPIClient: Sendable {
     func health() async throws -> BackendServiceStatus
     func fetchCompanions(page: Int, pageSize: Int, tag: String?, availability: AvailabilityStatus?, isOnline: Bool?) async throws -> [Companion]
     func fetchCompanion(id: String) async throws -> Companion
-    func fetchMe() async throws -> User
-    func updateMe(displayName: String?, gender: UserGender?, age: Int?) async throws -> User
     func fetchConversations() async throws -> [ConversationSummary]
     func fetchMessages(conversationId: String, cursor: String?, limit: Int?) async throws -> [Message]
-    func fetchModerationCases() async throws -> [ModerationCase]
     func sendMessage(conversationId: String, content: String, senderId: String) async throws -> BackendSendMessageResponse
     func submitReport(reason: String, conversationId: String?, targetId: String?, recentContext: String?) async throws -> ModerationCase
     func createOrder(companionId: String, themeId: String, durationMinutes: Int) async throws -> Order
@@ -130,25 +127,6 @@ struct BackendClient: BackendAPIClient, Sendable {
         return BackendDTOMapper.companion(from: data)
     }
 
-    func fetchMe() async throws -> User {
-        let data: AuthUserResponse = try await request(path: "/api/v1/me")
-        return AuthDTOMapper.user(from: data)
-    }
-
-    func updateMe(displayName: String?, gender: UserGender?, age: Int?) async throws -> User {
-        var body: [String: Any] = [:]
-        if let displayName { body["displayName"] = displayName }
-        if let gender { body["gender"] = gender.rawValue }
-        if let age { body["age"] = age }
-
-        let data: AuthUserResponse = try await request(
-            path: "/api/v1/me",
-            method: "PATCH",
-            body: body
-        )
-        return AuthDTOMapper.user(from: data)
-    }
-
     func fetchConversations() async throws -> [ConversationSummary] {
         let data: BackendConversationsData = try await request(path: "/api/v1/conversations")
         return data.conversations.map(BackendDTOMapper.conversation(from:))
@@ -168,11 +146,6 @@ struct BackendClient: BackendAPIClient, Sendable {
             : queryPath("/api/v1/conversations/\(encoded)/messages", queryItems: queryItems)
         let data: BackendMessagesData = try await request(path: path)
         return data.messages.compactMap(BackendDTOMapper.message(from:))
-    }
-
-    func fetchModerationCases() async throws -> [ModerationCase] {
-        let data: BackendModerationCasesData = try await request(path: "/api/v1/moderation/cases")
-        return data.cases.compactMap(BackendDTOMapper.moderationCase(from:))
     }
 
     func submitReport(

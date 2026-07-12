@@ -27,7 +27,7 @@ AI 内容识别是平台内容安全员，不是陪用户聊天的机器人。
 | `warn` | 轻度越界 | 发出并提醒 |
 | `block` | 高风险 | 拦截并生成安全提醒 |
 
-正式后端已提供聊天与审核 API。`c1`–`c3` 聊天发送以服务端 `decision` 为准；本地 `HybridModerationService` 仅作 DEBUG 失败兜底与非后端会话。DeepSeek 为可选：未配置 `DEEPSEEK_API_KEY` 时纯规则审核仍可运行。
+正式后端已提供聊天与审核 API。`c1`–`c3` 聊天发送以服务端 `decision` 为准；iOS 的 `LocalModerationService` 仅用本地规则处理 DEBUG 失败兜底与尚未后端化的社区内容。DeepSeek 仅由后端可选启用，客户端不保存或直连任何 AI API key。
 
 ## 3. 当前架构
 

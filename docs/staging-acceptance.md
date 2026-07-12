@@ -50,7 +50,7 @@ npm run start:dev
 
 前置：API 已 seed；**TestFlight 使用 scheme `TalkAndTalk-Staging`**（`BACKEND_BASE_URL=https://api-staging.talkandtalk.app`，`ENABLE_PHONE_LOGIN=YES`）。  
 生产 Archive 使用 scheme `TalkAndTalk`（Release，仅 Apple 登录）。  
-仅使用 `frontend/ios/TalkAndTalk.xcodeproj`（不要打开 `TalkAndTalk 2.xcodeproj`）。
+仅使用 `frontend/ios/TalkAndTalk.xcodeproj`。
 
 | # | 场景 | 期望 |
 |---|------|------|

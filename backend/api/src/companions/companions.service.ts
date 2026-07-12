@@ -64,10 +64,7 @@ export class CompanionsService {
       ...this.profileData(dto),
       isPublished: dto.isPublished ?? false
     };
-    const item = await this.prisma.companionProfile.create({
-      data,
-      include: this.includeTags()
-    });
+    await this.prisma.companionProfile.create({ data });
 
     await this.replaceTags(id, dto.tags);
     return this.getAdmin(id);

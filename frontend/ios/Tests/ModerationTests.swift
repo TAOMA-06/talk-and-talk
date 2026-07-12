@@ -28,6 +28,22 @@ final class ModerationTests: XCTestCase {
         XCTAssertEqual(result.decision, .allow)
     }
 
+    func testLocalModerationServiceUsesRulesWithoutAI() async {
+        let service = LocalModerationService()
+        let cases: [(String, ModerationDecision)] = [
+            ("我们加微信聊吧", .block),
+            ("你要听话", .warn),
+            ("代理兼职赚钱", .review),
+            ("今天有点累，想找人聊聊", .allow)
+        ]
+
+        for (text, expectedDecision) in cases {
+            let result = await service.moderate(text: text, source: .chat, context: nil)
+            XCTAssertEqual(result.decision, expectedDecision, "Unexpected decision for: \(text)")
+            XCTAssertFalse(result.usedAI)
+        }
+    }
+
     func testCommunityAdRejected() {
         let result = engine.moderate(text: "代理兼职赚钱，加我了解", source: .community, context: nil)
         XCTAssertNotEqual(result.decision, .allow)

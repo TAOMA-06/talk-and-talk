@@ -35,28 +35,6 @@ enum DS {
     }
 }
 
-enum DSTypography {
-    static func title(_ text: String) -> Text {
-        Text(text).font(.system(size: 22, weight: .semibold)).foregroundStyle(Color.dsTextPrimary)
-    }
-
-    static func sectionTitle(_ text: String) -> Text {
-        Text(text).font(.system(size: 17, weight: .semibold)).foregroundStyle(Color.dsTextPrimary)
-    }
-
-    static func body(_ text: String) -> Text {
-        Text(text).font(.system(size: 15, weight: .regular)).foregroundStyle(Color.dsTextPrimary)
-    }
-
-    static func caption(_ text: String) -> Text {
-        Text(text).font(.system(size: 13, weight: .regular)).foregroundStyle(Color.dsTextSecondary)
-    }
-
-    static func label(_ text: String) -> Text {
-        Text(text).font(.system(size: 11, weight: .medium)).foregroundStyle(Color.dsTextSecondary)
-    }
-}
-
 extension Color {
     static let dsBackground = Color(red: 0.955, green: 0.970, blue: 0.958)
     static let dsSurface = Color(red: 1.000, green: 1.000, blue: 0.988)
@@ -433,61 +411,6 @@ struct DSInitialsAvatar: View {
         case .warning: Color.dsWarning.opacity(0.10)
         case .danger: Color.dsDanger.opacity(0.10)
         }
-    }
-}
-
-struct DSLoadingView: View {
-    var message = "加载中..."
-
-    var body: some View {
-        VStack(spacing: DS.Space.md) {
-            ProgressView()
-            Text(message)
-                .font(.system(size: 13))
-                .foregroundStyle(Color.dsTextSecondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, DS.Space.xxxl)
-    }
-}
-
-struct DSErrorView: View {
-    let title: String
-    let message: String
-    var retryTitle = "重试"
-    var onRetry: (() -> Void)?
-
-    var body: some View {
-        VStack(spacing: DS.Space.lg) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 28))
-                .foregroundStyle(Color.dsDanger)
-            Text(title)
-                .font(.system(size: 17, weight: .semibold))
-            Text(message)
-                .font(.system(size: 13))
-                .foregroundStyle(Color.dsTextSecondary)
-                .multilineTextAlignment(.center)
-            if let onRetry {
-                DSPrimaryButton(title: retryTitle, action: onRetry)
-                    .frame(maxWidth: 200)
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(DS.Space.xl)
-    }
-}
-
-struct DSToast: View {
-    let message: String
-
-    var body: some View {
-        Text(message)
-            .font(.system(size: 13, weight: .medium))
-            .foregroundStyle(.white)
-            .padding(.horizontal, DS.Space.lg)
-            .padding(.vertical, DS.Space.md)
-            .background(Color.dsTextPrimary.opacity(0.92), in: Capsule())
     }
 }
 

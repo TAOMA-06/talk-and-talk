@@ -26,10 +26,6 @@ struct SendCodeResponse: Decodable {
     let expiresInSeconds: Int
 }
 
-struct BackendErrorResponse: Decodable {
-    let error: BackendErrorDetail
-}
-
 struct BackendErrorDetail: Decodable {
     let code: String
     let message: String

@@ -51,82 +51,6 @@ typealias SoftCard = DSCardAlias
 typealias GlassSurface = DSCardAlias
 typealias GlassPanel = DSCardAlias
 
-struct GlassCapsule<Content: View>: View {
-    @ViewBuilder var content: Content
-
-    var body: some View {
-        content
-            .padding(.horizontal, DS.Space.md)
-            .padding(.vertical, DS.Space.sm)
-            .background(Color.dsSurfaceElevated, in: Capsule())
-            .overlay(Capsule().stroke(Color.dsBorder.opacity(0.62), lineWidth: DS.Stroke.hairline))
-    }
-}
-
-struct PrimaryActionButton: View {
-    let title: String
-    let systemImage: String
-    var isEnabled = true
-    var action: () -> Void
-
-    var body: some View {
-        DSPrimaryButton(title: title, systemImage: systemImage, isEnabled: isEnabled, action: action)
-    }
-}
-
-struct ModernHero: View {
-    let eyebrow: String
-    let title: String
-    let subtitle: String
-    let primaryTitle: String
-    let primarySystemImage: String
-    var secondary: String?
-    var metricTitle: String = "可约"
-    var metricValue: String = "0"
-    let action: () -> Void
-
-    var body: some View {
-        DSCard {
-            VStack(alignment: .leading, spacing: DS.Space.lg) {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: DS.Space.sm) {
-                        DSBadge(text: eyebrow, tone: .primary)
-                        Text(title)
-                            .font(.system(size: 22, weight: .semibold))
-                            .foregroundStyle(Color.dsTextPrimary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    Spacer(minLength: DS.Space.md)
-                    DSInsetSurface(padding: DS.Space.md) {
-                        VStack(spacing: DS.Space.xxs) {
-                            Text(metricValue)
-                                .font(.system(size: 20, weight: .semibold))
-                                .foregroundStyle(Color.dsTextPrimary)
-                            Text(metricTitle)
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundStyle(Color.dsTextSecondary)
-                        }
-                    }
-                    .frame(width: 78)
-                }
-
-                Text(subtitle)
-                    .font(.system(size: 15))
-                    .foregroundStyle(Color.dsTextSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                DSPrimaryButton(title: primaryTitle, systemImage: primarySystemImage, action: action)
-
-                if let secondary {
-                    Text(secondary)
-                        .font(.system(size: 13))
-                        .foregroundStyle(Color.dsTextSecondary)
-                }
-            }
-        }
-    }
-}
-
 struct ActionDock<Content: View>: View {
     @ViewBuilder var content: Content
 
@@ -352,48 +276,6 @@ struct EmptyStateView: View {
     }
 }
 
-struct BottomActionBar: View {
-    let companion: Companion
-    @EnvironmentObject private var store: AppStore
-
-    var body: some View {
-        ActionDock {
-            HStack(spacing: DS.Space.sm) {
-                VStack(alignment: .leading, spacing: DS.Space.xxs) {
-                    Text("先试聊 \(store.freeTrialMessageLimit) 条")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(Color.dsTextPrimary)
-                        .lineLimit(1)
-                    Text("满意后 ¥\(companion.pricePerHalfHour)/30m 继续")
-                        .font(.system(size: 11))
-                        .foregroundStyle(Color.dsTextSecondary)
-                        .lineLimit(1)
-                }
-                .layoutPriority(1)
-
-                Spacer(minLength: DS.Space.sm)
-
-                DSButton(title: "确认订单", variant: .secondary, maxWidth: 92, action: {
-                    store.navigate(.order(companion.id))
-                })
-
-                DSButton(
-                    title: store.user.isVerified ? "开始试聊" : "先认证",
-                    systemImage: "bubble.left.and.bubble.right",
-                    maxWidth: 124,
-                    action: {
-                        guard store.user.isVerified else {
-                            store.navigate(.verify)
-                            return
-                        }
-                        store.navigate(.chat(.companion(id: companion.id)))
-                    }
-                )
-            }
-        }
-    }
-}
-
 struct FlowLayout: Layout {
     var spacing: CGFloat = DS.Space.sm
 
@@ -506,17 +388,5 @@ struct UserAgreementSheet: View {
                 remainingSeconds -= 1
             }
         }
-    }
-}
-
-extension View {
-    @ViewBuilder
-    func liquidGlass(cornerRadius: CGFloat, tint: Color = .clear, interactive: Bool = false) -> some View {
-        self
-    }
-
-    @ViewBuilder
-    func liquidGlassCapsule(tint: Color = .clear, interactive: Bool = false) -> some View {
-        self
     }
 }

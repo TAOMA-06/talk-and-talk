@@ -1,6 +1,6 @@
-import { randomBytes, createHash } from "node:crypto";
+import { createHash } from "node:crypto";
 
-import { HttpStatus, Inject, Injectable, Logger } from "@nestjs/common";
+import { HttpStatus, Inject, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import * as bcrypt from "bcrypt";
@@ -44,7 +44,6 @@ function maskPhone(phone: string): string {
 
 @Injectable()
 export class AuthService {
-  private readonly logger = new Logger(AuthService.name);
   private redis: Redis | null = null;
 
   constructor(

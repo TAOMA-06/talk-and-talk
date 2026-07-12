@@ -90,10 +90,6 @@ struct BackendConversationParticipantDTO: Decodable {
     let responseTime: String?
 }
 
-struct BackendModerationCasesData: Decodable {
-    let cases: [BackendModerationCaseDTO]
-}
-
 struct BackendReportData: Decodable {
     let report: BackendReportSummaryDTO?
     let moderationCase: BackendModerationCaseDTO

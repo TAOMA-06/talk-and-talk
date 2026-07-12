@@ -55,7 +55,7 @@ final class AppStore: ObservableObject {
 
     let freeTrialMessageLimit = 5
 
-    private let moderationService: ModerationService = HybridModerationService()
+    private let moderationService: ModerationService = LocalModerationService()
     private let creditService = CreditService()
     private let backendClientFactory: (URL) -> any BackendAPIClient
     private weak var authSession: AuthSession?
@@ -66,10 +66,6 @@ final class AppStore: ObservableObject {
     ) {
         self.authSession = authSession
         self.backendClientFactory = backendClientFactory
-    }
-
-    func bindAuthSession(_ session: AuthSession) {
-        authSession = session
     }
 
     func applyAuthenticatedUser(_ authenticatedUser: User) {
@@ -316,19 +312,6 @@ final class AppStore: ObservableObject {
         }
     }
 
-    func syncMessagesFromBackend(for companionId: String) async {
-        await syncBackendChat(for: companionId)
-    }
-
-    private func syncModerationCasesFromBackend(client: any BackendAPIClient) async {
-        do {
-            let cases = try await client.fetchModerationCases()
-            moderationCases = cases
-        } catch {
-            // Keep existing cases if the queue sync fails; chat may still work.
-        }
-    }
-
     private func applyCompanionListFallback(message: String) {
 #if DEBUG
         if companions.isEmpty {
@@ -381,10 +364,6 @@ final class AppStore: ObservableObject {
 
     func approvedCommunityPosts() -> [CommunityPost] {
         communityPosts.filter { $0.moderationStatus == .approved }
-    }
-
-    func pendingCommunityPosts() -> [CommunityPost] {
-        communityPosts.filter { $0.authorId == user.id && $0.moderationStatus == .pending }
     }
 
     func pendingServiceOrdersForCurrentCompanion() -> [Order] {
@@ -473,18 +452,6 @@ final class AppStore: ObservableObject {
         )
 #else
         throw BackendError.unavailable
-#endif
-    }
-
-    func createOrder(companionId: String, themeId: String, durationMinutes: Int) -> Order? {
-#if DEBUG
-        return try? createLocalPaidOrder(
-            companionId: companionId,
-            themeId: themeId,
-            durationMinutes: durationMinutes
-        )
-#else
-        return nil
 #endif
     }
 

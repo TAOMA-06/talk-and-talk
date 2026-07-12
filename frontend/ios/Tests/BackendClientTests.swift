@@ -238,45 +238,6 @@ final class BackendClientTests: XCTestCase {
         XCTAssertEqual(response.moderationCase?.decision, .block)
     }
 
-    func testFetchModerationCasesMapsBackendPayload() async throws {
-        StubURLProtocol.nextResponse = (
-            """
-            {
-              "data": {
-                "cases": [
-                  {
-                    "id": "mc1",
-                    "title": "聊天拦截：线下见面",
-                    "category": "内容风控",
-                    "riskLevel": "high",
-                    "status": "humanReview",
-                    "source": "chat",
-                    "content": "我们加微信聊吧",
-                    "targetId": "c1",
-                    "aiScore": 0.9,
-                    "aiReason": "疑似交换联系方式",
-                    "decision": "block",
-                    "matchedRules": ["contact.offline"],
-                    "usedAI": true,
-                    "resolvedAt": null
-                  }
-                ]
-              },
-              "meta": { "timestamp": "2026-07-07T02:00:00.000Z", "requestId": "req-4" }
-            }
-            """,
-            200
-        )
-
-        let client = BackendClient(baseURL: URL(string: "http://127.0.0.1:3000")!, session: session)
-        let cases = try await client.fetchModerationCases()
-
-        XCTAssertEqual(cases.count, 1)
-        XCTAssertEqual(cases[0].id, "mc1")
-        XCTAssertEqual(cases[0].decision, .block)
-        XCTAssertTrue(cases[0].usedAI)
-    }
-
     func testHealthRequiresOkStatus() async {
         StubURLProtocol.nextResponse = (
             """
@@ -386,37 +347,6 @@ final class BackendClientTests: XCTestCase {
         XCTAssertEqual(companion.id, "c2")
         XCTAssertEqual(companion.name, "许澈")
         XCTAssertEqual(companion.specialties, ["职场减压"])
-    }
-
-    func testFetchMeMapsUserProfile() async throws {
-        StubURLProtocol.nextResponse = (
-            """
-            {
-              "data": {
-                "id": "u1",
-                "role": "user",
-                "profile": {
-                  "displayName": "小楷",
-                  "phone": "138****8000",
-                  "age": 23,
-                  "gender": "male",
-                  "isVerified": true,
-                  "safetyScore": 88
-                }
-              },
-              "meta": { "timestamp": "2026-07-07T02:00:00.000Z", "requestId": "req-me" }
-            }
-            """,
-            200
-        )
-
-        let client = BackendClient(baseURL: URL(string: "http://127.0.0.1:3000")!, session: session)
-        let user = try await client.fetchMe()
-
-        XCTAssertEqual(user.name, "小楷")
-        XCTAssertEqual(user.age, 23)
-        XCTAssertEqual(user.gender, .male)
-        XCTAssertTrue(user.isVerified)
     }
 
     func testBackendConfigSupportsWhitelistedChatCompanions() {
@@ -574,23 +504,11 @@ private struct FailingBackendAPIClient: BackendAPIClient, Sendable {
         throw BackendError.unavailable
     }
 
-    func fetchMe() async throws -> User {
-        throw BackendError.unavailable
-    }
-
-    func updateMe(displayName: String?, gender: UserGender?, age: Int?) async throws -> User {
-        throw BackendError.unavailable
-    }
-
     func fetchConversations() async throws -> [ConversationSummary] {
         throw BackendError.unavailable
     }
 
     func fetchMessages(conversationId: String, cursor: String?, limit: Int?) async throws -> [Message] {
-        throw BackendError.unavailable
-    }
-
-    func fetchModerationCases() async throws -> [ModerationCase] {
         throw BackendError.unavailable
     }
 
@@ -660,23 +578,11 @@ private struct SuccessfulBackendAPIClient: BackendAPIClient, Sendable {
         Self.companion
     }
 
-    func fetchMe() async throws -> User {
-        MockData.user
-    }
-
-    func updateMe(displayName: String?, gender: UserGender?, age: Int?) async throws -> User {
-        MockData.user
-    }
-
     func fetchConversations() async throws -> [ConversationSummary] {
         []
     }
 
     func fetchMessages(conversationId: String, cursor: String?, limit: Int?) async throws -> [Message] {
-        []
-    }
-
-    func fetchModerationCases() async throws -> [ModerationCase] {
         []
     }
 
@@ -834,23 +740,11 @@ private struct ChatBackendAPIClient: BackendAPIClient, Sendable {
         MockData.companions[0]
     }
 
-    func fetchMe() async throws -> User {
-        MockData.user
-    }
-
-    func updateMe(displayName: String?, gender: UserGender?, age: Int?) async throws -> User {
-        MockData.user
-    }
-
     func fetchConversations() async throws -> [ConversationSummary] {
         []
     }
 
     func fetchMessages(conversationId: String, cursor: String?, limit: Int?) async throws -> [Message] {
-        []
-    }
-
-    func fetchModerationCases() async throws -> [ModerationCase] {
         []
     }
 

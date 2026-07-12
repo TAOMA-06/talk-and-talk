@@ -1,23 +1,25 @@
 .DS_Store
 .codegraph/
+
+# Xcode
 DerivedData/
 xcuserdata/
 *.xcuserstate
-TalkAndTalk.xcodeproj/project.xcworkspace/xcuserdata/
-TalkAndTalk.xcodeproj/xcuserdata/
-frontend/ios/TalkAndTalk.xcodeproj/project.xcworkspace/xcuserdata/
-frontend/ios/TalkAndTalk.xcodeproj/xcuserdata/
+frontend/ios/build/
+**/TalkAndTalk 2.xcodeproj/
+
+# Backend dependencies and generated output
+node_modules/
 backend/api/.env
 backend/api/.env.staging
 backend/api/.env.production
-backend/api/node_modules/
 backend/api/dist/
 backend/api/coverage/
 backend/api/backups/
+
+# Deployment secrets
 infra/nginx/certs/
 *.pem
 infra/secrets/*
 !infra/secrets/.gitkeep
 !infra/secrets/README.md
-frontend/ios/build/
-**/TalkAndTalk 2.xcodeproj/
