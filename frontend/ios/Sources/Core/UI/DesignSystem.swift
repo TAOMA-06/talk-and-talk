@@ -12,26 +12,46 @@ enum DS {
     }
 
     enum Radius {
-        static let sm: CGFloat = 8
-        static let md: CGFloat = 12
-        static let lg: CGFloat = 16
-        static let xl: CGFloat = 24
+        static let sm: CGFloat = 10
+        static let md: CGFloat = 14
+        static let lg: CGFloat = 18
+        static let xl: CGFloat = 26
+        static let pill: CGFloat = 999
+    }
+
+    /// Calm listening-app type scale — prefer these over ad-hoc sizes on feature screens.
+    enum TypeScale {
+        static let display: CGFloat = 28
+        static let title: CGFloat = 22
+        static let section: CGFloat = 17
+        static let body: CGFloat = 15
+        static let callout: CGFloat = 13
+        static let caption: CGFloat = 12
+        static let micro: CGFloat = 11
     }
 
     enum Motion {
         static let fast: Double = 0.15
-        static let normal: Double = 0.2
+        static let normal: Double = 0.22
+        static let gentle: Double = 0.32
     }
 
     enum ControlHeight {
         static let sm: CGFloat = 34
-        static let md: CGFloat = 44
+        static let md: CGFloat = 46
         static let lg: CGFloat = 52
     }
 
     enum Stroke {
         static let hairline: CGFloat = 0.75
         static let regular: CGFloat = 1
+    }
+
+    enum Elevation {
+        static let cardShadowOpacity: Double = 0.035
+        static let cardShadowRadius: CGFloat = 16
+        static let cardShadowY: CGFloat = 6
+        static let dockShadowOpacity: Double = 0.06
     }
 }
 
@@ -66,18 +86,28 @@ extension Color {
 struct DSCard<Content: View>: View {
     var padding: CGFloat = DS.Space.lg
     var isInset = false
+    var elevated = true
     @ViewBuilder var content: Content
 
     var body: some View {
+        let radius = isInset ? DS.Radius.sm : DS.Radius.lg
         content
             .padding(padding)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(isInset ? Color.dsSurfaceMuted.opacity(0.72) : Color.dsSurfaceElevated, in: RoundedRectangle(cornerRadius: isInset ? DS.Radius.sm : DS.Radius.lg, style: .continuous))
+            .background(
+                isInset ? Color.dsSurfaceMuted.opacity(0.78) : Color.dsSurfaceElevated,
+                in: RoundedRectangle(cornerRadius: radius, style: .continuous)
+            )
             .overlay {
-                RoundedRectangle(cornerRadius: isInset ? DS.Radius.sm : DS.Radius.lg, style: .continuous)
-                    .stroke(Color.dsBorder.opacity(isInset ? 0.55 : 0.74), lineWidth: DS.Stroke.hairline)
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .stroke(Color.dsBorder.opacity(isInset ? 0.50 : 0.68), lineWidth: DS.Stroke.hairline)
             }
-            .shadow(color: Color.dsTextPrimary.opacity(isInset ? 0 : 0.040), radius: 14, x: 0, y: 7)
+            .shadow(
+                color: Color.dsTextPrimary.opacity(isInset || !elevated ? 0 : DS.Elevation.cardShadowOpacity),
+                radius: DS.Elevation.cardShadowRadius,
+                x: 0,
+                y: DS.Elevation.cardShadowY
+            )
     }
 }
 
@@ -116,11 +146,11 @@ struct DSButton: View {
                         .font(.system(size: 14, weight: .semibold))
                 }
                 Text(title)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: DS.TypeScale.body, weight: .semibold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.82)
             }
-            .padding(.horizontal, DS.Space.md)
+            .padding(.horizontal, DS.Space.lg)
             .frame(maxWidth: maxWidth)
             .frame(height: height)
             .foregroundStyle(foreground)
@@ -129,7 +159,7 @@ struct DSButton: View {
                 RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous)
                     .stroke(border, lineWidth: DS.Stroke.hairline)
             }
-            .shadow(color: shadow, radius: 12, x: 0, y: 6)
+            .shadow(color: shadow, radius: 10, x: 0, y: 5)
         }
         .disabled(!isEnabled || isLoading)
         .buttonStyle(DSPressButtonStyle())
@@ -478,26 +508,31 @@ struct DSSectionHeader: View {
     var action: (() -> Void)?
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline) {
+        HStack(alignment: .firstTextBaseline, spacing: DS.Space.md) {
             VStack(alignment: .leading, spacing: DS.Space.xxs) {
                 Text(title)
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.system(size: DS.TypeScale.section, weight: .semibold))
                     .foregroundStyle(Color.dsTextPrimary)
                 if let subtitle {
                     Text(subtitle)
-                        .font(.system(size: 13))
+                        .font(.system(size: DS.TypeScale.callout))
                         .foregroundStyle(Color.dsTextSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            Spacer()
+            Spacer(minLength: DS.Space.sm)
             if let actionTitle, let action {
                 Button(action: action) {
-                    Text(actionTitle)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Color.dsPrimary)
-                        .padding(.horizontal, DS.Space.sm)
-                        .frame(height: DS.ControlHeight.sm)
-                        .background(Color.dsPrimarySoft.opacity(0.52), in: Capsule())
+                    HStack(spacing: DS.Space.xxs) {
+                        Text(actionTitle)
+                            .font(.system(size: DS.TypeScale.callout, weight: .semibold))
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10, weight: .bold))
+                    }
+                    .foregroundStyle(Color.dsPrimary)
+                    .padding(.horizontal, DS.Space.md)
+                    .frame(height: DS.ControlHeight.sm)
+                    .background(Color.dsPrimarySoft.opacity(0.58), in: Capsule())
                 }
                 .buttonStyle(DSPressButtonStyle())
             }

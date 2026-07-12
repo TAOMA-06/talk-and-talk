@@ -82,9 +82,11 @@ struct CommunityView: View {
     @ViewBuilder
     private var feedContent: some View {
         if approvedPosts.isEmpty && reviewPosts.isEmpty {
+            let copy = MarketplaceEmptyCopy.content(for: .communityFeed)
             SquareEmptyState(
-                title: "广场还在等第一条声音",
-                subtitle: "可以先说说此刻想聊的事，也可以稍后回来看看。",
+                title: copy.title,
+                subtitle: copy.subtitle,
+                symbol: copy.symbol,
                 primaryTitle: publishTitle,
                 primaryAction: startPublishing,
                 secondaryTitle: nil,
@@ -92,10 +94,12 @@ struct CommunityView: View {
                 isPrimaryEnabled: canStartPublishFlow
             )
         } else if filteredApprovedPosts.isEmpty {
+            let copy = MarketplaceEmptyCopy.content(for: .communityTopicQuiet)
             SquareEmptyState(
-                title: "这个话题暂时安静",
-                subtitle: "换个话题看看，或者发一条让合适的人看见。",
-                primaryTitle: "查看全部话题",
+                title: copy.title,
+                subtitle: copy.subtitle,
+                symbol: copy.symbol,
+                primaryTitle: copy.actionTitle ?? "查看全部话题",
                 primaryAction: { selectedTopic = "全部" },
                 secondaryTitle: publishTitle,
                 secondaryAction: startPublishing,
@@ -476,6 +480,7 @@ private struct SquareReviewSection: View {
 private struct SquareEmptyState: View {
     let title: String
     let subtitle: String
+    var symbol: String = "text.bubble"
     let primaryTitle: String
     let primaryAction: () -> Void
     let secondaryTitle: String?
@@ -483,24 +488,29 @@ private struct SquareEmptyState: View {
     let isPrimaryEnabled: Bool
 
     var body: some View {
-        DSCard(padding: DS.Space.xl) {
+        DSCard(padding: DS.Space.xl, elevated: false) {
             VStack(spacing: DS.Space.md) {
-                DSInitialsAvatar(initials: "", tone: .neutral, size: 56)
-                    .overlay {
-                        Image(systemName: "text.bubble")
-                            .font(.system(size: 24, weight: .regular))
-                            .foregroundStyle(Color.dsPrimary)
-                    }
+                ZStack {
+                    Circle()
+                        .fill(Color.dsPrimarySoft.opacity(0.72))
+                        .frame(width: 64, height: 64)
+                    Image(systemName: symbol)
+                        .font(.system(size: 24, weight: .regular))
+                        .foregroundStyle(Color.dsPrimary)
+                        .symbolRenderingMode(.hierarchical)
+                }
 
-                VStack(spacing: DS.Space.xxs) {
+                VStack(spacing: DS.Space.sm) {
                     Text(title)
-                        .font(.system(size: 17, weight: .semibold))
+                        .font(.system(size: DS.TypeScale.section, weight: .semibold))
                         .foregroundStyle(Color.dsTextPrimary)
+                        .multilineTextAlignment(.center)
                     Text(subtitle)
-                        .font(.system(size: 13))
+                        .font(.system(size: DS.TypeScale.callout))
                         .foregroundStyle(Color.dsTextSecondary)
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: 280)
                 }
 
                 HStack(spacing: DS.Space.sm) {
@@ -511,6 +521,7 @@ private struct SquareEmptyState: View {
                 }
             }
             .frame(maxWidth: .infinity)
+            .padding(.vertical, DS.Space.sm)
         }
     }
 }

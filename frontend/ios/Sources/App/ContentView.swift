@@ -65,11 +65,11 @@ struct InitialGenderSelectionView: View {
 
     var body: some View {
         ZStack {
-            Color.dsBackground.ignoresSafeArea()
-            VStack(alignment: .leading, spacing: DS.Space.lg) {
+            AppBackground()
+            VStack(alignment: .leading, spacing: DS.Space.xl) {
                 Spacer()
                 StepTitle(symbol: "person.2", title: "选择你的身份", subtitle: "用于匹配广场展示规则：女生发需求，男生实名后发自荐。")
-                HStack(spacing: DS.Space.sm) {
+                HStack(spacing: DS.Space.md) {
                     GenderChoiceButton(gender: .female, isSelected: false, symbol: "heart.text.square") {
                         store.setUserGender(.female)
                     }
@@ -78,11 +78,11 @@ struct InitialGenderSelectionView: View {
                     }
                 }
                 Text("选择后可在“我的”里调整。")
-                    .font(.system(size: 13))
+                    .font(.system(size: DS.TypeScale.callout))
                     .foregroundStyle(Color.dsTextSecondary)
                 Spacer()
             }
-            .padding(DS.Space.lg)
+            .padding(DS.Space.xl)
         }
     }
 }

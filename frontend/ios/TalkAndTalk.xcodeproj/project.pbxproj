@@ -18,6 +18,7 @@
 		319E54A850CAA1E3B3F115CC /* BackendConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = E318D1532BA33F6CC4EBB232 /* BackendConfig.swift */; };
 		31A57330611897758F3C6D9E /* LocalModerationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F8594D88502ACE4A36106DD /* LocalModerationService.swift */; };
 		3D59EFF9712A11F6AA1A4BF9 /* NotificationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDA3918A52F3CD3042DA07B2 /* NotificationsView.swift */; };
+		450EC39A9557997524408F03 /* MarketplaceUIHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2493C8466388C756351CF21 /* MarketplaceUIHelpers.swift */; };
 		475E9D0887A2DDF7C445216C /* TokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 363DCDF5566BD9FCFECC733D /* TokenStore.swift */; };
 		4793219FE63077EEA4450925 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B1E327B0E0600DD2FA7DA0B /* ContentView.swift */; };
 		4AE49DFC612BF88AC5997434 /* CreditService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 062507A80BCACC829F743FAE /* CreditService.swift */; };
@@ -40,6 +41,7 @@
 		BA9CC4FCCD7713B1797DC79F /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5A6477B74715507A1104BE31 /* WebKit.framework */; };
 		BE8CB25A7F33C99B8280A102 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 007F9F5619ED56C144799B00 /* Models.swift */; };
 		C9A2FB0AC8EFAFC384F611BE /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDCBDDAD4FB2128224897576 /* HomeView.swift */; };
+		CC775D16F79B9C3DA7DFCF06 /* MarketplaceUIHelpersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F68C0F384DBFCF1EAE826E68 /* MarketplaceUIHelpersTests.swift */; };
 		CC7B970062E49A992E5BE0A6 /* AuthSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = F31F2D6E952D2DAF7708EEC2 /* AuthSession.swift */; };
 		CF021E97725F7069CE15767E /* TalkAndTalkUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51F1133260FDA37354A743ED /* TalkAndTalkUITests.swift */; };
 		D6DF2B624AAA6750B0A7CB93 /* CompanionListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5437FBCE2ED1922E0FDFFAB4 /* CompanionListView.swift */; };
@@ -112,6 +114,7 @@
 		9B1E327B0E0600DD2FA7DA0B /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		9BBD6E81DCCC74A0100E6A34 /* CommunityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommunityView.swift; sourceTree = "<group>"; };
 		9FDE97C9E3513D57ACBA94D1 /* ChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatView.swift; sourceTree = "<group>"; };
+		A2493C8466388C756351CF21 /* MarketplaceUIHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarketplaceUIHelpers.swift; sourceTree = "<group>"; };
 		A6E3835F343B22384B2A21A2 /* AppStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStore.swift; sourceTree = "<group>"; };
 		A8049AC3D2DA38FB7C6FAD82 /* BackendClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendClientTests.swift; sourceTree = "<group>"; };
 		BC62D953D307AB680378E63A /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
@@ -129,6 +132,7 @@
 		F24991E535E69FA9B1E3B397 /* BackendDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendDTO.swift; sourceTree = "<group>"; };
 		F31F2D6E952D2DAF7708EEC2 /* AuthSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthSession.swift; sourceTree = "<group>"; };
 		F3CA8DB67E42B51681CDB5FF /* Staging.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Staging.xcconfig; sourceTree = "<group>"; };
+		F68C0F384DBFCF1EAE826E68 /* MarketplaceUIHelpersTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarketplaceUIHelpersTests.swift; sourceTree = "<group>"; };
 		F878EB904DAF2776F1CB6ED3 /* VerifyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifyView.swift; sourceTree = "<group>"; };
 		FBF8E318E6C1D48C49ABFAA0 /* AppleSignInCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSignInCoordinator.swift; sourceTree = "<group>"; };
 		FCB553A9D165F3912587BB17 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
@@ -228,6 +232,7 @@
 			isa = PBXGroup;
 			children = (
 				5E605DC8006E9FCCFE36D0FD /* DesignSystem.swift */,
+				A2493C8466388C756351CF21 /* MarketplaceUIHelpers.swift */,
 				45B56637DD1304D85224005F /* SharedViews.swift */,
 			);
 			path = UI;
@@ -247,6 +252,7 @@
 				13DAFC7288570D536CF5B548 /* AuthSessionTests.swift */,
 				A8049AC3D2DA38FB7C6FAD82 /* BackendClientTests.swift */,
 				D4C7B5A8F5944B691DC285D3 /* LoginStateTests.swift */,
+				F68C0F384DBFCF1EAE826E68 /* MarketplaceUIHelpersTests.swift */,
 				1FF03BAEB72A56CFE6283799 /* ModerationTests.swift */,
 				13E17E67BD70A4FD39C8A2DC /* TokenStoreTests.swift */,
 			);
@@ -537,6 +543,7 @@
 				D9FBF9A6389F20D188D853C0 /* AuthSessionTests.swift in Sources */,
 				6CFADD99C309A52C6B425C75 /* BackendClientTests.swift in Sources */,
 				70EB8E37D12BAF7511AD14EA /* LoginStateTests.swift in Sources */,
+				CC775D16F79B9C3DA7DFCF06 /* MarketplaceUIHelpersTests.swift in Sources */,
 				B81503F26333913BA98EEA8D /* ModerationTests.swift in Sources */,
 				5A9F47B2F8BDA522C73C25D8 /* TokenStoreTests.swift in Sources */,
 			);
@@ -576,6 +583,7 @@
 				C9A2FB0AC8EFAFC384F611BE /* HomeView.swift in Sources */,
 				31A57330611897758F3C6D9E /* LocalModerationService.swift in Sources */,
 				2939C42D4A2DA69B96983162 /* LoginView.swift in Sources */,
+				450EC39A9557997524408F03 /* MarketplaceUIHelpers.swift in Sources */,
 				7B2DD2E0120B8B7122D32607 /* MessagesView.swift in Sources */,
 				BE8CB25A7F33C99B8280A102 /* Models.swift in Sources */,
 				B6AC1C7D35FAB661E12DA64A /* ModerationService.swift in Sources */,

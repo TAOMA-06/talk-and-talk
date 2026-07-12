@@ -100,14 +100,13 @@ struct CompanionListView: View {
                     }
                 default:
                     CompanionListEmptyState(
-                        title: emptyTitle,
-                        subtitle: emptySubtitle,
+                        content: emptyContent,
                         reset: resetFilters,
                         back: { dismiss() }
                     )
                 }
             } else {
-                LazyVStack(spacing: DS.Space.sm) {
+                LazyVStack(spacing: DS.Space.md) {
                     ForEach(companions) { companion in
                         Button {
                             store.navigate(.companionDetail(companion.id))
@@ -134,49 +133,38 @@ struct CompanionListView: View {
         sort = .recommended
     }
 
-    private var emptyTitle: String {
-        switch filter {
-        case .online:
-            return "暂时没有在线陪伴者"
-        case .verified:
-            return "暂无已实名陪伴者"
-        case .availableTonight:
-            return "今晚暂时没有可聊的人"
-        case .budgetFriendly:
-            return "当前预算下暂无结果"
-        case .all:
-            return "暂无匹配陪伴者"
+    private var emptyContent: MarketplaceEmptyCopy.Content {
+        var content = MarketplaceEmptyCopy.content(for: .companionList(filter: filterKind))
+        if themeId != nil, filter == .all {
+            content = MarketplaceEmptyCopy.Content(
+                symbol: content.symbol,
+                title: content.title,
+                subtitle: "这个主题下暂时没有合适的人，可以放宽筛选，或返回发现页换个入口。",
+                actionTitle: content.actionTitle
+            )
         }
+        return content
     }
 
-    private var emptySubtitle: String {
-        if themeId != nil {
-            return "这个主题下暂时没有合适的人，可以放宽筛选，或返回发现页换个入口。"
+    private var filterKind: MarketplaceEmptyCopy.CompanionListFilterKind {
+        switch filter {
+        case .all: .all
+        case .online: .online
+        case .verified: .verified
+        case .availableTonight: .availableTonight
+        case .budgetFriendly: .budgetFriendly
         }
-        return "可以放宽筛选条件，先看看更多可聊的人。"
     }
 
     private func isRecommended(_ lhs: Companion, before rhs: Companion) -> Bool {
-        let leftAvailability = availabilityRank(for: lhs.availability)
-        let rightAvailability = availabilityRank(for: rhs.availability)
-        if leftAvailability != rightAvailability { return leftAvailability > rightAvailability }
-        if lhs.isVerified != rhs.isVerified { return lhs.isVerified && !rhs.isVerified }
-        if lhs.rating != rhs.rating { return lhs.rating > rhs.rating }
-        if lhs.reviewCount != rhs.reviewCount { return lhs.reviewCount > rhs.reviewCount }
+        if HomeCompanionSorter.compare(lhs, rhs) { return true }
+        if HomeCompanionSorter.compare(rhs, lhs) { return false }
 
         let leftResponse = responseSeconds(lhs.responseTime)
         let rightResponse = responseSeconds(rhs.responseTime)
         if leftResponse != rightResponse { return leftResponse < rightResponse }
 
         return lhs.pricePerHalfHour < rhs.pricePerHalfHour
-    }
-
-    private func availabilityRank(for status: AvailabilityStatus) -> Int {
-        switch status {
-        case .online: 2
-        case .available: 1
-        case .busy: 0
-        }
     }
 
     private func responseSeconds(_ value: String) -> Int {
@@ -222,36 +210,25 @@ private struct CompanionListErrorState: View {
 }
 
 private struct CompanionListEmptyState: View {
-    let title: String
-    let subtitle: String
+    let content: MarketplaceEmptyCopy.Content
     let reset: () -> Void
     let back: () -> Void
 
     var body: some View {
-        DSCard(padding: DS.Space.xl) {
+        DSCard(padding: DS.Space.xl, elevated: false) {
             VStack(spacing: DS.Space.md) {
-                DSInitialsAvatar(initials: "", tone: .neutral, size: 56)
-                    .overlay {
-                        Image(systemName: "person.2.slash")
-                            .font(.system(size: 24, weight: .regular))
-                            .foregroundStyle(Color.dsPrimary)
-                    }
-
-                VStack(spacing: DS.Space.xxs) {
-                    Text(title)
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(Color.dsTextPrimary)
-                    Text(subtitle)
-                        .font(.system(size: 13))
-                        .foregroundStyle(Color.dsTextSecondary)
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                EmptyStateView(
+                    symbol: content.symbol,
+                    title: content.title,
+                    subtitle: content.subtitle,
+                    compact: true
+                )
+                .padding(.vertical, 0)
 
                 HStack(spacing: DS.Space.sm) {
-                    DSButton(title: "放宽筛选", variant: .primary, action: reset)
+                    DSButton(title: content.actionTitle ?? "放宽筛选", variant: .primary, action: reset)
                         .accessibilityIdentifier("companionListResetFilters")
-                    DSButton(title: "返回发现", variant: .secondary, maxWidth: 108, action: back)
+                    DSButton(title: "返回发现", variant: .secondary, maxWidth: 120, action: back)
                         .accessibilityIdentifier("companionListBackToDiscover")
                 }
             }

@@ -16,33 +16,31 @@ private struct UserPanel: View {
     @EnvironmentObject private var store: AppStore
 
     var body: some View {
-        SoftCard {
-            HStack(spacing: DS.Space.lg) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous)
-                        .fill(Color.dsPrimary.opacity(0.12))
-                    Text(String(store.user.name.prefix(2)))
-                        .font(.system(size: 22, weight: .semibold))
-                        .foregroundStyle(Color.dsPrimary)
-                }
-                .frame(width: 64, height: 64)
+        DSCard {
+            HStack(alignment: .top, spacing: DS.Space.lg) {
+                DSInitialsAvatar(
+                    initials: String(store.user.name.prefix(2)),
+                    tone: .primary,
+                    size: 64
+                )
                 VStack(alignment: .leading, spacing: DS.Space.sm) {
-                    HStack {
-                        Text(store.user.name)
-                            .font(.system(size: 17, weight: .semibold))
+                    HStack(spacing: DS.Space.sm) {
+                        Text(store.user.name.isEmpty ? "用户" : store.user.name)
+                            .font(.system(size: DS.TypeScale.section, weight: .semibold))
                             .foregroundStyle(Color.dsTextPrimary)
                         if store.user.isVerified {
                             Image(systemName: "checkmark.seal.fill")
                                 .foregroundStyle(Color.dsPrimary)
+                                .accessibilityLabel("已实名")
                         }
                     }
-                    Text("\(store.user.phone) · \(store.user.age)+")
-                        .font(.system(size: 13))
+                    Text(profileMetaLine)
+                        .font(.system(size: DS.TypeScale.callout))
                         .foregroundStyle(Color.dsTextSecondary)
                     Text("账号状态 · \(store.user.accountStatus.displayName)")
-                        .font(.system(size: 12))
+                        .font(.system(size: DS.TypeScale.caption))
                         .foregroundStyle(Color.dsTextSecondary)
-                    HStack(spacing: DS.Space.sm) {
+                    FlowLayout(spacing: DS.Space.sm) {
                         StatusPill(
                             text: store.user.isVerified ? "已完成 18+ 实名" : "未完成实名",
                             symbol: store.user.isVerified ? "checkmark.shield" : "person.badge.key",
@@ -57,9 +55,17 @@ private struct UserPanel: View {
                         }
                     }
                 }
-                Spacer()
+                Spacer(minLength: 0)
             }
         }
+    }
+
+    private var profileMetaLine: String {
+        let phone = store.user.phone.isEmpty ? "未绑定手机" : store.user.phone
+        if store.user.age > 0 {
+            return "\(phone) · \(store.user.age)+"
+        }
+        return phone
     }
 }
 

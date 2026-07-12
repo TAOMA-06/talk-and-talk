@@ -2,21 +2,28 @@ import SwiftUI
 
 struct AppBackground: View {
     var body: some View {
-        LinearGradient(
-            colors: [Color.dsBackground, Color.dsHeroBottom.opacity(0.42)],
-            startPoint: .top,
-            endPoint: .bottom
-        )
+        ZStack {
+            Color.dsBackground
+            LinearGradient(
+                colors: [
+                    Color.dsPrimarySoft.opacity(0.55),
+                    Color.dsBackground.opacity(0.2),
+                    Color.dsHeroBottom.opacity(0.48)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
         .ignoresSafeArea()
     }
 }
 
 struct AppScaffold<Content: View>: View {
     let title: String
-    var spacing: CGFloat = DS.Space.lg
+    var spacing: CGFloat = DS.Space.xl
     var horizontalPadding: CGFloat = DS.Space.lg
     var topPadding: CGFloat = DS.Space.md
-    var bottomPadding: CGFloat = 96
+    var bottomPadding: CGFloat = 104
     var showsIndicators = false
     @ViewBuilder var content: Content
 
@@ -33,7 +40,7 @@ struct AppScaffold<Content: View>: View {
         .background(AppBackground())
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(Color.dsBackground.opacity(0.96), for: .navigationBar)
+        .toolbarBackground(Color.dsBackground.opacity(0.94), for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
     }
 }
@@ -57,12 +64,17 @@ struct ActionDock<Content: View>: View {
     var body: some View {
         content
             .padding(DS.Space.lg)
-            .background(Color.dsSurfaceElevated, in: RoundedRectangle(cornerRadius: DS.Radius.lg, style: .continuous))
+            .background(Color.dsSurfaceElevated, in: RoundedRectangle(cornerRadius: DS.Radius.xl, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: DS.Radius.lg, style: .continuous)
-                    .stroke(Color.dsBorder.opacity(0.72), lineWidth: DS.Stroke.hairline)
+                RoundedRectangle(cornerRadius: DS.Radius.xl, style: .continuous)
+                    .stroke(Color.dsBorder.opacity(0.65), lineWidth: DS.Stroke.hairline)
             }
-            .shadow(color: Color.dsTextPrimary.opacity(0.07), radius: 18, x: 0, y: 8)
+            .shadow(
+                color: Color.dsTextPrimary.opacity(DS.Elevation.dockShadowOpacity),
+                radius: 20,
+                x: 0,
+                y: 10
+            )
             .padding(.horizontal, DS.Space.md)
             .padding(.bottom, DS.Space.sm)
     }
@@ -144,51 +156,55 @@ struct CompanionSummaryCard: View {
     let companion: Companion
 
     var body: some View {
-        DSCard(padding: DS.Space.md) {
-            HStack(alignment: .top, spacing: DS.Space.md) {
-                CompanionAvatar(companion: companion, size: 46)
+        DSCard(padding: DS.Space.lg) {
+            VStack(alignment: .leading, spacing: DS.Space.md) {
+                HStack(alignment: .top, spacing: DS.Space.md) {
+                    CompanionAvatar(companion: companion, size: 52)
 
-                VStack(alignment: .leading, spacing: DS.Space.sm) {
-                    HStack(alignment: .firstTextBaseline, spacing: DS.Space.sm) {
-                        VStack(alignment: .leading, spacing: DS.Space.xxs) {
-                            HStack(spacing: DS.Space.sm) {
-                                Text(companion.name)
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundStyle(Color.dsTextPrimary)
-                                    .lineLimit(1)
-
-                                AvailabilityBadge(status: companion.availability)
-                            }
-
-                            Text(companion.role)
-                                .font(.system(size: 12))
-                                .foregroundStyle(Color.dsTextSecondary)
-                                .lineLimit(1)
-                        }
-
-                        Spacer(minLength: DS.Space.sm)
-
-                        VStack(alignment: .trailing, spacing: DS.Space.xxs) {
-                            Text("¥\(companion.pricePerHalfHour)")
-                                .font(.system(size: 16, weight: .semibold))
+                    VStack(alignment: .leading, spacing: DS.Space.xxs) {
+                        HStack(alignment: .center, spacing: DS.Space.sm) {
+                            Text(companion.name)
+                                .font(.system(size: DS.TypeScale.body + 1, weight: .semibold))
                                 .foregroundStyle(Color.dsTextPrimary)
-                            Text("30分钟")
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(Color.dsTextSecondary)
+                                .lineLimit(1)
+                            AvailabilityBadge(status: companion.availability)
+                            if companion.isVerified {
+                                TrustMicroBadge()
+                            }
                         }
+
+                        Text(companion.role)
+                            .font(.system(size: DS.TypeScale.caption))
+                            .foregroundStyle(Color.dsTextSecondary)
+                            .lineLimit(1)
+
+                        HStack(spacing: DS.Space.sm) {
+                            Label(companion.responseTime, systemImage: "bolt.fill")
+                            if companion.rating > 0 {
+                                Label(String(format: "%.1f", companion.rating), systemImage: "star.fill")
+                            }
+                            if companion.completedOrders > 0 {
+                                Text("\(companion.completedOrders)单")
+                            }
+                        }
+                        .font(.system(size: DS.TypeScale.micro, weight: .medium))
+                        .foregroundStyle(Color.dsTextSecondary)
+                        .padding(.top, DS.Space.xxs)
                     }
 
-                    HStack(spacing: DS.Space.sm) {
-                        StatusPill(text: companion.responseTime, symbol: "bolt", color: Color.dsPrimary)
-                        Label(String(format: "%.1f", companion.rating), systemImage: "star.fill")
-                        Text("\(companion.completedOrders)单")
-                        if companion.isVerified {
-                            TrustMicroBadge()
-                        }
-                    }
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Color.dsTextSecondary)
+                    Spacer(minLength: DS.Space.sm)
 
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("¥\(companion.pricePerHalfHour)")
+                            .font(.system(size: DS.TypeScale.section, weight: .semibold))
+                            .foregroundStyle(Color.dsPrimary)
+                        Text("/30分钟")
+                            .font(.system(size: DS.TypeScale.micro, weight: .medium))
+                            .foregroundStyle(Color.dsTextSecondary)
+                    }
+                }
+
+                if !companion.tags.isEmpty {
                     FlowLayout(spacing: DS.Space.sm) {
                         ForEach(companion.tags.prefix(3), id: \.self) { tag in
                             TagChip(title: tag)
@@ -220,14 +236,14 @@ struct TagChip: View {
 
     private var chipLabel: some View {
         Text(title)
-            .font(.system(size: 13, weight: isSelected ? .semibold : .medium))
+            .font(.system(size: DS.TypeScale.callout, weight: isSelected ? .semibold : .medium))
             .foregroundStyle(isSelected ? Color.white : Color.dsTextPrimary)
             .padding(.horizontal, isSelected ? DS.Space.lg : DS.Space.md)
             .frame(height: DS.ControlHeight.sm)
-            .background(isSelected ? color : Color.dsSurfaceElevated, in: Capsule())
+            .background(isSelected ? color : Color.dsSurfaceMuted.opacity(0.85), in: Capsule())
             .overlay {
                 if !isSelected {
-                    Capsule().stroke(Color.dsBorder.opacity(0.78), lineWidth: DS.Stroke.hairline)
+                    Capsule().stroke(Color.dsBorder.opacity(0.70), lineWidth: DS.Stroke.hairline)
                 }
             }
     }
@@ -250,29 +266,98 @@ struct EmptyStateView: View {
     let subtitle: String
     var actionTitle: String?
     var action: (() -> Void)?
+    var compact = false
+
+    init(
+        symbol: String,
+        title: String,
+        subtitle: String,
+        actionTitle: String? = nil,
+        action: (() -> Void)? = nil,
+        compact: Bool = false
+    ) {
+        self.symbol = symbol
+        self.title = title
+        self.subtitle = subtitle
+        self.actionTitle = actionTitle
+        self.action = action
+        self.compact = compact
+    }
+
+    /// Build from centralized marketplace empty-state copy.
+    init(content: MarketplaceEmptyCopy.Content, action: (() -> Void)? = nil, compact: Bool = false) {
+        self.symbol = content.symbol
+        self.title = content.title
+        self.subtitle = content.subtitle
+        self.actionTitle = content.actionTitle
+        self.action = action
+        self.compact = compact
+    }
 
     var body: some View {
         VStack(spacing: DS.Space.md) {
-            DSInitialsAvatar(initials: "", tone: .neutral, size: 54)
-                .overlay {
-                    Image(systemName: symbol)
-                        .font(.system(size: 24, weight: .regular))
-                        .foregroundStyle(Color.dsPrimary)
-                }
-            Text(title)
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(Color.dsTextPrimary)
-            Text(subtitle)
-                .font(.system(size: 13))
-                .foregroundStyle(Color.dsTextSecondary)
-                .multilineTextAlignment(.center)
+            ZStack {
+                Circle()
+                    .fill(Color.dsPrimarySoft.opacity(0.72))
+                    .frame(width: compact ? 56 : 68, height: compact ? 56 : 68)
+                Image(systemName: symbol)
+                    .font(.system(size: compact ? 22 : 26, weight: .regular))
+                    .foregroundStyle(Color.dsPrimary)
+                    .symbolRenderingMode(.hierarchical)
+            }
+            .accessibilityHidden(true)
+
+            VStack(spacing: DS.Space.sm) {
+                Text(title)
+                    .font(.system(size: DS.TypeScale.section, weight: .semibold))
+                    .foregroundStyle(Color.dsTextPrimary)
+                    .multilineTextAlignment(.center)
+                Text(subtitle)
+                    .font(.system(size: DS.TypeScale.callout))
+                    .foregroundStyle(Color.dsTextSecondary)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: 280)
+            }
+
             if let actionTitle, let action {
-                    DSSecondaryButton(title: actionTitle, action: action)
-                    .frame(maxWidth: 220)
+                DSButton(title: actionTitle, systemImage: "arrow.right", variant: .secondary, maxWidth: 200, action: action)
+                    .padding(.top, DS.Space.xxs)
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, DS.Space.xxl)
+        .padding(.vertical, compact ? DS.Space.xl : DS.Space.xxl)
+        .padding(.horizontal, DS.Space.md)
+    }
+}
+
+/// Card-wrapped empty state for list / feed shells (Discover, Community, Companion list).
+struct EmptyStateCard: View {
+    let content: MarketplaceEmptyCopy.Content
+    var action: (() -> Void)?
+    var secondaryTitle: String?
+    var secondaryAction: (() -> Void)?
+
+    var body: some View {
+        DSCard(padding: DS.Space.xl, elevated: false) {
+            VStack(spacing: DS.Space.md) {
+                EmptyStateView(content: content, action: nil, compact: true)
+                    .padding(.vertical, 0)
+
+                if content.actionTitle != nil || secondaryTitle != nil {
+                    HStack(spacing: DS.Space.sm) {
+                        if let actionTitle = content.actionTitle, let action {
+                            DSButton(title: actionTitle, variant: .primary, action: action)
+                        }
+                        if let secondaryTitle, let secondaryAction {
+                            DSButton(title: secondaryTitle, variant: .secondary, maxWidth: 120, action: secondaryAction)
+                        }
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity)
+        }
     }
 }
 

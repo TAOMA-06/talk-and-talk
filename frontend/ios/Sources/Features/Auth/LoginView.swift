@@ -63,18 +63,32 @@ struct LoginView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: DS.Space.sm) {
-            Text("登录 Talk&Talk")
+        VStack(alignment: .leading, spacing: DS.Space.md) {
+            Image(systemName: "bubble.left.and.bubble.right.fill")
                 .font(.system(size: 28, weight: .semibold))
+                .foregroundStyle(Color.dsPrimary)
+                .frame(width: 56, height: 56)
+                .background(Color.dsPrimarySoft.opacity(0.85), in: RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous))
+
+            Text("登录 Talk&Talk")
+                .font(.system(size: DS.TypeScale.display, weight: .semibold))
                 .foregroundStyle(Color.dsTextPrimary)
             Text(
                 phoneLoginEnabled
                     ? "使用手机号验证码或 Apple 账号登录，开始安全陪伴体验。"
                     : "使用 Apple 账号登录，开始安全陪伴体验。"
             )
-                .font(.system(size: 15))
+                .font(.system(size: DS.TypeScale.body))
                 .foregroundStyle(Color.dsTextSecondary)
                 .lineSpacing(3)
+                .fixedSize(horizontal: false, vertical: true)
+
+            DSBanner(
+                title: "平台内沟通，尊重边界",
+                message: "我们鼓励先试聊再下单，不会引导私下加联系方式。",
+                systemImage: "lock.shield",
+                tone: .primary
+            )
         }
     }
 

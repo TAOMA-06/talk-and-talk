@@ -60,13 +60,18 @@ struct MessagesView: View {
                 MessageSearchBar(text: $searchText)
 
                 if conversations.isEmpty {
-                    EmptyStateView(
-                        symbol: isSearching ? "magnifyingglass" : "bubble.left.and.bubble.right",
-                        title: isSearching ? "没有找到相关会话" : "暂无沟通会话",
-                        subtitle: isSearching ? "换个姓名或消息关键词再试试。" : "可以从在线陪伴者开始试聊，也可以在广场里继续平台内沟通。"
-                    )
-                    .padding(.top, DS.Space.md)
-                    .accessibilityIdentifier(isSearching ? "messagesSearchEmptyState" : "messagesEmptyState")
+                    let copy = MarketplaceEmptyCopy.content(for: .messages(isSearching: isSearching))
+                    EmptyStateView(content: copy, compact: false)
+                        .padding(.top, DS.Space.md)
+                        .background(
+                            Color.dsSurfaceElevated,
+                            in: RoundedRectangle(cornerRadius: DS.Radius.lg, style: .continuous)
+                        )
+                        .overlay {
+                            RoundedRectangle(cornerRadius: DS.Radius.lg, style: .continuous)
+                                .stroke(Color.dsBorder.opacity(0.68), lineWidth: DS.Stroke.hairline)
+                        }
+                        .accessibilityIdentifier(isSearching ? "messagesSearchEmptyState" : "messagesEmptyState")
                 } else {
                     LazyVStack(spacing: DS.Space.md) {
                         ForEach(conversations) { target in
@@ -117,21 +122,21 @@ private struct MessagesInboxHeader: View {
     let conversationCount: Int
 
     var body: some View {
-        SoftCard {
+        DSCard {
             VStack(alignment: .leading, spacing: DS.Space.lg) {
                 HStack(alignment: .top, spacing: DS.Space.md) {
                     Image(systemName: "lock.shield.fill")
-                        .font(.system(size: 20, weight: .semibold))
+                        .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(Color.dsPrimary)
-                        .frame(width: 42, height: 42)
-                        .background(Color.dsPrimarySoft.opacity(0.78), in: RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous))
+                        .frame(width: 44, height: 44)
+                        .background(Color.dsPrimarySoft.opacity(0.82), in: RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous))
 
-                    VStack(alignment: .leading, spacing: DS.Space.xxs) {
+                    VStack(alignment: .leading, spacing: DS.Space.sm) {
                         Text("平台内安全沟通")
-                            .font(.system(size: 19, weight: .semibold))
+                            .font(.system(size: DS.TypeScale.section + 2, weight: .semibold))
                             .foregroundStyle(Color.dsTextPrimary)
                         Text("聊天、试聊和订单沟通都留在这里，遇到不适可以随时举报。")
-                            .font(.system(size: 13))
+                            .font(.system(size: DS.TypeScale.callout))
                             .foregroundStyle(Color.dsTextSecondary)
                             .lineSpacing(3)
                             .fixedSize(horizontal: false, vertical: true)
@@ -149,7 +154,7 @@ private struct MessagesInboxHeader: View {
                 }
 
                 Text(conversationCount == 0 ? "还没有会话" : "\(conversationCount) 个正在进行的会话")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: DS.TypeScale.caption, weight: .medium))
                     .foregroundStyle(Color.dsTextSecondary)
             }
         }

@@ -10,6 +10,7 @@ struct HomeView: View {
             QuickMatchPanel()
             TonightAvailableSection()
             RecommendedCompanions()
+            HomeTrustFooter()
         }
         .task {
             if store.companionListLoadState == .idle {
@@ -24,12 +25,12 @@ private struct HomeGreetingBar: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: DS.Space.md) {
-            VStack(alignment: .leading, spacing: DS.Space.xxs) {
+            VStack(alignment: .leading, spacing: DS.Space.sm) {
                 Text(greeting)
-                    .font(.system(size: 22, weight: .semibold))
+                    .font(.system(size: DS.TypeScale.title, weight: .semibold))
                     .foregroundStyle(Color.dsTextPrimary)
                 Text("今天想找谁说说话？")
-                    .font(.system(size: 15))
+                    .font(.system(size: DS.TypeScale.body))
                     .foregroundStyle(Color.dsTextSecondary)
             }
 
@@ -51,13 +52,15 @@ private struct HomeGreetingBar: View {
         case 12..<18: timeGreeting = "下午好"
         default: timeGreeting = "晚上好"
         }
-        return "\(timeGreeting)，\(store.user.name)"
+        let name = store.user.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if name.isEmpty { return timeGreeting }
+        return "\(timeGreeting)，\(name)"
     }
 }
 
 private struct MoodEntryPanel: View {
     @EnvironmentObject private var store: AppStore
-    private let columns = [GridItem(.flexible()), GridItem(.flexible())]
+    private let columns = [GridItem(.flexible(), spacing: DS.Space.md), GridItem(.flexible(), spacing: DS.Space.md)]
 
     private let entries = [
         MoodEntry(id: "listen", title: "想被听见", subtitle: "有人认真听你说完", symbol: "heart.text.square", themeId: "t1", tone: .primary),
@@ -78,6 +81,8 @@ private struct MoodEntryPanel: View {
                         MoodEntryCard(entry: entry)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("\(entry.title)，\(entry.subtitle)")
+                    .accessibilityIdentifier("discoverMood-\(entry.id)")
                 }
             }
         }
@@ -100,10 +105,10 @@ private struct MoodEntryCard: View {
         DSCard(padding: DS.Space.md) {
             VStack(alignment: .leading, spacing: DS.Space.md) {
                 Image(systemName: entry.symbol)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(tint)
-                    .frame(width: 38, height: 38)
-                    .background(tint.opacity(0.10), in: RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous))
+                    .frame(width: 40, height: 40)
+                    .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous))
                     .overlay {
                         RoundedRectangle(cornerRadius: DS.Radius.md, style: .continuous)
                             .stroke(tint.opacity(0.14), lineWidth: DS.Stroke.hairline)
@@ -111,17 +116,17 @@ private struct MoodEntryCard: View {
 
                 VStack(alignment: .leading, spacing: DS.Space.xxs) {
                     Text(entry.title)
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: DS.TypeScale.body, weight: .semibold))
                         .foregroundStyle(Color.dsTextPrimary)
                         .lineLimit(1)
                     Text(entry.subtitle)
-                        .font(.system(size: 12))
+                        .font(.system(size: DS.TypeScale.caption))
                         .foregroundStyle(Color.dsTextSecondary)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .frame(maxWidth: .infinity, minHeight: 112, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: 118, alignment: .leading)
         }
     }
 
@@ -145,12 +150,12 @@ private struct QuickMatchPanel: View {
                 HStack(alignment: .top, spacing: DS.Space.md) {
                     VStack(alignment: .leading, spacing: DS.Space.sm) {
                         DSBadge(text: "快速匹配", tone: .primary)
-                        Text("现在有 \(store.onlineCompanionCount) 人在线，\(store.availableCompanionCount) 位可以聊。")
-                            .font(.system(size: 20, weight: .semibold))
+                        Text(headline)
+                            .font(.system(size: DS.TypeScale.title - 2, weight: .semibold))
                             .foregroundStyle(Color.dsTextPrimary)
                             .fixedSize(horizontal: false, vertical: true)
                         Text("只在平台内文字/语音沟通，可以先试聊，再决定是否继续。")
-                            .font(.system(size: 13))
+                            .font(.system(size: DS.TypeScale.callout))
                             .foregroundStyle(Color.dsTextSecondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -160,10 +165,10 @@ private struct QuickMatchPanel: View {
                     DSInsetSurface(padding: DS.Space.md) {
                         VStack(spacing: DS.Space.xxs) {
                             Text("\(store.availableCompanionCount)")
-                                .font(.system(size: 24, weight: .semibold))
-                                .foregroundStyle(Color.dsTextPrimary)
+                                .font(.system(size: 26, weight: .semibold))
+                                .foregroundStyle(Color.dsPrimary)
                             Text("可聊")
-                                .font(.system(size: 11, weight: .medium))
+                                .font(.system(size: DS.TypeScale.micro, weight: .medium))
                                 .foregroundStyle(Color.dsTextSecondary)
                         }
                     }
@@ -179,13 +184,22 @@ private struct QuickMatchPanel: View {
                     )
                     .accessibilityIdentifier(store.user.isVerified ? "discoverOnlineCompanionsButton" : "discoverVerifyButton")
 
-                    DSButton(title: "今晚可聊", systemImage: "moon.stars", variant: .secondary, maxWidth: 118) {
+                    DSButton(title: "今晚可聊", systemImage: "moon.stars", variant: .secondary, maxWidth: 124) {
                         store.navigate(.companionList(themeId: nil, preset: .availableTonight))
                     }
                     .accessibilityIdentifier("discoverTonightButton")
                 }
             }
         }
+    }
+
+    private var headline: String {
+        let online = store.onlineCompanionCount
+        let available = store.availableCompanionCount
+        if available == 0 && online == 0 {
+            return "现在还没有人在线，可以先认证或稍后再来。"
+        }
+        return "现在有 \(online) 人在线，\(available) 位可以聊。"
     }
 
     private func primaryAction() {
@@ -219,11 +233,8 @@ private struct TonightAvailableSection: View {
                         Task { await store.loadCompanions(pageSize: 50) }
                     }
                 default:
-                    EmptyStateView(
-                        symbol: "moon.zzz",
-                        title: "今晚暂时没有可聊的人",
-                        subtitle: "可以先看看全部陪伴者，找到适合稍后沟通的人。",
-                        actionTitle: "查看全部",
+                    EmptyStateCard(
+                        content: MarketplaceEmptyCopy.content(for: .tonightAvailable),
                         action: { store.navigate(.companionList(themeId: nil, preset: nil)) }
                     )
                 }
@@ -261,11 +272,11 @@ private struct TonightCompanionCard: View {
 
                 VStack(alignment: .leading, spacing: DS.Space.xxs) {
                     Text(companion.name)
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: DS.TypeScale.body + 1, weight: .semibold))
                         .foregroundStyle(Color.dsTextPrimary)
                         .lineLimit(1)
                     Text(companion.role)
-                        .font(.system(size: 12))
+                        .font(.system(size: DS.TypeScale.caption))
                         .foregroundStyle(Color.dsTextSecondary)
                         .lineLimit(1)
                 }
@@ -276,11 +287,12 @@ private struct TonightCompanionCard: View {
                     Spacer()
                     Text("¥\(companion.pricePerHalfHour)/30m")
                         .fontWeight(.semibold)
+                        .foregroundStyle(Color.dsPrimary)
                 }
-                .font(.system(size: 11))
+                .font(.system(size: DS.TypeScale.micro))
                 .foregroundStyle(Color.dsTextSecondary)
             }
-            .frame(width: 156, alignment: .leading)
+            .frame(width: 160, alignment: .leading)
         }
     }
 }
@@ -309,10 +321,17 @@ private struct RecommendedCompanions: View {
                         }
                     default:
                         EmptyStateView(
-                            symbol: "person.2.slash",
-                            title: "暂无推荐陪伴者",
-                            subtitle: "稍后再来看看，或换一个沟通主题。"
+                            content: MarketplaceEmptyCopy.content(for: .recommendedCompanions),
+                            compact: true
                         )
+                        .background(
+                            Color.dsSurfaceElevated,
+                            in: RoundedRectangle(cornerRadius: DS.Radius.lg, style: .continuous)
+                        )
+                        .overlay {
+                            RoundedRectangle(cornerRadius: DS.Radius.lg, style: .continuous)
+                                .stroke(Color.dsBorder.opacity(0.68), lineWidth: DS.Stroke.hairline)
+                        }
                     }
                 } else {
                     ForEach(companions) { companion in
@@ -329,6 +348,17 @@ private struct RecommendedCompanions: View {
     }
 }
 
+private struct HomeTrustFooter: View {
+    var body: some View {
+        DSBanner(
+            title: "平台内沟通 · 可试聊 · 可举报",
+            message: "不会引导私下加微信或线下见面。遇到不适内容，随时在会话里举报。",
+            systemImage: "lock.shield.fill",
+            tone: .primary
+        )
+    }
+}
+
 private struct CompanionLoadingCard: View {
     let title: String
 
@@ -337,7 +367,7 @@ private struct CompanionLoadingCard: View {
             HStack(spacing: DS.Space.md) {
                 ProgressView()
                 Text(title)
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.system(size: DS.TypeScale.callout, weight: .medium))
                     .foregroundStyle(Color.dsTextSecondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -356,33 +386,17 @@ private struct CompanionLoadErrorCard: View {
             title: "陪伴者加载失败",
             subtitle: message,
             actionTitle: "重试",
-            action: retry
+            action: retry,
+            compact: true
         )
+        .background(
+            Color.dsSurfaceElevated,
+            in: RoundedRectangle(cornerRadius: DS.Radius.lg, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: DS.Radius.lg, style: .continuous)
+                .stroke(Color.dsBorder.opacity(0.68), lineWidth: DS.Stroke.hairline)
+        }
         .accessibilityIdentifier("discoverCompanionError")
-    }
-}
-
-private enum HomeCompanionSorter {
-    static func sorted(_ companions: [Companion]) -> [Companion] {
-        companions.sorted { lhs, rhs in
-            score(for: lhs) > score(for: rhs)
-        }
-    }
-
-    private static func score(for companion: Companion) -> (Int, Int, Double, Int) {
-        (
-            availabilityRank(for: companion.availability),
-            companion.isVerified ? 1 : 0,
-            companion.rating,
-            companion.reviewCount
-        )
-    }
-
-    private static func availabilityRank(for status: AvailabilityStatus) -> Int {
-        switch status {
-        case .online: 2
-        case .available: 1
-        case .busy: 0
-        }
     }
 }

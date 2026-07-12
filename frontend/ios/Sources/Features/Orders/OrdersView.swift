@@ -37,7 +37,21 @@ struct OrdersView: View {
         let historyOrders = customerOrders.filter { !$0.status.isActive }
 
         if customerOrders.isEmpty {
-            EmptyStateView(symbol: "calendar.badge.clock", title: "暂无订单", subtitle: "去发现页选择陪伴者，开始第一次沟通。")
+            let copy = MarketplaceEmptyCopy.content(for: .orders)
+            EmptyStateView(
+                content: copy,
+                action: { store.selectedTab = .discover },
+                compact: true
+            )
+            .background(
+                Color.dsSurfaceElevated,
+                in: RoundedRectangle(cornerRadius: DS.Radius.lg, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: DS.Radius.lg, style: .continuous)
+                    .stroke(Color.dsBorder.opacity(0.68), lineWidth: DS.Stroke.hairline)
+            }
+            .accessibilityIdentifier("ordersEmptyState")
         } else {
             LazyVStack(spacing: DS.Space.lg) {
                 if !activeOrders.isEmpty {
