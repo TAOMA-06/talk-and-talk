@@ -6,6 +6,9 @@ import { PaymentsService } from "./payments.service";
 
 describe("PaymentsService", () => {
   const prisma = {
+    authIdentity: {
+      findFirst: jest.fn()
+    },
     order: {
       findUnique: jest.fn()
     },
@@ -220,5 +223,23 @@ describe("PaymentsService", () => {
         JSON.stringify({ out_trade_no: "T100", amount: { total: 3900 }, trade_state: "SUCCESS" })
       )
     ).rejects.toBeInstanceOf(AppException);
+  });
+
+  it("creates Mini Program params only for a user with a WeChat identity", async () => {
+    const pendingOrder = { ...baseOrder, status: "pending" };
+    prisma.order.findUnique
+      .mockResolvedValueOnce(pendingOrder)
+      .mockResolvedValueOnce({ ...pendingOrder, status: "paying" });
+    prisma.authIdentity.findFirst.mockResolvedValue({ providerId: "openid-1" });
+    prisma.$transaction.mockImplementation(async (fn: any) => fn({
+      paymentTransaction: { updateMany: jest.fn(), create: jest.fn().mockResolvedValue({ id: "p2", outTradeNo: "T200", status: "initiated" }) },
+      order: { update: jest.fn() }
+    }));
+
+    const result = await service.prepay("u1", "o1", "miniProgram");
+
+    expect(result.payment.channel).toBe("miniProgram");
+    expect(result.payment.wechatMiniProgramParams).toEqual(expect.objectContaining({ package: expect.stringMatching(/^prepay_id=/) }));
+    expect(result.payment.wechatAppParams).toBeUndefined();
   });
 });

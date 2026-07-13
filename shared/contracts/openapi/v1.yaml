@@ -24,6 +24,8 @@ tags:
   - name: conversations
   - name: moderation
   - name: notifications
+  - name: community
+  - name: reviews
   - name: admin
   - name: admin-moderation
 paths:
@@ -140,6 +142,37 @@ paths:
                     properties:
                       data:
                         $ref: "#/components/schemas/AuthSession"
+  /auth/wechat/mini-program:
+    post:
+      tags: [auth]
+      summary: Sign in with WeChat Mini Program code
+      operationId: wechatMiniProgramLogin
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code:
+                  type: string
+                  description: Short-lived credential returned by wx.login
+      responses:
+        "200":
+          description: Token pair + new or existing WeChat user
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/AuthSession"
+        "401":
+          $ref: "#/components/responses/Error"
   /auth/refresh:
     post:
       tags: [auth]
@@ -389,15 +422,128 @@ paths:
   /orders/{id}/prepay:
     post:
       tags: [orders]
-      summary: WeChat App prepay
+      summary: WeChat App or Mini Program prepay
       operationId: prepayOrder
       security:
         - bearerAuth: []
       parameters:
         - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                channel:
+                  type: string
+                  enum: [app, miniProgram]
+                  default: app
       responses:
         "200":
           description: Prepay params (mock=true on staging when using mock provider)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /community/posts:
+    get:
+      tags: [community]
+      summary: List approved community posts
+      operationId: listCommunityPosts
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Community post feed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+    post:
+      tags: [community]
+      summary: Create a moderated community post
+      operationId: createCommunityPost
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind, topic, content]
+              properties:
+                kind: { type: string, enum: [femaleRequest, malePromotion] }
+                topic: { type: string, maxLength: 80 }
+                content: { type: string, maxLength: 2000 }
+                coverImageUrl: { type: string }
+      responses:
+        "200":
+          description: Moderated post
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /community/posts/{id}/like:
+    post:
+      tags: [community]
+      summary: Set current user's like state
+      operationId: setCommunityPostLike
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [liked]
+              properties:
+                liked: { type: boolean }
+      responses:
+        "200":
+          description: Updated post
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /reviews/companion/{id}:
+    get:
+      tags: [reviews]
+      summary: List companion reviews
+      operationId: listCompanionReviews
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Reviews for the companion
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /reviews:
+    post:
+      tags: [reviews]
+      summary: Review a completed order
+      operationId: createReview
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [orderId, rating, content]
+              properties:
+                orderId: { type: string }
+                rating: { type: integer, minimum: 1, maximum: 5 }
+                content: { type: string, maxLength: 1000 }
+      responses:
+        "200":
+          description: Created review
           content:
             application/json:
               schema:

@@ -24,6 +24,8 @@ interface Environment {
   WECHAT_PAY_PRIVATE_KEY_PATH: string;
   WECHAT_PAY_CERT_SERIAL_NO: string;
   WECHAT_PAY_NOTIFY_BASE_URL: string;
+  WECHAT_MINIPROGRAM_APP_ID: string;
+  WECHAT_MINIPROGRAM_APP_SECRET: string;
   APPLE_SIGN_IN_BUNDLE_ID: string;
   SMS_PROVIDER: string;
   RATE_LIMIT_PER_MINUTE: number;
@@ -164,6 +166,12 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     throw new Error("SEED_ON_STARTUP is not allowed when APP_ENV=production");
   }
 
+  const miniProgramAppId = optionalString(env.WECHAT_MINIPROGRAM_APP_ID);
+  const miniProgramAppSecret = optionalString(env.WECHAT_MINIPROGRAM_APP_SECRET);
+  if (Boolean(miniProgramAppId) !== Boolean(miniProgramAppSecret)) {
+    throw new Error("WECHAT_MINIPROGRAM_APP_ID and WECHAT_MINIPROGRAM_APP_SECRET must be configured together");
+  }
+
   return {
     NODE_ENV: nodeEnv,
     APP_ENV: appEnv,
@@ -187,6 +195,8 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     WECHAT_PAY_PRIVATE_KEY_PATH: optionalString(env.WECHAT_PAY_PRIVATE_KEY_PATH),
     WECHAT_PAY_CERT_SERIAL_NO: optionalString(env.WECHAT_PAY_CERT_SERIAL_NO),
     WECHAT_PAY_NOTIFY_BASE_URL: optionalUrl(env.WECHAT_PAY_NOTIFY_BASE_URL),
+    WECHAT_MINIPROGRAM_APP_ID: miniProgramAppId,
+    WECHAT_MINIPROGRAM_APP_SECRET: miniProgramAppSecret,
     APPLE_SIGN_IN_BUNDLE_ID: optionalString(env.APPLE_SIGN_IN_BUNDLE_ID),
     SMS_PROVIDER: smsProvider,
     RATE_LIMIT_PER_MINUTE: parseInt(env.RATE_LIMIT_PER_MINUTE ?? "120", 10) || 120,

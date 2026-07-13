@@ -1,0 +1,10 @@
+<view class="page">
+  <view class="safety">平台内沟通 · 可举报 · 请勿交换私人联系方式</view>
+  <view wx:if="{{loading}}" class="empty">正在加载…</view>
+  <view wx:elif="{{error}}" class="empty">{{error}}</view>
+  <view wx:elif="{{!conversations.length}}" class="empty">支付订单后，会话会出现在这里。</view>
+  <view wx:else class="card conversation" wx:for="{{conversations}}" wx:key="id" bindtap="openChat" data-id="{{item.id}}">
+    <view class="row"><text class="name">{{item.name}}</text><text class="muted">{{item.updatedAt}}</text></view>
+    <view class="preview">{{item.preview}}</view>
+  </view>
+</view>

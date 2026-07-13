@@ -4,7 +4,9 @@ import {
   WeChatNotifyPayload,
   WeChatPayProvider,
   WeChatPrepayInput,
-  WeChatPrepayResult
+  WeChatAppPrepayResult,
+  WeChatMiniProgramPrepayInput,
+  WeChatMiniProgramPrepayResult
   , WeChatRefundInput, WeChatRefundNotifyPayload, WeChatRefundResult
 } from "./wechat-pay.provider";
 
@@ -13,7 +15,7 @@ export const MOCK_WECHAT_NOTIFY_TOKEN = "mock-wechat-notify";
 export class MockWeChatPayProvider implements WeChatPayProvider {
   readonly isMock = true;
 
-  async createAppPrepay(input: WeChatPrepayInput): Promise<WeChatPrepayResult> {
+  async createAppPrepay(input: WeChatPrepayInput): Promise<WeChatAppPrepayResult> {
     const prepayId = `mock_prepay_${input.outTradeNo}`;
     const nonceStr = randomBytes(8).toString("hex");
     const timeStamp = String(Math.floor(Date.now() / 1000));
@@ -23,6 +25,7 @@ export class MockWeChatPayProvider implements WeChatPayProvider {
 
     return {
       prepayId,
+      channel: "app",
       mock: true,
       clientParams: {
         appId: "wx_mock_app_id",
@@ -32,6 +35,29 @@ export class MockWeChatPayProvider implements WeChatPayProvider {
         nonceStr,
         timeStamp,
         sign
+      }
+    };
+  }
+
+  async createMiniProgramPrepay(input: WeChatMiniProgramPrepayInput): Promise<WeChatMiniProgramPrepayResult> {
+    const prepayId = `mock_prepay_${input.outTradeNo}`;
+    const nonceStr = randomBytes(8).toString("hex");
+    const timeStamp = String(Math.floor(Date.now() / 1000));
+    const packageValue = `prepay_id=${prepayId}`;
+    const paySign = createHmac("sha256", "mock-wechat-key")
+      .update(`${input.openId}.${input.outTradeNo}.${input.amountCents}.${timeStamp}`)
+      .digest("hex");
+
+    return {
+      prepayId,
+      channel: "miniProgram",
+      mock: true,
+      clientParams: {
+        timeStamp,
+        nonceStr,
+        package: packageValue,
+        signType: "RSA",
+        paySign
       }
     };
   }

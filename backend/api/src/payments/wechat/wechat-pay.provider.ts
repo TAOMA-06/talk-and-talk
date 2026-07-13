@@ -10,6 +10,14 @@ export type WeChatAppPayParams = {
   sign: string;
 };
 
+export type WeChatMiniProgramPayParams = {
+  timeStamp: string;
+  nonceStr: string;
+  package: string;
+  signType: "RSA";
+  paySign: string;
+};
+
 export type WeChatPrepayInput = {
   outTradeNo: string;
   description: string;
@@ -17,11 +25,25 @@ export type WeChatPrepayInput = {
   notifyUrl: string;
 };
 
-export type WeChatPrepayResult = {
+export type WeChatMiniProgramPrepayInput = WeChatPrepayInput & {
+  openId: string;
+};
+
+export type WeChatAppPrepayResult = {
   prepayId: string;
+  channel: "app";
   clientParams: WeChatAppPayParams;
   mock: boolean;
 };
+
+export type WeChatMiniProgramPrepayResult = {
+  prepayId: string;
+  channel: "miniProgram";
+  clientParams: WeChatMiniProgramPayParams;
+  mock: boolean;
+};
+
+export type WeChatPrepayResult = WeChatAppPrepayResult | WeChatMiniProgramPrepayResult;
 
 export type WeChatNotifyPayload = {
   outTradeNo: string;
@@ -53,7 +75,8 @@ export type WeChatRefundNotifyPayload = WeChatRefundResult & {
 
 export interface WeChatPayProvider {
   readonly isMock: boolean;
-  createAppPrepay(input: WeChatPrepayInput): Promise<WeChatPrepayResult>;
+  createAppPrepay(input: WeChatPrepayInput): Promise<WeChatAppPrepayResult>;
+  createMiniProgramPrepay(input: WeChatMiniProgramPrepayInput): Promise<WeChatMiniProgramPrepayResult>;
   verifyNotifySignature(headers: Record<string, string | string[] | undefined>, rawBody: string): boolean;
   parseNotifyPayload(rawBody: string): WeChatNotifyPayload;
   createRefund(input: WeChatRefundInput): Promise<WeChatRefundResult>;

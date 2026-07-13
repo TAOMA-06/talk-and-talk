@@ -10,7 +10,8 @@ import { NotificationsService } from "../notifications/notifications.service";
 import { OrdersService } from "../orders/orders.service";
 import {
   WECHAT_PAY_PROVIDER,
-  WeChatPayProvider
+  WeChatPayProvider,
+  WeChatPrepayInput
 } from "./wechat/wechat-pay.provider";
 
 type FulfillPaymentTxResult = {
@@ -35,7 +36,7 @@ export class PaymentsService {
     private readonly metrics: MetricsService
   ) {}
 
-  async prepay(userId: string, orderId: string) {
+  async prepay(userId: string, orderId: string, channel: "app" | "miniProgram" = "app") {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       include: { conversation: { select: { externalId: true } } }
@@ -72,12 +73,15 @@ export class PaymentsService {
     const outTradeNo = `T${Date.now()}${randomUUID().replace(/-/g, "").slice(0, 12)}`;
     const notifyUrl = this.buildNotifyUrl();
 
-    const prepay = await this.wechat.createAppPrepay({
+    const input: WeChatPrepayInput = {
       outTradeNo,
       description: `Talk&Talk 陪伴服务 ${order.durationMinutes}分钟`,
       amountCents: order.amountCents,
       notifyUrl
-    });
+    };
+    const prepay = channel === "miniProgram"
+      ? await this.wechat.createMiniProgramPrepay({ ...input, openId: await this.findMiniProgramOpenId(userId) })
+      : await this.wechat.createAppPrepay(input);
 
     const payment = await this.prisma.$transaction(async (tx) => {
       const db = tx as any;
@@ -122,7 +126,9 @@ export class PaymentsService {
         outTradeNo: payment.outTradeNo,
         status: payment.status,
         mock: prepay.mock,
-        wechatAppParams: prepay.clientParams
+        channel: prepay.channel,
+        wechatAppParams: prepay.channel === "app" ? prepay.clientParams : undefined,
+        wechatMiniProgramParams: prepay.channel === "miniProgram" ? prepay.clientParams : undefined
       }
     };
   }
@@ -495,6 +501,22 @@ export class PaymentsService {
     const baseUrl = this.config.get<string>("WECHAT_PAY_NOTIFY_BASE_URL")?.trim();
     const path = `/${prefix}/payments/wechat/notify`;
     return baseUrl ? `${baseUrl}${path}` : path;
+  }
+
+  private async findMiniProgramOpenId(userId: string): Promise<string> {
+    const identity: any = await this.prisma.authIdentity.findFirst({
+      where: { userId, provider: "wechatMiniProgram" },
+      orderBy: { id: "asc" }
+    } as any);
+    const openId = identity?.providerId?.trim();
+    if (!openId) {
+      throw new AppException(
+        "WECHAT_OPENID_MISSING",
+        "Sign in with WeChat Mini Program before starting Mini Program payment",
+        HttpStatus.CONFLICT
+      );
+    }
+    return openId;
   }
 
   private buildRefundNotifyUrl(): string {

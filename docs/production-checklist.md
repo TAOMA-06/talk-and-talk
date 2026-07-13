@@ -33,6 +33,14 @@
 - [ ] 真实 prepay / 平台证书验签 / resource 解密已联调通过（沙箱或生产小额）
 - [ ] staging 演示仍可用 mock-notify；production mock-notify → 403
 
+## 微信小程序
+
+- [ ] 小程序主体与 `api.talkandtalk.app` 已完成所需备案，且该 HTTPS 域名已配置为 request 合法域名
+- [ ] `WECHAT_MINIPROGRAM_APP_ID` / `WECHAT_MINIPROGRAM_APP_SECRET` 已填；AppSecret 仅存在于部署机密中
+- [ ] 微信支付商户号已绑定小程序 AppID，并开通 JSAPI 支付；真机已完成一笔小额支付与退款
+- [ ] 小程序后台已配置隐私保护指引；`/legal/privacy.html` 与 `/legal/terms.html` 均能在微信内打开
+- [ ] 小程序支付成功后以服务端回调订单状态为准；取消支付不将订单标记 paid
+
 ## DeepSeek（可选）
 
 - [ ] 未配置 `DEEPSEEK_API_KEY` 时确认纯规则审核可接受

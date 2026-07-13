@@ -58,9 +58,13 @@ extension AppleSignInCoordinator: ASAuthorizationControllerDelegate {
 
 extension AppleSignInCoordinator: ASAuthorizationControllerPresentationContextProviding {
     nonisolated func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
-        let scenes = UIApplication.shared.connectedScenes
-        let windowScene = scenes.first { $0.activationState == .foregroundActive } as? UIWindowScene
-        let window = windowScene?.windows.first { $0.isKeyWindow }
-        return window ?? ASPresentationAnchor()
+        // AuthenticationServices invokes this presentation callback on the main thread.
+        // Keep the protocol's nonisolated signature while making UIKit isolation explicit.
+        MainActor.assumeIsolated {
+            let scenes = UIApplication.shared.connectedScenes
+            let windowScene = scenes.first { $0.activationState == .foregroundActive } as? UIWindowScene
+            let window = windowScene?.windows.first { $0.isKeyWindow }
+            return window ?? ASPresentationAnchor()
+        }
     }
 }

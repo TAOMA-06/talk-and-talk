@@ -5,7 +5,9 @@ import {
   WeChatNotifyPayload,
   WeChatPayProvider,
   WeChatPrepayInput,
-  WeChatPrepayResult
+  WeChatAppPrepayResult,
+  WeChatMiniProgramPrepayInput,
+  WeChatMiniProgramPrepayResult
   , WeChatRefundInput, WeChatRefundNotifyPayload, WeChatRefundResult
 } from "./wechat-pay.provider";
 
@@ -16,12 +18,16 @@ import {
 export class DisabledWeChatPayProvider implements WeChatPayProvider {
   readonly isMock = false;
 
-  async createAppPrepay(_input: WeChatPrepayInput): Promise<WeChatPrepayResult> {
+  async createAppPrepay(_input: WeChatPrepayInput): Promise<WeChatAppPrepayResult> {
     throw new AppException(
       "WECHAT_PAY_NOT_CONFIGURED",
       "WeChat Pay is not configured for this environment",
       HttpStatus.SERVICE_UNAVAILABLE
     );
+  }
+
+  async createMiniProgramPrepay(_input: WeChatMiniProgramPrepayInput): Promise<WeChatMiniProgramPrepayResult> {
+    return this.unavailable();
   }
 
   verifyNotifySignature(

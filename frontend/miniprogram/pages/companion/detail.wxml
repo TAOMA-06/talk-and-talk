@@ -1,0 +1,22 @@
+<view class="page" wx:if="{{companion}}">
+  <view class="card profile">
+    <view class="avatar">{{companion.initials}}</view>
+    <view class="title">{{companion.name}}</view>
+    <view class="muted">{{companion.role}} · {{companion.availability}} · ★ {{companion.rating}}</view>
+    <view class="bio">{{companion.bio}}</view>
+    <view class="muted">¥{{companion.pricePerHalfHour}} / 30 分钟</view>
+    <view class="booking-row">
+      <picker mode="date" value="{{bookingDate}}" bindchange="setBookingDate"><view class="booking-picker">{{bookingDate}}</view></picker>
+      <picker mode="time" value="{{bookingTime}}" bindchange="setBookingTime"><view class="booking-picker">{{bookingTime}}</view></picker>
+    </view>
+    <button class="primary-button" loading="{{booking}}" bindtap="book">预约 30 分钟</button>
+  </view>
+  <view class="title section-title">用户评价</view>
+  <view wx:if="{{!reviews.length}}" class="empty">暂时还没有评价</view>
+  <view class="card" wx:for="{{reviews}}" wx:key="id">
+    <view class="row"><text>{{item.userName}}</text><text class="rating">★ {{item.rating}}</text></view>
+    <view class="review">{{item.content}}</view>
+  </view>
+</view>
+<view wx:elif="{{loading}}" class="empty">正在加载…</view>
+<view wx:else class="empty">{{error}}</view>

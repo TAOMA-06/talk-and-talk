@@ -35,7 +35,8 @@ import { WECHAT_PAY_PROVIDER } from "./wechat/wechat-pay.provider";
               mchId: env.WECHAT_PAY_MCH_ID,
               apiV3Key: env.WECHAT_PAY_API_V3_KEY,
               privateKeyPath: env.WECHAT_PAY_PRIVATE_KEY_PATH,
-              certSerialNo: env.WECHAT_PAY_CERT_SERIAL_NO
+              certSerialNo: env.WECHAT_PAY_CERT_SERIAL_NO,
+              miniProgramAppId: config.get<string>("WECHAT_MINIPROGRAM_APP_ID", "")
             });
           }
           return new DisabledWeChatPayProvider();
@@ -46,9 +47,10 @@ import { WECHAT_PAY_PROVIDER } from "./wechat/wechat-pay.provider";
           return new RealWeChatPayProvider({
             appId: env.WECHAT_PAY_APP_ID,
             mchId: env.WECHAT_PAY_MCH_ID,
-            apiV3Key: env.WECHAT_PAY_API_V3_KEY,
-            privateKeyPath: env.WECHAT_PAY_PRIVATE_KEY_PATH,
-            certSerialNo: env.WECHAT_PAY_CERT_SERIAL_NO
+              apiV3Key: env.WECHAT_PAY_API_V3_KEY,
+              privateKeyPath: env.WECHAT_PAY_PRIVATE_KEY_PATH,
+              certSerialNo: env.WECHAT_PAY_CERT_SERIAL_NO,
+              miniProgramAppId: config.get<string>("WECHAT_MINIPROGRAM_APP_ID", "")
           });
         }
 

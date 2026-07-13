@@ -6,6 +6,7 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { PaymentsService } from "../payments/payments.service";
 import { CreateOrderDto } from "./dto/create-order.dto";
 import { CreateRefundDto } from "./dto/create-refund.dto";
+import { PrepayDto } from "./dto/prepay.dto";
 import { OrdersService } from "./orders.service";
 
 @Controller("orders")
@@ -64,8 +65,8 @@ export class OrdersController {
 
   @Post(":id/prepay")
   @UseGuards(JwtAuthGuard)
-  prepay(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
-    return this.paymentsService.prepay(user.id, id);
+  prepay(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string, @Body() dto: PrepayDto) {
+    return this.paymentsService.prepay(user.id, id, dto.channel ?? "app");
   }
 
   @Post(":id/refund")

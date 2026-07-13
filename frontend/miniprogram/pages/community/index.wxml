@@ -1,0 +1,18 @@
+<view class="page">
+  <view class="card compose">
+    <view class="title">说说你想聊的</view>
+    <button class="kind" bindtap="switchKind">{{kind === 'femaleRequest' ? '女生需求' : '陪伴者自荐'}} · 切换</button>
+    <input placeholder="话题，例如：今晚想找人聊聊" value="{{topic}}" bindinput="setTopic" maxlength="80" />
+    <textarea placeholder="请勿留下联系方式、引导私联或线下见面" value="{{content}}" bindinput="setContent" maxlength="2000" auto-height="true" />
+    <button class="primary-button" loading="{{submitting}}" bindtap="submit">发布到广场</button>
+  </view>
+  <view wx:if="{{loading}}" class="empty">正在加载…</view>
+  <view wx:elif="{{error}}" class="empty">{{error}}</view>
+  <view wx:elif="{{!posts.length}}" class="empty">广场还很安静，发第一条内容吧。</view>
+  <view class="card" wx:for="{{posts}}" wx:key="id">
+    <view class="row"><text class="author">{{item.authorName}}</text><text class="muted">{{item.kind === 'femaleRequest' ? '需求' : '自荐'}}</text></view>
+    <view class="topic"># {{item.topic}}</view>
+    <view class="content">{{item.content}}</view>
+    <button class="like {{item.isLiked ? 'liked' : ''}}" bindtap="toggleLike" data-id="{{item.id}}">{{item.isLiked ? '已赞' : '点赞'}} {{item.likeCount}}</button>
+  </view>
+</view>

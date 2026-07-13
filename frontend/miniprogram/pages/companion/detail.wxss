@@ -1,0 +1,10 @@
+.profile { text-align: center; }
+.avatar { display: flex; width: 120rpx; height: 120rpx; margin: 0 auto 18rpx; align-items: center; justify-content: center; border-radius: 50%; background: #f5dce2; color: #a43f5c; font-size: 38rpx; font-weight: 700; }
+.bio { margin: 20rpx 0; text-align: left; line-height: 1.7; }
+.booking-row { display: flex; justify-content: center; gap: 18rpx; margin-top: 22rpx; }
+.booking-picker { padding: 14rpx 22rpx; border-radius: 12rpx; background: #fff5f6; color: #7a4857; }
+button { margin-top: 28rpx; }
+.section-title { margin: 34rpx 0 18rpx; }
+.row { display: flex; justify-content: space-between; }
+.rating { color: #b94a68; }
+.review { margin-top: 14rpx; color: #584147; line-height: 1.6; }

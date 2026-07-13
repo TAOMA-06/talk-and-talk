@@ -12,6 +12,7 @@ Talk&Talk 正式账号体系 API，前缀均为 `/api/v1`。所有 JSON 响应�
 | `POST` | `/auth/sms/send-code` | 无 | 发送手机验证码 |
 | `POST` | `/auth/phone/login` | 无 | 手机号 + 验证码登录 |
 | `POST` | `/auth/apple` | 无 | Apple Sign-In 登录 |
+| `POST` | `/auth/wechat/mini-program` | 无 | 小程序 `wx.login` code 登录 |
 | `POST` | `/auth/refresh` | 无 | 刷新 access/refresh token |
 | `POST` | `/auth/logout` | Bearer | 撤销 refresh token |
 | `GET` | `/users/me` | Bearer | 获取当前用户 |
@@ -75,6 +76,19 @@ Talk&Talk 正式账号体系 API，前缀均为 `/api/v1`。所有 JSON 响应�
 ```
 
 响应同 `phone/login`。
+
+### POST /auth/wechat/mini-program
+
+请求：
+
+```json
+{ "code": "wx.login 返回的短期凭证" }
+```
+
+服务端使用 `WECHAT_MINIPROGRAM_APP_ID` / `WECHAT_MINIPROGRAM_APP_SECRET` 交换 OpenID，并以 `wechatMiniProgram` 身份创建或读取账号。响应同 `phone/login`。
+
+- AppSecret 和微信 `session_key` 不会返回给客户端，也不写入数据库。
+- 首发不会将 Apple、手机号和微信身份自动合并；账户绑定必须由后续显式流程完成。
 
 ### POST /auth/refresh
 
@@ -141,6 +155,9 @@ Talk&Talk 正式账号体系 API，前缀均为 `/api/v1`。所有 JSON 响应�
 | `INVALID_PHONE` | 400 | 手机号格式无效 |
 | `INVALID_VERIFICATION_CODE` | 401 | 验证码错误或过期 |
 | `INVALID_APPLE_TOKEN` | 401 | Apple token 无效 |
+| `INVALID_WECHAT_CODE` | 401 | 小程序登录凭证无效或过期 |
+| `WECHAT_LOGIN_UNAVAILABLE` | 502 | 无法连接微信登录服务 |
+| `WECHAT_MINIPROGRAM_LOGIN_UNAVAILABLE` | 503 | 未配置小程序登录凭证 |
 | `UNAUTHORIZED` | 401 | JWT 缺失/无效/refresh 已撤销 |
 | `FORBIDDEN` | 403 | RBAC 权限不足 |
 
@@ -155,6 +172,8 @@ Talk&Talk 正式账号体系 API，前缀均为 `/api/v1`。所有 JSON 响应�
 | `SMS_PROVIDER` | `mock` / `none` / 未来 `aliyun` `tencent` |
 | `SMS_CODE_TTL_SECONDS` | 验证码有效期秒数，默认 `300` |
 | `APPLE_SIGN_IN_BUNDLE_ID` | Apple 登录 bundle id |
+| `WECHAT_MINIPROGRAM_APP_ID` | 小程序 AppID；同时用于 JSAPI 支付 |
+| `WECHAT_MINIPROGRAM_APP_SECRET` | 小程序 AppSecret，只能保存在 API 部署环境 |
 
 开发环境 `SMS_PROVIDER=mock` 时，验证码会输出到 API 日志。
 

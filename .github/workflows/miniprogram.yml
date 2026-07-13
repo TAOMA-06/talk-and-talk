@@ -1,0 +1,31 @@
+name: Mini Program CI
+
+on:
+  push:
+    paths:
+      - "frontend/miniprogram/**"
+      - ".github/workflows/miniprogram.yml"
+  pull_request:
+    paths:
+      - "frontend/miniprogram/**"
+      - ".github/workflows/miniprogram.yml"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/api/package-lock.json
+      - name: Install shared TypeScript toolchain
+        working-directory: backend/api
+        run: npm ci
+      - name: Validate Mini Program manifest and pages
+        run: node frontend/miniprogram/scripts/validate.mjs
+      - name: Type-check Mini Program
+        run: backend/api/node_modules/.bin/tsc -p frontend/miniprogram/tsconfig.json --noEmit
+      - name: Run Mini Program page/runtime smoke
+        run: node frontend/miniprogram/scripts/smoke.mjs

@@ -1,0 +1,10 @@
+input, textarea, .picker { box-sizing: border-box; width: 100%; margin-top: 16rpx; padding: 16rpx; border-radius: 12rpx; background: #fff5f6; font-size: 28rpx; }
+textarea { min-height: 130rpx; }
+.row { display: flex; justify-content: space-between; align-items: center; }
+.small { font-size: 32rpx; }
+.text-button, .legal { margin: 0; padding: 0; background: transparent; color: #b94a68; font-size: 26rpx; }
+.section-title { margin: 32rpx 0 16rpx; }
+.compact { padding: 40rpx 10rpx; }
+.notification { margin-bottom: 14rpx; }
+.name { font-weight: 700; }
+.legal { display: block; margin: 32rpx auto 0; color: #8d6e73; }

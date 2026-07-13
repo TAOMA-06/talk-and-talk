@@ -5,6 +5,7 @@ import { AuthService } from "./auth.service";
 import { SendCodeDto } from "./dto/send-code.dto";
 import { PhoneLoginDto } from "./dto/phone-login.dto";
 import { AppleLoginDto } from "./dto/apple-login.dto";
+import { WechatMiniProgramLoginDto } from "./dto/wechat-mini-program-login.dto";
 import { RefreshTokenDto } from "./dto/refresh-token.dto";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard";
 
@@ -26,6 +27,11 @@ export class AuthController {
   @Post("apple")
   async appleLogin(@Body() dto: AppleLoginDto) {
     return this.authService.loginWithApple(dto.identityToken);
+  }
+
+  @Post("wechat/mini-program")
+  async wechatMiniProgramLogin(@Body() dto: WechatMiniProgramLoginDto) {
+    return this.authService.loginWithWechatMiniProgram(dto.code);
   }
 
   @Post("refresh")

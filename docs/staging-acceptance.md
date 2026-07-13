@@ -46,6 +46,20 @@ npm run start:dev
 ./backend/api/scripts/acceptance-smoke.sh http://127.0.0.1:3000
 ```
 
+## 微信小程序验收
+
+前置：在小程序后台将 staging API 配置为 request 合法域名；配置有效 HTTPS 证书、ICP备案域名、测试小程序 AppID，并在 `.env.staging` 填写 `WECHAT_MINIPROGRAM_APP_ID` / `WECHAT_MINIPROGRAM_APP_SECRET`。若验证真实支付，商户号必须已绑定该小程序 AppID 并获 JSAPI 权限。
+
+| # | 场景 | 期望 |
+|---|------|------|
+| 1 | 真机首次打开小程序 | `wx.login` → `/auth/wechat/mini-program`；得到独立 JWT 会话，不保存 AppSecret 或 session_key |
+| 2 | 发现、详情、广场、评价 | 读取与 iOS 相同的正式 API 数据；发帖走服务端审核，点赞跨端一致 |
+| 3 | 创建订单 → `channel=miniProgram` prepay | staging mock 返回 `wechatMiniProgramParams`；真实环境能调起 `wx.requestPayment` |
+| 4 | 取消 / 成功支付 | 取消不标记 paid；成功后以微信回调刷新订单和会话 |
+| 5 | 聊天和举报 | 正常、warn、review、block 提示可见；举报只提交服务端回执 |
+| 6 | 陪伴者订单 | paid → inService → completed 状态流转正确；完成订单可评价 |
+| 7 | 隐私保护指引 | 首次涉及聊天、支付或发帖时，平台要求时可正常授权；隐私链接可打开 |
+
 ## iOS 完整回归（TestFlight / Staging 前）
 
 前置：API 已 seed；**TestFlight 使用 scheme `TalkAndTalk-Staging`**（`BACKEND_BASE_URL=https://api-staging.talkandtalk.app`，`ENABLE_PHONE_LOGIN=YES`）。  

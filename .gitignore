@@ -17,6 +17,10 @@ backend/api/dist/
 backend/api/coverage/
 backend/api/backups/
 
+# WeChat Mini Program local tooling / generated packages
+frontend/miniprogram/project.private.config.json
+frontend/miniprogram/miniprogram_npm/
+
 # Deployment secrets
 infra/nginx/certs/
 *.pem

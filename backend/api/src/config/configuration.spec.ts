@@ -112,4 +112,9 @@ describe("validateEnvironment", () => {
       })
     ).toThrow("JWT_ACCESS_SECRET");
   });
+
+  it("requires WeChat Mini Program credentials to be configured together", () => {
+    expect(() => validateEnvironment({ WECHAT_MINIPROGRAM_APP_ID: "wx123" }))
+      .toThrow("WECHAT_MINIPROGRAM_APP_ID");
+  });
 });

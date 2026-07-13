@@ -34,6 +34,7 @@ jest.mock("ioredis", () => {
 describe("AuthService", () => {
   let service: AuthService;
   let smsProvider: MockSmsProvider;
+  const originalFetch = global.fetch;
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -58,6 +59,8 @@ describe("AuthService", () => {
               const vals: Record<string, any> = {
                 REDIS_URL: "redis://localhost:6379",
                 SMS_CODE_TTL_SECONDS: 300,
+                WECHAT_MINIPROGRAM_APP_ID: "wx-mini-app",
+                WECHAT_MINIPROGRAM_APP_SECRET: "mini-secret",
                 JWT_ACCESS_TTL: "15m",
                 JWT_REFRESH_TTL: "30d"
               };
@@ -80,6 +83,10 @@ describe("AuthService", () => {
 
     service = module.get(AuthService);
     smsProvider = module.get(SMS_PROVIDER);
+  });
+
+  afterAll(() => {
+    global.fetch = originalFetch;
   });
 
   describe("sendCode", () => {
@@ -159,6 +166,45 @@ describe("AuthService", () => {
 
       await expect(service.loginWithPhone("13800138000", "000000"))
         .rejects.toThrow("invalid or expired");
+    });
+  });
+
+  describe("loginWithWechatMiniProgram", () => {
+    it("exchanges a code, creates an identity, and returns the normal session", async () => {
+      const fetchMock = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ openid: "openid-1", session_key: "not-persisted" })
+      });
+      global.fetch = fetchMock as unknown as typeof fetch;
+      mockPrisma.authIdentity.findUnique.mockResolvedValue(null);
+      mockPrisma.user.create.mockResolvedValue({ id: "wechat-user", role: "user" });
+      mockPrisma.refreshToken.create.mockResolvedValue({});
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: "wechat-user",
+        role: "user",
+        profile: { displayName: null, phone: null, gender: null, isVerified: false, safetyScore: 80 }
+      });
+
+      const result = await service.loginWithWechatMiniProgram("mini-code");
+
+      expect(result.user.id).toBe("wechat-user");
+      expect(fetchMock.mock.calls[0][0]).toContain("js_code=mini-code");
+      expect(mockPrisma.user.create).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({
+          identities: { create: { provider: "wechatMiniProgram", providerId: "openid-1" } }
+        })
+      }));
+    });
+
+    it("rejects an invalid or expired WeChat code", async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ errcode: 40029, errmsg: "invalid code" })
+      }) as unknown as typeof fetch;
+
+      await expect(service.loginWithWechatMiniProgram("expired-code")).rejects.toMatchObject({
+        code: "INVALID_WECHAT_CODE"
+      });
     });
   });
 

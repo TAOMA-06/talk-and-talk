@@ -17,6 +17,7 @@ enum UserRole {
 enum AuthProvider {
   phone
   apple
+  wechatMiniProgram
 }
 
 enum AccountStatus {

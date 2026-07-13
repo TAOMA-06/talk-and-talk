@@ -1,0 +1,27 @@
+<view class="page">
+  <view wx:if="{{profileLoading}}" class="empty">正在加载…</view>
+  <view wx:else>
+    <view class="card" wx:if="{{user}}">
+      <view class="title">{{user.profile.displayName || '微信用户'}}</view>
+      <view class="muted">{{user.role === 'companion' ? '陪伴者' : '普通用户'}} · 平台内沟通</view>
+      <input value="{{displayName}}" bindinput="setDisplayName" placeholder="显示名称" maxlength="30" />
+      <picker mode="selector" range="{{genders}}" bindchange="setGender"><view class="picker">性别：{{gender || '请选择'}}</view></picker>
+      <button class="primary-button" loading="{{saving}}" bindtap="saveProfile">保存资料</button>
+    </view>
+    <view class="card">
+      <view class="row"><text class="title small">成为陪伴者</text><button class="text-button" bindtap="toggleApplication">{{applicationVisible ? '收起' : '申请'}}</button></view>
+      <view wx:if="{{applicationVisible}}">
+        <input value="{{role}}" bindinput="setRole" placeholder="服务角色" />
+        <textarea value="{{bio}}" bindinput="setBio" placeholder="服务介绍" auto-height="true" />
+        <input value="{{price}}" bindinput="setPrice" type="number" placeholder="每 30 分钟价格" />
+        <input value="{{city}}" bindinput="setCity" placeholder="服务城市/线上" />
+        <button class="primary-button" bindtap="applyCompanion">提交申请</button>
+      </view>
+    </view>
+    <view class="title section-title">通知</view>
+    <view wx:if="{{!notifications.length}}" class="empty compact">暂无新通知</view>
+    <view wx:for="{{notifications}}" wx:key="id" class="card notification"><view class="name">{{item.title}}</view><view class="muted">{{item.body}}</view></view>
+    <button class="legal" bindtap="openPrivacy">隐私保护指引</button>
+    <button class="legal" bindtap="signOut">退出当前账号</button>
+  </view>
+</view>

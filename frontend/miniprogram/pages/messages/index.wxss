@@ -1,0 +1,4 @@
+.safety { margin-bottom: 20rpx; padding: 16rpx; border-radius: 14rpx; background: #fce8ed; color: #9b3d58; font-size: 25rpx; }
+.row { display: flex; justify-content: space-between; gap: 16rpx; }
+.name { font-weight: 700; }
+.preview { margin-top: 14rpx; overflow: hidden; color: #584147; white-space: nowrap; text-overflow: ellipsis; }

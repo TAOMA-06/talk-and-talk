@@ -11,6 +11,7 @@
 ```text
 talk-and-talk/
 ├── frontend/ios/          # iOS SwiftUI App（App Store / TestFlight）
+├── frontend/miniprogram/  # 原生 TypeScript 微信小程序
 ├── backend/api/           # NestJS API（Docker 可部署）
 ├── shared/contracts/      # OpenAPI v1 前后端共同契约
 ├── infra/                 # Docker Compose、nginx、secrets
@@ -30,6 +31,7 @@ talk-and-talk/
 | [docs/production-checklist.md](./docs/production-checklist.md) | 生产检查清单 |
 | [docs/app-store-metadata.md](./docs/app-store-metadata.md) | App Store Connect 元数据 |
 | [frontend/ios/](./frontend/ios/) | iOS SwiftUI App（**仅使用** `TalkAndTalk.xcodeproj`） |
+| [frontend/miniprogram/](./frontend/miniprogram/) | 微信小程序（微信登录、JSAPI 支付、用户/陪伴者业务） |
 | [backend/api/](./backend/api/) | NestJS 后端 |
 | [infra/](./infra/) | Docker Compose、nginx TLS 示例、secrets 挂载 |
 
@@ -108,6 +110,7 @@ Release 数据安全规则：正式构建不会编译 `MockData` 或离线身份
 | `DEEPSEEK_API_KEY` | 可选；空则纯规则审核 | 可选 |
 | `DEEPSEEK_URL` / `DEEPSEEK_MODEL` | DeepSeek 配置 | 有 key 时需要 |
 | `WECHAT_PAY_*` | 微信商户与证书路径、回调 base | 真实收款时必填 |
+| `WECHAT_MINIPROGRAM_APP_ID` / `WECHAT_MINIPROGRAM_APP_SECRET` | 小程序登录与 JSAPI 支付 AppID；AppSecret 仅后端保存 | 小程序发行必填 |
 | `APPLE_SIGN_IN_BUNDLE_ID` | 须与 iOS `com.talkandtalk.app` 一致 | 必填 |
 | `RATE_LIMIT_PER_MINUTE` | IP 限流，默认 `120` | |
 | `BODY_SIZE_LIMIT` | 默认 `1mb` | |
@@ -193,6 +196,13 @@ DATABASE_URL=postgres://... ./backend/api/scripts/db-backup.sh
 - 流程：创建订单 → `POST /orders/:id/prepay` → 客户端调起微信 / mock → `POST /payments/wechat/notify` 或 staging `mock-notify`
 - `APP_ENV=staging|development` 可用 mock 闭环；**生产真实预支付若代码仍为壳实现则不可收款**（NEXT_PHASE）
 - iOS：`WECHAT_APP_ID` 未配置时 Release 显示「微信支付未配置」类错误
+- 小程序：`POST /orders/:id/prepay` 提交 `{ "channel": "miniProgram" }`，服务端以当前微信 OpenID 创建 JSAPI 预支付，客户端再调用 `wx.requestPayment`。商户号需绑定小程序 AppID。
+
+## 微信小程序
+
+- 工程在 [`frontend/miniprogram`](./frontend/miniprogram)，使用微信开发者工具导入；发布准备见该目录 README。
+- 小程序用 `wx.login` 取得短期 code，后端调用 code2Session 并建立独立的 `wechatMiniProgram` 身份；不保存 `session_key`，也不会自动合并 Apple/微信账户。
+- 小程序后台必须配置 API 的 HTTPS request 合法域名和隐私保护指引；真机不能使用 localhost 或裸 IP。
 
 ## DeepSeek
 

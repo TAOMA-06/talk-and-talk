@@ -13,7 +13,9 @@ import {
   WeChatNotifyPayload,
   WeChatPayProvider,
   WeChatPrepayInput,
-  WeChatPrepayResult
+  WeChatAppPrepayResult,
+  WeChatMiniProgramPrepayInput,
+  WeChatMiniProgramPrepayResult
   , WeChatRefundInput, WeChatRefundNotifyPayload, WeChatRefundResult
 } from "./wechat-pay.provider";
 
@@ -23,6 +25,7 @@ export type RealWeChatPayConfig = {
   apiV3Key: string;
   privateKeyPath: string;
   certSerialNo: string;
+  miniProgramAppId?: string;
   /** Optional override for tests / private endpoints. */
   apiBaseUrl?: string;
   /** Injectable fetch for unit tests. */
@@ -58,7 +61,7 @@ export class RealWeChatPayProvider implements WeChatPayProvider {
     this.fetchImpl = config.fetchImpl ?? fetch;
   }
 
-  async createAppPrepay(input: WeChatPrepayInput): Promise<WeChatPrepayResult> {
+  async createAppPrepay(input: WeChatPrepayInput): Promise<WeChatAppPrepayResult> {
     const body = {
       appid: this.config.appId,
       mchid: this.config.mchId,
@@ -92,6 +95,7 @@ export class RealWeChatPayProvider implements WeChatPayProvider {
 
     return {
       prepayId,
+      channel: "app",
       mock: false,
       clientParams: {
         appId: this.config.appId,
@@ -102,6 +106,47 @@ export class RealWeChatPayProvider implements WeChatPayProvider {
         timeStamp,
         sign
       }
+    };
+  }
+
+  async createMiniProgramPrepay(input: WeChatMiniProgramPrepayInput): Promise<WeChatMiniProgramPrepayResult> {
+    const appId = this.config.miniProgramAppId?.trim();
+    if (!appId) {
+      throw new AppException(
+        "WECHAT_MINIPROGRAM_PAY_NOT_CONFIGURED",
+        "WeChat Mini Program payment is not configured",
+        HttpStatus.SERVICE_UNAVAILABLE
+      );
+    }
+    if (!input.openId.trim()) {
+      throw new AppException("WECHAT_OPENID_MISSING", "WeChat OpenID is required for Mini Program payment", HttpStatus.CONFLICT);
+    }
+
+    const body = {
+      appid: appId,
+      mchid: this.config.mchId,
+      description: input.description.slice(0, 127),
+      out_trade_no: input.outTradeNo,
+      notify_url: input.notifyUrl,
+      amount: { total: input.amountCents, currency: "CNY" },
+      payer: { openid: input.openId }
+    };
+    const response = await this.requestJson<{ prepay_id?: string }>("POST", "/v3/pay/transactions/jsapi", body);
+    const prepayId = response.prepay_id?.trim();
+    if (!prepayId) {
+      throw new AppException("WECHAT_PREPAY_FAILED", "WeChat prepay response missing prepay_id", HttpStatus.BAD_GATEWAY);
+    }
+
+    const timeStamp = String(Math.floor(Date.now() / 1000));
+    const nonceStr = buildNonce();
+    const packageValue = `prepay_id=${prepayId}`;
+    // Mini Program pay sign message: appId\n timeStamp\n nonceStr\n package\n
+    const paySign = this.signMessage(`${appId}\n${timeStamp}\n${nonceStr}\n${packageValue}\n`);
+    return {
+      prepayId,
+      channel: "miniProgram",
+      mock: false,
+      clientParams: { timeStamp, nonceStr, package: packageValue, signType: "RSA", paySign }
     };
   }
 

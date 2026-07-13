@@ -1,0 +1,10 @@
+.chat-page { padding-bottom: 150rpx; }
+.notice { margin-bottom: 20rpx; padding: 16rpx; border-radius: 14rpx; background: #fce8ed; color: #9b3d58; font-size: 24rpx; line-height: 1.5; }
+.message { margin: 18rpx 0; }
+.sender { margin-bottom: 6rpx; color: #8d6e73; font-size: 23rpx; }
+.bubble { display: inline-block; max-width: 88%; padding: 18rpx 22rpx; border-radius: 18rpx; background: #fff; line-height: 1.55; box-shadow: 0 4rpx 12rpx rgba(96, 50, 60, 0.06); }
+.system .bubble { background: #f5e7ec; color: #7a4857; font-size: 26rpx; }
+.composer { position: fixed; right: 0; bottom: 0; left: 0; display: flex; gap: 14rpx; padding: 16rpx 24rpx; background: #fff; box-shadow: 0 -4rpx 16rpx rgba(96, 50, 60, 0.08); }
+.composer input { flex: 1; padding: 16rpx; border-radius: 16rpx; background: #f9edef; }
+.send { margin: 0; background: #b94a68; color: #fff; font-size: 27rpx; }
+.report { margin: 28rpx auto 0; background: transparent; color: #8d6e73; font-size: 24rpx; }

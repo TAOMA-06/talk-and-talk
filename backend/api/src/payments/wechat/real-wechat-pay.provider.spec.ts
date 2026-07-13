@@ -98,6 +98,42 @@ describe("RealWeChatPayProvider helpers", () => {
     unlinkSync(keyPath);
   });
 
+  it("creates Mini Program JSAPI params with the Mini Program AppID and OpenID", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "wx-pay-"));
+    const keyPath = join(dir, "key.pem");
+    const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+    writeFileSync(keyPath, privateKey.export({ type: "pkcs8", format: "pem" }));
+    const fetchImpl = jest.fn().mockResolvedValue({
+      ok: true,
+      text: async () => JSON.stringify({ prepay_id: "wx_mini_prepay" })
+    });
+    const provider = new RealWeChatPayProvider({
+      appId: "wx_ios_app",
+      miniProgramAppId: "wx_mini_app",
+      mchId: "1900000000",
+      apiV3Key: "B".repeat(32),
+      privateKeyPath: keyPath,
+      certSerialNo: "SERIAL1",
+      apiBaseUrl: "https://example.test",
+      fetchImpl: fetchImpl as unknown as typeof fetch
+    });
+
+    const result = await provider.createMiniProgramPrepay({
+      outTradeNo: "T1000", description: "test", amountCents: 100, notifyUrl: "https://api.example/notify", openId: "openid-1"
+    });
+
+    expect(result.channel).toBe("miniProgram");
+    expect(result.clientParams.package).toBe("prepay_id=wx_mini_prepay");
+    expect(result.clientParams.signType).toBe("RSA");
+    expect(result.clientParams.paySign).toBeTruthy();
+    expect(fetchImpl.mock.calls[0][0]).toBe("https://example.test/v3/pay/transactions/jsapi");
+    expect(JSON.parse(fetchImpl.mock.calls[0][1].body)).toEqual(expect.objectContaining({
+      appid: "wx_mini_app", payer: { openid: "openid-1" }
+    }));
+
+    unlinkSync(keyPath);
+  });
+
   it("parseNotifyPayload decrypts ciphertext resource", () => {
     const dir = mkdtempSync(join(tmpdir(), "wx-pay-"));
     const keyPath = join(dir, "key.pem");

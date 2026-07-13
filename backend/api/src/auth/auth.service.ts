@@ -184,6 +184,64 @@ export class AuthService {
     return { ...tokens, user: profile };
   }
 
+  /**
+   * Exchanges the short-lived wx.login code on the server. The returned session_key
+   * deliberately never leaves this method and is not persisted by Talk&Talk.
+   */
+  async loginWithWechatMiniProgram(code: string): Promise<AuthTokens & { user: UserWithProfile }> {
+    const appId = this.config.get<string>("WECHAT_MINIPROGRAM_APP_ID", "").trim();
+    const appSecret = this.config.get<string>("WECHAT_MINIPROGRAM_APP_SECRET", "").trim();
+    const trimmedCode = code.trim();
+
+    if (!appId || !appSecret) {
+      throw new AppException(
+        "WECHAT_MINIPROGRAM_LOGIN_UNAVAILABLE",
+        "WeChat Mini Program login is not configured",
+        HttpStatus.SERVICE_UNAVAILABLE
+      );
+    }
+    if (!trimmedCode) {
+      throw new AppException("INVALID_WECHAT_CODE", "WeChat login code is required", HttpStatus.BAD_REQUEST);
+    }
+
+    const query = new URLSearchParams({
+      appid: appId,
+      secret: appSecret,
+      js_code: trimmedCode,
+      grant_type: "authorization_code"
+    });
+
+    let payload: { openid?: unknown; errcode?: unknown; errmsg?: unknown };
+    try {
+      const response = await fetch(`https://api.weixin.qq.com/sns/jscode2session?${query.toString()}`);
+      payload = await response.json() as { openid?: unknown; errcode?: unknown; errmsg?: unknown };
+      if (!response.ok) {
+        throw new Error("WeChat login request failed");
+      }
+    } catch {
+      throw new AppException(
+        "WECHAT_LOGIN_UNAVAILABLE",
+        "Unable to verify WeChat login at this time",
+        HttpStatus.BAD_GATEWAY
+      );
+    }
+
+    const openId = typeof payload.openid === "string" ? payload.openid.trim() : "";
+    if (!openId) {
+      throw new AppException(
+        "INVALID_WECHAT_CODE",
+        "WeChat login code is invalid or expired",
+        HttpStatus.UNAUTHORIZED
+      );
+    }
+
+    const user = await this.findOrCreateByWechatMiniProgram(openId);
+    const tokens = await this.issueTokens(user);
+    const profile = await this.getUserWithProfile(user.id);
+    await this.recordLoginAudit(user.id, user.role, "wechatMiniProgram");
+    return { ...tokens, user: profile };
+  }
+
   async refresh(refreshToken: string): Promise<AuthTokens> {
     const refreshSecret = this.config.getOrThrow<string>("JWT_REFRESH_SECRET");
 
@@ -261,7 +319,7 @@ export class AuthService {
   }
 
   private async findOrCreateByPhone(phone: string) {
-    const identity = await this.prisma.authIdentity.findUnique({
+    const identity: any = await this.prisma.authIdentity.findUnique({
       where: { provider_providerId: { provider: "phone", providerId: phone } },
       include: { user: true }
     });
@@ -296,6 +354,29 @@ export class AuthService {
         profile: { create: {} }
       }
     });
+  }
+
+  private async findOrCreateByWechatMiniProgram(openId: string) {
+    const identity: any = await this.prisma.authIdentity.findUnique({
+      where: {
+        provider_providerId: {
+          provider: "wechatMiniProgram",
+          providerId: openId
+        }
+      },
+      include: { user: true }
+    } as any);
+
+    if (identity) return identity.user;
+
+    return this.prisma.user.create({
+      data: {
+        identities: {
+          create: { provider: "wechatMiniProgram", providerId: openId }
+        },
+        profile: { create: {} }
+      }
+    } as any);
   }
 
   private async issueTokens(user: { id: string; role: string }): Promise<AuthTokens> {

@@ -1,0 +1,33 @@
+{
+  "pages": [
+    "pages/discover/index",
+    "pages/community/index",
+    "pages/orders/index",
+    "pages/messages/index",
+    "pages/profile/index",
+    "pages/companion/detail",
+    "pages/chat/index"
+  ],
+  "window": {
+    "navigationBarBackgroundColor": "#FFF8F8",
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "Talk&Talk",
+    "backgroundColor": "#FFF8F8",
+    "backgroundTextStyle": "light"
+  },
+  "tabBar": {
+    "color": "#8D6E73",
+    "selectedColor": "#B94A68",
+    "backgroundColor": "#FFFFFF",
+    "borderStyle": "white",
+    "list": [
+      { "pagePath": "pages/discover/index", "text": "发现" },
+      { "pagePath": "pages/community/index", "text": "广场" },
+      { "pagePath": "pages/orders/index", "text": "订单" },
+      { "pagePath": "pages/messages/index", "text": "消息" },
+      { "pagePath": "pages/profile/index", "text": "我的" }
+    ]
+  },
+  "sitemapLocation": "sitemap.json",
+  "style": "v2"
+}
