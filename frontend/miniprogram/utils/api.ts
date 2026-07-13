@@ -11,6 +11,7 @@ const ACCESS_TOKEN_KEY = "talkandtalk.accessToken";
 const REFRESH_TOKEN_KEY = "talkandtalk.refreshToken";
 const USER_KEY = "talkandtalk.user";
 let refreshInFlight: Promise<void> | null = null;
+let loginInFlight: Promise<AuthSession> | null = null;
 
 function storedAccessToken(): string { return wx.getStorageSync(ACCESS_TOKEN_KEY) || ""; }
 function storedRefreshToken(): string { return wx.getStorageSync(REFRESH_TOKEN_KEY) || ""; }
@@ -28,6 +29,25 @@ export function clearSession(): void {
 }
 
 export function currentUser(): AuthUser | null { return wx.getStorageSync(USER_KEY) || null; }
+
+function decodeJwtPayload(token: string): { exp?: number } | null {
+  try {
+    const segment = token.split(".")[1];
+    if (!segment) return null;
+    const padded = segment.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((segment.length + 3) % 4);
+    const bytes = wx.base64ToArrayBuffer(padded);
+    const text = String.fromCharCode(...new Uint8Array(bytes));
+    return JSON.parse(text) as { exp?: number };
+  } catch {
+    return null;
+  }
+}
+
+function isAccessTokenExpired(token: string, skewMs = 30_000): boolean {
+  const payload = decodeJwtPayload(token);
+  if (!payload?.exp) return false;
+  return payload.exp * 1000 <= Date.now() + skewMs;
+}
 
 function rawRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const header: Record<string, string> = { "content-type": "application/json" };
@@ -68,23 +88,6 @@ async function refreshSession(): Promise<void> {
   return refreshInFlight;
 }
 
-export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  try {
-    return await rawRequest<T>(path, options);
-  } catch (error) {
-    const apiError = error as ApiError;
-    if (options.authenticated !== false && options.retry !== false && apiError.statusCode === 401 && storedRefreshToken()) {
-      try {
-        await refreshSession();
-        return rawRequest<T>(path, { ...options, retry: false });
-      } catch {
-        clearSession();
-      }
-    }
-    throw error;
-  }
-}
-
 function wxLoginCode(): Promise<string> {
   return new Promise((resolve, reject) => wx.login({
     success: (result: any) => result.code ? resolve(result.code) : reject(new Error("未获取到微信登录凭证")),
@@ -92,14 +95,68 @@ function wxLoginCode(): Promise<string> {
   }));
 }
 
+async function loginWithWechatCode(): Promise<AuthSession> {
+  if (loginInFlight) return loginInFlight;
+  loginInFlight = (async () => {
+    const code = await wxLoginCode();
+    const session = await rawRequest<AuthSession>("/auth/wechat/mini-program", {
+      method: "POST", data: { code }, authenticated: false
+    });
+    saveSession(session);
+    return session;
+  })().finally(() => { loginInFlight = null; });
+  return loginInFlight;
+}
+
+export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  try {
+    return await rawRequest<T>(path, options);
+  } catch (error) {
+    const apiError = error as ApiError;
+    if (options.authenticated === false || options.retry === false || apiError.statusCode !== 401) {
+      throw error;
+    }
+
+    if (storedRefreshToken()) {
+      try {
+        await refreshSession();
+        return rawRequest<T>(path, { ...options, retry: false });
+      } catch {
+        clearSession();
+      }
+    } else {
+      clearSession();
+    }
+
+    try {
+      await loginWithWechatCode();
+      return rawRequest<T>(path, { ...options, retry: false });
+    } catch {
+      throw error;
+    }
+  }
+}
+
 export async function ensureSession(): Promise<AuthSession | null> {
-  if (storedAccessToken() && currentUser()) return null;
-  const code = await wxLoginCode();
-  const session = await rawRequest<AuthSession>("/auth/wechat/mini-program", {
-    method: "POST", data: { code }, authenticated: false
-  });
-  saveSession(session);
-  return session;
+  const accessToken = storedAccessToken();
+  if (accessToken && currentUser() && !isAccessTokenExpired(accessToken)) {
+    return null;
+  }
+
+  if (storedRefreshToken()) {
+    try {
+      await refreshSession();
+      if (!currentUser()) {
+        const user = await rawRequest<AuthUser>("/me");
+        wx.setStorageSync(USER_KEY, user);
+      }
+      if (storedAccessToken() && currentUser()) return null;
+    } catch {
+      clearSession();
+    }
+  }
+
+  return loginWithWechatCode();
 }
 
 export async function logout(): Promise<void> {

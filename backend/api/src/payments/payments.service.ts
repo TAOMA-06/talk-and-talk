@@ -504,10 +504,10 @@ export class PaymentsService {
   }
 
   private async findMiniProgramOpenId(userId: string): Promise<string> {
-    const identity: any = await this.prisma.authIdentity.findFirst({
+    const identity = await this.prisma.authIdentity.findFirst({
       where: { userId, provider: "wechatMiniProgram" },
       orderBy: { id: "asc" }
-    } as any);
+    });
     const openId = identity?.providerId?.trim();
     if (!openId) {
       throw new AppException(

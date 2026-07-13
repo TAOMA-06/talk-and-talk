@@ -6,6 +6,7 @@ DerivedData/
 xcuserdata/
 *.xcuserstate
 frontend/ios/build/
+frontend/ios/Screenshots/
 **/TalkAndTalk 2.xcodeproj/
 
 # Backend dependencies and generated output

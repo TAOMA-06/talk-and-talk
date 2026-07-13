@@ -134,7 +134,11 @@ final class TalkAndTalkUITests: XCTestCase {
         chooseInitialGender(in: app)
         tapTab(in: app, label: "消息", identifier: "bubble.left.and.bubble.right")
         XCTAssertTrue(app.textFields["messageSearchBar"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.staticTexts["平台内安全沟通"].exists || app.staticTexts["暂无沟通会话"].waitForExistence(timeout: 3))
+        XCTAssertTrue(
+            app.staticTexts["平台内沟通 · 可举报"].waitForExistence(timeout: 3)
+                || app.staticTexts["暂无会话"].exists
+                || app.staticTexts["还没有会话"].exists
+        )
         XCTAssertFalse(app.staticTexts["林屿"].exists)
     }
 

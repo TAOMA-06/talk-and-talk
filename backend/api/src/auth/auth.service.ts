@@ -319,7 +319,7 @@ export class AuthService {
   }
 
   private async findOrCreateByPhone(phone: string) {
-    const identity: any = await this.prisma.authIdentity.findUnique({
+    const identity = await this.prisma.authIdentity.findUnique({
       where: { provider_providerId: { provider: "phone", providerId: phone } },
       include: { user: true }
     });
@@ -357,7 +357,7 @@ export class AuthService {
   }
 
   private async findOrCreateByWechatMiniProgram(openId: string) {
-    const identity: any = await this.prisma.authIdentity.findUnique({
+    const identity = await this.prisma.authIdentity.findUnique({
       where: {
         provider_providerId: {
           provider: "wechatMiniProgram",
@@ -365,7 +365,7 @@ export class AuthService {
         }
       },
       include: { user: true }
-    } as any);
+    });
 
     if (identity) return identity.user;
 
@@ -376,7 +376,7 @@ export class AuthService {
         },
         profile: { create: {} }
       }
-    } as any);
+    });
   }
 
   private async issueTokens(user: { id: string; role: string }): Promise<AuthTokens> {
