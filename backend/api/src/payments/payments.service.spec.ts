@@ -88,6 +88,15 @@ describe("PaymentsService", () => {
     service = new PaymentsService(prisma, config, ordersService, wechat, notifications, audit, metrics);
   });
 
+  it("reports the active provider mode for deployment readiness", () => {
+    expect(service.status()).toEqual({
+      module: "payments",
+      status: "active",
+      provider: "mock",
+      productionReady: false
+    });
+  });
+
   it("fulfills mock notify: paying -> paid and activates conversation once", async () => {
     prisma.$transaction.mockImplementation(async (fn: any) => {
       const payment = {

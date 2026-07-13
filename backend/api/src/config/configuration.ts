@@ -21,6 +21,7 @@ interface Environment {
   WECHAT_PAY_APP_ID: string;
   WECHAT_PAY_MCH_ID: string;
   WECHAT_PAY_API_V3_KEY: string;
+  WECHAT_PAY_PRIVATE_KEY: string;
   WECHAT_PAY_PRIVATE_KEY_PATH: string;
   WECHAT_PAY_CERT_SERIAL_NO: string;
   WECHAT_PAY_NOTIFY_BASE_URL: string;
@@ -192,6 +193,7 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     WECHAT_PAY_APP_ID: optionalString(env.WECHAT_PAY_APP_ID),
     WECHAT_PAY_MCH_ID: optionalString(env.WECHAT_PAY_MCH_ID),
     WECHAT_PAY_API_V3_KEY: optionalString(env.WECHAT_PAY_API_V3_KEY),
+    WECHAT_PAY_PRIVATE_KEY: optionalString(env.WECHAT_PAY_PRIVATE_KEY),
     WECHAT_PAY_PRIVATE_KEY_PATH: optionalString(env.WECHAT_PAY_PRIVATE_KEY_PATH),
     WECHAT_PAY_CERT_SERIAL_NO: optionalString(env.WECHAT_PAY_CERT_SERIAL_NO),
     WECHAT_PAY_NOTIFY_BASE_URL: optionalUrl(env.WECHAT_PAY_NOTIFY_BASE_URL),

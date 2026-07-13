@@ -23,7 +23,8 @@ export type RealWeChatPayConfig = {
   appId: string;
   mchId: string;
   apiV3Key: string;
-  privateKeyPath: string;
+  privateKey?: string;
+  privateKeyPath?: string;
   certSerialNo: string;
   miniProgramAppId?: string;
   /** Optional override for tests / private endpoints. */
@@ -48,6 +49,7 @@ const PLATFORM_CERT_TTL_MS = 12 * 60 * 60 * 1000;
  * - AES-256-GCM resource decryption with apiV3Key
  */
 export class RealWeChatPayProvider implements WeChatPayProvider {
+  readonly mode = "real" as const;
   readonly isMock = false;
   private readonly privateKey: string;
   private readonly apiBaseUrl: string;
@@ -56,7 +58,16 @@ export class RealWeChatPayProvider implements WeChatPayProvider {
   private platformCertsFetchedAt = 0;
 
   constructor(private readonly config: RealWeChatPayConfig) {
-    this.privateKey = readFileSync(config.privateKeyPath, "utf8");
+    const inlinePrivateKey = config.privateKey?.trim().replace(/\\n/g, "\n");
+    if (inlinePrivateKey) {
+      this.privateKey = inlinePrivateKey;
+    } else if (config.privateKeyPath?.trim()) {
+      this.privateKey = readFileSync(config.privateKeyPath, "utf8");
+    } else {
+      throw new Error(
+        "WeChat Pay private key is required via WECHAT_PAY_PRIVATE_KEY or WECHAT_PAY_PRIVATE_KEY_PATH"
+      );
+    }
     this.apiBaseUrl = (config.apiBaseUrl ?? WECHAT_API_BASE).replace(/\/+$/, "");
     this.fetchImpl = config.fetchImpl ?? fetch;
   }
@@ -416,14 +427,15 @@ export function isWeChatConfigured(config: {
   WECHAT_PAY_APP_ID: string;
   WECHAT_PAY_MCH_ID: string;
   WECHAT_PAY_API_V3_KEY: string;
-  WECHAT_PAY_PRIVATE_KEY_PATH: string;
+  WECHAT_PAY_PRIVATE_KEY?: string;
+  WECHAT_PAY_PRIVATE_KEY_PATH?: string;
   WECHAT_PAY_CERT_SERIAL_NO: string;
 }): boolean {
   return Boolean(
     config.WECHAT_PAY_APP_ID &&
       config.WECHAT_PAY_MCH_ID &&
       config.WECHAT_PAY_API_V3_KEY &&
-      config.WECHAT_PAY_PRIVATE_KEY_PATH &&
+      (config.WECHAT_PAY_PRIVATE_KEY || config.WECHAT_PAY_PRIVATE_KEY_PATH) &&
       config.WECHAT_PAY_CERT_SERIAL_NO
   );
 }

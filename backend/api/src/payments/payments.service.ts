@@ -36,6 +36,15 @@ export class PaymentsService {
     private readonly metrics: MetricsService
   ) {}
 
+  status() {
+    return {
+      module: "payments",
+      status: this.wechat.mode === "disabled" ? "unavailable" : "active",
+      provider: this.wechat.mode,
+      productionReady: this.wechat.mode === "real"
+    };
+  }
+
   async prepay(userId: string, orderId: string, channel: "app" | "miniProgram" = "app") {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },

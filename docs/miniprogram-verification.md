@@ -1,6 +1,6 @@
 # 微信小程序与 iOS 双端验证记录
 
-更新时间：2026-07-12
+更新时间：2026-07-13
 
 ## 当前已验证
 
@@ -8,8 +8,10 @@
 |---|---|---|
 | 小程序工程完整性 | 通过 | `scripts/validate.mjs` 验证 7 个页面、5 个 Tab、WXML 事件、页面跳转、HTTPS API 与客户端密钥边界 |
 | 小程序 TypeScript | 通过 | `tsc --noEmit` 零错误；`project.config.json` 已启用 `typescript` 编译插件 |
-| 小程序页面运行时烟测 | 通过 | 编译并加载页面模块，模拟 `wx.login`、正式 API envelope、发现/预约、广场、订单、会话/消息、profile 与 mock 支付 |
-| 后端微信登录/JSAPI 支付 | 通过 | 26 个测试套件、103 项测试全部通过；包含 code2Session、OpenID 身份、双支付通道、社区与评价 |
+| 小程序页面运行时烟测 | 通过 | 编译并加载页面模块，模拟 `wx.login`、正式 API envelope、发现/预约、广场、订单、会话/消息、profile、mock 支付，以及 HTTPS/Cloud Run 双传输 |
+| 后端微信登录/JSAPI 支付 | 通过 | 27 个测试套件、109 项测试全部通过；包含控制器/DTO/就绪探针、code2Session、OpenID 身份、双支付通道、CloudBase 私钥注入、社区与评价 |
+| 云端部署预检 | 通过 | 4 项预检测试覆盖完整生产配置、占位密钥、Redis 密码、JWT 隔离、微信支付字段和 staging Mock 策略 |
+| 微信云托管代码适配 | 通过 | `develop/trial/release` 环境隔离、`wx.cloud.callContainer`、`X-WX-SERVICE` 与 `/api/v1` 路径已通过自动烟测 |
 | iOS Debug | 通过 | iPhone 17 Pro / iOS 26.5 模拟器实际构建启动，运行时 UI 可见发现、广场、订单、消息、我的 5 个 Tab |
 | iOS 单元测试 | 通过 | `TalkAndTalkTests` 52 项通过，0 失败 |
 | iOS Release 编译 | 通过 | `TalkAndTalk` Release 模拟器构建成功，Apple 登录主线程隔离警告已清零 |

@@ -16,6 +16,7 @@ import {
  * Never accepts notify signatures — prevents mock forge surface.
  */
 export class DisabledWeChatPayProvider implements WeChatPayProvider {
+  readonly mode = "disabled" as const;
   readonly isMock = false;
 
   async createAppPrepay(_input: WeChatPrepayInput): Promise<WeChatAppPrepayResult> {

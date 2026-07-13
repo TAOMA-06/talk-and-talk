@@ -121,6 +121,7 @@ Staging 部署：
 
 ```bash
 cp backend/api/.env.staging.example backend/api/.env.staging
+cd backend/api && npm run preflight:deployment -- .env.staging && cd ../..
 DEPLOY_ENV_FILE=../backend/api/.env.staging \
   docker compose -f infra/docker-compose.prod.yml --env-file backend/api/.env.staging up -d --build
 ./backend/api/scripts/acceptance-smoke.sh https://api-staging.talkandtalk.app
@@ -145,6 +146,7 @@ open frontend/ios/TalkAndTalk.xcodeproj
 ```bash
 cd backend/api
 npm test
+npm run test:preflight
 npm run test:e2e         # 同 npm run test:integration；需 Postgres + Redis
 ./scripts/acceptance-smoke.sh http://127.0.0.1:3000
 ```

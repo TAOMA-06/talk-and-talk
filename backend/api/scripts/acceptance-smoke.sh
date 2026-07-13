@@ -13,9 +13,9 @@ echo "==> Send SMS"
 SEND_JSON=$(curl -fsS -X POST "$API/auth/sms/send-code" \
   -H 'Content-Type: application/json' \
   -d "{\"phone\":\"$PHONE\"}")
-CODE=$(python3 - <<'PY' "$SEND_JSON"
+CODE=$(python3 - "$SEND_JSON" <<'PY'
 import json, sys
-data = json.load(sys.stdin)["data"]
+data = json.loads(sys.argv[1])["data"]
 print(data.get("devCode") or "")
 PY
 )
@@ -28,9 +28,9 @@ echo "==> Phone login"
 LOGIN_JSON=$(curl -fsS -X POST "$API/auth/phone/login" \
   -H 'Content-Type: application/json' \
   -d "{\"phone\":\"$PHONE\",\"code\":\"$CODE\"}")
-TOKEN=$(python3 - <<'PY' "$LOGIN_JSON"
+TOKEN=$(python3 - "$LOGIN_JSON" <<'PY'
 import json, sys
-print(json.load(sys.stdin)["data"]["accessToken"])
+print(json.loads(sys.argv[1])["data"]["accessToken"])
 PY
 )
 
@@ -38,22 +38,27 @@ echo "==> Companions"
 curl -fsS -H "Authorization: Bearer $TOKEN" "$API/companions" >/dev/null
 
 echo "==> Create order + prepay"
+SCHEDULED_AT=$(python3 - <<'PY'
+from datetime import datetime, timedelta, timezone
+print((datetime.now(timezone.utc) + timedelta(hours=1)).isoformat().replace("+00:00", "Z"))
+PY
+)
 ORDER_JSON=$(curl -fsS -X POST "$API/orders" \
   -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
-  -d '{"companionId":"c1","themeId":"t1","durationMinutes":30}')
-ORDER_ID=$(python3 - <<'PY' "$ORDER_JSON"
+  -d "{\"companionId\":\"c1\",\"themeId\":\"t1\",\"durationMinutes\":30,\"scheduledAt\":\"$SCHEDULED_AT\"}")
+ORDER_ID=$(python3 - "$ORDER_JSON" <<'PY'
 import json, sys
-print(json.load(sys.stdin)["data"]["id"])
+print(json.loads(sys.argv[1])["data"]["id"])
 PY
 )
 PREPAY_JSON=$(curl -fsS -X POST "$API/orders/$ORDER_ID/prepay" \
   -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{}')
-OUT_TRADE_NO=$(python3 - <<'PY' "$PREPAY_JSON"
+OUT_TRADE_NO=$(python3 - "$PREPAY_JSON" <<'PY'
 import json, sys
-print(json.load(sys.stdin)["data"]["payment"]["outTradeNo"])
+print(json.loads(sys.argv[1])["data"]["payment"]["outTradeNo"])
 PY
 )
 
@@ -74,9 +79,9 @@ BLOCK_JSON=$(curl -fsS -X POST "$API/conversations/c1/messages" \
   -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"content":"加微信私下聊","senderId":"smoke-user"}')
-python3 - <<'PY' "$BLOCK_JSON"
+python3 - "$BLOCK_JSON" <<'PY'
 import json, sys
-data = json.load(sys.stdin)["data"]
+data = json.loads(sys.argv[1])["data"]
 assert data["moderation"]["decision"] == "block", data
 print("block ok")
 PY

@@ -81,7 +81,13 @@ for (const file of walk(root).filter((path) => [".ts", ".wxml", ".json"].include
 
 const apiConfig = readFileSync(join(root, "utils/config.ts"), "utf8");
 if (!/https:\/\//.test(apiConfig) || /localhost|127\.0\.0\.1/.test(apiConfig)) {
-  errors.push("utils/config.ts must use a public HTTPS API domain");
+  errors.push("utils/config.ts must keep public HTTPS API endpoints for iOS and payment callbacks");
+}
+if (!/api-staging\.talkandtalk\.app/.test(apiConfig) || !/api\.talkandtalk\.app/.test(apiConfig)) {
+  errors.push("utils/config.ts must separate staging and release HTTPS endpoints");
+}
+if (!/callContainer/.test(readFileSync(join(root, "utils/api.ts"), "utf8")) || !/X-WX-SERVICE/.test(readFileSync(join(root, "utils/api.ts"), "utf8"))) {
+  errors.push("utils/api.ts must preserve the WeChat Cloud Run transport boundary");
 }
 
 for (const warning of warnings) console.warn(`WARN: ${warning}`);

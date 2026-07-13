@@ -173,6 +173,29 @@ paths:
                         $ref: "#/components/schemas/AuthSession"
         "401":
           $ref: "#/components/responses/Error"
+  /auth/wechat/mini-program/status:
+    get:
+      tags: [auth]
+      summary: Check whether server-side Mini Program credentials are configured
+      operationId: wechatMiniProgramStatus
+      security: []
+      responses:
+        "200":
+          description: Configuration readiness without credential values
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [module, status, configured]
+                        properties:
+                          module: { type: string, enum: [wechatMiniProgram] }
+                          status: { type: string, enum: [configured, unconfigured] }
+                          configured: { type: boolean }
   /auth/refresh:
     post:
       tags: [auth]
@@ -571,11 +594,22 @@ paths:
       operationId: paymentsStatus
       responses:
         "200":
-          description: Status
+          description: Active payment provider and production readiness
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SuccessEnvelope"
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [module, status, provider, productionReady]
+                        properties:
+                          module: { type: string, enum: [payments] }
+                          status: { type: string, enum: [active, unavailable] }
+                          provider: { type: string, enum: [real, mock, disabled] }
+                          productionReady: { type: boolean }
   /payments/wechat/notify:
     post:
       tags: [payments]

@@ -89,6 +89,14 @@ describe("AuthService", () => {
     global.fetch = originalFetch;
   });
 
+  it("reports Mini Program credentials as configured without returning them", () => {
+    expect(service.wechatMiniProgramStatus()).toEqual({
+      module: "wechatMiniProgram",
+      status: "configured",
+      configured: true
+    });
+  });
+
   describe("sendCode", () => {
     it("should send a code and return TTL", async () => {
       mockPrisma.verificationCode.create.mockResolvedValue({ id: "vc-1" });

@@ -5,10 +5,12 @@ on:
     branches: [main]
     paths:
       - "backend/api/**"
+      - "shared/contracts/**"
       - ".github/workflows/api.yml"
   pull_request:
     paths:
       - "backend/api/**"
+      - "shared/contracts/**"
       - ".github/workflows/api.yml"
 
 defaults:
@@ -67,6 +69,8 @@ jobs:
         run: npm run build
       - name: Unit tests
         run: npm test
+      - name: Deployment preflight tests
+        run: npm run test:preflight
       - name: Migrate
         run: npx prisma migrate deploy
       - name: E2E tests

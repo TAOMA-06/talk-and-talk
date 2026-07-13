@@ -9,6 +9,7 @@
     "start:dev": "ts-node-dev --respawn --transpile-only src/main.ts",
     "start:prod": "node dist/main.js",
     "test": "npm run prisma:generate && jest --runInBand",
+    "test:preflight": "node --test scripts/deployment-preflight.test.mjs",
     "test:e2e": "npm run prisma:generate && jest --config test/jest-e2e.json --runInBand",
     "test:integration": "npm run test:e2e",
     "prisma:generate": "prisma generate",
@@ -16,7 +17,8 @@
     "prisma:deploy": "prisma migrate deploy",
     "prisma:seed": "ts-node src/database/seed.ts",
     "db:deploy": "prisma migrate deploy",
-    "db:seed": "ts-node src/database/seed.ts"
+    "db:seed": "ts-node src/database/seed.ts",
+    "preflight:deployment": "node scripts/deployment-preflight.mjs"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.15",

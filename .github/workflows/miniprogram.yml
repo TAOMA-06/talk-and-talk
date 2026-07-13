@@ -4,10 +4,12 @@ on:
   push:
     paths:
       - "frontend/miniprogram/**"
+      - "shared/contracts/**"
       - ".github/workflows/miniprogram.yml"
   pull_request:
     paths:
       - "frontend/miniprogram/**"
+      - "shared/contracts/**"
       - ".github/workflows/miniprogram.yml"
 
 jobs:

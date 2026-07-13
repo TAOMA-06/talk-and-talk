@@ -13,6 +13,7 @@ import {
 export const MOCK_WECHAT_NOTIFY_TOKEN = "mock-wechat-notify";
 
 export class MockWeChatPayProvider implements WeChatPayProvider {
+  readonly mode = "mock" as const;
   readonly isMock = true;
 
   async createAppPrepay(input: WeChatPrepayInput): Promise<WeChatAppPrepayResult> {

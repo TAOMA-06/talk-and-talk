@@ -12,6 +12,7 @@
 
 ## CORS / JWT / 密钥
 
+- [ ] `cd backend/api && npm run preflight:deployment -- .env.production` 通过
 - [ ] `CORS_ORIGINS` 为显式 allowlist（生产禁止依赖开发默认列表）
 - [ ] `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` 为高强度随机值，非 `CHANGE_ME` / 开发默认
 - [ ] access / refresh 密钥互不相同
@@ -26,8 +27,10 @@
 
 ## 微信支付
 
+- [ ] `GET /api/v1/payments/status` 返回 `provider=real`、`productionReady=true`
 - [ ] `WECHAT_PAY_APP_ID` / `MCH_ID` / `API_V3_KEY` / `CERT_SERIAL_NO` / `NOTIFY_BASE_URL` 已填
-- [ ] `WECHAT_PAY_PRIVATE_KEY_PATH` 指向容器内可读私钥；compose 中已取消注释 volume 并挂载（见 `secrets/README.md`）
+- [ ] 私钥二选一：CloudBase 使用加密环境变量 `WECHAT_PAY_PRIVATE_KEY`；Compose 使用指向容器内可读文件的 `WECHAT_PAY_PRIVATE_KEY_PATH`（见 [`infra/secrets/README.md`](../infra/secrets/README.md)）
+- [ ] 商户私钥未提交到仓库、未进入小程序包、未出现在日志中
 - [ ] 通知 URL 可达：`https://api.talkandtalk.app/api/v1/payments/wechat/notify`
 - [ ] 生产未配齐微信时 prepay 返回 `WECHAT_PAY_NOT_CONFIGURED`（**禁止** Mock 提供商）
 - [ ] 真实 prepay / 平台证书验签 / resource 解密已联调通过（沙箱或生产小额）
@@ -35,7 +38,8 @@
 
 ## 微信小程序
 
-- [ ] 小程序主体与 `api.talkandtalk.app` 已完成所需备案，且该 HTTPS 域名已配置为 request 合法域名
+- [ ] `GET /api/v1/auth/wechat/mini-program/status` 返回 `configured=true`
+- [ ] 使用 `wx.request` 时，小程序主体与 `api.talkandtalk.app` 已完成所需备案并配置 request 合法域名；使用云托管 `callContainer` 时已关联对应 CloudBase 环境
 - [ ] `WECHAT_MINIPROGRAM_APP_ID` / `WECHAT_MINIPROGRAM_APP_SECRET` 已填；AppSecret 仅存在于部署机密中
 - [ ] 微信支付商户号已绑定小程序 AppID，并开通 JSAPI 支付；真机已完成一笔小额支付与退款
 - [ ] 小程序后台已配置隐私保护指引；`/legal/privacy.html` 与 `/legal/terms.html` 均能在微信内打开
@@ -92,7 +96,7 @@
 ## 发布后冒烟
 
 ```bash
-./backend/api/scripts/acceptance-smoke.sh https://api.talkandtalk.app
+./backend/api/scripts/production-smoke.sh https://api.talkandtalk.app
 ```
 
-生产若禁用 mock 支付/SMS，冒烟脚本中相关步骤可能失败——按环境裁剪或仅跑 health + Apple/登录可达性检查。
+该脚本严格要求 health/database/redis 全部为 `ok`、小程序凭证已配置、支付 provider 为 `real`、短信 Mock 关闭、法律页可访问且公网 metrics 被阻断。可提供短期 `PRODUCTION_ACCESS_TOKEN` 额外验证 authenticated mock-notify 返回 403。

@@ -55,7 +55,8 @@ Day 1 routes currently available:
 | `POST /api/v1/orders/:id/cancel` | Cancel pending/paying order (JWT) |
 | `POST /api/v1/orders/:id/prepay` | WeChat App prepay → paying (JWT); returns `wechatAppParams` + `mock` flag |
 | `POST /api/v1/orders/:id/refund` | Refund skeleton (JWT): creates pending `RefundTransaction` |
-| `GET /api/v1/payments/status` | Payments module status (`active`) |
+| `GET /api/v1/payments/status` | Payment provider readiness：`real` / `mock` / `disabled` |
+| `GET /api/v1/auth/wechat/mini-program/status` | 小程序 AppID/AppSecret 配置就绪状态（不返回凭证） |
 | `POST /api/v1/payments/wechat/notify` | WeChat notify (signature verify, idempotent, amount/status checks; activates conversation on first success) |
 | `POST /api/v1/payments/wechat/mock-notify` | Dev/test only: simulate successful notify (JWT) |
 | `GET /api/v1/admin/status` | Admin module skeleton status (`admin` only) |
