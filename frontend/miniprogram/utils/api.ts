@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "./config";
+import { BackendConfig, backendConfig } from "./config";
 import {
   AuthSession, AuthUser, ChatMessage, CommunityPost, Companion, Conversation, MiniProgramPayParams,
   Notification, Order, Review
@@ -7,8 +7,14 @@ import {
   bindLegalConsentToUser, currentLegalConsent, requireLegalConsent, withdrawLegalConsent
 } from "./privacy";
 
-type RequestOptions = { method?: "GET" | "POST" | "PATCH" | "DELETE"; data?: Record<string, unknown>; authenticated?: boolean; retry?: boolean };
+export type RequestOptions = {
+  method?: "GET" | "POST" | "PATCH" | "DELETE";
+  data?: Record<string, unknown>;
+  authenticated?: boolean;
+  retry?: boolean;
+};
 type ApiError = Error & { statusCode?: number; code?: string };
+type TransportResponse = { statusCode: number; data?: any };
 
 const ACCESS_TOKEN_KEY = "talkandtalk.accessToken";
 const REFRESH_TOKEN_KEY = "talkandtalk.refreshToken";
@@ -17,6 +23,7 @@ let refreshInFlight: Promise<void> | null = null;
 let loginInFlight: Promise<AuthSession> | null = null;
 let legalConsentVerificationInFlight: Promise<void> | null = null;
 let verifiedLegalConsentKey = "";
+const initializedCloudEnvironments = new Set<string>();
 
 function storedAccessToken(): string { return wx.getStorageSync(ACCESS_TOKEN_KEY) || ""; }
 function storedRefreshToken(): string { return wx.getStorageSync(REFRESH_TOKEN_KEY) || ""; }
@@ -57,27 +64,57 @@ function isAccessTokenExpired(token: string, skewMs = 30_000): boolean {
   return payload.exp * 1000 <= Date.now() + skewMs;
 }
 
-function rawRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const header: Record<string, string> = { "content-type": "application/json" };
-  if (options.authenticated !== false && storedAccessToken()) header.Authorization = `Bearer ${storedAccessToken()}`;
+function ensureCloudInitialized(config: Extract<BackendConfig, { transport: "cloudRun" }>): void {
+  if (!wx.cloud?.init || !wx.cloud?.callContainer) {
+    throw new Error("当前微信基础库不支持云托管，请升级微信后重试");
+  }
+  if (initializedCloudEnvironments.has(config.envId)) return;
+  wx.cloud.init({ env: config.envId });
+  initializedCloudEnvironments.add(config.envId);
+}
+
+export function initializeBackend(): void {
+  const config = backendConfig();
+  if (config.transport === "cloudRun") ensureCloudInitialized(config);
+}
+
+/** Shared transport boundary: public HTTPS and WeChat Cloud Run return the same API envelope. */
+export function dispatchBackendRequest(
+  config: BackendConfig,
+  path: string,
+  options: RequestOptions,
+  header: Record<string, string>
+): Promise<TransportResponse> {
   return new Promise((resolve, reject) => {
+    const callbacks = {
+      success: (response: TransportResponse) => resolve(response),
+      fail: () => reject(new Error("网络连接失败，请稍后重试"))
+    };
+
+    if (config.transport === "cloudRun") {
+      try {
+        ensureCloudInitialized(config);
+      } catch (error) {
+        reject(error);
+        return;
+      }
+      wx.cloud.callContainer({
+        config: { env: config.envId },
+        path: `${config.apiPrefix}${path}`,
+        method: options.method || "GET",
+        data: options.data,
+        header: { ...header, "X-WX-SERVICE": config.service },
+        ...callbacks
+      });
+      return;
+    }
+
     wx.request({
-      url: `${API_BASE_URL}${path}`,
+      url: `${config.baseUrl}${path}`,
       method: options.method || "GET",
       data: options.data,
       header,
-      success: (response: any) => {
-        const body = response.data || {};
-        if (response.statusCode >= 200 && response.statusCode < 300) {
-          resolve(body.data as T);
-          return;
-        }
-        const error = new Error(body.error?.message || "服务暂时不可用") as ApiError;
-        error.statusCode = response.statusCode;
-        error.code = body.error?.code;
-        reject(error);
-      },
-      fail: () => reject(new Error("网络连接失败，请稍后重试"))
+      ...callbacks
     });
   });
 }
@@ -129,6 +166,19 @@ async function verifyServerLegalConsent(user: AuthUser): Promise<void> {
     verifiedLegalConsentKey = key;
   })().finally(() => { legalConsentVerificationInFlight = null; });
   return legalConsentVerificationInFlight;
+}
+
+async function rawRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const header: Record<string, string> = { "content-type": "application/json" };
+  if (options.authenticated !== false && storedAccessToken()) header.Authorization = `Bearer ${storedAccessToken()}`;
+  const response = await dispatchBackendRequest(backendConfig(), path, options, header);
+  const body = response.data || {};
+  if (response.statusCode >= 200 && response.statusCode < 300) return body.data as T;
+
+  const error = new Error(body.error?.message || "服务暂时不可用") as ApiError;
+  error.statusCode = response.statusCode;
+  error.code = body.error?.code;
+  throw error;
 }
 
 async function refreshSession(): Promise<void> {
@@ -196,8 +246,8 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     try {
       await loginWithWechatCode();
       return rawRequest<T>(path, { ...options, retry: false });
-    } catch {
-      throw error;
+    } catch (loginError) {
+      throw loginError;
     }
   }
 }
@@ -238,6 +288,7 @@ export async function logout(): Promise<void> {
 }
 
 export const api = {
+  health: () => request<{ status: "ok" | "degraded"; service: string; version: string }>("/health", { authenticated: false }),
   fetchMe: () => request<AuthUser>("/me"),
   updateMe: (data: Record<string, unknown>) => request<AuthUser>("/me", { method: "PATCH", data }),
   requestDeletion: () => request<{ id: string; status: string; message: string }>("/me/deletion-request", { method: "POST" }),

@@ -22,6 +22,7 @@ interface Environment {
   WECHAT_PAY_APP_ID: string;
   WECHAT_PAY_MCH_ID: string;
   WECHAT_PAY_API_V3_KEY: string;
+  WECHAT_PAY_PRIVATE_KEY: string;
   WECHAT_PAY_PRIVATE_KEY_PATH: string;
   WECHAT_PAY_CERT_SERIAL_NO: string;
   WECHAT_PAY_NOTIFY_BASE_URL: string;
@@ -268,17 +269,18 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
 
   const wechatPayMchId = optionalString(env.WECHAT_PAY_MCH_ID);
   const wechatPayApiV3Key = optionalString(env.WECHAT_PAY_API_V3_KEY);
+  const wechatPayPrivateKey = optionalString(env.WECHAT_PAY_PRIVATE_KEY);
   const wechatPayPrivateKeyPath = optionalString(env.WECHAT_PAY_PRIVATE_KEY_PATH);
   const wechatPayCertSerialNo = optionalString(env.WECHAT_PAY_CERT_SERIAL_NO);
   const wechatPayNotifyBaseUrl = optionalUrl(env.WECHAT_PAY_NOTIFY_BASE_URL);
 
   if (appEnv === "production") {
     const requiredMiniProgramPaymentConfig = {
+      WECHAT_PAY_APP_ID: optionalString(env.WECHAT_PAY_APP_ID),
       WECHAT_MINIPROGRAM_APP_ID: miniProgramAppId,
       WECHAT_MINIPROGRAM_APP_SECRET: miniProgramAppSecret,
       WECHAT_PAY_MCH_ID: wechatPayMchId,
       WECHAT_PAY_API_V3_KEY: wechatPayApiV3Key,
-      WECHAT_PAY_PRIVATE_KEY_PATH: wechatPayPrivateKeyPath,
       WECHAT_PAY_CERT_SERIAL_NO: wechatPayCertSerialNo,
       WECHAT_PAY_NOTIFY_BASE_URL: wechatPayNotifyBaseUrl
     };
@@ -287,6 +289,9 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
       .map(([name]) => name);
     if (missing.length > 0) {
       throw new Error(`Mini Program production payment configuration is missing: ${missing.join(", ")}`);
+    }
+    if (!wechatPayPrivateKey && !wechatPayPrivateKeyPath) {
+      throw new Error("Mini Program production payment configuration is missing: WECHAT_PAY_PRIVATE_KEY or WECHAT_PAY_PRIVATE_KEY_PATH");
     }
     if (wechatPayApiV3Key.length !== 32) {
       throw new Error("WECHAT_PAY_API_V3_KEY must be exactly 32 characters in production");
@@ -341,6 +346,7 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     WECHAT_PAY_APP_ID: optionalString(env.WECHAT_PAY_APP_ID),
     WECHAT_PAY_MCH_ID: wechatPayMchId,
     WECHAT_PAY_API_V3_KEY: wechatPayApiV3Key,
+    WECHAT_PAY_PRIVATE_KEY: wechatPayPrivateKey,
     WECHAT_PAY_PRIVATE_KEY_PATH: wechatPayPrivateKeyPath,
     WECHAT_PAY_CERT_SERIAL_NO: wechatPayCertSerialNo,
     WECHAT_PAY_NOTIFY_BASE_URL: wechatPayNotifyBaseUrl,

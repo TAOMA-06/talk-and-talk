@@ -47,7 +47,9 @@ try {
   const generatedConfig = readFileSync(join(generatedRoot, "utils/config.ts"), "utf8");
   const generatedProject = JSON.parse(readFileSync(join(generatedRoot, "project.config.json"), "utf8"));
   assert.match(generatedConfig, /GENERATED LOCAL DEVTOOLS BUILD ONLY/);
-  assert.match(generatedConfig, /API_BASE_URL = "http:\/\/127\.0\.0\.1:3000\/api\/v1"/);
+  for (const environment of ["develop", "trial", "release"]) {
+    assert.match(generatedConfig, new RegExp(`${environment}: "http:\\/\\/127\\.0\\.0\\.1:3000\\/api\\/v1"`));
+  }
   assert.match(generatedConfig, /privacy: "http:\/\/127\.0\.0\.1:3000\/legal\/privacy\.html"/);
   assert.match(generatedConfig, /terms: "http:\/\/127\.0\.0\.1:3000\/legal\/terms\.html"/);
   assert.doesNotMatch(generatedConfig, /WECHAT_MINIPROGRAM_APP_SECRET/);
@@ -69,7 +71,7 @@ try {
   const generatedReleaseValidation = run(validator, ["--root", generatedRoot], releaseEnvironment);
   assert.notEqual(generatedReleaseValidation.status, 0, "release validation must reject a generated local copy");
   assert.match(processOutput(generatedReleaseValidation), /setting\.urlCheck=true/);
-  assert.match(processOutput(generatedReleaseValidation), /API_BASE_URL must use a public HTTPS domain/);
+  assert.match(processOutput(generatedReleaseValidation), /HTTPS_BACKENDS\.release must use a public HTTPS domain/);
 
   const insecurePublicHttp = run(generator, [
     "--api-base-url", "http://example.com/api/v1",

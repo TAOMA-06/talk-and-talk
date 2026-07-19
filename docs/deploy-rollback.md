@@ -7,7 +7,8 @@
 1. 记录即将发布的 **git tag / commit** 与 `APP_VERSION`。
 2. 备份数据库：`DATABASE_URL=... ./backend/api/scripts/db-backup.sh`
 3. 确认目标环境 env 文件已填写且 **未提交 git**（`.env.staging` / `.env.production`）。
-4. 生产过一遍 [production-checklist.md](./production-checklist.md)。
+4. 执行 `cd backend/api && npm run preflight:deployment -- .env.production`（staging 换相应文件）。
+5. 生产过一遍 [production-checklist.md](./production-checklist.md)。
 
 ## Staging
 
@@ -34,6 +35,7 @@ cp backend/api/.env.production.example backend/api/.env.production
 docker compose -f infra/docker-compose.prod.yml --env-file backend/api/.env.production up -d --build
 
 curl -fsS https://api.talkandtalk.app/api/v1/health
+./backend/api/scripts/production-smoke.sh https://api.talkandtalk.app
 ```
 
 生产注意：
@@ -43,7 +45,7 @@ curl -fsS https://api.talkandtalk.app/api/v1/health
 | `SEED_ON_STARTUP` | `false` |
 | `SMS_PROVIDER` | 禁止 `mock`；真实厂商未就绪时见 NEXT_PHASE |
 | `mock-notify` | 生产应不可用或拒绝 |
-| 微信私钥 | `WECHAT_PAY_PRIVATE_KEY_HOST_PATH` 指向 host PEM，compose 固定只读挂载到 `WECHAT_PAY_PRIVATE_KEY_PATH` |
+| 微信私钥 | CloudBase 使用加密环境变量 `WECHAT_PAY_PRIVATE_KEY`；Compose 使用 `WECHAT_PAY_PRIVATE_KEY_HOST_PATH` 指向 host PEM，并只读挂载到 `WECHAT_PAY_PRIVATE_KEY_PATH` |
 | Redis | 建议 `requirepass`，URL 带密码 |
 | Metrics | 使用 `Authorization: Bearer $METRICS_TOKEN`，同时保留 Nginx 内网 allowlist |
 

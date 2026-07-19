@@ -83,6 +83,7 @@ Compose starts:
 ```bash
 npm run build
 npm test                 # unit
+npm run test:preflight   # deployment preflight validator tests
 npm run test:e2e         # integration-level HTTP tests (alias: test:integration)
 npm run test:integration
 ```
@@ -120,6 +121,12 @@ script at that instance; do not clear the shared Redis database or lower the
 production limit. `MOCK_SMS_RETRY_INTERVAL_SECONDS` and
 `MOCK_SMS_MAX_ATTEMPTS` remain bounded to a combined 60 seconds.
 
+Before a staging/production release, validate the filled environment file without printing secret values:
+
+```bash
+npm run preflight:deployment -- .env.production
+```
+
 ## API contract (frozen v1)
 
 Machine-readable OpenAPI: [shared/contracts/openapi/v1.yaml](../../shared/contracts/openapi/v1.yaml)  
@@ -139,7 +146,7 @@ Completed (v0.1 ship scope):
 - Chat send with RuleEngine + optional DeepSeek; case creation on non-allow
 - Admin Moderation API: overview, filtered queue, detail, conversation evidence, actions, labels export
 - User reports: `POST /moderation/reports`
-- Orders + WeChat prepay path (mock on staging/dev)
+- Orders + WeChat API v3 App/JSAPI prepay, notify verification/decryption, refund; mock only on staging/dev when real credentials are absent
 - Notifications + account deletion request
 - Web ops console at `/admin/` (static)
 - Legal pages: `/legal/privacy.html`, `/legal/terms.html`
@@ -150,14 +157,14 @@ Deployment:
 - `GET /api/v1/health` 含依赖状态与运行时 metrics
 - `GET /api/v1/metrics` Prometheus 文本格式
 - `docker compose -f ../../infra/docker-compose.prod.yml` + `infra/nginx/` 示例
-- `scripts/db-backup.sh`、`scripts/acceptance-smoke.sh`
+- `scripts/db-backup.sh`、`scripts/acceptance-smoke.sh`、`scripts/production-smoke.sh`、deployment preflight
 - Production checklist: [docs/production-checklist.md](../../docs/production-checklist.md)
 
 Not implemented yet (see [NEXT_PHASE.md](../../NEXT_PHASE.md)):
 
 - Real SMS (Aliyun/Tencent) production providers
-- WeChat Pay production prepay + platform-cert verification end-to-end
-- WeChat cert automation mount in compose
+- Real WeChat merchant/account verification on the target CloudBase environment
+- WeChat certificate/private-key secret mount automation for the selected hosting account
 
 Web 审核后台：启动后打开 `http://localhost:3000/admin/`。Seed 账号见 [docs/admin-moderation-api.md](../../docs/admin-moderation-api.md)。
 

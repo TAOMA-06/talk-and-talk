@@ -356,6 +356,20 @@ assert result["message"]["content"] == sys.argv[2], result
 PY
 }
 
+assert_message_blocked() {
+  python3 - "$1" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as source:
+    result = json.load(source)["data"]
+
+assert result["moderation"]["decision"] == "block", result
+assert result["message"] is None, result
+assert result["safetyMessage"] is not None, result
+PY
+}
+
 assert_conversation_messages() {
   python3 - "$1" "$2" "$3" <<'PY'
 import json
@@ -464,6 +478,10 @@ CUSTOMER_MESSAGES_JSON="$(api_request customer-messages GET "/conversations/$COM
 assert_conversation_messages "$CUSTOMER_MESSAGES_JSON" "$CUSTOMER_MESSAGE" "$OWNER_MESSAGE"
 OWNER_MESSAGES_JSON="$(api_request owner-messages GET "/conversations/$OWNER_CONVERSATION_ID/messages" "$OWNER_TOKEN")"
 assert_conversation_messages "$OWNER_MESSAGES_JSON" "$CUSTOMER_MESSAGE" "$OWNER_MESSAGE"
+
+say 'Chat safety: off-platform contact is blocked'
+BLOCKED_MESSAGE_JSON="$(api_request blocked-message POST "/conversations/$COMPANION_ID/messages" "$CUSTOMER_TOKEN" "$(make_message_body '加微信私下聊')")"
+assert_message_blocked "$BLOCKED_MESSAGE_JSON"
 
 if [[ "$CHECK_REFUND" == '1' ]]; then
   say 'Mock full refund and refund synchronization'

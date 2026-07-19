@@ -29,6 +29,8 @@ talk-and-talk/
 | [docs/staging-acceptance.md](./docs/staging-acceptance.md) | Staging 与小程序联调 |
 | [docs/deploy-rollback.md](./docs/deploy-rollback.md) | 部署与回滚 |
 | [docs/production-checklist.md](./docs/production-checklist.md) | 生产检查清单 |
+| [docs/wechat-backend-selection.md](./docs/wechat-backend-selection.md) | 微信后端方案选型、云托管部署与真机验收 |
+| [docs/app-store-metadata.md](./docs/app-store-metadata.md) | App Store Connect 元数据 |
 | [frontend/ios/](./frontend/ios/) | 历史 iOS SwiftUI App（当前不发布） |
 | [frontend/miniprogram/](./frontend/miniprogram/) | 微信小程序（微信登录、JSAPI 支付、用户/陪伴者业务） |
 | [backend/api/](./backend/api/) | NestJS 后端 |
@@ -146,6 +148,7 @@ npm run db:seed
 ```bash
 cd backend/api
 npm test                 # unit（src/**/*.spec.ts）
+npm run test:preflight   # 部署配置检查器单元测试
 npm run test:e2e         # HTTP 集成级 e2e（需 Postgres + Redis）
 npm run test:integration # 同 test:e2e 别名
 ./scripts/acceptance-smoke.sh http://127.0.0.1:3000
@@ -168,6 +171,13 @@ xcodebuild test \
 手工回归清单见 [docs/staging-acceptance.md](./docs/staging-acceptance.md)。
 
 ## 部署（Staging / Production）
+
+填写环境文件后先运行不会输出密钥值的部署预检：
+
+```bash
+cd backend/api
+npm run preflight:deployment -- .env.production
+```
 
 ```bash
 # Production
@@ -196,16 +206,17 @@ DATABASE_URL=postgres://... ./backend/api/scripts/db-backup.sh
 
 ## 微信支付
 
-- 环境变量：`WECHAT_PAY_APP_ID`、`MCH_ID`、`API_V3_KEY`、`PRIVATE_KEY_PATH`、`CERT_SERIAL_NO`、`NOTIFY_BASE_URL`
+- 环境变量：`WECHAT_PAY_APP_ID`、`MCH_ID`、`API_V3_KEY`、`CERT_SERIAL_NO`、`NOTIFY_BASE_URL`，以及二选一的 `WECHAT_PAY_PRIVATE_KEY`（CloudBase 加密环境变量）/ `WECHAT_PAY_PRIVATE_KEY_PATH`（文件挂载）
 - 流程：创建订单 → `POST /orders/:id/prepay` → 客户端调起微信 / mock → `POST /payments/wechat/notify` 或 staging `mock-notify`
-- `APP_ENV=staging|development` 可用 mock 闭环；production 强制真实微信配置、平台证书验签、回调解密、退款与关单配置齐全
+- `APP_ENV=staging|development` 可用 mock 闭环；生产使用微信支付 API v3 真实预支付、平台证书验签、回调解密与退款，未完整配置时硬失败且不会回落 Mock
 - 小程序：`POST /orders/:id/prepay` 提交 `{ "channel": "miniProgram" }`，服务端以当前微信 OpenID 创建 JSAPI 预支付，客户端再调用 `wx.requestPayment`。商户号需绑定小程序 AppID。
 
 ## 微信小程序
 
 - 工程在 [`frontend/miniprogram`](./frontend/miniprogram)，使用微信开发者工具导入；发布准备见该目录 README。
 - 小程序用 `wx.login` 取得短期 code，后端调用 code2Session 并建立独立的 `wechatMiniProgram` 身份；不保存 `session_key`，也不会自动合并 Apple/微信账户。
-- 小程序后台必须配置 API 的 HTTPS request 合法域名和隐私保护指引；真机不能使用 localhost 或裸 IP。
+- 已支持两种正式传输：公网 HTTPS `wx.request`，或微信云托管 `wx.cloud.callContainer`；后者无需配置 request 合法域名，但公网入口仍供 iOS 和支付回调使用。
+- 推荐部署与验收步骤见 [微信后端方案选型](./docs/wechat-backend-selection.md)。
 
 ## DeepSeek
 

@@ -9,6 +9,7 @@ on:
       - "backend/api/public/legal/**"
       - "backend/api/package.json"
       - "backend/api/package-lock.json"
+      - "shared/contracts/**"
       - ".github/workflows/miniprogram.yml"
   pull_request:
     paths:
@@ -18,6 +19,7 @@ on:
       - "backend/api/public/legal/**"
       - "backend/api/package.json"
       - "backend/api/package-lock.json"
+      - "shared/contracts/**"
       - ".github/workflows/miniprogram.yml"
 
 jobs:

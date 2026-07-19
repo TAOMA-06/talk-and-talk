@@ -14,6 +14,7 @@ describe("validateEnvironment", () => {
     SMS_PROVIDER: "none",
     WECHAT_MINIPROGRAM_APP_ID: "wx-mini-app",
     WECHAT_MINIPROGRAM_APP_SECRET: "mini-secret",
+    WECHAT_PAY_APP_ID: "wx-mini-app",
     WECHAT_PAY_MCH_ID: "1900000000",
     WECHAT_PAY_API_V3_KEY: "k".repeat(32),
     WECHAT_PAY_PRIVATE_KEY_PATH: "/run/secrets/wechat-pay-key.pem",
@@ -201,6 +202,23 @@ describe("validateEnvironment", () => {
       ...productionEnv,
       WECHAT_PAY_MCH_ID: ""
     })).toThrow("WECHAT_PAY_MCH_ID");
+  });
+
+  it("requires a WeChat payment app id in production", () => {
+    expect(() => validateEnvironment({
+      ...productionEnv,
+      WECHAT_PAY_APP_ID: ""
+    })).toThrow("WECHAT_PAY_APP_ID");
+  });
+
+  it("allows an inline CloudBase payment private key in production", () => {
+    const env = validateEnvironment({
+      ...productionEnv,
+      WECHAT_PAY_PRIVATE_KEY_PATH: "",
+      WECHAT_PAY_PRIVATE_KEY: "-----BEGIN PRIVATE KEY-----\\nprivate-key-material\\n-----END PRIVATE KEY-----"
+    });
+
+    expect(env.WECHAT_PAY_PRIVATE_KEY).toContain("BEGIN PRIVATE KEY");
   });
 
   it("requires an absolute HTTPS WeChat notify base URL in production", () => {

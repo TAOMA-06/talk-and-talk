@@ -13,6 +13,7 @@ function selectWeChatProvider(config: ConfigService) {
     WECHAT_PAY_APP_ID: config.get<string>("WECHAT_PAY_APP_ID", ""),
     WECHAT_PAY_MCH_ID: config.get<string>("WECHAT_PAY_MCH_ID", ""),
     WECHAT_PAY_API_V3_KEY: config.get<string>("WECHAT_PAY_API_V3_KEY", ""),
+    WECHAT_PAY_PRIVATE_KEY: config.get<string>("WECHAT_PAY_PRIVATE_KEY", ""),
     WECHAT_PAY_PRIVATE_KEY_PATH: config.get<string>("WECHAT_PAY_PRIVATE_KEY_PATH", ""),
     WECHAT_PAY_CERT_SERIAL_NO: config.get<string>("WECHAT_PAY_CERT_SERIAL_NO", "")
   };
@@ -21,7 +22,7 @@ function selectWeChatProvider(config: ConfigService) {
     env.WECHAT_PAY_APP_ID &&
       env.WECHAT_PAY_MCH_ID &&
       env.WECHAT_PAY_API_V3_KEY &&
-      env.WECHAT_PAY_PRIVATE_KEY_PATH &&
+      (env.WECHAT_PAY_PRIVATE_KEY || env.WECHAT_PAY_PRIVATE_KEY_PATH) &&
       env.WECHAT_PAY_CERT_SERIAL_NO
   );
 
@@ -68,6 +69,21 @@ describe("WeChat provider selection", () => {
           WECHAT_PAY_MCH_ID: "m",
           WECHAT_PAY_API_V3_KEY: "k".repeat(32),
           WECHAT_PAY_PRIVATE_KEY_PATH: "/run/secrets/wechat_private_key.pem",
+          WECHAT_PAY_CERT_SERIAL_NO: "ser"
+        })
+      )
+    ).toBe("real");
+  });
+
+  it("production accepts an inline private key for CloudBase", () => {
+    expect(
+      selectWeChatProvider(
+        makeConfig({
+          APP_ENV: "production",
+          WECHAT_PAY_APP_ID: "wx",
+          WECHAT_PAY_MCH_ID: "m",
+          WECHAT_PAY_API_V3_KEY: "k".repeat(32),
+          WECHAT_PAY_PRIVATE_KEY: "-----BEGIN PRIVATE KEY-----\\nkey\\n-----END PRIVATE KEY-----",
           WECHAT_PAY_CERT_SERIAL_NO: "ser"
         })
       )

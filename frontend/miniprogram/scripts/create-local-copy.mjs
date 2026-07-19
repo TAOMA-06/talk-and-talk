@@ -107,15 +107,30 @@ function replaceExactlyOnce(source, expression, replacement, description) {
   return result;
 }
 
+function replaceHttpsBackends(source, apiBaseUrl) {
+  let recordReplacements = 0;
+  const result = source.replace(/const HTTPS_BACKENDS[\s\S]*?\n\};/, (record) => {
+    recordReplacements += 1;
+    let endpointReplacements = 0;
+    const updated = record.replace(/\b(develop|trial|release)\s*:\s*["'][^"']+["']/g, (_match, environment) => {
+      endpointReplacements += 1;
+      return `${environment}: ${JSON.stringify(apiBaseUrl)}`;
+    });
+    if (endpointReplacements !== 3) {
+      throw new Error("Could not update all HTTPS_BACKENDS entries in the generated config");
+    }
+    return updated;
+  });
+  if (recordReplacements !== 1) {
+    throw new Error("Could not locate HTTPS_BACKENDS in the generated config");
+  }
+  return result;
+}
+
 function localConfig(apiBaseUrl) {
   const origin = new URL(apiBaseUrl).origin;
   let source = readFileSync(join(sourceRoot, "utils/config.ts"), "utf8");
-  source = replaceExactlyOnce(
-    source,
-    /export const API_BASE_URL = ["'][^"']+["'];/,
-    `export const API_BASE_URL = ${JSON.stringify(apiBaseUrl)};`,
-    "API_BASE_URL"
-  );
+  source = replaceHttpsBackends(source, apiBaseUrl);
   source = replaceExactlyOnce(
     source,
     /privacy:\s*["'][^"']+["']/,

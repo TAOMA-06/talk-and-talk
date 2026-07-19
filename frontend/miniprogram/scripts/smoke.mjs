@@ -34,6 +34,8 @@ let pullDownRefreshStops = 0;
 const paymentInvocations = [];
 const modalInvocations = [];
 const navigations = [];
+let cloudRunCall = null;
+let environmentVersion = "release";
 
 const companion = {
   id: "companion-1", name: "小安", role: "情绪倾听者", initials: "小安", bio: "安全、耐心地倾听",
@@ -149,6 +151,7 @@ function responseFor(path, method, data, query = new URLSearchParams()) {
   if (path === "/me") return { id: "user-1", role: "user", profile: { displayName: "微信用户", gender: "female" } };
   if (path === "/auth/logout" && method === "POST") return { success: true };
   if (path === "/notifications") return { items: [] };
+  if (path === "/health") return { status: "ok", service: "talk-and-talk-api" };
   throw new Error(`Unhandled smoke route: ${method} ${path}`);
 }
 
@@ -158,6 +161,18 @@ globalThis.wx = {
   getStorageSync: (key) => storage.get(key),
   setStorageSync: (key, value) => storage.set(key, value),
   removeStorageSync: (key) => storage.delete(key),
+  getAccountInfoSync: () => ({ miniProgram: { envVersion: environmentVersion } }),
+  cloud: {
+    init: () => undefined,
+    callContainer: ({ path, method = "GET", data = {}, header, config, success, fail }) => {
+      cloudRunCall = { path, method, data, header, config };
+      try {
+        const apiPath = path.replace(/^\/api\/v1/, "");
+        const payload = responseFor(apiPath, method, data);
+        queueMicrotask(() => success({ statusCode: 200, data: { data: payload, meta: {} } }));
+      } catch (error) { queueMicrotask(() => fail(error)); }
+    }
+  },
   login: ({ success }) => queueMicrotask(() => success({ code: "smoke-code" })),
   request: ({ url, method = "GET", data = {}, success, fail }) => {
     try {
@@ -323,4 +338,20 @@ assert.equal(storage.has("talkandtalk.legalConsent"), false);
 assert.equal(storage.has("talkandtalk.accessToken"), false);
 assert.ok(navigations.includes("/pages/consent/index"));
 
-console.log(`Mini Program runtime smoke passed: consent/legal gates, ${calls.length} API calls and mock/real payment branches`);
+const apiModule = await import(`${pathToFileURL(join(output, "utils/api.js")).href}`);
+const configModule = await import(`${pathToFileURL(join(output, "utils/config.js")).href}`);
+assert.equal(configModule.backendConfig().baseUrl, "https://api.talkandtalk.app/api/v1");
+environmentVersion = "trial";
+assert.equal(configModule.backendConfig().baseUrl, "https://api-staging.talkandtalk.app/api/v1");
+const cloudResponse = await apiModule.dispatchBackendRequest(
+  { transport: "cloudRun", envId: "smoke-env", service: "talk-and-talk-api", apiPrefix: "/api/v1" },
+  "/health",
+  { method: "GET", authenticated: false },
+  { "content-type": "application/json" }
+);
+assert.equal(cloudResponse.data.data.status, "ok");
+assert.equal(cloudRunCall.path, "/api/v1/health");
+assert.equal(cloudRunCall.header["X-WX-SERVICE"], "talk-and-talk-api");
+assert.equal(cloudRunCall.config.env, "smoke-env");
+
+console.log(`Mini Program runtime smoke passed: consent/legal gates, ${calls.length} API calls, mock/real payment branches and HTTPS/Cloud Run transport coverage`);

@@ -85,6 +85,7 @@ export type WeChatRefundNotifyPayload = WeChatRefundResult & {
 };
 
 export interface WeChatPayProvider {
+  readonly mode: "mock" | "real" | "disabled";
   readonly isMock: boolean;
   createAppPrepay(input: WeChatPrepayInput): Promise<WeChatAppPrepayResult>;
   createMiniProgramPrepay(input: WeChatMiniProgramPrepayInput): Promise<WeChatMiniProgramPrepayResult>;

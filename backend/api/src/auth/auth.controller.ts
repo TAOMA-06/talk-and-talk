@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Post, Req, UseGuards } from "@nestjs/common";
 import { Request } from "express";
 
 import { clientIp } from "../common/rate-limit/ip-rate-limit.middleware";
@@ -39,6 +39,11 @@ export class AuthController {
   @Post("wechat/mini-program")
   async wechatMiniProgramLogin(@Body() dto: WechatMiniProgramLoginDto) {
     return this.authService.loginWithWechatMiniProgram(dto.code);
+  }
+
+  @Get("wechat/mini-program/status")
+  wechatMiniProgramStatus() {
+    return this.authService.wechatMiniProgramStatus();
   }
 
   @Post("refresh")

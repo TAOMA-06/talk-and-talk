@@ -116,12 +116,9 @@ for (const file of walk(root).filter((path) => [".ts", ".wxml", ".json"].include
 
 const apiConfig = readFileSync(join(root, "utils/config.ts"), "utf8");
 
-function exportedString(source, name) {
-  return source.match(new RegExp(`export\\s+const\\s+${name}\\s*=\\s*[\"']([^\"']+)[\"']`))?.[1] || null;
-}
-
-function objectString(source, key) {
-  return source.match(new RegExp(`${key}:\\s*[\"']([^\"']+)[\"']`))?.[1] || null;
+function recordString(source, recordName, key) {
+  const body = source.match(new RegExp(`const\\s+${recordName}\\b[^=]*=\\s*\\{([\\s\\S]*?)\\n\\}(?:\\s+as\\s+const)?;`))?.[1];
+  return body?.match(new RegExp(`${key}\\s*:\\s*[\"']([^\"']+)[\"']`))?.[1] || null;
 }
 
 function isNonPublicOrLiteralHost(hostname) {
@@ -156,20 +153,28 @@ function publicHttpsUrl(value, expectedPath, description) {
   }
 }
 
-const apiBaseUrl = publicHttpsUrl(
-  exportedString(apiConfig, "API_BASE_URL"),
+const releaseApiBaseUrl = publicHttpsUrl(
+  recordString(apiConfig, "HTTPS_BACKENDS", "release"),
   "/api/v1",
-  "API_BASE_URL"
+  "HTTPS_BACKENDS.release"
 );
+const stagingApiBaseUrl = publicHttpsUrl(
+  recordString(apiConfig, "HTTPS_BACKENDS", "trial"),
+  "/api/v1",
+  "HTTPS_BACKENDS.trial"
+);
+if (releaseApiBaseUrl && stagingApiBaseUrl && releaseApiBaseUrl.origin === stagingApiBaseUrl.origin) {
+  errors.push("HTTPS_BACKENDS.trial and HTTPS_BACKENDS.release must use separate origins");
+}
 
 for (const [document, publicFile] of [["privacy", "privacy.html"], ["terms", "terms.html"]]) {
   const legalUrl = publicHttpsUrl(
-    objectString(apiConfig, document),
+    recordString(apiConfig, "LEGAL_URLS", document),
     `/legal/${publicFile}`,
     `LEGAL_URLS.${document}`
   );
-  if (apiBaseUrl && legalUrl && apiBaseUrl.origin !== legalUrl.origin) {
-    errors.push(`LEGAL_URLS.${document} must use the same public origin as API_BASE_URL`);
+  if (releaseApiBaseUrl && legalUrl && releaseApiBaseUrl.origin !== legalUrl.origin) {
+    errors.push(`LEGAL_URLS.${document} must use the same public origin as HTTPS_BACKENDS.release`);
   }
   if (!existsSync(join(repo, "backend/api/public/legal", publicFile))) {
     errors.push(`backend/api/public/legal/${publicFile} is missing`);
@@ -191,6 +196,10 @@ const frontendGenders = extractGenderContract(readFileSync(frontendGenderPath, "
 const backendGenders = extractGenderContract(readFileSync(backendGenderPath, "utf8"), relative(repo, backendGenderPath));
 if (JSON.stringify(frontendGenders) !== JSON.stringify(backendGenders)) {
   errors.push(`gender contract drift: Mini Program [${frontendGenders.join(", ")}] != API [${backendGenders.join(", ")}]`);
+}
+
+if (!/callContainer/.test(readFileSync(join(root, "utils/api.ts"), "utf8")) || !/X-WX-SERVICE/.test(readFileSync(join(root, "utils/api.ts"), "utf8"))) {
+  errors.push("utils/api.ts must preserve the WeChat Cloud Run transport boundary");
 }
 
 for (const warning of warnings) console.warn(`WARN: ${warning}`);

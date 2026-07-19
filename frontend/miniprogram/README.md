@@ -32,6 +32,8 @@ HTTPS staging 副本会保留 `urlCheck: true`。脚本拒绝把公共 HTTP 地�
 
 仓库不保存 AppID；CI 只使用 `WECHAT_MINIPROGRAM_APP_ID` 做发行结构门禁，不生成签名包或自动上传。开发者工具内的本机请求不替代真实微信登录、真实支付回调、体验版上传或真机验收。
 
+正式联调与发行时，在微信开发者工具导入原始目录并选择实际小程序 AppID。[`utils/config.ts`](./utils/config.ts) 让开发版/体验版使用 staging、正式版使用 production；如已创建微信云托管环境，可填入环境 ID 并启用 `callContainer`。使用 HTTPS 时，须在小程序后台配置 request/upload/download 合法域名并填写隐私保护指引；生产域名为 `https://api.talkandtalk.app`。
+
 提交前可在仓库根目录运行：
 
 ```bash
@@ -40,7 +42,7 @@ backend/api/node_modules/.bin/tsc -p frontend/miniprogram/tsconfig.json --noEmit
 node frontend/miniprogram/scripts/smoke.mjs
 ```
 
-第一条检查页面注册、首次协议门槛、法律文件入口、前后端性别枚举、HTTPS API 和客户端密钥泄露；第二条检查全部 TypeScript；第三条会加载编译后的页面，模拟首次同意、微信登录、正式 API envelope、预约下单、订单、会话/消息，以及 mock 与真实 `wx.requestPayment` 分支。开发环境缺少 AppID 只警告；发行门禁使用 `MINIPROGRAM_RELEASE=1`，缺少有效的外部 AppID 会失败。
+第一条检查页面注册、首次协议门槛、WXML 事件绑定、跳转目标、法律文件入口、前后端性别枚举、HTTPS/云托管传输和客户端密钥泄露；第二条检查全部 TypeScript；第三条会加载编译后的页面，模拟首次同意、微信登录、正式 API envelope、预约下单、订单、会话/消息、mock 与真实 `wx.requestPayment` 分支，并验证 `wx.request` 与 `wx.cloud.callContainer` 两条入口。开发环境缺少 AppID 只警告；发行门禁使用 `MINIPROGRAM_RELEASE=1`，缺少有效的外部 AppID 会失败。CI 会执行相同门禁。
 
 生成副本的隔离与反向发行校验可单独验证：
 
@@ -54,6 +56,7 @@ node frontend/miniprogram/scripts/test-local-build.mjs
 
 - 后端填写 `WECHAT_MINIPROGRAM_APP_ID` 和 `WECHAT_MINIPROGRAM_APP_SECRET`；AppSecret 只保存在服务器环境变量中。
 - 在 GitHub Actions 仓库变量中填写公开标识 `WECHAT_MINIPROGRAM_APP_ID`。项目文件保持空 AppID，禁止提交真实 AppID 或任何 AppSecret。
+- 推荐把现有 Docker 后端部署到微信云托管容器，PostgreSQL/Redis 放在同一 VPC；完整选型与验收见 [`docs/wechat-backend-selection.md`](../../docs/wechat-backend-selection.md)。
 - 将小程序 AppID 绑定到微信支付商户号，并完成 JSAPI 支付权限开通；后端复用既有商户证书和回调地址。
 - 在小程序后台配置隐私政策，隐私链接使用 `https://api.talkandtalk.app/legal/privacy.html`；将 `https://api.talkandtalk.app` 同时配置为业务域名，确保小程序内的用户协议和隐私政策 `web-view` 可打开。首次同意前不会登录或请求 API，聊天和支付还会调用平台隐私授权接口。
 - 上传前只允许导入原始 `frontend/miniprogram`，并在真机验证微信登录、真实小额支付、退款、订单会话与审核提示；禁止上传 `frontend/miniprogram-local`。

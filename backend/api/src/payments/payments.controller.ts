@@ -27,7 +27,7 @@ export class PaymentsController {
 
   @Get("status")
   status() {
-    return { module: "payments", status: "active" };
+    return this.paymentsService.status();
   }
 
   @Post("wechat/notify")

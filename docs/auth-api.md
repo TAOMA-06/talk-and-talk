@@ -13,6 +13,7 @@ Talk&Talk 正式账号体系 API，前缀均为 `/api/v1`。所有 JSON 响应�
 | `POST` | `/auth/phone/login` | 无 | 手机号 + 验证码登录 |
 | `POST` | `/auth/apple` | 无 | Apple Sign-In 登录 |
 | `POST` | `/auth/wechat/mini-program` | 无 | 小程序 `wx.login` code 登录 |
+| `GET` | `/auth/wechat/mini-program/status` | 无 | 只返回服务端是否已配置小程序凭证，不返回凭证值 |
 | `POST` | `/auth/refresh` | 无 | 刷新 access/refresh token |
 | `POST` | `/auth/logout` | Bearer | 撤销 refresh token |
 | `GET` | `/users/me` | Bearer | 获取当前用户 |
@@ -89,6 +90,18 @@ Talk&Talk 正式账号体系 API，前缀均为 `/api/v1`。所有 JSON 响应�
 
 - AppSecret 和微信 `session_key` 不会返回给客户端，也不写入数据库。
 - 首发不会将 Apple、手机号和微信身份自动合并；账户绑定必须由后续显式流程完成。
+
+### GET /auth/wechat/mini-program/status
+
+供部署探针确认 AppID 与 AppSecret 是否同时存在，不会返回任何凭证内容：
+
+```json
+{
+  "module": "wechatMiniProgram",
+  "status": "configured",
+  "configured": true
+}
+```
 
 ### POST /auth/refresh
 

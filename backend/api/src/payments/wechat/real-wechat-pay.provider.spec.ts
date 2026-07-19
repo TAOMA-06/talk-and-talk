@@ -24,6 +24,16 @@ describe("RealWeChatPayProvider helpers", () => {
 
     expect(
       isWeChatConfigured({
+        WECHAT_PAY_APP_ID: "wx",
+        WECHAT_PAY_MCH_ID: "m",
+        WECHAT_PAY_API_V3_KEY: "k".repeat(32),
+        WECHAT_PAY_PRIVATE_KEY: "-----BEGIN PRIVATE KEY-----",
+        WECHAT_PAY_CERT_SERIAL_NO: "ser"
+      })
+    ).toBe(true);
+
+    expect(
+      isWeChatConfigured({
         WECHAT_PAY_APP_ID: "",
         WECHAT_PAY_MCH_ID: "m",
         WECHAT_PAY_API_V3_KEY: "k".repeat(32),
@@ -59,10 +69,11 @@ describe("RealWeChatPayProvider helpers", () => {
   });
 
   it("createAppPrepay signs and returns client params when API returns prepay_id", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "wx-pay-"));
-    const keyPath = join(dir, "key.pem");
     const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
-    writeFileSync(keyPath, privateKey.export({ type: "pkcs8", format: "pem" }));
+    const inlinePrivateKey = privateKey
+      .export({ type: "pkcs8", format: "pem" })
+      .toString()
+      .replace(/\n/g, "\\n");
 
     const fetchImpl = jest.fn().mockResolvedValue({
       ok: true,
@@ -73,7 +84,7 @@ describe("RealWeChatPayProvider helpers", () => {
       appId: "wx_app",
       mchId: "1900000000",
       apiV3Key: "B".repeat(32),
-      privateKeyPath: keyPath,
+      privateKey: inlinePrivateKey,
       certSerialNo: "SERIAL1",
       apiBaseUrl: "https://example.test",
       fetchImpl: fetchImpl as unknown as typeof fetch
@@ -94,8 +105,6 @@ describe("RealWeChatPayProvider helpers", () => {
     expect(result.clientParams.package).toBe("Sign=WXPay");
     expect(result.clientParams.sign).toBeTruthy();
     expect(fetchImpl).toHaveBeenCalled();
-
-    unlinkSync(keyPath);
   });
 
   it("creates Mini Program JSAPI params with the Mini Program AppID and OpenID", async () => {

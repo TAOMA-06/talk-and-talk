@@ -5,10 +5,12 @@ on:
     branches: [main]
     paths:
       - "frontend/ios/**"
+      - "shared/contracts/**"
       - ".github/workflows/ios.yml"
   pull_request:
     paths:
       - "frontend/ios/**"
+      - "shared/contracts/**"
       - ".github/workflows/ios.yml"
 
 jobs:

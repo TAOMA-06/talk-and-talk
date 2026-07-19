@@ -73,6 +73,17 @@ export class AuthService implements OnModuleDestroy {
     this.redis = null;
   }
 
+  wechatMiniProgramStatus() {
+    const appId = this.config.get<string>("WECHAT_MINIPROGRAM_APP_ID", "").trim();
+    const appSecret = this.config.get<string>("WECHAT_MINIPROGRAM_APP_SECRET", "").trim();
+    const configured = Boolean(appId && appSecret);
+    return {
+      module: "wechatMiniProgram",
+      status: configured ? "configured" : "unconfigured",
+      configured
+    };
+  }
+
   async sendCode(phone: string, ip?: string): Promise<{ expiresInSeconds: number; devCode?: string }> {
     const smsProvider = this.config.get<string>("SMS_PROVIDER", "mock");
     if (smsProvider === "none") {
