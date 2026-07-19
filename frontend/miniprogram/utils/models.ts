@@ -1,7 +1,10 @@
+export const USER_GENDERS = ["female", "male"] as const;
+export type UserGender = typeof USER_GENDERS[number];
+
 export type AuthUser = {
   id: string;
   role: "user" | "companion" | "moderator" | "admin";
-  profile?: { displayName?: string | null; phone?: string | null; gender?: string | null; isVerified?: boolean } | null;
+  profile?: { displayName?: string | null; phone?: string | null; gender?: UserGender | null; isVerified?: boolean } | null;
 };
 
 export type AuthSession = { accessToken: string; refreshToken: string; expiresIn: number; user: AuthUser };
@@ -23,6 +26,7 @@ export type Review = { id: string; orderId?: string; companionId: string; userNa
 export type Order = {
   id: string; companionId: string; themeId: string; durationMinutes: number; amountCents: number; status: string;
   scheduledAt?: string; createdAt: string; companion?: Companion; companionSnapshot?: { name: string; role: string; initials: string };
+  companionConfirmedAt?: string | null;
 };
 
 export type Conversation = {

@@ -5,10 +5,12 @@ on:
     branches: [main]
     paths:
       - "backend/api/**"
+      - "infra/**"
       - ".github/workflows/api.yml"
   pull_request:
     paths:
       - "backend/api/**"
+      - "infra/**"
       - ".github/workflows/api.yml"
 
 defaults:
@@ -48,7 +50,7 @@ jobs:
       NODE_ENV: test
       APP_ENV: development
       DATABASE_URL: postgres://talk:talk@localhost:5432/talk_and_talk
-      REDIS_URL: redis://localhost:6379
+      REDIS_URL: redis://localhost:6379/15
       JWT_ACCESS_SECRET: ci-access-secret
       JWT_REFRESH_SECRET: ci-refresh-secret
       SMS_PROVIDER: mock
@@ -65,9 +67,26 @@ jobs:
         run: npm ci
       - name: Build
         run: npm run build
+      - name: Verify production artifacts
+        run: npm run verify:prod-artifacts
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
       - name: Unit tests
         run: npm test
       - name: Migrate
         run: npx prisma migrate deploy
       - name: E2E tests
         run: npm run test:e2e
+        env:
+          E2E_REDIS_FLUSH_ALLOWED: "1"
+      - name: Build production image
+        working-directory: .
+        run: docker build -t talk-and-talk-api:ci backend/api
+      - name: Validate production Compose
+        working-directory: .
+        env:
+          DEPLOY_ENV_FILE: ../backend/api/.env.production.example
+          POSTGRES_PASSWORD: ci-postgres-password
+          REDIS_PASSWORD: ci-redis-password
+          WECHAT_PAY_PRIVATE_KEY_HOST_PATH: ./secrets/mock-private-key.txt
+        run: docker compose -f infra/docker-compose.prod.yml config --quiet

@@ -117,6 +117,10 @@ enum DeletionRequestStatus {
   cancelled
 }
 
+enum LegalConsentSource {
+  wechatMiniProgram
+}
+
 model User {
   id            String        @id @default(uuid())
   role          UserRole      @default(user)
@@ -124,6 +128,7 @@ model User {
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   identities    AuthIdentity[]
+  staffCredential StaffCredential?
   profile       UserProfile?
   refreshTokens RefreshToken[]
   conversations Conversation[]
@@ -131,6 +136,7 @@ model User {
   orders        Order[]
   notifications Notification[]
   deletionRequests AccountDeletionRequest[]
+  legalConsentReceipts LegalConsentReceipt[]
   companionProfile CompanionProfile? @relation("CompanionOwner")
   communityPosts CommunityPost[]
   communityLikes CommunityLike[]
@@ -147,6 +153,23 @@ model AuthIdentity {
 
   @@unique([provider, providerId])
   @@index([userId])
+}
+
+model StaffCredential {
+  id                   String    @id @default(uuid())
+  userId               String    @unique
+  username             String    @unique
+  passwordHash         String
+  totpSecretCiphertext String
+  failedAttempts       Int       @default(0)
+  lockedUntil          DateTime?
+  lastLoginAt          DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([username, lockedUntil])
 }
 
 model UserProfile {
@@ -230,6 +253,7 @@ model Order {
   companionInitialsSnapshot String
   themeNameSnapshot String
   conversationId  String?
+  companionConfirmedAt DateTime?
   paidAt          DateTime?
   cancelledAt     DateTime?
   completedAt     DateTime?
@@ -261,6 +285,7 @@ model PaymentTransaction {
   clientParams  Json?
   notifyPayload Json?
   paidAt        DateTime?
+  expiresAt     DateTime?
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
 
@@ -359,10 +384,11 @@ model Message {
 }
 
 model MessageReadState {
-  id             String   @id @default(uuid())
-  conversationId String
-  userId         String
-  readAt         DateTime @default(now())
+  id                String   @id @default(uuid())
+  conversationId    String
+  userId            String
+  readAt            DateTime @default(now())
+  lastReadMessageId String?
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -465,6 +491,28 @@ model AccountDeletionRequest {
 
   @@index([userId, status])
   @@index([createdAt])
+}
+
+model LegalConsentReceipt {
+  id              String             @id @default(uuid())
+  userId          String
+  version         String
+  privacyVersion  String
+  termsVersion    String
+  privacyAccepted Boolean
+  termsAccepted   Boolean
+  adultConfirmed  Boolean
+  acceptedAt      DateTime
+  consentedAt     DateTime           @default(now())
+  withdrawnAt     DateTime?
+  privacyUrl      String
+  termsUrl        String
+  source          LegalConsentSource @default(wechatMiniProgram)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, version, consentedAt])
+  @@index([userId, consentedAt])
 }
 
 model ModerationLabel {

@@ -109,7 +109,7 @@ Web 审核后台：
 http://localhost:3000/admin/
 ```
 
-开发账号：`13800000001`（admin）、`13800000002`（moderator）。`SMS_PROVIDER=mock` 时验证码见 API 日志。
+开发 seed phone 身份为 `13800000001`（admin）、`13800000002`（moderator），仅用于 API 测试。Web 审核后台使用独立密码 + TOTP，按 `docs/staff-operations.md` 初始化。
 
 Docker（本地）：
 
@@ -128,7 +128,7 @@ DEPLOY_ENV_FILE=../backend/api/.env.staging \
 
 生产部署默认加载 `backend/api/.env.production`（见 `infra/docker-compose.prod.yml` 中 `DEPLOY_ENV_FILE`，路径相对 `infra/`）。
 
-环境变量：`APP_ENV`（development/staging/production）控制 mock 支付与 seed；`GET /api/v1/health` 返回 metrics 快照。
+环境变量：`APP_ENV`（development/staging/production）控制 mock 支付与 seed；`GET /api/v1/health` 只返回依赖状态，metrics 需携带 `Authorization: Bearer $METRICS_TOKEN` 请求 `/api/v1/metrics`。
 
 iOS：Debug 默认 `http://127.0.0.1:3000`（[`Config/Debug.xcconfig`](../frontend/ios/Config/Debug.xcconfig)）；Release 默认 `https://api.talkandtalk.app`。TestFlight 前在 `Config/Shared.xcconfig` 填写 `WECHAT_APP_ID` 与 Apple Team。
 

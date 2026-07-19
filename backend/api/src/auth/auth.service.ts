@@ -1,6 +1,6 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
-import { HttpStatus, Inject, Injectable } from "@nestjs/common";
+import { HttpStatus, Inject, Injectable, OnModuleDestroy } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import * as bcrypt from "bcrypt";
@@ -12,7 +12,10 @@ import { AuditService } from "../common/audit/audit.service";
 import { AppException } from "../common/errors/app.exception";
 import { maskPhone as maskPhoneUtil } from "../common/logging/redact";
 import { PrismaService } from "../database/prisma.service";
+import { decryptTotpSecret, matchTotpCounter } from "./staff-auth.crypto";
 import { SMS_PROVIDER, SmsProvider } from "./sms/sms-provider.interface";
+
+const DUMMY_STAFF_PASSWORD_HASH = bcrypt.hashSync("invalid-staff-credential-padding", 12);
 
 export interface AuthTokens {
   accessToken: string;
@@ -43,7 +46,7 @@ function maskPhone(phone: string): string {
 }
 
 @Injectable()
-export class AuthService {
+export class AuthService implements OnModuleDestroy {
   private redis: Redis | null = null;
 
   constructor(
@@ -63,6 +66,11 @@ export class AuthService {
       this.redis.on("error", () => undefined);
     }
     return this.redis;
+  }
+
+  onModuleDestroy(): void {
+    this.redis?.disconnect();
+    this.redis = null;
   }
 
   async sendCode(phone: string, ip?: string): Promise<{ expiresInSeconds: number; devCode?: string }> {
@@ -158,6 +166,90 @@ export class AuthService {
     return { ...tokens, user: profile };
   }
 
+  async loginStaff(
+    username: string,
+    password: string,
+    totpCode: string,
+    ip?: string
+  ): Promise<AuthTokens & { user: UserWithProfile }> {
+    const normalizedUsername = username.trim().toLowerCase();
+    const usernameKey = createHash("sha256").update(normalizedUsername).digest("hex");
+    const redis = this.getRedis();
+    const rateKeys = [`staff-login:user:${usernameKey}`];
+    if (ip) rateKeys.push(`staff-login:ip:${createHash("sha256").update(ip).digest("hex")}`);
+
+    for (const key of rateKeys) {
+      const count = await redis.incr(key);
+      if (count === 1) await redis.expire(key, 900);
+      if (count > 10) {
+        throw new AppException("STAFF_LOGIN_RATE_LIMITED", "Too many login attempts", HttpStatus.TOO_MANY_REQUESTS);
+      }
+    }
+
+    const credential = await this.prisma.staffCredential.findUnique({
+      where: { username: normalizedUsername },
+      include: { user: true }
+    });
+
+    const now = new Date();
+    const passwordMatches = credential
+      ? await bcrypt.compare(password, credential.passwordHash)
+      : await bcrypt.compare(password, DUMMY_STAFF_PASSWORD_HASH);
+    let totpMatches = false;
+    if (credential && passwordMatches) {
+      try {
+        const secret = decryptTotpSecret(
+          credential.totpSecretCiphertext,
+          this.config.getOrThrow<string>("STAFF_TOTP_ENCRYPTION_KEY")
+        );
+        const counter = matchTotpCounter(secret, totpCode);
+        if (counter !== null) {
+          const replayClaim = await redis.set(`staff-totp:${credential.id}:${counter}`, "1", "EX", 90, "NX");
+          totpMatches = replayClaim === "OK";
+        }
+      } catch {
+        totpMatches = false;
+      }
+    }
+
+    const eligible = credential &&
+      (credential.user.role === "admin" || credential.user.role === "moderator") &&
+      credential.user.accountStatus === "active";
+    const lockExpired = credential?.lockedUntil ? credential.lockedUntil <= now : true;
+
+    if (!credential || !passwordMatches || !totpMatches || !eligible || !lockExpired) {
+      if (credential) {
+        await this.prisma.$executeRaw`
+          UPDATE "StaffCredential"
+          SET "failedAttempts" = "failedAttempts" + 1,
+              "lockedUntil" = CASE
+                WHEN "failedAttempts" + 1 >= 5 THEN ${new Date(now.getTime() + 15 * 60_000)}
+                ELSE "lockedUntil"
+              END,
+              "updatedAt" = ${now}
+          WHERE "id" = ${credential.id}
+        `;
+        await this.audit.record({
+          actorId: credential.userId,
+          action: "admin.login_failed",
+          resourceType: "auth",
+          resourceId: credential.userId,
+          metadata: { provider: "staffPasswordTotp", ip: ip ?? null }
+        });
+      }
+      throw new AppException("STAFF_LOGIN_FAILED", "Invalid staff credentials", HttpStatus.UNAUTHORIZED);
+    }
+
+    await this.prisma.staffCredential.update({
+      where: { id: credential.id },
+      data: { failedAttempts: 0, lockedUntil: null, lastLoginAt: now }
+    });
+    const tokens = await this.issueTokens(credential.user);
+    const profile = await this.getUserWithProfile(credential.userId);
+    await this.recordLoginAudit(credential.userId, credential.user.role, "staffPasswordTotp", { ip: ip ?? null });
+    return { ...tokens, user: profile };
+  }
+
   async loginWithApple(identityToken: string): Promise<AuthTokens & { user: UserWithProfile }> {
     const bundleId = this.config.get<string>("APPLE_SIGN_IN_BUNDLE_ID");
     if (!bundleId) {
@@ -212,8 +304,12 @@ export class AuthService {
     });
 
     let payload: { openid?: unknown; errcode?: unknown; errmsg?: unknown };
+    const abortController = new AbortController();
+    const timeout = setTimeout(() => abortController.abort(), 8_000);
     try {
-      const response = await fetch(`https://api.weixin.qq.com/sns/jscode2session?${query.toString()}`);
+      const response = await fetch(`https://api.weixin.qq.com/sns/jscode2session?${query.toString()}`, {
+        signal: abortController.signal
+      });
       payload = await response.json() as { openid?: unknown; errcode?: unknown; errmsg?: unknown };
       if (!response.ok) {
         throw new Error("WeChat login request failed");
@@ -224,6 +320,8 @@ export class AuthService {
         "Unable to verify WeChat login at this time",
         HttpStatus.BAD_GATEWAY
       );
+    } finally {
+      clearTimeout(timeout);
     }
 
     const openId = typeof payload.openid === "string" ? payload.openid.trim() : "";
@@ -259,10 +357,13 @@ export class AuthService {
       throw new AppException("UNAUTHORIZED", "Refresh token has been revoked or expired", HttpStatus.UNAUTHORIZED);
     }
 
-    await this.prisma.refreshToken.update({
-      where: { id: stored.id },
+    const revoked = await this.prisma.refreshToken.updateMany({
+      where: { id: stored.id, revokedAt: null },
       data: { revokedAt: new Date() }
     });
+    if (revoked.count !== 1) {
+      throw new AppException("UNAUTHORIZED", "Refresh token has already been used", HttpStatus.UNAUTHORIZED);
+    }
 
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: payload.sub } });
     return this.issueTokens(user);
@@ -386,12 +487,12 @@ export class AuthService {
     const refreshTtl = this.config.get<string>("JWT_REFRESH_TTL", "30d");
 
     const accessToken = this.jwt.sign(
-      { sub: user.id, role: user.role } as Record<string, unknown>,
+      { sub: user.id, role: user.role, jti: randomUUID() } as Record<string, unknown>,
       { secret: accessSecret, expiresIn: accessTtl as any }
     );
 
     const refreshToken = this.jwt.sign(
-      { sub: user.id } as Record<string, unknown>,
+      { sub: user.id, jti: randomUUID() } as Record<string, unknown>,
       { secret: refreshSecret, expiresIn: refreshTtl as any }
     );
 

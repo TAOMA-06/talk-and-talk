@@ -7,4 +7,7 @@ textarea { min-height: 130rpx; }
 .compact { padding: 40rpx 10rpx; }
 .notification { margin-bottom: 14rpx; }
 .name { font-weight: 700; }
-.legal { display: block; margin: 32rpx auto 0; color: #8d6e73; }
+.legal-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 12rpx 28rpx; margin-top: 32rpx; }
+.legal { display: block; margin: 0; color: #8d6e73; }
+.account-actions { display: flex; flex-direction: column; align-items: center; gap: 20rpx; margin-top: 32rpx; }
+.danger { color: #a53c55; }

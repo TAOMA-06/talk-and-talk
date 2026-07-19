@@ -47,7 +47,13 @@ export class CompanionsService {
 
   async getPublished(id: string) {
     const item = await this.prisma.companionProfile.findFirst({
-      where: { id, isPublished: true },
+      where: {
+        id,
+        isPublished: true,
+        isVerified: true,
+        ownerUserId: { not: null },
+        owner: { accountStatus: "active", profile: { isVerified: true } }
+      },
       include: this.includeTags()
     });
 
@@ -128,6 +134,7 @@ export class CompanionsService {
   }
 
   async create(dto: CreateCompanionDto) {
+    if (dto.isPublished) await this.assertPublishable(dto.ownerUserId, dto.isVerified);
     const id = dto.id ?? randomUUID();
     const data: any = {
       id,
@@ -141,7 +148,16 @@ export class CompanionsService {
   }
 
   async update(id: string, dto: UpdateCompanionDto) {
-    await this.findRecordOrThrow(id);
+    const existing = await this.findRecordOrThrow(id);
+    if (
+      dto.isPublished ||
+      (existing.isPublished && (dto.ownerUserId !== undefined || dto.isVerified !== undefined))
+    ) {
+      await this.assertPublishable(
+        dto.ownerUserId ?? existing.ownerUserId,
+        dto.isVerified ?? existing.isVerified
+      );
+    }
     await this.prisma.companionProfile.update({
       where: { id },
       data: this.profileData(dto)
@@ -155,7 +171,8 @@ export class CompanionsService {
   }
 
   async publish(id: string) {
-    await this.findRecordOrThrow(id);
+    const existing = await this.findRecordOrThrow(id);
+    await this.assertPublishable(existing.ownerUserId, existing.isVerified);
     await this.prisma.companionProfile.update({
       where: { id },
       data: { isPublished: true }
@@ -178,7 +195,12 @@ export class CompanionsService {
   }
 
   private buildPublicWhere(query: ListCompanionsQueryDto) {
-    const where: any = { isPublished: true };
+    const where: any = {
+      isPublished: true,
+      isVerified: true,
+      ownerUserId: { not: null },
+      owner: { accountStatus: "active", profile: { isVerified: true } }
+    };
     if (query.availability) where.availability = query.availability;
     if (query.isOnline !== undefined) where.isOnline = query.isOnline === "true";
     if (query.tag) {
@@ -219,6 +241,34 @@ export class CompanionsService {
     }
 
     return item;
+  }
+
+  private async assertPublishable(ownerUserId: string | null | undefined, profileVerified: boolean) {
+    if (!profileVerified) {
+      throw new AppException(
+        "COMPANION_PROFILE_NOT_VERIFIED",
+        "Companion profile must be verified before publishing",
+        HttpStatus.CONFLICT
+      );
+    }
+    if (!ownerUserId) {
+      throw new AppException(
+        "COMPANION_OWNER_REQUIRED",
+        "A verified owner account is required before publishing",
+        HttpStatus.CONFLICT
+      );
+    }
+    const owner = await this.prisma.user.findUnique({
+      where: { id: ownerUserId },
+      include: { profile: true }
+    });
+    if (!owner || owner.accountStatus !== "active" || owner.profile?.isVerified !== true) {
+      throw new AppException(
+        "COMPANION_OWNER_NOT_ELIGIBLE",
+        "Companion owner must be active and identity-verified",
+        HttpStatus.CONFLICT
+      );
+    }
   }
 
   private profileData(dto: CreateCompanionDto | UpdateCompanionDto) {

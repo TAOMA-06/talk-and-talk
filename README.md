@@ -1,6 +1,6 @@
 # Talk&Talk
 
-女性友好的线上陪伴服务工程（iOS App + NestJS 正式后端）。
+女性友好的线上陪伴服务工程。**当前唯一发行范围是微信小程序 + NestJS 后端**；`frontend/ios` 仅保留为历史/后续工程，不参与本次商用放行。
 
 - 新人请先读 [docs/GUIDE.md](./docs/GUIDE.md)
 - **v0.1 已冻结 `/api/v1` 契约**：[shared/contracts](./shared/contracts)
@@ -10,7 +10,7 @@
 
 ```text
 talk-and-talk/
-├── frontend/ios/          # iOS SwiftUI App（App Store / TestFlight）
+├── frontend/ios/          # 历史 iOS 工程（不在当前发行范围）
 ├── frontend/miniprogram/  # 原生 TypeScript 微信小程序
 ├── backend/api/           # NestJS API（Docker 可部署）
 ├── shared/contracts/      # OpenAPI v1 前后端共同契约
@@ -26,11 +26,10 @@ talk-and-talk/
 | [shared/contracts](./shared/contracts) | OpenAPI v1 冻结契约 |
 | [docs/auth-api.md](./docs/auth-api.md) | Auth API 说明 |
 | [docs/admin-moderation-api.md](./docs/admin-moderation-api.md) | 审核后台 API |
-| [docs/staging-acceptance.md](./docs/staging-acceptance.md) | Staging 联调与 iOS 回归 |
+| [docs/staging-acceptance.md](./docs/staging-acceptance.md) | Staging 与小程序联调 |
 | [docs/deploy-rollback.md](./docs/deploy-rollback.md) | 部署与回滚 |
 | [docs/production-checklist.md](./docs/production-checklist.md) | 生产检查清单 |
-| [docs/app-store-metadata.md](./docs/app-store-metadata.md) | App Store Connect 元数据 |
-| [frontend/ios/](./frontend/ios/) | iOS SwiftUI App（**仅使用** `TalkAndTalk.xcodeproj`） |
+| [frontend/ios/](./frontend/ios/) | 历史 iOS SwiftUI App（当前不发布） |
 | [frontend/miniprogram/](./frontend/miniprogram/) | 微信小程序（微信登录、JSAPI 支付、用户/陪伴者业务） |
 | [backend/api/](./backend/api/) | NestJS 后端 |
 | [infra/](./infra/) | Docker Compose、nginx TLS 示例、secrets 挂载 |
@@ -57,9 +56,9 @@ npm run start:dev
 curl http://localhost:3000/api/v1/health
 ```
 
-Web 审核后台：`http://localhost:3000/admin/`  
+Web 审核后台：`http://localhost:3000/admin/`（独立用户名、密码和 TOTP；初始化见 `docs/staff-operations.md`）
 法律页：`http://localhost:3000/legal/privacy.html`、`/legal/terms.html`  
-开发账号：`13800000001`（admin）、`13800000002`（moderator）；`SMS_PROVIDER=mock` 时验证码见 API 日志。
+开发普通 phone 身份：`13800000001`（admin）、`13800000002`（moderator）；审核后台不使用短信登录。
 
 Docker（本地 API + Postgres + Redis）：
 
@@ -67,7 +66,7 @@ Docker（本地 API + Postgres + Redis）：
 docker compose -f infra/docker-compose.yml up --build
 ```
 
-### iOS
+### iOS（不在当前发行范围）
 
 ```bash
 cd frontend/ios
@@ -107,11 +106,12 @@ Release 数据安全规则：正式构建不会编译 `MockData` 或离线身份
 | `JWT_ACCESS_TTL` / `JWT_REFRESH_TTL` | 默认 `15m` / `30d` | 按需 |
 | `SMS_CODE_TTL_SECONDS` | 验证码 TTL，默认 `300` | |
 | `SMS_PROVIDER` | `mock` / `none`（真实厂商见 NEXT_PHASE） | **禁止 mock**；`none` 则无短信登录 |
+| `STAFF_TOTP_ENCRYPTION_KEY` | 加密审核后台 TOTP 种子 | **必填、独立高强度密钥** |
 | `DEEPSEEK_API_KEY` | 可选；空则纯规则审核 | 可选 |
 | `DEEPSEEK_URL` / `DEEPSEEK_MODEL` | DeepSeek 配置 | 有 key 时需要 |
 | `WECHAT_PAY_*` | 微信商户与证书路径、回调 base | 真实收款时必填 |
 | `WECHAT_MINIPROGRAM_APP_ID` / `WECHAT_MINIPROGRAM_APP_SECRET` | 小程序登录与 JSAPI 支付 AppID；AppSecret 仅后端保存 | 小程序发行必填 |
-| `APPLE_SIGN_IN_BUNDLE_ID` | 须与 iOS `com.talkandtalk.app` 一致 | 必填 |
+| `APPLE_SIGN_IN_BUNDLE_ID` | 历史 iOS 登录配置 | 小程序首发不使用 |
 | `RATE_LIMIT_PER_MINUTE` | IP 限流，默认 `120` | |
 | `BODY_SIZE_LIMIT` | 默认 `1mb` | |
 | `SEED_ON_STARTUP` | 容器启动时 seed | 生产 **false** |
@@ -139,7 +139,7 @@ npm run prisma:seed
 npm run db:seed
 ```
 
-写入陪伴者与 staff 手机号。生产首次可临时 `SEED_ON_STARTUP=true`，就绪后改 `false` 并轮换默认管理员。
+写入本地/staging 陪伴者、可登录 owner 与 staff phone 测试身份。陪伴者 owner 手机为 `13800000101`–`13800000105`。生产禁止 `SEED_ON_STARTUP=true`；正式陪伴者与 staff 必须通过受控运营流程预置，不能复用默认账号。审核后台员工凭据按 `docs/staff-operations.md` 初始化。
 
 ## 测试
 
@@ -149,6 +149,10 @@ npm test                 # unit（src/**/*.spec.ts）
 npm run test:e2e         # HTTP 集成级 e2e（需 Postgres + Redis）
 npm run test:integration # 同 test:e2e 别名
 ./scripts/acceptance-smoke.sh http://127.0.0.1:3000
+cd ../..
+backend/api/node_modules/.bin/tsc -p frontend/miniprogram/tsconfig.json --noEmit
+node frontend/miniprogram/scripts/validate.mjs
+node frontend/miniprogram/scripts/smoke.mjs
 ```
 
 iOS：
@@ -166,10 +170,10 @@ xcodebuild test \
 ## 部署（Staging / Production）
 
 ```bash
-# Production（默认加载 backend/api/.env.production）
+# Production
 cp backend/api/.env.production.example backend/api/.env.production
-# 填写密钥后：
-docker compose -f infra/docker-compose.prod.yml up -d --build
+# 填写密钥、数据库/Redis 密码，并把微信商户私钥放到配置的 host path 后：
+docker compose -f infra/docker-compose.prod.yml --env-file backend/api/.env.production up -d --build
 
 # Staging
 cp backend/api/.env.staging.example backend/api/.env.staging
@@ -194,8 +198,7 @@ DATABASE_URL=postgres://... ./backend/api/scripts/db-backup.sh
 
 - 环境变量：`WECHAT_PAY_APP_ID`、`MCH_ID`、`API_V3_KEY`、`PRIVATE_KEY_PATH`、`CERT_SERIAL_NO`、`NOTIFY_BASE_URL`
 - 流程：创建订单 → `POST /orders/:id/prepay` → 客户端调起微信 / mock → `POST /payments/wechat/notify` 或 staging `mock-notify`
-- `APP_ENV=staging|development` 可用 mock 闭环；**生产真实预支付若代码仍为壳实现则不可收款**（NEXT_PHASE）
-- iOS：`WECHAT_APP_ID` 未配置时 Release 显示「微信支付未配置」类错误
+- `APP_ENV=staging|development` 可用 mock 闭环；production 强制真实微信配置、平台证书验签、回调解密、退款与关单配置齐全
 - 小程序：`POST /orders/:id/prepay` 提交 `{ "channel": "miniProgram" }`，服务端以当前微信 OpenID 创建 JSAPI 预支付，客户端再调用 `wx.requestPayment`。商户号需绑定小程序 AppID。
 
 ## 微信小程序
@@ -235,8 +238,8 @@ DATABASE_URL=postgres://... ./backend/api/scripts/db-backup.sh
 
 ## 当前能力边界（v0.1）
 
-- Auth：手机（mock）/ Apple、JWT、refresh/logout、`/me`
-- 陪伴者列表与详情、订单与 mock 支付闭环
-- `c1`–`c3` 聊天 + 服务端审核；Admin 审核 Web
-- 通知、注销申请、日志脱敏、限流、helmet
-- **不做**：复杂推荐、人脸实名、多支付、完整社区后端等 → [NEXT_PHASE.md](./NEXT_PHASE.md)
+- Auth：微信小程序登录、JWT、原子 refresh/logout、服务端法律同意与 18+ 门禁
+- 陪伴者列表与详情、预约订单、微信 JSAPI 预支付/回调/退款/关单
+- 支付后客户与陪伴者会话、服务端审核；Admin 审核 Web
+- 通知、注销申请、同意撤回、日志脱敏、限流、helmet
+- **不做**：复杂推荐、人脸实名、多支付渠道等 → [NEXT_PHASE.md](./NEXT_PHASE.md)

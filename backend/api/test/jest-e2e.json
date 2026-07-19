@@ -6,5 +6,6 @@
     "^.+\\.(t|j)s$": "ts-jest"
   },
   "transformIgnorePatterns": ["/node_modules/(?!jose)"],
+  "setupFilesAfterEnv": ["<rootDir>/test/setup-e2e.ts"],
   "testEnvironment": "node"
 }

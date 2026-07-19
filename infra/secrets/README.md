@@ -6,13 +6,14 @@ Place host-side secrets here for production mounts. All `*.pem` files are gitign
 
 1. Export the merchant API private key from WeChat Pay merchant platform.
 2. Save as `infra/secrets/wechat_private_key.pem` (mode `600`).
-3. Uncomment the `api` volume in `infra/docker-compose.prod.yml`:
+3. Set this host path in the deployment env file:
 
 ```yaml
-volumes:
-  - ${WECHAT_PAY_PRIVATE_KEY_HOST_PATH:-./secrets/wechat_private_key.pem}:/run/secrets/wechat_private_key.pem:ro
+WECHAT_PAY_PRIVATE_KEY_HOST_PATH=./secrets/wechat_private_key.pem
 ```
 
-4. Set `WECHAT_PAY_PRIVATE_KEY_PATH=/run/secrets/wechat_private_key.pem` in `backend/api/.env.production`.
+API 容器以非 root 的 `node` 用户（UID/GID 1000）运行。生产 PEM 应由部署机安全下发，并确保容器用户只读可访问，例如属主/组映射到 1000 且权限不宽于 `0440`；不要为了绕过权限问题使用 `0777`。
+
+4. Set `WECHAT_PAY_PRIVATE_KEY_PATH=/run/secrets/wechat_private_key.pem` in `backend/api/.env.production` and deploy with `--env-file backend/api/.env.production`.
 
 Never commit real keys or API v3 keys.

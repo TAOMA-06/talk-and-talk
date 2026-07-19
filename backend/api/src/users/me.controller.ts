@@ -2,6 +2,7 @@ import { Body, Controller, Get, Patch, Post, UseGuards } from "@nestjs/common";
 
 import { AuthenticatedUser } from "../auth/auth.service";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { SkipLegalConsent } from "../auth/decorators/skip-legal-consent.decorator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { UpdateMeDto } from "./dto/update-me.dto";
 import { UsersService } from "./users.service";
@@ -23,6 +24,7 @@ export class MeController {
   }
 
   @Post("me/deletion-request")
+  @SkipLegalConsent()
   @UseGuards(JwtAuthGuard)
   async requestDeletion(@CurrentUser() user: AuthenticatedUser) {
     return await this.usersService.requestDeletion(user.id);

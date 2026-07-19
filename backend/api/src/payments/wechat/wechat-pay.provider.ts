@@ -1,4 +1,5 @@
 export const WECHAT_PAY_PROVIDER = Symbol("WECHAT_PAY_PROVIDER");
+export const WECHAT_PREPAY_TTL_MS = 15 * 60 * 1000;
 
 export type WeChatAppPayParams = {
   appId: string;
@@ -23,6 +24,7 @@ export type WeChatPrepayInput = {
   description: string;
   amountCents: number;
   notifyUrl: string;
+  expiresAt?: Date;
 };
 
 export type WeChatMiniProgramPrepayInput = WeChatPrepayInput & {
@@ -46,10 +48,13 @@ export type WeChatMiniProgramPrepayResult = {
 export type WeChatPrepayResult = WeChatAppPrepayResult | WeChatMiniProgramPrepayResult;
 
 export type WeChatNotifyPayload = {
+  appId: string;
+  mchId: string;
   outTradeNo: string;
   transactionId: string;
   tradeState: string;
   amountCents: number;
+  currency: string;
   raw: Record<string, unknown>;
 };
 
@@ -69,7 +74,13 @@ export type WeChatRefundResult = {
 };
 
 export type WeChatRefundNotifyPayload = WeChatRefundResult & {
+  appId?: string;
+  mchId: string;
+  outTradeNo: string;
+  transactionId: string;
+  totalAmountCents: number;
   refundAmountCents: number;
+  currency?: string;
   raw: Record<string, unknown>;
 };
 
@@ -77,6 +88,8 @@ export interface WeChatPayProvider {
   readonly isMock: boolean;
   createAppPrepay(input: WeChatPrepayInput): Promise<WeChatAppPrepayResult>;
   createMiniProgramPrepay(input: WeChatMiniProgramPrepayInput): Promise<WeChatMiniProgramPrepayResult>;
+  closePayment(outTradeNo: string): Promise<void>;
+  queryPayment(outTradeNo: string): Promise<WeChatNotifyPayload>;
   verifyNotifySignature(headers: Record<string, string | string[] | undefined>, rawBody: string): boolean;
   parseNotifyPayload(rawBody: string): WeChatNotifyPayload;
   createRefund(input: WeChatRefundInput): Promise<WeChatRefundResult>;

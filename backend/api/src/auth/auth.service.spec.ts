@@ -7,21 +7,25 @@ import { JwtService } from "@nestjs/jwt";
 import { AuditService } from "../common/audit/audit.service";
 import { PrismaService } from "../database/prisma.service";
 import { AuthService } from "./auth.service";
+import { encryptTotpSecret } from "./staff-auth.crypto";
 import { SMS_PROVIDER } from "./sms/sms-provider.interface";
 import { MockSmsProvider } from "./sms/mock-sms.provider";
 
 const mockPrisma = {
   verificationCode: { create: jest.fn(), findFirst: jest.fn(), update: jest.fn() },
   authIdentity: { findUnique: jest.fn() },
+  staffCredential: { findUnique: jest.fn(), update: jest.fn() },
   user: { create: jest.fn(), findUnique: jest.fn(), findUniqueOrThrow: jest.fn() },
-  refreshToken: { create: jest.fn(), findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() }
+  refreshToken: { create: jest.fn(), findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
+  $executeRaw: jest.fn()
 };
 
 const mockRedis = {
   get: jest.fn(),
   set: jest.fn(),
   incr: jest.fn(),
-  expire: jest.fn()
+  expire: jest.fn(),
+  disconnect: jest.fn()
 };
 
 jest.mock("ioredis", () => {
@@ -40,6 +44,7 @@ describe("AuthService", () => {
     jest.clearAllMocks();
     mockRedis.get.mockResolvedValue(null);
     mockRedis.incr.mockResolvedValue(1);
+    mockRedis.set.mockResolvedValue("OK");
 
     const module = await Test.createTestingModule({
       providers: [
@@ -70,7 +75,8 @@ describe("AuthService", () => {
               const vals: Record<string, string> = {
                 REDIS_URL: "redis://localhost:6379",
                 JWT_ACCESS_SECRET: "test-access",
-                JWT_REFRESH_SECRET: "test-refresh"
+                JWT_REFRESH_SECRET: "test-refresh",
+                STAFF_TOTP_ENCRYPTION_KEY: "test-staff-totp-key-at-least-32-characters"
               };
               return vals[key];
             })
@@ -134,6 +140,15 @@ describe("AuthService", () => {
     });
   });
 
+  it("disconnects the Redis client during application shutdown", async () => {
+    mockPrisma.verificationCode.create.mockResolvedValue({ id: "vc-1" });
+    await service.sendCode("13800138000");
+
+    service.onModuleDestroy();
+
+    expect(mockRedis.disconnect).toHaveBeenCalledTimes(1);
+  });
+
   describe("loginWithPhone", () => {
     it("should return tokens on valid code", async () => {
       const bcrypt = require("bcrypt");
@@ -166,6 +181,61 @@ describe("AuthService", () => {
 
       await expect(service.loginWithPhone("13800138000", "000000"))
         .rejects.toThrow("invalid or expired");
+    });
+  });
+
+  describe("loginStaff", () => {
+    it("requires both the password and TOTP before issuing staff tokens", async () => {
+      const bcrypt = require("bcrypt");
+      const passwordHash = await bcrypt.hash("Correct-Horse-Battery-9!", 4);
+      const key = "test-staff-totp-key-at-least-32-characters";
+      const totpSecretCiphertext = encryptTotpSecret("GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ", key);
+      const dateSpy = jest.spyOn(Date, "now").mockReturnValue(59_000);
+      mockPrisma.staffCredential.findUnique.mockResolvedValue({
+        id: "staff-credential-1",
+        userId: "staff-1",
+        username: "ops-admin",
+        passwordHash,
+        totpSecretCiphertext,
+        failedAttempts: 0,
+        lockedUntil: null,
+        user: { id: "staff-1", role: "admin", accountStatus: "active" }
+      });
+      mockPrisma.staffCredential.update.mockResolvedValue({});
+      mockPrisma.refreshToken.create.mockResolvedValue({});
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: "staff-1",
+        role: "admin",
+        profile: { displayName: "Ops", phone: null, age: null, gender: null, isVerified: true, safetyScore: 100 }
+      });
+
+      const result = await service.loginStaff("OPS-ADMIN", "Correct-Horse-Battery-9!", "287082", "127.0.0.1");
+
+      expect(result.user.role).toBe("admin");
+      expect(result.accessToken).toBe("mock-token");
+      expect(mockPrisma.staffCredential.update).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ failedAttempts: 0, lockedUntil: null })
+      }));
+      dateSpy.mockRestore();
+    });
+
+    it("records a failed attempt without revealing which factor was wrong", async () => {
+      const bcrypt = require("bcrypt");
+      mockPrisma.staffCredential.findUnique.mockResolvedValue({
+        id: "staff-credential-2",
+        userId: "staff-2",
+        username: "reviewer",
+        passwordHash: await bcrypt.hash("Correct-Horse-Battery-9!", 4),
+        totpSecretCiphertext: "invalid",
+        failedAttempts: 0,
+        lockedUntil: null,
+        user: { id: "staff-2", role: "moderator", accountStatus: "active" }
+      });
+
+      await expect(service.loginStaff("reviewer", "wrong-password-long", "000000"))
+        .rejects.toMatchObject({ code: "STAFF_LOGIN_FAILED" });
+      expect(mockPrisma.$executeRaw).toHaveBeenCalled();
+      expect(mockPrisma.refreshToken.create).not.toHaveBeenCalled();
     });
   });
 
@@ -206,6 +276,23 @@ describe("AuthService", () => {
         code: "INVALID_WECHAT_CODE"
       });
     });
+
+    it("aborts a stalled WeChat code exchange after the upstream timeout", async () => {
+      jest.useFakeTimers();
+      global.fetch = jest.fn((_url, init) => new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => {
+          const error = new Error("aborted");
+          error.name = "AbortError";
+          reject(error);
+        });
+      })) as unknown as typeof fetch;
+
+      const login = service.loginWithWechatMiniProgram("stalled-code");
+      const expectation = expect(login).rejects.toMatchObject({ code: "WECHAT_LOGIN_UNAVAILABLE" });
+      await jest.advanceTimersByTimeAsync(8_000);
+      await expectation;
+      jest.useRealTimers();
+    });
   });
 
   describe("refresh", () => {
@@ -238,15 +325,29 @@ describe("AuthService", () => {
         expiresAt: new Date(Date.now() + 86400000),
         revokedAt: null
       });
-      mockPrisma.refreshToken.update.mockResolvedValue({});
+      mockPrisma.refreshToken.updateMany.mockResolvedValue({ count: 1 });
       mockPrisma.user.findUniqueOrThrow.mockResolvedValue({ id: "user-1", role: "user" });
       mockPrisma.refreshToken.create.mockResolvedValue({});
 
       const result = await svc.refresh("old-refresh");
       expect(result.accessToken).toBe("new-token");
-      expect(mockPrisma.refreshToken.update).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { id: "rt-1" } })
+      expect(mockPrisma.refreshToken.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: "rt-1", revokedAt: null } })
       );
+    });
+
+    it("rejects a concurrent refresh after another request consumes the token", async () => {
+      mockPrisma.refreshToken.findUnique.mockResolvedValue({
+        id: "rt-race",
+        userId: "user-1",
+        expiresAt: new Date(Date.now() + 86_400_000),
+        revokedAt: null
+      });
+      mockPrisma.refreshToken.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(service.refresh("raced-refresh")).rejects.toMatchObject({
+        code: "UNAUTHORIZED"
+      });
     });
 
     it("should reject revoked refresh token", async () => {

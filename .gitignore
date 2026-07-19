@@ -21,6 +21,7 @@ backend/api/backups/
 # WeChat Mini Program local tooling / generated packages
 frontend/miniprogram/project.private.config.json
 frontend/miniprogram/miniprogram_npm/
+frontend/miniprogram-local/
 
 # Deployment secrets
 infra/nginx/certs/
@@ -28,3 +29,4 @@ infra/nginx/certs/
 infra/secrets/*
 !infra/secrets/.gitkeep
 !infra/secrets/README.md
+!infra/secrets/mock-private-key.txt

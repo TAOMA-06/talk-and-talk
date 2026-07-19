@@ -25,4 +25,26 @@ describe("AuditService", () => {
       })
     });
   });
+
+  it("can write through a transaction-scoped audit client", async () => {
+    const rootCreate = jest.fn();
+    const transactionCreate = jest.fn().mockResolvedValue({ id: "a2" });
+    const service = new AuditService({ auditLog: { create: rootCreate } } as any);
+
+    await service.record(
+      {
+        actorId: "u1",
+        action: "legal.consent_recorded",
+        resourceType: "legalConsentReceipt",
+        resourceId: "lc1",
+        metadata: { version: "1.0-2026-07-19" }
+      },
+      { auditLog: { create: transactionCreate } } as any
+    );
+
+    expect(transactionCreate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ action: "legal.consent_recorded", resourceId: "lc1" })
+    }));
+    expect(rootCreate).not.toHaveBeenCalled();
+  });
 });

@@ -11,13 +11,19 @@ export type AuditRecordInput = {
   metadata?: Record<string, unknown> | null;
 };
 
+type AuditDatabase = {
+  auditLog: {
+    create(input: { data: Record<string, unknown> }): Promise<unknown>;
+  };
+};
+
 @Injectable()
 export class AuditService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async record(input: AuditRecordInput) {
+  async record(input: AuditRecordInput, database: AuditDatabase = this.prisma) {
     const metadata = input.metadata ? redactSecrets(input.metadata) : null;
-    return this.prisma.auditLog.create({
+    return database.auditLog.create({
       data: {
         actorId: input.actorId ?? null,
         action: input.action,

@@ -39,6 +39,7 @@ type PlatformCertEntry = {
 };
 
 const WECHAT_API_BASE = "https://api.mch.weixin.qq.com";
+const WECHAT_REQUEST_TIMEOUT_MS = 8_000;
 const PLATFORM_CERT_TTL_MS = 12 * 60 * 60 * 1000;
 
 /**
@@ -68,6 +69,7 @@ export class RealWeChatPayProvider implements WeChatPayProvider {
       description: input.description.slice(0, 127),
       out_trade_no: input.outTradeNo,
       notify_url: input.notifyUrl,
+      ...(input.expiresAt ? { time_expire: input.expiresAt.toISOString() } : {}),
       amount: {
         total: input.amountCents,
         currency: "CNY"
@@ -128,6 +130,7 @@ export class RealWeChatPayProvider implements WeChatPayProvider {
       description: input.description.slice(0, 127),
       out_trade_no: input.outTradeNo,
       notify_url: input.notifyUrl,
+      ...(input.expiresAt ? { time_expire: input.expiresAt.toISOString() } : {}),
       amount: { total: input.amountCents, currency: "CNY" },
       payer: { openid: input.openId }
     };
@@ -147,6 +150,36 @@ export class RealWeChatPayProvider implements WeChatPayProvider {
       channel: "miniProgram",
       mock: false,
       clientParams: { timeStamp, nonceStr, package: packageValue, signType: "RSA", paySign }
+    };
+  }
+
+  async closePayment(outTradeNo: string): Promise<void> {
+    const encoded = encodeURIComponent(outTradeNo);
+    await this.requestJson(
+      "POST",
+      `/v3/pay/transactions/out-trade-no/${encoded}/close`,
+      { mchid: this.config.mchId },
+      ["ORDER_CLOSED"]
+    );
+  }
+
+  async queryPayment(outTradeNo: string): Promise<WeChatNotifyPayload> {
+    const encodedTradeNo = encodeURIComponent(outTradeNo);
+    const encodedMchId = encodeURIComponent(this.config.mchId);
+    const response = await this.requestJson<Record<string, unknown>>(
+      "GET",
+      `/v3/pay/transactions/out-trade-no/${encodedTradeNo}?mchid=${encodedMchId}`
+    );
+    const amount = (response.amount as Record<string, unknown> | undefined) ?? {};
+    return {
+      appId: String(response.appid ?? ""),
+      mchId: String(response.mchid ?? ""),
+      outTradeNo: String(response.out_trade_no ?? outTradeNo),
+      transactionId: String(response.transaction_id ?? ""),
+      tradeState: String(response.trade_state ?? ""),
+      amountCents: Number(amount.total ?? 0),
+      currency: String(amount.currency ?? ""),
+      raw: response
     };
   }
 
@@ -229,10 +262,13 @@ export class RealWeChatPayProvider implements WeChatPayProvider {
 
     const amount = (decrypted.amount as Record<string, unknown> | undefined) ?? {};
     return {
+      appId: String(decrypted.appid ?? ""),
+      mchId: String(decrypted.mchid ?? ""),
       outTradeNo: String(decrypted.out_trade_no ?? ""),
       transactionId: String(decrypted.transaction_id ?? ""),
       tradeState: String(decrypted.trade_state ?? ""),
       amountCents: Number(amount.total ?? 0),
+      currency: String(amount.currency ?? ""),
       raw: parsed
     };
   }
@@ -265,8 +301,16 @@ export class RealWeChatPayProvider implements WeChatPayProvider {
       : ((resource as any).plaintext ?? resource);
     const amount = (decrypted.amount as Record<string, unknown> | undefined) ?? {};
     return {
-      ...this.refundResult(decrypted),
+      appId: optionalPayloadString(decrypted.appid),
+      mchId: String(decrypted.mchid ?? ""),
+      outTradeNo: String(decrypted.out_trade_no ?? ""),
+      transactionId: String(decrypted.transaction_id ?? ""),
+      outRefundNo: String(decrypted.out_refund_no ?? ""),
+      refundId: String(decrypted.refund_id ?? ""),
+      status: String(decrypted.refund_status ?? decrypted.status ?? ""),
+      totalAmountCents: Number(amount.total ?? 0),
       refundAmountCents: Number(amount.refund ?? 0),
+      currency: optionalPayloadString(amount.currency),
       raw: parsed
     };
   }
@@ -339,25 +383,48 @@ export class RealWeChatPayProvider implements WeChatPayProvider {
   private async requestJson<T>(
     method: "GET" | "POST",
     path: string,
-    body?: Record<string, unknown>
+    body?: Record<string, unknown>,
+    acceptedErrorCodes: string[] = []
   ): Promise<T> {
     const url = `${this.apiBaseUrl}${path}`;
     const bodyText = body ? JSON.stringify(body) : "";
     const authorization = this.buildAuthorization(method, path, bodyText);
 
-    const response = await this.fetchImpl(url, {
-      method,
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        Authorization: authorization,
-        "User-Agent": "TalkAndTalk-API/0.1"
-      },
-      body: method === "POST" ? bodyText : undefined
-    });
+    let response: Response;
+    try {
+      response = await this.fetchImpl(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          Authorization: authorization,
+          "User-Agent": "TalkAndTalk-API/0.1"
+        },
+        body: method === "POST" ? bodyText : undefined,
+        signal: AbortSignal.timeout(WECHAT_REQUEST_TIMEOUT_MS)
+      });
+    } catch (error) {
+      const name = error instanceof Error ? error.name : "";
+      throw new AppException(
+        name === "AbortError" || name === "TimeoutError" ? "WECHAT_API_TIMEOUT" : "WECHAT_API_ERROR",
+        name === "AbortError" || name === "TimeoutError"
+          ? `WeChat API ${method} ${path} timed out`
+          : `WeChat API ${method} ${path} request failed`,
+        HttpStatus.BAD_GATEWAY
+      );
+    }
 
     const text = await response.text();
     if (!response.ok) {
+      let responseCode = "";
+      try {
+        responseCode = String((JSON.parse(text) as { code?: unknown }).code ?? "");
+      } catch {
+        responseCode = "";
+      }
+      if (acceptedErrorCodes.includes(responseCode)) {
+        return {} as T;
+      }
       throw new AppException(
         "WECHAT_API_ERROR",
         `WeChat API ${method} ${path} failed: ${response.status}`,
@@ -414,18 +481,24 @@ export class RealWeChatPayProvider implements WeChatPayProvider {
 
 export function isWeChatConfigured(config: {
   WECHAT_PAY_APP_ID: string;
+  WECHAT_MINIPROGRAM_APP_ID?: string;
   WECHAT_PAY_MCH_ID: string;
   WECHAT_PAY_API_V3_KEY: string;
   WECHAT_PAY_PRIVATE_KEY_PATH: string;
   WECHAT_PAY_CERT_SERIAL_NO: string;
 }): boolean {
   return Boolean(
-    config.WECHAT_PAY_APP_ID &&
+    (config.WECHAT_PAY_APP_ID || config.WECHAT_MINIPROGRAM_APP_ID) &&
       config.WECHAT_PAY_MCH_ID &&
       config.WECHAT_PAY_API_V3_KEY &&
       config.WECHAT_PAY_PRIVATE_KEY_PATH &&
       config.WECHAT_PAY_CERT_SERIAL_NO
   );
+}
+
+function optionalPayloadString(value: unknown): string | undefined {
+  const result = typeof value === "string" ? value.trim() : "";
+  return result || undefined;
 }
 
 export function buildNonce(): string {

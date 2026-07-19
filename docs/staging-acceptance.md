@@ -17,6 +17,8 @@ DEPLOY_ENV_FILE=../backend/api/.env.staging \
 
 `DEPLOY_ENV_FILE` 控制 API 容器加载的配置文件（默认 production 使用 `../backend/api/.env.production`，路径相对 `infra/`）。
 
+Seed 陪伴者 owner 登录手机号依次为 `13800000101`–`13800000105`。Web 审核后台需另按 [`staff-operations.md`](./staff-operations.md) 初始化密码和 TOTP 凭据。
+
 或本地（需 Postgres + Redis）：
 
 ```bash
@@ -30,15 +32,15 @@ npm run start:dev
 
 | # | 步骤 | 期望 |
 |---|------|------|
-| 1 | `prisma:migrate` + `seed` | 5 陪伴者；admin `13800000001`、moderator `13800000002` |
+| 1 | `prisma:migrate` + `seed` | 5 个有可登录 owner 的陪伴者；admin `13800000001`、moderator `13800000002` |
 | 2 | `POST /api/v1/auth/sms/send-code` + `phone/login` | 返回 access/refresh token |
 | 3 | `GET /api/v1/companions` | 返回 seed 陪伴者列表 |
 | 4 | `POST /api/v1/orders` → `prepay` | `payment.mock=true`（staging） |
 | 5 | iOS 微信沙箱唤起 **或** `POST /payments/wechat/mock-notify` | 订单 `paid`，会话激活 |
 | 6 | `POST /conversations/c1/messages` 正常文案 | `decision=allow`，有 `companionReply` |
 | 7 | 发送「加微信私下聊」等违规文案 | `decision=block`，`safetyMessage`，创建 ModerationCase |
-| 8 | Web `http://<host>/admin/` moderator 登录处置 | `confirmViolation` / `dismiss` 写入 ActionLog |
-| 9 | `GET /api/v1/health` | `metrics` 含请求数、错误率、AI/微信计数 |
+| 8 | Web `http://<host>/admin/` 使用 moderator 密码 + TOTP 登录处置 | `confirmViolation` / `dismiss` 写入 ActionLog |
+| 9 | `GET /api/v1/health`；带 Bearer token 请求 `/api/v1/metrics` | health 仅含依赖状态；受保护 metrics 含请求/AI/微信计数 |
 
 ## 自动化冒烟
 

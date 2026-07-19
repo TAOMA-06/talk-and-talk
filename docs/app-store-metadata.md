@@ -71,7 +71,7 @@ App 内设置页同步展示全文，并可打开上述 URL。
 | 手机号 | `13800138000`（或审核专用号） |
 | 验证码 | `SMS_PROVIDER=mock` 时见 API 日志；勿对审核员写死生产码 |
 | Apple | 使用审核员自己的 Apple ID 测试 Sign in with Apple |
-| Staff（勿给审核） | seed：`13800000001` admin / `13800000002` moderator |
+| Staff（勿给审核） | 独立 Web 后台密码 + TOTP；不得向小程序审核员提供 |
 
 若审核包指向 production 且 SMS 为 `none`，审核备注必须说明 **仅支持 Apple 登录**。
 

@@ -3,8 +3,11 @@ import {
   AuthSession, AuthUser, ChatMessage, CommunityPost, Companion, Conversation, MiniProgramPayParams,
   Notification, Order, Review
 } from "./models";
+import {
+  bindLegalConsentToUser, currentLegalConsent, requireLegalConsent, withdrawLegalConsent
+} from "./privacy";
 
-type RequestOptions = { method?: "GET" | "POST" | "PATCH"; data?: Record<string, unknown>; authenticated?: boolean; retry?: boolean };
+type RequestOptions = { method?: "GET" | "POST" | "PATCH" | "DELETE"; data?: Record<string, unknown>; authenticated?: boolean; retry?: boolean };
 type ApiError = Error & { statusCode?: number; code?: string };
 
 const ACCESS_TOKEN_KEY = "talkandtalk.accessToken";
@@ -12,6 +15,8 @@ const REFRESH_TOKEN_KEY = "talkandtalk.refreshToken";
 const USER_KEY = "talkandtalk.user";
 let refreshInFlight: Promise<void> | null = null;
 let loginInFlight: Promise<AuthSession> | null = null;
+let legalConsentVerificationInFlight: Promise<void> | null = null;
+let verifiedLegalConsentKey = "";
 
 function storedAccessToken(): string { return wx.getStorageSync(ACCESS_TOKEN_KEY) || ""; }
 function storedRefreshToken(): string { return wx.getStorageSync(REFRESH_TOKEN_KEY) || ""; }
@@ -20,12 +25,15 @@ function saveSession(session: AuthSession): void {
   wx.setStorageSync(ACCESS_TOKEN_KEY, session.accessToken);
   wx.setStorageSync(REFRESH_TOKEN_KEY, session.refreshToken);
   wx.setStorageSync(USER_KEY, session.user);
+  bindLegalConsentToUser(session.user.id);
 }
 
 export function clearSession(): void {
   wx.removeStorageSync(ACCESS_TOKEN_KEY);
   wx.removeStorageSync(REFRESH_TOKEN_KEY);
   wx.removeStorageSync(USER_KEY);
+  verifiedLegalConsentKey = "";
+  legalConsentVerificationInFlight = null;
 }
 
 export function currentUser(): AuthUser | null { return wx.getStorageSync(USER_KEY) || null; }
@@ -74,6 +82,55 @@ function rawRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
   });
 }
 
+function consentPayload() {
+  const consent = currentLegalConsent();
+  if (!consent) throw new Error("请先阅读并同意用户协议与隐私政策");
+  return {
+    version: consent.version,
+    acceptedAt: consent.acceptedAt,
+    privacyAccepted: consent.privacyAccepted,
+    termsAccepted: consent.termsAccepted,
+    adultConfirmed: consent.adultConfirmed,
+    privacyUrl: consent.privacyUrl,
+    termsUrl: consent.termsUrl,
+    source: consent.source
+  };
+}
+
+async function uploadLegalConsentReceipt(userId: string): Promise<void> {
+  const payload = consentPayload();
+  const response = await rawRequest<{ receipt: { id: string; version: string } }>("/users/me/legal-consents", {
+    method: "POST", data: payload
+  });
+  if (!response?.receipt?.id || response.receipt.version !== payload.version) {
+    throw new Error("服务端未确认协议同意记录");
+  }
+  verifiedLegalConsentKey = `${userId}:${payload.version}`;
+}
+
+async function verifyServerLegalConsent(user: AuthUser): Promise<void> {
+  const consent = currentLegalConsent();
+  if (!consent) requireLegalConsent();
+  const key = `${user.id}:${consent!.version}`;
+  if (verifiedLegalConsentKey === key) return;
+  if (legalConsentVerificationInFlight) return legalConsentVerificationInFlight;
+
+  legalConsentVerificationInFlight = (async () => {
+    const status = await rawRequest<{ valid: boolean; receipt: { id: string; version: string } | null }>(
+      `/users/me/legal-consents?version=${encodeURIComponent(consent!.version)}`
+    );
+    if (!status?.valid || status.receipt?.version !== consent!.version) {
+      withdrawLegalConsent();
+      clearSession();
+      wx.reLaunch({ url: "/pages/consent/index" });
+      throw new Error("协议版本需要重新确认");
+    }
+    bindLegalConsentToUser(user.id);
+    verifiedLegalConsentKey = key;
+  })().finally(() => { legalConsentVerificationInFlight = null; });
+  return legalConsentVerificationInFlight;
+}
+
 async function refreshSession(): Promise<void> {
   if (refreshInFlight) return refreshInFlight;
   refreshInFlight = (async () => {
@@ -96,6 +153,7 @@ function wxLoginCode(): Promise<string> {
 }
 
 async function loginWithWechatCode(): Promise<AuthSession> {
+  requireLegalConsent();
   if (loginInFlight) return loginInFlight;
   loginInFlight = (async () => {
     const code = await wxLoginCode();
@@ -103,12 +161,19 @@ async function loginWithWechatCode(): Promise<AuthSession> {
       method: "POST", data: { code }, authenticated: false
     });
     saveSession(session);
+    try {
+      await uploadLegalConsentReceipt(session.user.id);
+    } catch {
+      clearSession();
+      throw new Error("暂时无法记录协议同意，请稍后重试");
+    }
     return session;
   })().finally(() => { loginInFlight = null; });
   return loginInFlight;
 }
 
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  requireLegalConsent();
   try {
     return await rawRequest<T>(path, options);
   } catch (error) {
@@ -138,8 +203,10 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
 }
 
 export async function ensureSession(): Promise<AuthSession | null> {
+  requireLegalConsent();
   const accessToken = storedAccessToken();
   if (accessToken && currentUser() && !isAccessTokenExpired(accessToken)) {
+    await verifyServerLegalConsent(currentUser()!);
     return null;
   }
 
@@ -149,8 +216,12 @@ export async function ensureSession(): Promise<AuthSession | null> {
       if (!currentUser()) {
         const user = await rawRequest<AuthUser>("/me");
         wx.setStorageSync(USER_KEY, user);
+        bindLegalConsentToUser(user.id);
       }
-      if (storedAccessToken() && currentUser()) return null;
+      if (storedAccessToken() && currentUser()) {
+        await verifyServerLegalConsent(currentUser()!);
+        return null;
+      }
     } catch {
       clearSession();
     }
@@ -169,6 +240,8 @@ export async function logout(): Promise<void> {
 export const api = {
   fetchMe: () => request<AuthUser>("/me"),
   updateMe: (data: Record<string, unknown>) => request<AuthUser>("/me", { method: "PATCH", data }),
+  requestDeletion: () => request<{ id: string; status: string; message: string }>("/me/deletion-request", { method: "POST" }),
+  withdrawLegalConsent: () => rawRequest<{ withdrawn: boolean; withdrawnAt: string | null }>("/users/me/legal-consents/current", { method: "DELETE" }),
   companions: () => request<{ items: Companion[] }>("/companions"),
   companion: (id: string) => request<Companion>(`/companions/${encodeURIComponent(id)}`, { authenticated: false }),
   ownCompanion: () => request<Companion>("/companions/me/profile"),
@@ -184,11 +257,27 @@ export const api = {
   cancelOrder: (id: string) => request<Order>(`/orders/${encodeURIComponent(id)}/cancel`, { method: "POST" }),
   startService: (id: string) => request<Order>(`/orders/service/${encodeURIComponent(id)}/start`, { method: "POST" }),
   completeService: (id: string) => request<Order>(`/orders/service/${encodeURIComponent(id)}/complete`, { method: "POST" }),
+  confirmServiceOrder: (id: string) => request<Order>(`/orders/service/${encodeURIComponent(id)}/confirm`, { method: "POST" }),
+  rejectServiceOrder: (id: string) => request<Order>(`/orders/service/${encodeURIComponent(id)}/reject`, { method: "POST" }),
   prepay: (id: string) => request<{ order: Order; payment: { outTradeNo: string; mock: boolean; channel: string; wechatMiniProgramParams?: MiniProgramPayParams } }>(`/orders/${encodeURIComponent(id)}/prepay`, { method: "POST", data: { channel: "miniProgram" } }),
+  syncPayment: (id: string) => request<{
+    code: "SUCCESS" | "PENDING";
+    message: string;
+    data: { alreadyProcessed: boolean; orderId: string; orderStatus: string };
+  }>(`/orders/${encodeURIComponent(id)}/payment/sync`, { method: "POST" }),
   mockNotify: (outTradeNo: string) => request("/payments/wechat/mock-notify", { method: "POST", data: { outTradeNo } }),
   refund: (id: string, reason: string) => request(`/orders/${encodeURIComponent(id)}/refund`, { method: "POST", data: { reason } }),
   conversations: () => request<{ conversations: Conversation[] }>("/conversations"),
-  messages: (id: string) => request<{ messages: ChatMessage[]; pagination: { nextCursor?: string | null; hasMore: boolean } }>(`/conversations/${encodeURIComponent(id)}/messages`),
+  messages: (id: string, options: { cursor?: string; limit?: number } = {}) => {
+    const query = [
+      options.cursor ? `cursor=${encodeURIComponent(options.cursor)}` : "",
+      typeof options.limit === "number" ? `limit=${encodeURIComponent(String(options.limit))}` : ""
+    ].filter(Boolean).join("&");
+    const suffix = query ? `?${query}` : "";
+    return request<{ messages: ChatMessage[]; pagination: { nextCursor?: string | null; hasMore: boolean } }>(
+      `/conversations/${encodeURIComponent(id)}/messages${suffix}`
+    );
+  },
   sendMessage: (id: string, content: string) => request<{
     moderation: { decision: "allow" | "warn" | "review" | "block"; riskLevel: string };
     message: ChatMessage | null;

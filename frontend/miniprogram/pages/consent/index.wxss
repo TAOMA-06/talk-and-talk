@@ -1,0 +1,13 @@
+.consent-page { box-sizing: border-box; min-height: 100vh; padding: 100rpx 48rpx 64rpx; background: linear-gradient(180deg, #fff8f8 0%, #ffffff 72%); }
+.brand { color: #b94a68; font-size: 28rpx; font-weight: 700; letter-spacing: 3rpx; }
+.title { margin-top: 16rpx; font-size: 52rpx; font-weight: 700; }
+.summary { margin-top: 28rpx; color: #5f4b50; font-size: 29rpx; line-height: 1.75; }
+.notice { margin-top: 32rpx; padding: 28rpx; border-radius: 20rpx; background: #fff0f3; color: #684f55; font-size: 26rpx; line-height: 1.7; }
+.notice view + view { margin-top: 12rpx; }
+.document-links { display: flex; gap: 20rpx; margin-top: 28rpx; }
+.document-link { flex: 1; margin: 0; padding: 0; background: transparent; color: #b94a68; font-size: 27rpx; text-align: left; }
+.agreement { display: flex; align-items: flex-start; gap: 12rpx; margin-top: 40rpx; color: #4b383d; font-size: 27rpx; line-height: 1.5; }
+.agreement checkbox { flex: none; transform: scale(.82); transform-origin: top left; }
+.accept { margin-top: 40rpx; }
+.accept[disabled] { background: #d9c6ca; color: #ffffff; }
+.customer-service { width: 100%; margin-top: 28rpx; text-align: center; }

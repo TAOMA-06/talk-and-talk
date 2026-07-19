@@ -10,6 +10,7 @@ import { HttpExceptionFilter } from "../src/common/errors/http-exception.filter"
 import { buildCorsOptions } from "../src/config/cors";
 import { PrismaService } from "../src/database/prisma.service";
 import { seedDatabase } from "../src/database/seed";
+import { grantCurrentLegalConsent } from "./legal-consent-fixture";
 
 describe("Companions and me (e2e)", () => {
   let app: INestApplication;
@@ -89,6 +90,7 @@ describe("Companions and me (e2e)", () => {
         }
       }
     });
+    if (role === "user") await grantCurrentLegalConsent(prisma, user.id);
 
     const token = jwt.sign(
       { sub: user.id, role },
@@ -139,12 +141,20 @@ describe("Companions and me (e2e)", () => {
 
   it("allows admins to create, edit, publish and unpublish companions", async () => {
     const { token } = await createUser("admin");
+    const { user: owner } = await createUser("user");
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/admin/users/${owner.id}/verification`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ isVerified: true, reason: "test identity review" })
+      .expect(200);
 
     await request(app.getHttpServer())
       .post("/api/v1/admin/companions")
       .set("Authorization", `Bearer ${token}`)
       .send({
         id: "c-admin",
+        ownerUserId: owner.id,
         name: "陆安",
         role: "测试陪伴者",
         initials: "LA",

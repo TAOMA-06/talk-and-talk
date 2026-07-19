@@ -29,9 +29,9 @@ curl -fsS https://api-staging.talkandtalk.app/api/v1/health
 
 ```bash
 cp backend/api/.env.production.example backend/api/.env.production
-# 强密码 JWT、DB、CORS、Apple bundle、微信/短信策略
+# 强密码 JWT、DB、CORS、微信小程序与商户支付配置
 
-docker compose -f infra/docker-compose.prod.yml up -d --build
+docker compose -f infra/docker-compose.prod.yml --env-file backend/api/.env.production up -d --build
 
 curl -fsS https://api.talkandtalk.app/api/v1/health
 ```
@@ -43,9 +43,9 @@ curl -fsS https://api.talkandtalk.app/api/v1/health
 | `SEED_ON_STARTUP` | `false` |
 | `SMS_PROVIDER` | 禁止 `mock`；真实厂商未就绪时见 NEXT_PHASE |
 | `mock-notify` | 生产应不可用或拒绝 |
-| 微信私钥 | 挂载到 `WECHAT_PAY_PRIVATE_KEY_PATH`（compose 需自行加 volume） |
+| 微信私钥 | `WECHAT_PAY_PRIVATE_KEY_HOST_PATH` 指向 host PEM，compose 固定只读挂载到 `WECHAT_PAY_PRIVATE_KEY_PATH` |
 | Redis | 建议 `requirepass`，URL 带密码 |
-| Metrics | 勿对公网裸奔 |
+| Metrics | 使用 `Authorization: Bearer $METRICS_TOKEN`，同时保留 Nginx 内网 allowlist |
 
 ### 镜像 / 版本记录
 
@@ -74,7 +74,7 @@ git rev-parse HEAD
 
 1. 记录当前镜像 tag / git commit（故障现场）。
 2. 切回上一版本：`git checkout <tag>` 或拉取上一镜像。
-3. `DEPLOY_ENV_FILE=... docker compose -f infra/docker-compose.prod.yml up -d --build api`（或等价只重建 api）。
+3. `docker compose -f infra/docker-compose.prod.yml --env-file backend/api/.env.production up -d --build api`（或目标环境对应 env 文件）。
 4. 验证 `/api/v1/health` 为 `ok` 或可解释的 `degraded`。
 
 ## 数据库回滚
@@ -94,7 +94,7 @@ Prisma **不提供**生产 `migrate down`。步骤：
 ## 回滚后验收
 
 - `GET /api/v1/health`：`dependencies.database/redis` 为 `ok`
-- `GET /api/v1/metrics` 可访问（内网 / staging）
+- `GET /api/v1/metrics` 携带 `Authorization: Bearer $METRICS_TOKEN` 可访问（内网 / staging）
 - 登录、`GET /companions`、下单 prepay；staging 可 mock-notify
 - Web `/admin/` moderator 可登录
 - 法律页：`/legal/privacy.html`、`/legal/terms.html`

@@ -65,6 +65,12 @@ Day 1 routes currently available:
 | `POST /api/v1/notifications/:id/read` | Mark one read (JWT) |
 | `POST /api/v1/notifications/read-all` | Mark all read (JWT) |
 | `POST /api/v1/me/deletion-request` | Account deletion request (JWT) → AuditLog |
+| `GET /api/v1/admin/account-deletions` | Admin queue; optional `status=pending\|processing`, `page`, `pageSize` |
+| `POST /api/v1/admin/account-deletions/:id/start` | Atomically claim a pending deletion for processing |
+| `POST /api/v1/admin/account-deletions/:id/complete` | Complete deletion with required `{ note }`; admin only |
+| `POST /api/v1/admin/account-deletions/:id/orders/:orderId/payment/sync` | Admin-only provider query; safely closes only expired unpaid prepays |
+| `POST /api/v1/admin/account-deletions/:id/orders/:orderId/refund/sync` | Admin-only provider query for an existing refund; never creates a refund |
+| `POST /api/v1/admin/account-deletions/:id/orders/:orderId/refund/initiate` | Deletion-only full original-route refund with fixed reason code |
 
 Web 运营后台：`http://localhost:3000/admin/`（静态页，需 staff JWT）。详见 [admin-moderation-api.md](./admin-moderation-api.md)。
 
@@ -74,6 +80,12 @@ Every JSON response must use:
 - Error: `{ error: { code, message, details? }, meta }`
 
 `x-request-id` must be copied into both the response header and `meta.requestId`. If the request header is missing, the backend generates a UUID.
+
+### Account deletion operations
+
+Process each request in order: list the queue, start it, settle any active order/refund obligations, then complete it with an operator note. Start immediately restricts the account and revokes refresh tokens so the user cannot begin another order/payment mutation. If a payment/refund callback is missing, use the admin sync routes above. Payment sync may close and cancel only an unpaid prepay whose provider expiry has elapsed; refund sync only reconciles an already-existing refund. If payment sync confirms a missed successful payment, the deletion-only refund route may create one full original-route refund with the fixed reason `ACCOUNT_DELETION_SETTLEMENT`. That route only accepts an order belonging to the `processing` deletion request, reuses the existing Order→Payment→Refund locking/idempotency rules, cannot choose a partial amount or arbitrary reason, and writes exactly one admin-initiation audit. None of these routes can create a prepay or a new payment. Start and complete are idempotent: retries do not repeat state changes or audit events. Completion has a 60-second settlement window after start, then is rejected with `DELETION_HAS_ACTIVE_FINANCIAL_OBLIGATIONS` while an order is `paying`, `paid`, or `inService`, or a refund is `pendingReview`, `pending`, or `processing`.
+
+Successful completion runs in one database transaction. It revokes refresh tokens, removes login identities and staff credentials, clears identifiable `UserProfile` fields, marks the retained user record `banned`, updates the request to `completed`, and records the operator audit. It deliberately retains the `User` primary key plus orders, payments, refunds, and audit logs for reconciliation and statutory retention. Operators must not delete the user row or use cascade deletion as part of this workflow. The generic admin status endpoint cannot reactivate either a processing or completed deletion; a completed user also cannot submit a second deletion request.
 
 ## iOS Current Dependencies
 

@@ -1,8 +1,15 @@
-import { HttpStatus, Injectable } from "@nestjs/common";
+import { HttpStatus, Inject, Injectable } from "@nestjs/common";
 import { AppException } from "../common/errors/app.exception";
 import { PrismaService } from "../database/prisma.service";
 import { NotificationsService } from "../notifications/notifications.service";
+import {
+  WECHAT_PAY_PROVIDER,
+  WECHAT_PREPAY_TTL_MS,
+  WeChatPayProvider
+} from "../payments/wechat/wechat-pay.provider";
 import { CreateOrderDto } from "./dto/create-order.dto";
+
+const SERVICE_EARLY_START_MS = 15 * 60 * 1000;
 
 type OrderRecord = {
   id: string;
@@ -19,6 +26,7 @@ type OrderRecord = {
   companionInitialsSnapshot: string;
   themeNameSnapshot: string;
   conversationId: string | null;
+  companionConfirmedAt: Date | null;
   paidAt: Date | null;
   cancelledAt: Date | null;
   completedAt: Date | null;
@@ -33,7 +41,8 @@ type OrderRecord = {
 export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly notifications: NotificationsService
+    private readonly notifications: NotificationsService,
+    @Inject(WECHAT_PAY_PROVIDER) private readonly wechat: WeChatPayProvider
   ) {}
 
   async create(userId: string, dto: CreateOrderDto) {
@@ -47,7 +56,13 @@ export class OrdersService {
     }
 
     const companion = await this.prisma.companionProfile.findFirst({
-      where: { id: dto.companionId, isPublished: true }
+      where: {
+        id: dto.companionId,
+        isPublished: true,
+        isVerified: true,
+        ownerUserId: { not: null },
+        owner: { accountStatus: "active", profile: { isVerified: true } }
+      }
     } as any);
 
     if (!companion) {
@@ -112,30 +127,170 @@ export class OrdersService {
   }
 
   async startService(userId: string, orderId: string) {
-    const order = await this.findServiceOrderOrThrow(userId, orderId);
-    if (order.status !== "paid") {
-      throw new AppException("ORDER_INVALID_STATE", "Only paid orders can start", HttpStatus.CONFLICT);
-    }
-    const updated = await this.prisma.order.update({
-      where: { id: orderId },
-      data: { status: "inService" },
-      include: { conversation: { select: { externalId: true } } }
-    } as any);
-    await this.notifications.create(order.userId, "orderStatus", "服务已开始", "陪伴者已开始本次服务。", { orderId, status: "inService" });
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const db = tx as any;
+      await db.$queryRaw`SELECT "id" FROM "Order" WHERE "id" = ${orderId} FOR UPDATE`;
+      const order = await db.order.findUnique({
+        where: { id: orderId },
+        include: {
+          companion: { select: { ownerUserId: true } },
+          conversation: { select: { externalId: true } }
+        }
+      });
+      if (!order || order.companion.ownerUserId !== userId) {
+        throw new AppException("ORDER_NOT_FOUND", "Order not found", HttpStatus.NOT_FOUND);
+      }
+      if (order.status !== "paid") {
+        throw new AppException("ORDER_INVALID_STATE", "Only paid orders can start", HttpStatus.CONFLICT);
+      }
+      const activeRefund = await db.refundTransaction.findFirst({
+        where: {
+          orderId,
+          status: { in: ["pendingReview", "pending", "processing", "success", "failed"] }
+        },
+        select: { id: true }
+      });
+      if (activeRefund) {
+        throw new AppException(
+          "ORDER_REFUND_IN_PROGRESS",
+          "Service cannot start while a refund request is active",
+          HttpStatus.CONFLICT
+        );
+      }
+      const now = Date.now();
+      const scheduledStart = order.scheduledAt.getTime();
+      const scheduledEnd = scheduledStart + order.durationMinutes * 60_000;
+      if (now < scheduledStart - SERVICE_EARLY_START_MS) {
+        throw new AppException(
+          "ORDER_SERVICE_NOT_READY",
+          "Service can only start within 15 minutes of the scheduled time",
+          HttpStatus.CONFLICT
+        );
+      }
+      if (now >= scheduledEnd) {
+        throw new AppException(
+          "ORDER_SERVICE_WINDOW_EXPIRED",
+          "The scheduled service window has ended",
+          HttpStatus.CONFLICT
+        );
+      }
+      return db.order.update({
+        where: { id: orderId },
+        data: { status: "inService" },
+        include: { conversation: { select: { externalId: true } } }
+      });
+    }, { maxWait: 5_000, timeout: 10_000 });
+    await this.notifications.create(updated.userId, "orderStatus", "服务已开始", "陪伴者已开始本次服务。", { orderId, status: "inService" });
+    return this.toDto(updated);
+  }
+
+  async confirmOrder(userId: string, orderId: string) {
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const db = tx as any;
+      await db.$queryRaw`SELECT "id" FROM "Order" WHERE "id" = ${orderId} FOR UPDATE`;
+      const order = await db.order.findUnique({
+        where: { id: orderId },
+        include: { companion: { include: { owner: { include: { profile: true } } } }, conversation: true }
+      });
+      if (!order || order.companion.ownerUserId !== userId) {
+        throw new AppException("ORDER_NOT_FOUND", "Order not found", HttpStatus.NOT_FOUND);
+      }
+      if (order.status !== "pending") {
+        throw new AppException("ORDER_INVALID_STATE", "Only pending orders can be confirmed", HttpStatus.CONFLICT);
+      }
+      if (order.companionConfirmedAt) return order;
+      if (order.scheduledAt.getTime() <= Date.now()) {
+        throw new AppException("ORDER_SCHEDULE_EXPIRED", "Past bookings cannot be confirmed", HttpStatus.CONFLICT);
+      }
+      if (
+        order.companion.availability === "busy" ||
+        order.companion.availableTimes.length === 0 ||
+        order.companion.owner?.accountStatus !== "active" ||
+        order.companion.owner?.profile?.isVerified !== true
+      ) {
+        throw new AppException("COMPANION_UNAVAILABLE", "Companion is not accepting this booking", HttpStatus.CONFLICT);
+      }
+      return db.order.update({
+        where: { id: orderId },
+        data: { companionConfirmedAt: new Date() },
+        include: { conversation: { select: { externalId: true } } }
+      });
+    });
+    await this.notifications.create(
+      updated.userId,
+      "orderStatus",
+      "预约已确认",
+      "陪伴者已确认本次预约，现在可以安全支付。",
+      { orderId, status: "pending", companionConfirmed: true }
+    );
+    return this.toDto(updated);
+  }
+
+  async rejectOrder(userId: string, orderId: string) {
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const db = tx as any;
+      await db.$queryRaw`SELECT "id" FROM "Order" WHERE "id" = ${orderId} FOR UPDATE`;
+      const order = await db.order.findUnique({
+        where: { id: orderId },
+        include: { companion: { select: { ownerUserId: true } }, conversation: true }
+      });
+      if (!order || order.companion.ownerUserId !== userId) {
+        throw new AppException("ORDER_NOT_FOUND", "Order not found", HttpStatus.NOT_FOUND);
+      }
+      if (order.status !== "pending" || order.companionConfirmedAt) {
+        throw new AppException("ORDER_INVALID_STATE", "Only unconfirmed pending orders can be rejected", HttpStatus.CONFLICT);
+      }
+      const activePayment = await db.paymentTransaction.findFirst({
+        where: { orderId, status: "initiated" },
+        select: { id: true }
+      });
+      if (activePayment) {
+        throw new AppException(
+          "ORDER_PAYMENT_IN_PROGRESS",
+          "An order with an active payment cannot be rejected",
+          HttpStatus.CONFLICT
+        );
+      }
+      return db.order.update({
+        where: { id: orderId },
+        data: { status: "cancelled", cancelledAt: new Date() },
+        include: { conversation: { select: { externalId: true } } }
+      });
+    });
+    await this.notifications.create(
+      updated.userId,
+      "orderStatus",
+      "预约未被接受",
+      "陪伴者当前无法接受该时段，订单已取消且不会扣款。",
+      { orderId, status: "cancelled" }
+    );
     return this.toDto(updated);
   }
 
   async completeService(userId: string, orderId: string) {
-    const order = await this.findServiceOrderOrThrow(userId, orderId);
-    if (order.status !== "inService") {
-      throw new AppException("ORDER_INVALID_STATE", "Only in-service orders can complete", HttpStatus.CONFLICT);
-    }
-    const updated = await this.prisma.order.update({
-      where: { id: orderId },
-      data: { status: "completed", completedAt: new Date() },
-      include: { conversation: { select: { externalId: true } } }
-    } as any);
-    await this.notifications.create(order.userId, "orderStatus", "服务已完成", "本次服务已完成，你现在可以提交评价。", { orderId, status: "completed" });
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const db = tx as any;
+      await db.$queryRaw`SELECT "id" FROM "Order" WHERE "id" = ${orderId} FOR UPDATE`;
+      const order = await db.order.findUnique({
+        where: { id: orderId },
+        include: {
+          companion: { select: { ownerUserId: true } },
+          conversation: { select: { externalId: true } }
+        }
+      });
+      if (!order || order.companion.ownerUserId !== userId) {
+        throw new AppException("ORDER_NOT_FOUND", "Order not found", HttpStatus.NOT_FOUND);
+      }
+      if (order.status !== "inService") {
+        throw new AppException("ORDER_INVALID_STATE", "Only in-service orders can complete", HttpStatus.CONFLICT);
+      }
+      return db.order.update({
+        where: { id: orderId },
+        data: { status: "completed", completedAt: new Date() },
+        include: { conversation: { select: { externalId: true } } }
+      });
+    }, { maxWait: 5_000, timeout: 10_000 });
+    await this.notifications.create(updated.userId, "orderStatus", "服务已完成", "本次服务已完成，你现在可以提交评价。", { orderId, status: "completed" });
     return this.toDto(updated);
   }
 
@@ -145,27 +300,56 @@ export class OrdersService {
   }
 
   async cancel(userId: string, orderId: string) {
-    const order = await this.findOwnedOrThrow(userId, orderId);
-
-    if (order.status !== "pending" && order.status !== "paying") {
-      throw new AppException(
-        "ORDER_INVALID_STATE",
-        "Only pending or paying orders can be cancelled",
-        HttpStatus.CONFLICT
-      );
-    }
-
     const updated = await this.prisma.$transaction(async (tx) => {
       const db = tx as any;
-      await db.paymentTransaction.updateMany({
-        where: {
-          orderId,
-          status: "initiated"
-        },
-        data: {
-          status: "closed"
-        }
+      // Serialize with prepay and payment callbacks. A locally closed WeChat
+      // prepay remains externally payable, so never cancel an order once an
+      // initiated payment exists.
+      await db.$queryRaw`SELECT "id" FROM "Order" WHERE "id" = ${orderId} FOR UPDATE`;
+      const order = await db.order.findUnique({
+        where: { id: orderId },
+        include: { conversation: { select: { externalId: true } } }
       });
+      if (!order || order.userId !== userId) {
+        throw new AppException("ORDER_NOT_FOUND", "Order not found", HttpStatus.NOT_FOUND);
+      }
+      if (!["pending", "paying"].includes(order.status)) {
+        throw new AppException(
+          "ORDER_INVALID_STATE",
+          "Only pending or paying orders can be cancelled",
+          HttpStatus.CONFLICT
+        );
+      }
+
+      const activePayment = await db.paymentTransaction.findFirst({
+        where: { orderId, status: "initiated" },
+        select: { id: true, outTradeNo: true, createdAt: true, expiresAt: true }
+      });
+      if (activePayment) {
+        const expiresAt = activePayment.expiresAt instanceof Date
+          ? activePayment.expiresAt
+          : new Date(activePayment.createdAt.getTime() + WECHAT_PREPAY_TTL_MS);
+        if (expiresAt.getTime() > Date.now()) {
+          throw new AppException(
+            "ORDER_PAYMENT_IN_PROGRESS",
+            "Order has an active WeChat payment and cannot be cancelled",
+            HttpStatus.CONFLICT
+          );
+        }
+
+        await this.wechat.closePayment(activePayment.outTradeNo);
+        const closed = await db.paymentTransaction.updateMany({
+          where: { id: activePayment.id, status: "initiated" },
+          data: { status: "closed" }
+        });
+        if (closed.count !== 1) {
+          throw new AppException(
+            "PAYMENT_STATE_CHANGED",
+            "Payment state changed while closing the expired prepay",
+            HttpStatus.CONFLICT
+          );
+        }
+      }
 
       return db.order.update({
         where: { id: orderId },
@@ -175,7 +359,7 @@ export class OrdersService {
         },
         include: { conversation: { select: { externalId: true } } }
       });
-    });
+    }, { maxWait: 5_000, timeout: 10_000 });
 
     await this.notifications.create(
       userId,
@@ -221,6 +405,7 @@ export class OrdersService {
         failureReason: order.refunds[0].failureReason
       } : null,
       conversationId: order.conversation?.externalId ?? null,
+      companionConfirmedAt: order.companionConfirmedAt?.toISOString() ?? null,
       paidAt: order.paidAt?.toISOString() ?? null,
       cancelledAt: order.cancelledAt?.toISOString() ?? null,
       completedAt: order.completedAt?.toISOString() ?? null,

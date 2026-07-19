@@ -5,23 +5,26 @@
       <view class="title">{{user.profile.displayName || '微信用户'}}</view>
       <view class="muted">{{user.role === 'companion' ? '陪伴者' : '普通用户'}} · 平台内沟通</view>
       <input value="{{displayName}}" bindinput="setDisplayName" placeholder="显示名称" maxlength="30" />
-      <picker mode="selector" range="{{genders}}" bindchange="setGender"><view class="picker">性别：{{gender || '请选择'}}</view></picker>
+      <picker mode="selector" range="{{genderLabels}}" bindchange="setGender"><view class="picker">性别：{{genderLabel}}</view></picker>
       <button class="primary-button" loading="{{saving}}" bindtap="saveProfile">保存资料</button>
     </view>
     <view class="card">
-      <view class="row"><text class="title small">成为陪伴者</text><button class="text-button" bindtap="toggleApplication">{{applicationVisible ? '收起' : '申请'}}</button></view>
-      <view wx:if="{{applicationVisible}}">
-        <input value="{{role}}" bindinput="setRole" placeholder="服务角色" />
-        <textarea value="{{bio}}" bindinput="setBio" placeholder="服务介绍" auto-height="true" />
-        <input value="{{price}}" bindinput="setPrice" type="number" placeholder="每 30 分钟价格" />
-        <input value="{{city}}" bindinput="setCity" placeholder="服务城市/线上" />
-        <button class="primary-button" bindtap="applyCompanion">提交申请</button>
-      </view>
+      <view class="title small">陪伴者入驻</view>
+      <view class="muted">首发阶段仅开放平台已完成实名与资质审核的预配置陪伴者，暂不接受小程序内自助申请。</view>
     </view>
     <view class="title section-title">通知</view>
     <view wx:if="{{!notifications.length}}" class="empty compact">暂无新通知</view>
     <view wx:for="{{notifications}}" wx:key="id" class="card notification"><view class="name">{{item.title}}</view><view class="muted">{{item.body}}</view></view>
-    <button class="legal" bindtap="openPrivacy">隐私保护指引</button>
-    <button class="legal" bindtap="signOut">退出当前账号</button>
+    <view class="legal-links">
+      <button class="legal" bindtap="openTerms">用户协议</button>
+      <button class="legal" bindtap="openPrivacy">Talk&amp;Talk 隐私政策</button>
+      <button class="legal" bindtap="openWechatPrivacy">微信隐私保护指引</button>
+      <button class="legal" open-type="contact">联系平台客服</button>
+    </view>
+    <view class="account-actions">
+      <button class="legal" bindtap="signOut">退出当前账号</button>
+      <button class="legal danger" bindtap="requestDeletion">申请注销账号</button>
+      <button class="legal danger" bindtap="withdrawConsent">撤回协议同意并退出</button>
+    </view>
   </view>
 </view>

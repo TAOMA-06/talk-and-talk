@@ -3,10 +3,14 @@
   <view wx:if="{{loading}}" class="empty">正在加载…</view>
   <view wx:elif="{{error}}" class="empty">{{error}}</view>
   <view wx:else class="messages">
+    <view wx:if="{{loadingOlder}}" class="history-status">正在加载更早消息…</view>
+    <view wx:elif="{{hasMore}}" class="history-status">上拉加载更早消息</view>
+    <view wx:elif="{{messages.length}}" class="history-status">已显示全部消息</view>
     <view wx:for="{{messages}}" wx:key="id" class="message {{item.type === 'system' || item.type === 'safety' ? 'system' : ''}}">
       <view class="sender">{{item.senderName || item.senderId}}</view>
       <view class="bubble">{{item.content}}</view>
     </view>
+    <view wx:if="{{syncing}}" class="sync-status">正在同步新消息…</view>
   </view>
   <view class="composer">
     <input value="{{draft}}" bindinput="setDraft" maxlength="2000" placeholder="输入消息…" confirm-type="send" bindconfirm="send" />

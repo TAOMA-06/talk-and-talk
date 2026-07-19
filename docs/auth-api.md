@@ -140,7 +140,7 @@ Talk&Talk 正式账号体系 API，前缀均为 `/api/v1`。所有 JSON 响应�
 - `GET|POST /admin/moderation/*` 需要 `moderator` 或 `admin`
 - `GET /moderation/cases` 需要 `moderator` 或 `admin`
 
-开发 seed 账号：
+开发 seed phone 身份（API 测试兼容；Web 审核后台改用密码 + TOTP）：
 
 | 手机号 | 角色 |
 |--------|------|
@@ -154,6 +154,8 @@ Talk&Talk 正式账号体系 API，前缀均为 `/api/v1`。所有 JSON 响应�
 | `RATE_LIMITED` | 429 | 验证码发送过频 |
 | `INVALID_PHONE` | 400 | 手机号格式无效 |
 | `INVALID_VERIFICATION_CODE` | 401 | 验证码错误或过期 |
+| `STAFF_LOGIN_FAILED` | 401 | 员工密码、TOTP、账号状态或防重放校验失败（统一响应） |
+| `STAFF_LOGIN_RATE_LIMITED` | 429 | 员工登录尝试过多 |
 | `INVALID_APPLE_TOKEN` | 401 | Apple token 无效 |
 | `INVALID_WECHAT_CODE` | 401 | 小程序登录凭证无效或过期 |
 | `WECHAT_LOGIN_UNAVAILABLE` | 502 | 无法连接微信登录服务 |

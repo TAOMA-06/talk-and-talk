@@ -139,6 +139,8 @@ export const seedCompanions: SeedCompanion[] = [
 ];
 
 type SeedClient = {
+  user: Pick<PrismaClient["user"], "upsert">;
+  authIdentity: Pick<PrismaClient["authIdentity"], "upsert">;
   companionProfile: Pick<PrismaClient["companionProfile"], "upsert">;
   companionServiceTag: Pick<PrismaClient["companionServiceTag"], "deleteMany" | "upsert">;
   serviceTag: Pick<PrismaClient["serviceTag"], "upsert">;
@@ -221,11 +223,44 @@ export async function seedDatabase(client: SeedClient = prisma) {
   if (environment.APP_ENV === "production") {
     throw new Error("Demo companion seed is disabled when APP_ENV=production");
   }
-  for (const companion of seedCompanions) {
+  for (const [index, companion] of seedCompanions.entries()) {
+    const ownerUserId = `seed-owner-${companion.id}`;
+    const ownerPhone = `+86138000001${String(index + 1).padStart(2, "0")}`;
+    await client.user.upsert({
+      where: { id: ownerUserId },
+      create: {
+        id: ownerUserId,
+        role: "companion",
+        profile: {
+          create: {
+            displayName: companion.name,
+            phone: ownerPhone,
+            isVerified: true,
+            safetyScore: 100
+          }
+        }
+      },
+      update: {
+        role: "companion",
+        accountStatus: "active",
+        profile: {
+          upsert: {
+              create: { displayName: companion.name, phone: ownerPhone, isVerified: true, safetyScore: 100 },
+              update: { displayName: companion.name, phone: ownerPhone, isVerified: true }
+          }
+        }
+      }
+    });
+    await client.authIdentity.upsert({
+      where: { provider_providerId: { provider: "phone", providerId: ownerPhone } },
+      create: { userId: ownerUserId, provider: "phone", providerId: ownerPhone },
+      update: { userId: ownerUserId }
+    });
     await client.companionProfile.upsert({
       where: { id: companion.id },
       create: {
         id: companion.id,
+        ownerUserId,
         name: companion.name,
         role: companion.role,
         initials: companion.initials,
@@ -246,6 +281,7 @@ export async function seedDatabase(client: SeedClient = prisma) {
         isPublished: true
       },
       update: {
+        ownerUserId,
         name: companion.name,
         role: companion.role,
         initials: companion.initials,

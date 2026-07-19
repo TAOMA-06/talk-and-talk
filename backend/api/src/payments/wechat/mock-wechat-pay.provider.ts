@@ -14,8 +14,10 @@ export const MOCK_WECHAT_NOTIFY_TOKEN = "mock-wechat-notify";
 
 export class MockWeChatPayProvider implements WeChatPayProvider {
   readonly isMock = true;
+  private readonly prepays = new Map<string, { amountCents: number; channel: "app" | "miniProgram" }>();
 
   async createAppPrepay(input: WeChatPrepayInput): Promise<WeChatAppPrepayResult> {
+    this.prepays.set(input.outTradeNo, { amountCents: input.amountCents, channel: "app" });
     const prepayId = `mock_prepay_${input.outTradeNo}`;
     const nonceStr = randomBytes(8).toString("hex");
     const timeStamp = String(Math.floor(Date.now() / 1000));
@@ -40,6 +42,7 @@ export class MockWeChatPayProvider implements WeChatPayProvider {
   }
 
   async createMiniProgramPrepay(input: WeChatMiniProgramPrepayInput): Promise<WeChatMiniProgramPrepayResult> {
+    this.prepays.set(input.outTradeNo, { amountCents: input.amountCents, channel: "miniProgram" });
     const prepayId = `mock_prepay_${input.outTradeNo}`;
     const nonceStr = randomBytes(8).toString("hex");
     const timeStamp = String(Math.floor(Date.now() / 1000));
@@ -59,6 +62,22 @@ export class MockWeChatPayProvider implements WeChatPayProvider {
         signType: "RSA",
         paySign
       }
+    };
+  }
+
+  async closePayment(_outTradeNo: string): Promise<void> {}
+
+  async queryPayment(outTradeNo: string): Promise<WeChatNotifyPayload> {
+    const prepay = this.prepays.get(outTradeNo);
+    return {
+      appId: prepay?.channel === "miniProgram" ? "wx-mini-app" : "wx_mock_app_id",
+      mchId: "1900000000",
+      outTradeNo,
+      transactionId: `mock_query_txn_${outTradeNo}`,
+      tradeState: prepay ? "SUCCESS" : "NOTPAY",
+      amountCents: prepay?.amountCents ?? 0,
+      currency: "CNY",
+      raw: { out_trade_no: outTradeNo, trade_state: prepay ? "SUCCESS" : "NOTPAY" }
     };
   }
 
@@ -87,10 +106,13 @@ export class MockWeChatPayProvider implements WeChatPayProvider {
     const amountCents = Number(amount.total ?? parsed.amountCents ?? 0);
 
     return {
+      appId: String(resource.appid ?? resource.appId ?? parsed.appId ?? "wx_mock_app_id"),
+      mchId: String(resource.mchid ?? resource.mchId ?? parsed.mchId ?? "1900000000"),
       outTradeNo,
       transactionId,
       tradeState,
       amountCents,
+      currency: String(amount.currency ?? resource.currency ?? parsed.currency ?? "CNY"),
       raw: parsed
     };
   }
@@ -105,14 +127,28 @@ export class MockWeChatPayProvider implements WeChatPayProvider {
 
   parseRefundNotifyPayload(rawBody: string): WeChatRefundNotifyPayload {
     const parsed = JSON.parse(rawBody) as Record<string, unknown>;
+    const resource = (parsed.resource as Record<string, unknown> | undefined) ?? parsed;
+    const plaintext = (resource.plaintext as Record<string, unknown> | undefined) ?? resource;
+    const amount = (plaintext.amount as Record<string, unknown> | undefined) ?? {};
     return {
-      outRefundNo: String(parsed.outRefundNo ?? parsed.out_refund_no ?? ""),
-      refundId: String(parsed.refundId ?? parsed.refund_id ?? ""),
-      status: String(parsed.status ?? "SUCCESS"),
-      refundAmountCents: Number(parsed.refundAmountCents ?? 0),
+      appId: optionalString(plaintext.appid ?? plaintext.appId ?? parsed.appId),
+      mchId: String(plaintext.mchid ?? plaintext.mchId ?? parsed.mchId ?? "1900000000"),
+      outTradeNo: String(plaintext.outTradeNo ?? plaintext.out_trade_no ?? ""),
+      transactionId: String(plaintext.transactionId ?? plaintext.transaction_id ?? ""),
+      outRefundNo: String(plaintext.outRefundNo ?? plaintext.out_refund_no ?? ""),
+      refundId: String(plaintext.refundId ?? plaintext.refund_id ?? ""),
+      status: String(plaintext.refund_status ?? plaintext.status ?? "SUCCESS"),
+      totalAmountCents: Number(amount.total ?? plaintext.totalAmountCents ?? 0),
+      refundAmountCents: Number(amount.refund ?? plaintext.refundAmountCents ?? 0),
+      currency: optionalString(amount.currency ?? plaintext.currency),
       raw: parsed
     };
   }
+}
+
+function optionalString(value: unknown): string | undefined {
+  const result = typeof value === "string" ? value.trim() : "";
+  return result || undefined;
 }
 
 function headerValue(

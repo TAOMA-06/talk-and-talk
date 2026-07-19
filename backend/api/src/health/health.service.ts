@@ -5,8 +5,6 @@ import { ConfigService } from "@nestjs/config";
 import Redis from "ioredis";
 import { Pool } from "pg";
 
-import { MetricsService, MetricsSnapshot } from "../metrics/metrics.service";
-
 export type DependencyStatus = {
   status: "ok" | "error";
   latencyMs: number;
@@ -23,14 +21,12 @@ export type HealthResponse = {
     database: DependencyStatus;
     redis: DependencyStatus;
   };
-  metrics: MetricsSnapshot;
 };
 
 @Injectable()
 export class HealthService {
   constructor(
-    private readonly config: ConfigService,
-    private readonly metrics: MetricsService
+    private readonly config: ConfigService
   ) {}
 
   async check(): Promise<HealthResponse> {
@@ -49,8 +45,7 @@ export class HealthService {
       dependencies: {
         database,
         redis
-      },
-      metrics: this.metrics.snapshot()
+      }
     };
   }
 
@@ -102,10 +97,11 @@ export class HealthService {
   }
 
   private error(start: number, error: unknown): DependencyStatus {
+    const exposeDetails = this.config.getOrThrow<string>("APP_ENV") !== "production";
     return {
       status: "error",
       latencyMs: this.latency(start),
-      message: error instanceof Error
+      message: exposeDetails && error instanceof Error
         ? error.message || error.name || "Dependency check failed"
         : "Dependency check failed"
     };

@@ -45,6 +45,18 @@ export class OrdersController {
     return this.ordersService.startService(user.id, id);
   }
 
+  @Post("service/:id/confirm")
+  @UseGuards(JwtAuthGuard)
+  confirmOrder(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
+    return this.ordersService.confirmOrder(user.id, id);
+  }
+
+  @Post("service/:id/reject")
+  @UseGuards(JwtAuthGuard)
+  rejectOrder(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
+    return this.ordersService.rejectOrder(user.id, id);
+  }
+
   @Post("service/:id/complete")
   @UseGuards(JwtAuthGuard)
   completeService(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
@@ -67,6 +79,12 @@ export class OrdersController {
   @UseGuards(JwtAuthGuard)
   prepay(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string, @Body() dto: PrepayDto) {
     return this.paymentsService.prepay(user.id, id, dto.channel ?? "app");
+  }
+
+  @Post(":id/payment/sync")
+  @UseGuards(JwtAuthGuard)
+  syncPayment(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
+    return this.paymentsService.syncPayment(user.id, id);
   }
 
   @Post(":id/refund")

@@ -5,10 +5,12 @@
     <view class="section-title">我的预约</view>
     <view wx:if="{{!orders.length}}" class="empty">还没有订单，去发现页找一位陪伴者吧。</view>
     <view class="card" wx:for="{{orders}}" wx:key="id">
-      <view class="row"><text class="name">{{item.displayName}}</text><text class="status">{{item.status}}</text></view>
-      <view class="muted">{{item.durationMinutes}} 分钟 · ¥{{item.amountCents / 100}}</view>
+      <view class="row"><text class="name">{{item.displayName}}</text><text class="status">{{item.statusText}}</text></view>
+      <view class="schedule">预约：{{item.scheduledAtText}}</view>
+      <view class="muted">{{item.durationMinutes}} 分钟 · {{item.amountText}}</view>
+      <view wx:if="{{item.status === 'pending' && !item.companionConfirmedAt}}" class="muted">等待陪伴者确认预约，确认前不会扣款。</view>
       <view class="actions">
-        <button wx:if="{{item.status === 'pending' || item.status === 'paying'}}" class="primary-button action" loading="{{payingId === item.id}}" bindtap="pay" data-id="{{item.id}}">去支付</button>
+        <button wx:if="{{(item.status === 'pending' || item.status === 'paying') && item.companionConfirmedAt}}" class="primary-button action" loading="{{payingId === item.id}}" bindtap="pay" data-id="{{item.id}}">去支付</button>
         <button wx:if="{{item.status === 'pending' || item.status === 'paying'}}" class="plain action" bindtap="cancel" data-id="{{item.id}}">取消订单</button>
         <button wx:if="{{item.status === 'paid' || item.status === 'inService' || item.status === 'completed'}}" class="plain action" bindtap="refund" data-id="{{item.id}}">申请退款</button>
         <button wx:if="{{item.status === 'completed'}}" class="primary-button action" bindtap="review" data-id="{{item.id}}">提交评价</button>
@@ -16,9 +18,13 @@
     </view>
     <view wx:if="{{serviceOrders.length}}" class="section-title">作为陪伴者</view>
     <view class="card" wx:for="{{serviceOrders}}" wx:key="id">
-      <view class="row"><text class="name">{{item.displayName}}</text><text class="status">{{item.status}}</text></view>
-      <view class="muted">{{item.durationMinutes}} 分钟服务</view>
+      <view class="row"><text class="name">{{item.displayName}}</text><text class="status">{{item.statusText}}</text></view>
+      <view class="schedule">预约：{{item.scheduledAtText}}</view>
+      <view class="muted">{{item.durationMinutes}} 分钟服务 · {{item.amountText}}</view>
       <view class="actions">
+        <button wx:if="{{item.status === 'pending' && !item.companionConfirmedAt}}" class="primary-button action" bindtap="confirmServiceOrder" data-id="{{item.id}}">确认预约</button>
+        <button wx:if="{{item.status === 'pending' && !item.companionConfirmedAt}}" class="plain action" bindtap="rejectServiceOrder" data-id="{{item.id}}">无法接单</button>
+        <view wx:if="{{item.status === 'pending' && item.companionConfirmedAt}}" class="muted">已确认，等待客户支付</view>
         <button wx:if="{{item.status === 'paid'}}" class="primary-button action" bindtap="startService" data-id="{{item.id}}">开始服务</button>
         <button wx:if="{{item.status === 'inService'}}" class="primary-button action" bindtap="completeService" data-id="{{item.id}}">完成服务</button>
       </view>

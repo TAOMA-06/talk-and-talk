@@ -50,6 +50,6 @@ export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer
       .apply(RequestIdMiddleware, RequestMetricsMiddleware, IpRateLimitMiddleware)
-      .forRoutes("*");
+      .forRoutes("{*path}");
   }
 }

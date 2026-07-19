@@ -10,6 +10,7 @@ import { HttpExceptionFilter } from "../src/common/errors/http-exception.filter"
 import { buildCorsOptions } from "../src/config/cors";
 import { PrismaService } from "../src/database/prisma.service";
 import { seedDatabase } from "../src/database/seed";
+import { grantCurrentLegalConsent } from "./legal-consent-fixture";
 
 describe("Notifications and security (e2e)", () => {
   let app: INestApplication;
@@ -91,6 +92,7 @@ describe("Notifications and security (e2e)", () => {
         }
       }
     });
+    if (role === "user") await grantCurrentLegalConsent(prisma, user.id);
     const token = jwt.sign(
       { sub: user.id, role },
       { secret: "e2e-access-secret", expiresIn: "15m" }
@@ -154,6 +156,17 @@ describe("Notifications and security (e2e)", () => {
       .get("/api/v1/admin/status")
       .set("Authorization", `Bearer ${token}`)
       .expect(403);
+  });
+
+  it("invalidates an existing access token immediately after an account is banned", async () => {
+    const { user, token } = await createUser("user");
+    await prisma.user.update({ where: { id: user.id }, data: { accountStatus: "banned" } });
+
+    const response = await request(app.getHttpServer())
+      .get("/api/v1/notifications")
+      .set("Authorization", `Bearer ${token}`)
+      .expect(403);
+    expect(response.body.error.code).toBe("ACCOUNT_BANNED");
   });
 
   it("writes audit log on account deletion request", async () => {

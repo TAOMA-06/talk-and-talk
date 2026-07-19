@@ -1,5 +1,7 @@
 .chat-page { padding-bottom: 150rpx; }
 .notice { margin-bottom: 20rpx; padding: 16rpx; border-radius: 14rpx; background: #fce8ed; color: #9b3d58; font-size: 24rpx; line-height: 1.5; }
+.history-status, .sync-status { padding: 12rpx 0; color: #8d6e73; font-size: 23rpx; text-align: center; }
+.sync-status { color: #a45168; }
 .message { margin: 18rpx 0; }
 .sender { margin-bottom: 6rpx; color: #8d6e73; font-size: 23rpx; }
 .bubble { display: inline-block; max-width: 88%; padding: 18rpx 22rpx; border-radius: 18rpx; background: #fff; line-height: 1.55; box-shadow: 0 4rpx 12rpx rgba(96, 50, 60, 0.06); }

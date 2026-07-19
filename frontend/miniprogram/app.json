@@ -1,12 +1,14 @@
 {
   "pages": [
+    "pages/consent/index",
     "pages/discover/index",
     "pages/community/index",
     "pages/orders/index",
     "pages/messages/index",
     "pages/profile/index",
     "pages/companion/detail",
-    "pages/chat/index"
+    "pages/chat/index",
+    "pages/legal/index"
   ],
   "window": {
     "navigationBarBackgroundColor": "#FFF8F8",

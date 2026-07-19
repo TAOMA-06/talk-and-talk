@@ -4,10 +4,20 @@ on:
   push:
     paths:
       - "frontend/miniprogram/**"
+      - "backend/api/src/**"
+      - "backend/api/prisma/**"
+      - "backend/api/public/legal/**"
+      - "backend/api/package.json"
+      - "backend/api/package-lock.json"
       - ".github/workflows/miniprogram.yml"
   pull_request:
     paths:
       - "frontend/miniprogram/**"
+      - "backend/api/src/**"
+      - "backend/api/prisma/**"
+      - "backend/api/public/legal/**"
+      - "backend/api/package.json"
+      - "backend/api/package-lock.json"
       - ".github/workflows/miniprogram.yml"
 
 jobs:
@@ -24,7 +34,13 @@ jobs:
         working-directory: backend/api
         run: npm ci
       - name: Validate Mini Program manifest and pages
+        env:
+          MINIPROGRAM_RELEASE: "1"
+          WECHAT_MINIPROGRAM_APP_ID: ${{ vars.WECHAT_MINIPROGRAM_APP_ID }}
         run: node frontend/miniprogram/scripts/validate.mjs
+      - name: Verify shared profile and legal-consent contracts
+        working-directory: backend/api
+        run: npm test -- --runTestsByPath src/users/dto/update-me.dto.spec.ts src/users/dto/legal-consent.dto.spec.ts
       - name: Type-check Mini Program
         run: backend/api/node_modules/.bin/tsc -p frontend/miniprogram/tsconfig.json --noEmit
       - name: Run Mini Program page/runtime smoke

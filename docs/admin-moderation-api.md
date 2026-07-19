@@ -10,14 +10,14 @@
 | `moderator` | 审核概览、工单、处置、样本标注/导出 |
 | `admin` | 同 moderator，另含 `GET /admin/status` 与 companions 管理 |
 
-开发 seed 账号（`npm run prisma:seed`）：
+开发 seed phone 身份（只用于 API 测试，不是 Web 审核后台凭据）：
 
 | 手机号 | 角色 |
 |--------|------|
 | `13800000001` | admin |
 | `13800000002` | moderator |
 
-`SMS_PROVIDER=mock` 时验证码输出到 API 日志。
+Web `/admin/` 使用 `POST /auth/staff/login` 的独立用户名、密码与 TOTP。按 [staff-operations.md](./staff-operations.md) 初始化；生产不允许共享或 seed 员工凭据。
 
 ## Staff API（`moderator` / `admin` + JWT）
 

@@ -5,6 +5,7 @@ set -euo pipefail
 
 BASE_URL="${1:-https://api.talkandtalk.app}"
 API="$BASE_URL/api/v1"
+: "${METRICS_TOKEN:?Set METRICS_TOKEN to the production metrics bearer token}"
 
 echo "==> Health"
 HEALTH=$(curl -fsS "$API/health")
@@ -14,7 +15,11 @@ echo "$HEALTH" | grep -Eq '"status":"(ok|degraded)"' || {
   exit 1
 }
 
-echo "==> SMS send-code must be unavailable (production Apple-only)"
+echo "==> Public legal documents"
+curl -fsS "$BASE_URL/legal/privacy.html" >/dev/null
+curl -fsS "$BASE_URL/legal/terms.html" >/dev/null
+
+echo "==> SMS send-code must be unavailable (production uses WeChat Mini Program login)"
 HTTP_CODE=$(curl -sS -o /tmp/tat-prod-sms.json -w "%{http_code}" \
   -X POST "$API/auth/sms/send-code" \
   -H 'Content-Type: application/json' \
@@ -43,8 +48,17 @@ if [[ "$MOCK_CODE" == "200" ]]; then
 fi
 echo "mock-notify rejected as expected (HTTP $MOCK_CODE)"
 
-echo "==> Metrics should not be world-readable if nginx hardened (optional probe)"
-METRICS_CODE=$(curl -sS -o /dev/null -w "%{http_code}" "$API/metrics" || true)
-echo "metrics HTTP $METRICS_CODE (403/404 preferred on public edge; 200 only on private network)"
+echo "==> Metrics authentication"
+METRICS_PUBLIC_CODE=$(curl -sS -o /dev/null -w "%{http_code}" "$API/metrics" || true)
+if [[ "$METRICS_PUBLIC_CODE" == "200" ]]; then
+  echo "metrics must not be readable without a bearer token" >&2
+  exit 1
+fi
+METRICS_AUTH_CODE=$(curl -sS -o /tmp/tat-prod-metrics.txt -w "%{http_code}" \
+  -H "Authorization: Bearer $METRICS_TOKEN" "$API/metrics" || true)
+if [[ "$METRICS_AUTH_CODE" != "200" ]]; then
+  echo "authenticated metrics probe failed (HTTP $METRICS_AUTH_CODE)" >&2
+  exit 1
+fi
 
 echo "==> Production smoke OK"

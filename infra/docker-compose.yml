@@ -4,6 +4,8 @@ services:
       context: ../backend/api
     environment:
       NODE_ENV: production
+      APP_ENV: development
+      HOST: 0.0.0.0
       PORT: 3000
       API_PREFIX: api/v1
       APP_VERSION: 0.1.0
@@ -22,6 +24,8 @@ services:
       WECHAT_PAY_CERT_SERIAL_NO: ""
       APPLE_SIGN_IN_BUNDLE_ID: ""
       SMS_PROVIDER: none
+      STAFF_TOTP_ENCRYPTION_KEY: docker-local-staff-totp-encryption-key
+      METRICS_TOKEN: ""
     ports:
       - "3000:3000"
     depends_on:

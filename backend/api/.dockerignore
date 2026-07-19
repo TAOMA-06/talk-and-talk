@@ -1,0 +1,14 @@
+.env
+.env.*
+!.env.example
+!.env.production.example
+!.env.staging.example
+.git
+.DS_Store
+node_modules
+dist
+coverage
+backups
+*.log
+*.pem
+*.key

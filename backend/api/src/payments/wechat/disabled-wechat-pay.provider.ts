@@ -30,6 +30,9 @@ export class DisabledWeChatPayProvider implements WeChatPayProvider {
     return this.unavailable();
   }
 
+  async closePayment(_outTradeNo: string): Promise<void> { return this.unavailable(); }
+  async queryPayment(_outTradeNo: string): Promise<WeChatNotifyPayload> { return this.unavailable(); }
+
   verifyNotifySignature(
     _headers: Record<string, string | string[] | undefined>,
     _rawBody: string

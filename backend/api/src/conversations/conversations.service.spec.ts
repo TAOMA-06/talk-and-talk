@@ -3,9 +3,7 @@ import { ConversationsService } from "./conversations.service";
 describe("ConversationsService.ensureConversation", () => {
   const prisma = {
     conversation: {
-      findUnique: jest.fn(),
-      create: jest.fn(),
-      upsert: jest.fn()
+      findFirst: jest.fn()
     },
     companionProfile: {
       findFirst: jest.fn()
@@ -28,7 +26,7 @@ describe("ConversationsService.ensureConversation", () => {
     service = new ConversationsService(prisma, moderation, moderationCases);
   });
 
-  it("returns an existing conversation even when the companion is unpublished", async () => {
+  it("returns an activated conversation for an authorized participant", async () => {
     const existing = {
       id: "conv-1",
       externalId: "c1",
@@ -36,51 +34,46 @@ describe("ConversationsService.ensureConversation", () => {
       companionId: "c1",
       companion: { id: "c1", name: "林屿", isPublished: false }
     };
-    prisma.conversation.findUnique.mockResolvedValue(existing);
+    prisma.conversation.findFirst.mockResolvedValue(existing);
 
     const result = await (service as any).ensureConversation("u1", "c1");
 
     expect(result).toBe(existing);
     expect(prisma.companionProfile.findFirst).not.toHaveBeenCalled();
-    expect(prisma.conversation.create).not.toHaveBeenCalled();
+    expect(prisma.conversation.findFirst).toHaveBeenCalledWith({
+      where: {
+        orders: { some: { status: { in: ["paid", "inService", "completed"] } } },
+        OR: [
+          { userId: "u1", externalId: "c1" },
+          { id: "c1", companion: { ownerUserId: "u1" } }
+        ]
+      },
+      include: {
+        companion: true,
+        user: { include: { profile: true } }
+      }
+    });
   });
 
-  it("requires a published companion when creating a new conversation", async () => {
-    prisma.conversation.findUnique.mockResolvedValue(null);
-    prisma.companionProfile.findFirst.mockResolvedValue(null);
+  it("rejects free messaging to a published companion", async () => {
+    prisma.conversation.findFirst.mockResolvedValue(null);
+    prisma.companionProfile.findFirst.mockResolvedValue({ id: "c1", isPublished: true });
 
-    await expect((service as any).ensureConversation("u1", "c-missing")).rejects.toMatchObject({
-      code: "CONVERSATION_NOT_FOUND"
+    await expect((service as any).ensureConversation("u1", "c1")).rejects.toMatchObject({
+      code: "PAYMENT_REQUIRED"
     });
 
     expect(prisma.companionProfile.findFirst).toHaveBeenCalledWith({
-      where: { id: "c-missing", isPublished: true }
+      where: { id: "c1", isPublished: true }
     });
   });
 
-  it("creates a conversation for a published companion when none exists", async () => {
-    const companion = { id: "c1", name: "林屿", isPublished: true };
-    const created = {
-      id: "conv-2",
-      externalId: "c1",
-      userId: "u1",
-      companionId: "c1",
-      companion
-    };
-    prisma.conversation.findUnique.mockResolvedValue(null);
-    prisma.companionProfile.findFirst.mockResolvedValue(companion);
-    prisma.conversation.create.mockResolvedValue(created);
+  it("hides unknown or unauthorized conversation routes", async () => {
+    prisma.conversation.findFirst.mockResolvedValue(null);
+    prisma.companionProfile.findFirst.mockResolvedValue(null);
 
-    const result = await (service as any).ensureConversation("u1", "c1");
-
-    expect(result).toBe(created);
-    expect(prisma.conversation.create).toHaveBeenCalledWith({
-      data: {
-        externalId: "c1",
-        userId: "u1",
-        companionId: "c1"
-      },
-      include: { companion: true }
+    await expect((service as any).ensureConversation("third-party", "conv-private")).rejects.toMatchObject({
+      code: "CONVERSATION_NOT_FOUND"
     });
   });
 });

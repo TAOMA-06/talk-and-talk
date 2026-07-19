@@ -1,16 +1,15 @@
-import { Injectable, NestMiddleware } from "@nestjs/common";
+import { HttpStatus, Injectable, NestMiddleware, OnModuleDestroy } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { NextFunction, Request, Response } from "express";
 import Redis from "ioredis";
 
 import { AppException } from "../errors/app.exception";
-import { HttpStatus } from "@nestjs/common";
-
 /**
- * Simple IP rate limit using Redis. Fail-open if Redis is unavailable so health checks still work.
+ * Simple IP rate limit using Redis. Production authentication routes fail closed when Redis is
+ * unavailable; ordinary routes and health checks remain available for diagnosis.
  */
 @Injectable()
-export class IpRateLimitMiddleware implements NestMiddleware {
+export class IpRateLimitMiddleware implements NestMiddleware, OnModuleDestroy {
   private redis: Redis | null = null;
 
   constructor(private readonly config: ConfigService) {}
@@ -27,6 +26,11 @@ export class IpRateLimitMiddleware implements NestMiddleware {
     return this.redis;
   }
 
+  onModuleDestroy(): void {
+    this.redis?.disconnect();
+    this.redis = null;
+  }
+
   async use(req: Request, res: Response, next: NextFunction) {
     const limit = this.config.get<number>("RATE_LIMIT_PER_MINUTE") ?? 120;
     const windowSeconds = 60;
@@ -39,7 +43,7 @@ export class IpRateLimitMiddleware implements NestMiddleware {
         try {
           await redis.connect();
         } catch {
-          next();
+          this.handleRedisUnavailable(req, next);
           return;
         }
       }
@@ -60,19 +64,38 @@ export class IpRateLimitMiddleware implements NestMiddleware {
         return;
       }
     } catch {
-      // Fail open
+      this.handleRedisUnavailable(req, next);
+      return;
+    }
+    next();
+  }
+
+  private handleRedisUnavailable(req: Request, next: NextFunction): void {
+    const appEnv = this.config.get<string>("APP_ENV", "development");
+    if (shouldFailClosed(req, appEnv)) {
+      next(
+        new AppException(
+          "RATE_LIMIT_UNAVAILABLE",
+          "Authentication is temporarily unavailable, please try again later",
+          HttpStatus.SERVICE_UNAVAILABLE
+        )
+      );
+      return;
     }
     next();
   }
 }
 
 export function clientIp(req: Request): string {
-  const forwarded = req.headers["x-forwarded-for"];
-  if (typeof forwarded === "string" && forwarded.length > 0) {
-    return forwarded.split(",")[0]!.trim();
-  }
-  if (Array.isArray(forwarded) && forwarded[0]) {
-    return forwarded[0].split(",")[0]!.trim();
-  }
+  // Express computes req.ip from the configured trusted proxy chain. Reading X-Forwarded-For
+  // directly would allow an internet client to choose its own rate-limit bucket.
   return req.ip || req.socket.remoteAddress || "unknown";
+}
+
+export function shouldFailClosed(req: Request, appEnv: string): boolean {
+  if (appEnv !== "production" || req.method.toUpperCase() !== "POST") {
+    return false;
+  }
+  const path = req.originalUrl || req.url || "";
+  return /(?:^|\/)auth\/(?:sms\/send-code|phone\/login|wechat\/mini-program|refresh)(?:[/?]|$)/.test(path);
 }

@@ -7,9 +7,10 @@ import {
   Param,
   Post,
   Req,
+  Res,
   UseGuards
 } from "@nestjs/common";
-import { Request } from "express";
+import { Request, Response } from "express";
 
 import { AuthenticatedUser } from "../auth/auth.service";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
@@ -31,22 +32,29 @@ export class PaymentsController {
 
   @Post("wechat/notify")
   @HttpCode(200)
-  async wechatNotify(@Req() req: RequestWithRawBody, @Headers() headers: Record<string, string>) {
+  async wechatNotify(
+    @Req() req: RequestWithRawBody,
+    @Headers() headers: Record<string, string>,
+    @Res() response: Response
+  ) {
     const rawBody =
       req.rawBody?.toString("utf8") ??
       (typeof req.body === "string" ? req.body : JSON.stringify(req.body ?? {}));
 
     const result = await this.paymentsService.handleWechatNotify(headers, rawBody);
-    // WeChat expects non-envelope style; global interceptor will still wrap.
-    // Clients that need raw WeChat format can use code/message fields in data.
-    return result;
+    response.status(200).json({ code: result.code, message: result.message });
   }
 
   @Post("wechat/refund-notify")
   @HttpCode(200)
-  async refundNotify(@Req() req: RequestWithRawBody, @Headers() headers: Record<string, string>) {
+  async refundNotify(
+    @Req() req: RequestWithRawBody,
+    @Headers() headers: Record<string, string>,
+    @Res() response: Response
+  ) {
     const rawBody = req.rawBody?.toString("utf8") ?? (typeof req.body === "string" ? req.body : JSON.stringify(req.body ?? {}));
-    return this.paymentsService.handleWechatRefundNotify(headers, rawBody);
+    const result = await this.paymentsService.handleWechatRefundNotify(headers, rawBody);
+    response.status(200).json(result);
   }
 
   @Post("refunds/:id/approve")

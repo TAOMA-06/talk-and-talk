@@ -1,4 +1,5 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
+import { randomUUID } from "node:crypto";
 
 import { AppException } from "../common/errors/app.exception";
 import { PrismaService } from "../database/prisma.service";
@@ -8,6 +9,7 @@ import { ListMessagesQueryDto } from "./dto/list-messages.dto";
 import { SendMessageDto } from "./dto/send-message.dto";
 
 type Db = any;
+const CHAT_ENABLED_ORDER_STATUSES = ["paid", "inService", "completed"] as const;
 
 @Injectable()
 export class ConversationsService {
@@ -19,9 +21,13 @@ export class ConversationsService {
 
   async list(userId: string) {
     const conversations = await this.prisma.conversation.findMany({
-      where: { userId },
+      where: {
+        orders: { some: { status: { in: [...CHAT_ENABLED_ORDER_STATUSES] } } },
+        OR: [{ userId }, { companion: { ownerUserId: userId } }]
+      },
       include: {
         companion: true,
+        user: { include: { profile: true } },
         messages: {
           orderBy: [{ createdAt: "desc" }, { id: "desc" }],
           take: 1
@@ -36,20 +42,46 @@ export class ConversationsService {
 
     const items = await Promise.all(
       conversations.map(async (conversation: any) => {
-        const readAt = conversation.readStates[0]?.readAt ?? new Date(0);
+        const isCustomer = conversation.userId === userId;
+        const readState = conversation.readStates[0];
+        const unreadPosition = readState
+          ? {
+              OR: [
+                { createdAt: { gt: readState.readAt } },
+                ...(readState.lastReadMessageId
+                  ? [
+                      {
+                        createdAt: readState.readAt,
+                        id: { gt: readState.lastReadMessageId }
+                      }
+                    ]
+                  : [])
+              ]
+            }
+          : {};
         const unreadCount = await this.prisma.message.count({
           where: {
             conversationId: conversation.id,
             senderId: { not: userId },
-            createdAt: { gt: readAt }
+            ...unreadPosition
           }
         } as any);
 
         return {
-          id: conversation.externalId,
-          participant: this.participantDto(conversation.companion),
+          // Customer routes stay compatible with the public companion id. An
+          // owner must route by the internal id because one companion can have
+          // multiple customer conversations with the same external id.
+          id: isCustomer ? conversation.externalId : conversation.id,
+          companionId: conversation.companionId,
+          viewerRole: isCustomer ? "customer" : "companion",
+          participant: isCustomer
+            ? this.companionParticipantDto(conversation.companion)
+            : this.customerParticipantDto(conversation.user),
           lastMessage: conversation.messages[0]
-            ? this.toMessageDto(conversation.messages[0], conversation.externalId)
+            ? this.toMessageDto(
+                conversation.messages[0],
+                isCustomer ? conversation.externalId : conversation.id
+              )
             : null,
           unreadCount,
           updatedAt: conversation.updatedAt.toISOString()
@@ -68,46 +100,54 @@ export class ConversationsService {
           where: { id: query.cursor, conversationId: conversation.id }
         } as any)
       : null;
+    if (query.cursor && !cursorMessage) {
+      throw new AppException("INVALID_CURSOR", "Message cursor is invalid", HttpStatus.BAD_REQUEST);
+    }
 
     const where: any = { conversationId: conversation.id };
     if (cursorMessage) {
       where.OR = [
-        { createdAt: { gt: cursorMessage.createdAt } },
-        { createdAt: cursorMessage.createdAt, id: { gt: cursorMessage.id } }
+        { createdAt: { lt: cursorMessage.createdAt } },
+        { createdAt: cursorMessage.createdAt, id: { lt: cursorMessage.id } }
       ];
     }
 
     const messages = await this.prisma.message.findMany({
       where,
-      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      // Fetch newest-first so an app that does not paginate still sees live
+      // messages. Reverse the selected page before returning for chat display.
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: limit + 1
     } as any);
 
-    const page = messages.slice(0, limit);
+    const page = messages.slice(0, limit).reverse();
     if (page.length) {
-      await this.prisma.messageReadState.upsert({
-        where: {
-          conversationId_userId: {
-            conversationId: conversation.id,
-            userId
-          }
-        },
-        create: {
-          conversationId: conversation.id,
-          userId,
-          readAt: new Date()
-        },
-        update: {
-          readAt: new Date()
-        }
-      } as any);
+      const readThrough = page[page.length - 1].createdAt;
+      const lastReadMessageId = page[page.length - 1].id;
+      const readStateId = randomUUID();
+      await this.prisma.$executeRaw`
+        INSERT INTO "MessageReadState"
+          ("id", "conversationId", "userId", "readAt", "lastReadMessageId")
+        VALUES
+          (${readStateId}, ${conversation.id}, ${userId}, ${readThrough}, ${lastReadMessageId})
+        ON CONFLICT ("conversationId", "userId") DO UPDATE
+        SET
+          "readAt" = EXCLUDED."readAt",
+          "lastReadMessageId" = EXCLUDED."lastReadMessageId"
+        WHERE
+          "MessageReadState"."readAt" < EXCLUDED."readAt"
+          OR (
+            "MessageReadState"."readAt" = EXCLUDED."readAt"
+            AND COALESCE("MessageReadState"."lastReadMessageId", '') < EXCLUDED."lastReadMessageId"
+          )
+      `;
     }
 
     return {
-      messages: page.map((message: any) => this.toMessageDto(message, conversation.externalId)),
+      messages: page.map((message: any) => this.toMessageDto(message, externalId)),
       pagination: {
         limit,
-        nextCursor: messages.length > limit ? page[page.length - 1]?.id ?? null : null,
+        nextCursor: messages.length > limit ? page[0]?.id ?? null : null,
         hasMore: messages.length > limit
       }
     };
@@ -127,6 +167,7 @@ export class ConversationsService {
     if (!user) {
       throw new AppException("UNAUTHORIZED", "User not found", HttpStatus.UNAUTHORIZED);
     }
+    const isCompanion = conversation.companion.ownerUserId === userId;
 
     const recentMessages = await this.prisma.message.findMany({
       where: {
@@ -154,7 +195,9 @@ export class ConversationsService {
           data: {
             conversationId: conversation.id,
             senderId: userId,
-            senderName: user.profile?.displayName ?? "用户",
+            senderName: isCompanion
+              ? conversation.companion.name
+              : user.profile?.displayName ?? "用户",
             content,
             type: "text",
             createdAt: new Date(now)
@@ -179,7 +222,9 @@ export class ConversationsService {
         result: moderation,
         source: "chat",
         content,
-        targetId: conversation.externalId,
+        // Moderation evidence must identify this customer's conversation, not
+        // the shared public companion id.
+        targetId: conversation.id,
         messageId: message?.id ?? null,
         actorId: userId,
         db
@@ -195,50 +240,52 @@ export class ConversationsService {
 
     return {
       moderation: this.toPublicModeration(moderation),
-      message: result.message ? this.toMessageDto(result.message, conversation.externalId) : null,
-      safetyMessage: result.safetyMessage ? this.toMessageDto(result.safetyMessage, conversation.externalId) : null,
+      message: result.message ? this.toMessageDto(result.message, externalId) : null,
+      safetyMessage: result.safetyMessage ? this.toMessageDto(result.safetyMessage, externalId) : null,
       companionReply: null
     };
   }
 
   private async ensureConversation(userId: string, externalId: string) {
-    const existing = await this.prisma.conversation.findUnique({
+    const existing = await this.prisma.conversation.findFirst({
       where: {
-        userId_externalId: {
-          userId,
-          externalId
-        }
+        orders: { some: { status: { in: [...CHAT_ENABLED_ORDER_STATUSES] } } },
+        OR: [
+          { userId, externalId },
+          { id: externalId, companion: { ownerUserId: userId } }
+        ]
       },
-      include: { companion: true }
+      include: {
+        companion: true,
+        user: { include: { profile: true } }
+      }
     } as any);
 
     if (existing) {
       return existing;
     }
 
-    // New conversations can only be started with published companions.
-    // Existing conversations remain readable/writable even if later unpublished.
+    // Payment fulfillment owns conversation activation. A published profile must
+    // not let an API client bypass ordering and payment.
     const companion = await this.prisma.companionProfile.findFirst({
       where: { id: externalId, isPublished: true }
     } as any);
 
-    if (!companion) {
-      throw new AppException("CONVERSATION_NOT_FOUND", "Conversation not found", HttpStatus.NOT_FOUND);
+    if (companion) {
+      throw new AppException(
+        "PAYMENT_REQUIRED",
+        "A paid order is required before messaging this companion",
+        HttpStatus.FORBIDDEN
+      );
     }
 
-    return this.prisma.conversation.create({
-      data: {
-        externalId: companion.id,
-        userId,
-        companionId: companion.id
-      },
-      include: { companion: true }
-    } as any);
+    throw new AppException("CONVERSATION_NOT_FOUND", "Conversation not found", HttpStatus.NOT_FOUND);
   }
 
-  private participantDto(companion: any) {
+  private companionParticipantDto(companion: any) {
     return {
       id: companion.id,
+      kind: "companion",
       name: companion.name,
       role: companion.role,
       initials: companion.initials,
@@ -246,6 +293,21 @@ export class ConversationsService {
       isVerified: companion.isVerified,
       availability: companion.availability,
       responseTime: companion.responseTime
+    };
+  }
+
+  private customerParticipantDto(user: any) {
+    const name = user.profile?.displayName?.trim() || "用户";
+    return {
+      id: user.id,
+      kind: "customer",
+      name,
+      role: "客户",
+      initials: name.slice(0, 2),
+      isOnline: false,
+      isVerified: user.profile?.isVerified ?? false,
+      availability: "available",
+      responseTime: ""
     };
   }
 

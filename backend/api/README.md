@@ -95,6 +95,31 @@ Acceptance smoke:
 ./scripts/acceptance-smoke.sh http://127.0.0.1:3000
 ```
 
+This is a **development-only** closed-loop business-flow check. It requires a
+healthy PostgreSQL/Redis pair, `SMS_PROVIDER=mock`, mock WeChat payment, and
+the local seed data (`npm run db:seed`). It logs in an isolated customer and
+the seeded `c1` companion owner (`13800000101`), records both legal-consent
+receipts, creates and confirms an order, completes mock payment, verifies
+two-way chat, then verifies refund and cancellation. It leaves those clearly
+labelled test records in the development database.
+
+The script intentionally uses the mock **App** payment channel by default:
+Mini Program prepay correctly requires a real server-verified WeChat OpenID
+and must be exercised separately with genuine WeChat authorization. Override
+the non-secret test settings only when needed, for example
+`COMPANION_ID`, `COMPANION_OWNER_PHONE`, `LEGAL_CONSENT_VERSION`, or
+`CHECK_REFUND=0`. The seeded companion owner's fixed phone is protected by the
+normal 60-second mock-SMS throttle; an immediate rerun waits and retries in
+bounded five-second intervals instead of clearing Redis or weakening the
+backend rate limit. Those controls only cover the per-phone throttle. The
+separate SMS IP protection permits five sends per IP per hour, so more than two
+full runs from the same local API process can still return `429`. For repeated
+local acceptance runs, start a temporary API instance with a dedicated local
+Redis logical database (for example `redis://127.0.0.1:6379/14`) and point the
+script at that instance; do not clear the shared Redis database or lower the
+production limit. `MOCK_SMS_RETRY_INTERVAL_SECONDS` and
+`MOCK_SMS_MAX_ATTEMPTS` remain bounded to a combined 60 seconds.
+
 ## API contract (frozen v1)
 
 Machine-readable OpenAPI: [shared/contracts/openapi/v1.yaml](../../shared/contracts/openapi/v1.yaml)  

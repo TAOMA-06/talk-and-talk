@@ -15,6 +15,7 @@
 - [ ] `CORS_ORIGINS` 为显式 allowlist（生产禁止依赖开发默认列表）
 - [ ] `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` 为高强度随机值，非 `CHANGE_ME` / 开发默认
 - [ ] access / refresh 密钥互不相同
+- [ ] `METRICS_TOKEN` 为 32+ 位随机值；metrics 采集端发送 Bearer token
 - [ ] `.env.production` 未提交到 git（见根 `.gitignore`）
 
 ## 数据库与 Redis
@@ -26,8 +27,8 @@
 
 ## 微信支付
 
-- [ ] `WECHAT_PAY_APP_ID` / `MCH_ID` / `API_V3_KEY` / `CERT_SERIAL_NO` / `NOTIFY_BASE_URL` 已填
-- [ ] `WECHAT_PAY_PRIVATE_KEY_PATH` 指向容器内可读私钥；compose 中已取消注释 volume 并挂载（见 `secrets/README.md`）
+- [ ] `WECHAT_MINIPROGRAM_APP_ID` / `MCH_ID` / `API_V3_KEY` / `CERT_SERIAL_NO` / `NOTIFY_BASE_URL` 已填
+- [ ] `WECHAT_PAY_PRIVATE_KEY_HOST_PATH` 指向 host PEM；`WECHAT_PAY_PRIVATE_KEY_PATH` 为容器内只读挂载路径（见 `secrets/README.md`）
 - [ ] 通知 URL 可达：`https://api.talkandtalk.app/api/v1/payments/wechat/notify`
 - [ ] 生产未配齐微信时 prepay 返回 `WECHAT_PAY_NOT_CONFIGURED`（**禁止** Mock 提供商）
 - [ ] 真实 prepay / 平台证书验签 / resource 解密已联调通过（沙箱或生产小额）
@@ -49,14 +50,8 @@
 ## 短信 / 登录策略
 
 - [ ] `APP_ENV=production` 时 **禁止** `SMS_PROVIDER=mock`（启动校验会拒绝）
-- [ ] **产品策略：production 仅 Apple 登录**（`SMS_PROVIDER=none` → `SMS_UNAVAILABLE`）
-- [ ] iOS Release `ENABLE_PHONE_LOGIN=NO`；Staging/Debug 可保留手机登录
-- [ ] 真实 SMS（Aliyun/Tencent）为后续增强，不阻塞「仅 Apple」商业路径
-
-## Apple 登录
-
-- [ ] `APPLE_SIGN_IN_BUNDLE_ID=com.talkandtalk.app`（与 iOS 一致）
-- [ ] Apple Developer 中 Sign in with Apple 已启用对应 App ID
+- [ ] **产品策略：production 使用微信小程序登录**（`SMS_PROVIDER=none` → `SMS_UNAVAILABLE`）
+- [ ] 真实 SMS（Aliyun/Tencent）为后续增强，不阻塞小程序首发
 
 ## 日志脱敏
 
@@ -73,7 +68,8 @@
 ## 管理员与 Seed
 
 - [ ] 生产 `SEED_ON_STARTUP=false`
-- [ ] 首次 seed 后立即轮换/限制默认 admin、moderator 手机号账号
+- [ ] 按 [staff-operations.md](./staff-operations.md) 创建独立 admin 与 moderator，并完成密码 + TOTP 真实登录
+- [ ] 确认生产不存在 seed 手机账号、共享员工账号或默认密码
 - [ ] Web `/admin/` 仅内网或 VPN 可达（推荐；至少不公开宣传）
 
 ## 监控与告警
@@ -82,17 +78,18 @@
 - [ ] `GET /api/v1/metrics` 仅内网抓取（勿对公网裸奔）
 - [ ] 告警：5xx 率、依赖 down、磁盘、证书到期（工具自选）
 
-## iOS / App Store 联动
+## 微信开发者工具 / 发行
 
-- [ ] Release `BACKEND_BASE_URL=https://api.talkandtalk.app`
-- [ ] `WECHAT_APP_ID` 与后端商户配置一致
+- [ ] 在官方微信开发者工具导入 `frontend/miniprogram`，选择与后端一致的 AppID
+- [ ] 关闭“不校验合法域名”调试开关后完成编译、预览、体验版真机回归
+- [ ] 上传体验版并完成微信审核；仓库 CI 只做结构/契约验证，不代替签名上传
 - [ ] 隐私政策 / 用户协议 HTTPS 可打开（`/legal/privacy.html`、`/legal/terms.html`）
-- [ ] 见 [app-store-metadata.md](./app-store-metadata.md)
 
 ## 发布后冒烟
 
 ```bash
-./backend/api/scripts/acceptance-smoke.sh https://api.talkandtalk.app
+METRICS_TOKEN='<production token>' \
+  ./backend/api/scripts/production-smoke.sh https://api.talkandtalk.app
 ```
 
-生产若禁用 mock 支付/SMS，冒烟脚本中相关步骤可能失败——按环境裁剪或仅跑 health + Apple/登录可达性检查。
+`acceptance-smoke.sh` 依赖 mock SMS / mock 支付，仅允许在 development 或 staging 使用，禁止用于 production 放行。

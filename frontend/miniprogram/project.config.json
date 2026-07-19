@@ -1,7 +1,6 @@
 {
   "compileType": "miniprogram",
   "libVersion": "3.8.5",
-  "appid": "touristappid",
   "projectname": "talk-and-talk",
   "setting": {
     "es6": true,
