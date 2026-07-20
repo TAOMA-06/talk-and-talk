@@ -28,6 +28,8 @@ let importSequence = 0;
 let createdOrderPayload = null;
 let updatedProfilePayload = null;
 let paymentIsMock = true;
+let failNextOrderCreate = false;
+const attemptedOrderRequestIds = [];
 let privacyAuthorizationRequests = 0;
 let modalConfirm = false;
 let pullDownRefreshStops = 0;
@@ -71,7 +73,7 @@ const chatMessages = Array.from({ length: 55 }, (_, index) => ({
   conversationId: companion.id,
   senderId: index % 2 ? companion.id : "user-1",
   senderName: index % 2 ? companion.name : "微信用户",
-  content: index === 54 ? "订单已支付，平台担保沟通已开启。" : `历史消息 ${index + 1}`,
+  content: index === 54 ? "订单已支付，平台内沟通已开启。" : `历史消息 ${index + 1}`,
   type: index === 54 ? "system" : "text",
   timestamp: new Date(chatMessageStartedAt + index * 60_000).toISOString()
 }));
@@ -105,7 +107,7 @@ function responseFor(path, method, data, query = new URLSearchParams()) {
     return { accessToken: "access", refreshToken: "refresh", expiresIn: 900, user: { id: "user-1", role: "user", profile: { displayName: "微信用户" } } };
   }
   if (path === "/users/me/legal-consents" && method === "POST") {
-    assert.equal(data.version, "1.0-2026-07-19");
+    assert.equal(data.version, "2.0-2026-07-20");
     assert.equal(data.privacyAccepted, true);
     assert.equal(data.termsAccepted, true);
     assert.equal(data.adultConfirmed, true);
@@ -113,7 +115,7 @@ function responseFor(path, method, data, query = new URLSearchParams()) {
     return { receipt: { id: "consent-1", version: data.version } };
   }
   if (path === "/users/me/legal-consents" && method === "GET") {
-    return { valid: true, receipt: { id: "consent-1", version: "1.0-2026-07-19" } };
+    return { valid: true, receipt: { id: "consent-1", version: "2.0-2026-07-20" } };
   }
   if (path === "/recommendations/topics" && method === "GET") {
     return { algorithmVersion: "companion-ranking-v1", items: [
@@ -152,8 +154,14 @@ function responseFor(path, method, data, query = new URLSearchParams()) {
     topic: "睡前放松", content: "想找人聊聊", likeCount: 0, isLiked: false, moderationStatus: "approved", createdAt: new Date().toISOString()
   }] };
   if (path === "/orders" && method === "POST") {
+    attemptedOrderRequestIds.push(data.clientRequestId);
     createdOrderPayload = data;
     assert.ok(Date.parse(data.scheduledAt) > Date.now(), "created order must include a future scheduledAt");
+    assert.match(data.clientRequestId, /^[A-Za-z0-9_-]{16,64}$/, "created order must carry a stable idempotency key");
+    if (failNextOrderCreate) {
+      failNextOrderCreate = false;
+      throw new Error("simulated ambiguous order timeout");
+    }
     return { ...order, scheduledAt: data.scheduledAt };
   }
   if (path === "/orders" && method === "GET") return { items: [order] };
@@ -268,7 +276,7 @@ consent.setAgreement({ detail: { value: ["accepted"] } });
 consent.setAdultConfirmation({ detail: { value: ["adult"] } });
 await consent.accept();
 const consentRecord = storage.get("talkandtalk.legalConsent");
-assert.equal(consentRecord.version, "1.0-2026-07-19");
+assert.equal(consentRecord.version, "2.0-2026-07-20");
 assert.equal(consentRecord.privacyAccepted, true);
 assert.equal(consentRecord.termsAccepted, true);
 assert.equal(consentRecord.source, "wechatMiniProgram");
@@ -354,7 +362,30 @@ chat.onUnload();
 const detail = await loadPage("companion/detail");
 detail.companionId = companion.id;
 await detail.load();
+failNextOrderCreate = true;
 await detail.book();
+// The smoke output is CommonJS-cached by Node, so instantiate a fresh page
+// object explicitly to model a Mini Program page/process restart.
+const detailAfterRestart = {
+  ...detail,
+  data: { ...structuredClone(detail.data), orderClientRequestId: "" },
+  setData(patch) { Object.assign(this.data, patch); }
+};
+detailAfterRestart.companionId = companion.id;
+detailAfterRestart.themeId = detail.themeId;
+detailAfterRestart.setData({ bookingDate: detail.data.bookingDate, bookingTime: detail.data.bookingTime });
+await detailAfterRestart.book();
+assert.equal(attemptedOrderRequestIds.length, 2);
+assert.equal(
+  attemptedOrderRequestIds[0],
+  attemptedOrderRequestIds[1],
+  "an ambiguous create followed by a page restart must reuse the persisted idempotency key"
+);
+assert.equal(
+  [...storage.keys()].some((key) => key.startsWith("talkandtalk.pendingOrder.")),
+  false,
+  "an acknowledged order create must clear its persisted pending key"
+);
 assert.equal(createdOrderPayload.themeId, "t1");
 
 const community = await loadPage("community/index");

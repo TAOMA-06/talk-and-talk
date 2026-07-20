@@ -7,7 +7,7 @@ import { CreateLegalConsentDto, GetLegalConsentDto } from "./legal-consent.dto";
 
 describe("Legal consent DTOs", () => {
   const valid = {
-    version: "1.0-2026-07-19",
+    version: "2.0-2026-07-20",
     acceptedAt: "2026-07-19T08:00:00.000Z",
     privacyAccepted: true,
     termsAccepted: true,

@@ -17,6 +17,7 @@ import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
+import { RejectRefundDto, ReviewRefundDto } from "./dto/review-refund.dto";
 import { PaymentsService } from "./payments.service";
 
 type RequestWithRawBody = Request & { rawBody?: Buffer };
@@ -59,30 +60,37 @@ export class PaymentsController {
 
   @Post("refunds/:id/approve")
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles("moderator", "admin")
-  approveRefund(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string, @Body() body: { note?: string }) {
+  @Roles("admin")
+  approveRefund(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string, @Body() body: ReviewRefundDto) {
     return this.paymentsService.approveRefund(user.id, id, body.note);
   }
 
   @Get("refunds/review-queue")
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles("moderator", "admin")
+  @Roles("admin")
   refundReviewQueue() {
     return this.paymentsService.listRefundsAwaitingReview();
   }
 
   @Post("refunds/:id/reject")
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles("moderator", "admin")
-  rejectRefund(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string, @Body() body: { note?: string }) {
+  @Roles("admin")
+  rejectRefund(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string, @Body() body: RejectRefundDto) {
     return this.paymentsService.rejectRefund(user.id, id, body.note);
   }
 
   @Post("refunds/:id/retry")
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles("moderator", "admin")
-  retryRefund(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string, @Body() body: { note?: string }) {
+  @Roles("admin")
+  retryRefund(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string, @Body() body: ReviewRefundDto) {
     return this.paymentsService.retryRefund(user.id, id, body.note);
+  }
+
+  @Post("refunds/:id/sync")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("admin")
+  syncRefund(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
+    return this.paymentsService.syncRefundForAdmin(user.id, id);
   }
 
   @Post("wechat/mock-notify")

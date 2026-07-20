@@ -16,6 +16,7 @@ export class CreateCommunityPostDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(2048)
   coverImageUrl?: string;
 }
 

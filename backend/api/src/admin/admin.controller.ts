@@ -118,7 +118,7 @@ export class AdminController {
       userId,
       orderId,
       "ACCOUNT_DELETION_SETTLEMENT",
-      { actorId: actor.id, requestId }
+      { actorId: actor.id, requestId, reasonCode: "ACCOUNT_DELETION_SETTLEMENT" }
     );
     return result;
   }
@@ -192,23 +192,39 @@ export class AdminController {
     @Param("id") userId: string,
     @Body() dto: UpdateUserVerificationDto
   ) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user) {
-      throw new AppException("USER_NOT_FOUND", "User not found", HttpStatus.NOT_FOUND);
-    }
-    const profile = await this.prisma.userProfile.upsert({
-      where: { userId },
-      create: { userId, isVerified: dto.isVerified },
-      update: { isVerified: dto.isVerified }
+    const result = await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${userId} FOR UPDATE`;
+      const user = await tx.user.findUnique({ where: { id: userId } });
+      if (!user) {
+        throw new AppException("USER_NOT_FOUND", "User not found", HttpStatus.NOT_FOUND);
+      }
+      const profile = await tx.userProfile.upsert({
+        where: { userId },
+        create: { userId, isVerified: dto.isVerified },
+        update: { isVerified: dto.isVerified }
+      });
+      const unpublished = dto.isVerified
+        ? { count: 0 }
+        : await tx.companionProfile.updateMany({
+            where: { ownerUserId: userId, isPublished: true },
+            data: { isPublished: false }
+          });
+      await this.audit.record({
+        actorId: actor.id,
+        action: "user.verification_updated",
+        resourceType: "user",
+        resourceId: userId,
+        metadata: {
+          isVerified: dto.isVerified,
+          reason: dto.reason.trim(),
+          evidenceReference: dto.evidenceReference?.trim() || null,
+          unpublishedCompanions: unpublished.count,
+          republishRequiresFreshAdminAction: !dto.isVerified
+        }
+      }, tx);
+      return { profile, unpublishedCount: unpublished.count };
     });
-    await this.audit.record({
-      actorId: actor.id,
-      action: "user.verification_updated",
-      resourceType: "user",
-      resourceId: userId,
-      metadata: { isVerified: dto.isVerified, reason: dto.reason?.trim() || null }
-    });
-    return { userId, isVerified: profile.isVerified };
+    return { userId, isVerified: result.profile.isVerified, unpublishedCompanions: result.unpublishedCount };
   }
 
   @Get("companions")

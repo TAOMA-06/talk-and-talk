@@ -34,7 +34,7 @@ async function bootstrap() {
   app.use(helmet({
     contentSecurityPolicy: {
       directives: {
-        scriptSrc: ["'self'", "'sha256-2PB2mTXoPuyqf/+3vkSZtH/bG/8y/jm7USgK/aYHvPs='"]
+        scriptSrc: ["'self'", "'sha256-zE+aCHqEs7k+xLRRMzhge2ZdiHQ4hW7T/e5CrlpJryc='"]
       }
     }
   }));

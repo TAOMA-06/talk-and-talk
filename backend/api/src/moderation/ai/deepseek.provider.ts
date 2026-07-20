@@ -23,9 +23,9 @@ export class DeepSeekAIProvider implements AIProvider {
     const baseUrl = this.config.get<string>("DEEPSEEK_URL", "https://api.deepseek.com").replace(/\/$/, "");
     const model = this.config.get<string>("DEEPSEEK_MODEL", "deepseek-chat");
 
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 8000);
       const response = await fetch(`${baseUrl}/v1/chat/completions`, {
         method: "POST",
         headers: {
@@ -50,8 +50,6 @@ export class DeepSeekAIProvider implements AIProvider {
         }),
         signal: controller.signal
       });
-      clearTimeout(timeout);
-
       if (!response.ok) {
         this.logger.warn(`DeepSeek moderation failed with status ${response.status}`);
         this.metrics.recordAiFailure();
@@ -63,25 +61,33 @@ export class DeepSeekAIProvider implements AIProvider {
       };
       const content = body.choices?.[0]?.message?.content ?? "{}";
       const parsed = JSON.parse(content) as { score?: number; reasons?: string[]; categories?: string[] };
-      const score = typeof parsed.score === "number" ? Math.min(1, Math.max(0, parsed.score)) : 0.05;
-      const reasons = Array.isArray(parsed.reasons)
-        ? parsed.reasons.filter((item): item is string => typeof item === "string")
-        : [];
       const allowedCategories = new Set<ModerationCategory>([
         "privateContact", "offlineMeetup", "privatePayment", "fraudOrSpam", "sexualContent",
         "harassmentOrHate", "privacy", "selfHarm", "violence", "normal"
       ]);
-      const categories = Array.isArray(parsed.categories)
-        ? parsed.categories.filter((item): item is ModerationCategory =>
-            typeof item === "string" && allowedCategories.has(item as ModerationCategory)
-          )
-        : [];
+      if (
+        typeof parsed.score !== "number" ||
+        !Number.isFinite(parsed.score) ||
+        parsed.score < 0 ||
+        parsed.score > 1 ||
+        !Array.isArray(parsed.reasons) ||
+        parsed.reasons.some((item) => typeof item !== "string") ||
+        !Array.isArray(parsed.categories) ||
+        parsed.categories.some((item) => typeof item !== "string" || !allowedCategories.has(item as ModerationCategory))
+      ) {
+        throw new Error("provider returned an invalid moderation schema");
+      }
+      const score = parsed.score;
+      const reasons = parsed.reasons;
+      const categories = parsed.categories as ModerationCategory[];
 
       return { score, reasons, categories, provider: "deepseek", providerVersion: model, available: true };
     } catch (error) {
       this.logger.warn(`DeepSeek moderation unavailable: ${error instanceof Error ? error.message : "unknown"}`);
       this.metrics.recordAiFailure();
       return { score: 0.05, reasons: [], categories: [], provider: "deepseek", available: false };
+    } finally {
+      clearTimeout(timeout);
     }
   }
 }

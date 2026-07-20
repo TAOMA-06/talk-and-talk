@@ -143,7 +143,7 @@ Completed (v0.1 ship scope):
 - Prisma: users/auth, companions, conversations/messages, moderation cases/evidence/action logs, audit logs, labels
 - Auth: phone SMS login (mock provider), Apple login, JWT refresh/logout, `GET /users/me` / `/me`
 - RBAC: `admin` for companions management; `moderator`/`admin` for moderation ops
-- Chat send with RuleEngine + optional DeepSeek; case creation on non-allow
+- Chat send with RuleEngine + production-required DeepSeek-compatible review; provider outages fail closed into human review
 - Admin Moderation API: overview, filtered queue, detail, conversation evidence, actions, labels export
 - User reports: `POST /moderation/reports`
 - Orders + WeChat API v3 App/JSAPI prepay, notify verification/decryption, refund; mock only on staging/dev when real credentials are absent

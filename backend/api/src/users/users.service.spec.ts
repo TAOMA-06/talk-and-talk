@@ -22,8 +22,12 @@ describe("UsersService", () => {
   } as any;
 
   const audit = { record: jest.fn().mockResolvedValue({}) } as any;
+  const legalArchive = { assertVersionPublished: jest.fn().mockResolvedValue(undefined) } as any;
+  const moderation = { moderateAsync: jest.fn() } as any;
+  const moderationCases = { createFromResult: jest.fn() } as any;
   const legalDefinition = {
-    LEGAL_CONSENT_VERSION: "1.0-2026-07-19",
+    API_PREFIX: "api/v1",
+    LEGAL_CONSENT_VERSION: "2.0-2026-07-20",
     LEGAL_PRIVACY_URL: "https://api.talkandtalk.app/legal/privacy.html",
     LEGAL_TERMS_URL: "https://api.talkandtalk.app/legal/terms.html"
   };
@@ -34,7 +38,8 @@ describe("UsersService", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new UsersService(prisma, audit, config);
+    moderation.moderateAsync.mockResolvedValue({ decision: "allow" });
+    service = new UsersService(prisma, audit, config, legalArchive, moderation, moderationCases);
   });
 
   it("updates only safe profile fields", async () => {
@@ -96,6 +101,29 @@ describe("UsersService", () => {
     });
   });
 
+  it("does not publish a display name that fails profile moderation", async () => {
+    prisma.user.findUnique.mockResolvedValue({ id: "u1", role: "user" });
+    moderation.moderateAsync.mockResolvedValue({
+      decision: "block",
+      riskLevel: "high",
+      priority: "high",
+      score: 0.95,
+      reasons: ["疑似联系方式"],
+      matchedRules: ["contact.phone"],
+      categories: ["privateContact"],
+      policyVersion: "chat-v2",
+      usedAI: false
+    });
+    moderationCases.createFromResult.mockResolvedValue({ id: "case-name-1" });
+
+    await expect(service.updateMe("u1", { displayName: "13800138000" }))
+      .rejects.toMatchObject({
+        code: "DISPLAY_NAME_REQUIRES_REVISION",
+        details: { moderationCaseId: "case-name-1", decision: "block" }
+      });
+    expect(prisma.userProfile.upsert).not.toHaveBeenCalled();
+  });
+
   it("skips upsert when no profile fields are provided", async () => {
     prisma.user.findUnique
       .mockResolvedValueOnce({ id: "u1", role: "user" })
@@ -121,9 +149,9 @@ describe("UsersService", () => {
     const created = {
       id: "lc1",
       userId: "u1",
-      version: "1.0-2026-07-19",
-      privacyVersion: "1.0-2026-07-19",
-      termsVersion: "1.0-2026-07-19",
+      version: "2.0-2026-07-20",
+      privacyVersion: "2.0-2026-07-20",
+      termsVersion: "2.0-2026-07-20",
       privacyAccepted: true,
       termsAccepted: true,
       adultConfirmed: true,
@@ -144,7 +172,7 @@ describe("UsersService", () => {
     prisma.$transaction = jest.fn(async (callback: (db: any) => Promise<unknown>) => callback(tx));
 
     const result = await service.recordLegalConsent("u1", {
-      version: "1.0-2026-07-19",
+      version: "2.0-2026-07-20",
       acceptedAt: "2026-07-18T08:00:00.000Z",
       privacyAccepted: true,
       termsAccepted: true,
@@ -157,9 +185,9 @@ describe("UsersService", () => {
     expect(tx.legalConsentReceipt.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         userId: "u1",
-        version: "1.0-2026-07-19",
-        privacyVersion: "1.0-2026-07-19",
-        termsVersion: "1.0-2026-07-19",
+        version: "2.0-2026-07-20",
+        privacyVersion: "2.0-2026-07-20",
+        termsVersion: "2.0-2026-07-20",
         adultConfirmed: true,
         privacyUrl: "https://api.talkandtalk.app/legal/privacy.html",
         termsUrl: "https://api.talkandtalk.app/legal/terms.html",
@@ -174,7 +202,9 @@ describe("UsersService", () => {
         resourceId: "lc1",
         metadata: expect.objectContaining({
           previousVersion: null,
-          version: "1.0-2026-07-19"
+          version: "2.0-2026-07-20",
+          privacyArchiveUrl: "https://api.talkandtalk.app/api/v1/legal/privacy/versions/2.0-2026-07-20",
+          termsArchiveUrl: "https://api.talkandtalk.app/api/v1/legal/terms/versions/2.0-2026-07-20"
         })
       }),
       tx
@@ -182,7 +212,7 @@ describe("UsersService", () => {
     expect(result.receipt).toEqual(expect.objectContaining({
       id: "lc1",
       userId: "u1",
-      version: "1.0-2026-07-19",
+      version: "2.0-2026-07-20",
       recordedAt: "2026-07-18T08:00:02.000Z"
     }));
   });
@@ -191,9 +221,9 @@ describe("UsersService", () => {
     const existing = {
       id: "lc1",
       userId: "u1",
-      version: "1.0-2026-07-19",
-      privacyVersion: "1.0-2026-07-19",
-      termsVersion: "1.0-2026-07-19",
+      version: "2.0-2026-07-20",
+      privacyVersion: "2.0-2026-07-20",
+      termsVersion: "2.0-2026-07-20",
       privacyAccepted: true,
       termsAccepted: true,
       adultConfirmed: true,
@@ -233,7 +263,7 @@ describe("UsersService", () => {
   it("rejects forged legal versions and document URLs before persistence", async () => {
     prisma.$transaction = jest.fn();
     const current = {
-      version: "1.0-2026-07-19",
+      version: "2.0-2026-07-20",
       acceptedAt: "2026-07-18T00:00:00.000Z",
       privacyAccepted: true as const,
       termsAccepted: true as const,
@@ -256,7 +286,7 @@ describe("UsersService", () => {
     prisma.$transaction = jest.fn();
 
     await expect(service.recordLegalConsent("u1", {
-      version: "1.0-2026-07-19",
+      version: "2.0-2026-07-20",
       acceptedAt: "2100-01-01T00:00:00.000Z",
       privacyAccepted: true,
       termsAccepted: true,
@@ -274,9 +304,9 @@ describe("UsersService", () => {
       .mockResolvedValueOnce({
         id: "lc1",
         userId: "u1",
-        version: "1.0-2026-07-19",
-        privacyVersion: "1.0-2026-07-19",
-        termsVersion: "1.0-2026-07-19",
+        version: "2.0-2026-07-20",
+        privacyVersion: "2.0-2026-07-20",
+        termsVersion: "2.0-2026-07-20",
         privacyAccepted: true,
         termsAccepted: true,
         adultConfirmed: true,
@@ -304,7 +334,7 @@ describe("UsersService", () => {
         source: "wechatMiniProgram"
       });
 
-    await expect(service.getLegalConsent("u1", "1.0-2026-07-19"))
+    await expect(service.getLegalConsent("u1", "2.0-2026-07-20"))
       .resolves.toEqual(expect.objectContaining({ valid: true, receipt: expect.objectContaining({ id: "lc1" }) }));
     await expect(service.getLegalConsent("u1", "2.0-2026-08-01"))
       .resolves.toEqual(expect.objectContaining({ valid: false, receipt: expect.objectContaining({ id: "lc-old" }) }));

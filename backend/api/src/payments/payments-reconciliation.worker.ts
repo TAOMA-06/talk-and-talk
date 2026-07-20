@@ -24,9 +24,9 @@ export class PaymentsReconciliationWorker implements OnModuleInit, OnModuleDestr
   onModuleInit() {
     if (!this.config.get<boolean>("PAYMENT_RECONCILIATION_ENABLED")) return;
     const intervalMs = (this.config.get<number>("PAYMENT_RECONCILIATION_INTERVAL_SECONDS") ?? 60) * 1_000;
-    this.timer = setInterval(() => void this.reconcile(), intervalMs);
+    this.timer = setInterval(() => this.reconcileSafely(), intervalMs);
     this.timer.unref?.();
-    void this.reconcile();
+    this.reconcileSafely();
   }
 
   onModuleDestroy() {
@@ -39,22 +39,38 @@ export class PaymentsReconciliationWorker implements OnModuleInit, OnModuleDestr
     this.running = true;
     try {
       const batchSize = this.config.get<number>("PAYMENT_RECONCILIATION_BATCH_SIZE") ?? 50;
+      const expiredRequests = await this.orders.expireUnconfirmedOrders(batchSize);
       const expiredReservations = await this.orders.expireUnpaidReservations(batchSize);
+      const refunds = await this.payments.reconcileStaleRefunds(batchSize);
+      const prepays = await this.payments.reconcileExpiredPrepays(batchSize);
       const settlement = await this.payments.reconcileExpiredServiceWindows(batchSize);
-      if (settlement.failures > 0) {
+      if (refunds.failures > 0 || prepays.failures > 0 || settlement.failures > 0) {
         this.logger.warn(
-          `Payment reconciliation completed with ${settlement.failures} failed item(s); ` +
-          `${settlement.refundAttempts}/${settlement.scanned} overdue orders were attempted.`
+          `Payment reconciliation completed with ${refunds.failures} refund, ${prepays.failures} prepay and ` +
+          `${settlement.failures} service-window failure(s).`
         );
       }
-      if (expiredReservations > 0 || settlement.refundAttempts > 0) {
+      if (
+        expiredRequests > 0 || expiredReservations > 0 || refunds.submissions > 0 ||
+        refunds.queries > 0 || prepays.paidRecovered > 0 ||
+        prepays.closed > 0 || settlement.refundAttempts > 0
+      ) {
         this.logger.log(
-          `Reconciled ${expiredReservations} expired reservation(s) and ${settlement.refundAttempts} overdue service refund(s).`
+          `Reconciled ${expiredRequests} expired request(s), ${expiredReservations} expired reservation(s), ` +
+          `${refunds.submissions} refund submission(s), ${refunds.queries} refund query(s), ` +
+          `${prepays.paidRecovered} recovered payment(s), ${prepays.closed} closed prepay(s), and ` +
+          `${settlement.refundAttempts} overdue service refund(s).`
         );
       }
-      return { expiredReservations, ...settlement };
+      return { expiredRequests, expiredReservations, refunds, prepays, settlement };
     } finally {
       this.running = false;
     }
+  }
+
+  private reconcileSafely(): void {
+    void this.reconcile().catch((error) => {
+      this.logger.error(`Payment reconciliation scan failed (${error instanceof Error ? error.name : "unknown_error"})`);
+    });
   }
 }

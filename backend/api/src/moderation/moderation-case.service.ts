@@ -23,11 +23,8 @@ export interface CreateModerationCaseInput {
   assignedToUserId?: string | null;
   /** When true, create even if decision is allow (used for user reports). */
   forceCreate?: boolean;
-  /** When provided, writes inside an existing Prisma interactive transaction. */
-  db?: {
-    moderationCase: PrismaService["moderationCase"];
-    mediaAsset?: PrismaService["mediaAsset"];
-  };
+  /** When provided, all case, evidence, notification, and audit writes use it. */
+  db?: any;
 }
 
 export interface CreateReportCaseInput {
@@ -50,7 +47,7 @@ export class ModerationCaseService {
     private readonly mediaAssets: MediaAssetService
   ) {}
 
-  async createFromResult(input: CreateModerationCaseInput) {
+  async createFromResult(input: CreateModerationCaseInput): Promise<any | null> {
     const {
       result,
       source,
@@ -72,7 +69,14 @@ export class ModerationCaseService {
       return null;
     }
 
-    const client = db ?? this.prisma;
+    if (!db) {
+      return this.prisma.$transaction(async (tx) => this.createFromResult({
+        ...input,
+        db: tx as any
+      }));
+    }
+
+    const client = db;
     const created = await client.moderationCase.create({
       data: {
         title: title ?? this.caseTitle(result, content),
@@ -124,17 +128,11 @@ export class ModerationCaseService {
     if (messageId) {
       await this.mediaAssets.preserveEvidenceForMessage(
         messageId,
-        db && "mediaAsset" in db ? (db as { mediaAsset: PrismaService["mediaAsset"] }) : undefined
+        "mediaAsset" in db ? db : undefined
       );
     }
 
-    // Outside interactive tx is fine for notification/audit side effects.
-    if (!db) {
-      await this.afterCaseCreated(created, result, subjectUserId ?? actorId, conversationId);
-    } else if (subjectUserId ?? actorId) {
-      // When inside chat transaction, notify after commit asynchronously.
-      void this.afterCaseCreated(created, result, subjectUserId ?? actorId, conversationId).catch(() => undefined);
-    }
+    await this.afterCaseCreated(created, result, subjectUserId ?? actorId, conversationId, client);
 
     return created;
   }
@@ -142,40 +140,44 @@ export class ModerationCaseService {
   async createReportCase(input: CreateReportCaseInput) {
     const { result, reason, content, targetId, messageId, conversationId, subjectUserId, actorId } = input;
     const status = result.score >= 0.55 ? "humanReview" : "pending";
-    const created = await this.createFromResult({
-      result,
-      source: "report",
-      content,
-      targetId,
-      messageId,
-      conversationId,
-      subjectUserId,
-      reporterUserId: actorId,
-      actorId,
-      title: `举报：${reason.slice(0, 40)}`,
-      status,
-      forceCreate: true
-    });
-
-    if (!created) {
-      throw new Error("Expected report case creation to succeed");
-    }
-
-    if (actorId) {
-      await this.audit.record({
+    return this.prisma.$transaction(async (tx) => {
+      const db = tx as any;
+      const created = await this.createFromResult({
+        result,
+        source: "report",
+        content,
+        targetId,
+        messageId,
+        conversationId,
+        subjectUserId,
+        reporterUserId: actorId,
         actorId,
-        action: "create_report",
-        resourceType: "moderation_case",
-        resourceId: created.id,
-        metadata: {
-          reason: reason.slice(0, 200),
-          source: "report",
-          decision: result.decision
-        }
+        title: `举报：${reason.slice(0, 40)}`,
+        status,
+        forceCreate: true,
+        db
       });
-    }
 
-    return created;
+      if (!created) {
+        throw new Error("Expected report case creation to succeed");
+      }
+
+      if (actorId) {
+        await this.audit.record({
+          actorId,
+          action: "create_report",
+          resourceType: "moderation_case",
+          resourceId: created.id,
+          metadata: {
+            reason: reason.slice(0, 200),
+            source: "report",
+            decision: result.decision
+          }
+        }, db);
+      }
+
+      return created;
+    });
   }
 
   async createAppeal(input: { caseId: string; subjectUserId: string; reason: string }) {
@@ -244,7 +246,8 @@ export class ModerationCaseService {
     created: { id: string },
     result: ModerationResult,
     actorId?: string | null,
-    conversationId?: string | null
+    conversationId?: string | null,
+    database: any = this.prisma
   ) {
     if (actorId) {
       await this.notifications.create(
@@ -256,7 +259,8 @@ export class ModerationCaseService {
           caseId: created.id,
           decision: result.decision,
           ...(conversationId ? { conversationId } : {})
-        }
+        },
+        database
       );
     }
     await this.audit.record({
@@ -265,7 +269,7 @@ export class ModerationCaseService {
       resourceType: "moderation_case",
       resourceId: created.id,
       metadata: { decision: result.decision, riskLevel: result.riskLevel }
-    });
+    }, database);
   }
 
   private buildEvidences(result: ModerationResult, content: string) {

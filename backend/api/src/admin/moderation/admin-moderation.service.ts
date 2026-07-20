@@ -166,29 +166,24 @@ export class AdminModerationService {
     if (!existing) {
       throw new AppException("NOT_FOUND", `Moderation case ${caseId} was not found`, HttpStatus.NOT_FOUND);
     }
-    if (
-      ["confirmViolation", "dismiss", "approveMessage", "rejectMessage", "escalate"].includes(action) &&
-      (existing.status === "resolved" || existing.status === "dismissed")
-    ) {
-      throw new AppException("CASE_ALREADY_CLOSED", "The case is already closed", HttpStatus.CONFLICT);
-    }
-    if ((action === "restrict24h" || action === "restrict7d") && !existing.subjectUserId) {
-      throw new AppException(
-        "CASE_SUBJECT_REQUIRED",
-        "A chat restriction requires an identified message sender",
-        HttpStatus.CONFLICT
-      );
-    }
-    if (action === "upholdAppeal" || action === "overturnAppeal") {
-      const pendingAppeal = (existing.appeals ?? []).find((appeal: any) => appeal.status === "pending");
-      if (!pendingAppeal) {
-        throw new AppException("APPEAL_NOT_PENDING", "No pending appeal exists for this case", HttpStatus.CONFLICT);
-      }
-    }
+    this.assertActionAllowed(existing, action);
 
     const statusUpdate = this.statusForAction(action);
     const result = await this.prisma.$transaction(async (tx) => {
       const db = tx as any;
+      // Two moderators can open the same queue item. Serialize decisions and
+      // re-read after the lock so a stale browser cannot overwrite a decision
+      // that committed while it was waiting.
+      if (typeof db.$queryRaw === "function") {
+        await db.$queryRaw`SELECT "id" FROM "ModerationCase" WHERE "id" = ${caseId} FOR UPDATE`;
+      }
+      const locked = typeof db.moderationCase.findUnique === "function"
+        ? await db.moderationCase.findUnique({ where: { id: caseId }, include: { appeals: true } })
+        : existing;
+      if (!locked) {
+        throw new AppException("NOT_FOUND", `Moderation case ${caseId} was not found`, HttpStatus.NOT_FOUND);
+      }
+      this.assertActionAllowed(locked, action);
       const updated = await db.moderationCase.update({
         where: { id: caseId },
         data: {
@@ -217,16 +212,16 @@ export class AdminModerationService {
           resourceType: "moderation_case",
           resourceId: caseId,
           metadata: {
-            previousStatus: existing.status,
+            previousStatus: locked.status,
             nextStatus: statusUpdate.status,
             note: note?.trim() || null
           }
         }
       });
 
-      if (existing.messageId && publishesMessage(action)) {
+      if (locked.messageId && publishesMessage(action)) {
         await db.message.update({
-          where: { id: existing.messageId },
+          where: { id: locked.messageId },
           data: {
             moderationStatus: "published",
             visibility: "participants",
@@ -235,9 +230,9 @@ export class AdminModerationService {
           }
         });
       }
-      if (existing.messageId && blocksMessage(action)) {
+      if (locked.messageId && blocksMessage(action)) {
         await db.message.update({
-          where: { id: existing.messageId },
+          where: { id: locked.messageId },
           data: {
             // A direct automated rejection was never delivered and remains
             // `blocked`; a reviewer confirmation can also take down a message
@@ -248,6 +243,18 @@ export class AdminModerationService {
             moderationDecision: "block",
             reviewedAt: new Date()
           }
+        });
+      }
+      if (locked.source === "community" && locked.targetId && publishesMessage(action)) {
+        await db.communityPost.updateMany({
+          where: { id: locked.targetId },
+          data: { status: "approved" }
+        });
+      }
+      if (locked.source === "community" && locked.targetId && blocksMessage(action)) {
+        await db.communityPost.updateMany({
+          where: { id: locked.targetId },
+          data: { status: "rejected" }
         });
       }
       if (action === "upholdAppeal" || action === "overturnAppeal") {
@@ -262,25 +269,39 @@ export class AdminModerationService {
         });
       }
 
-      return { case: updated, actionLog };
-    });
+      const manualEscalation = action === "confirmViolation" && locked.subjectUserId
+        ? await this.chatRestrictions.recordManualConfirmedViolation(
+            locked.subjectUserId,
+            caseId,
+            actorId,
+            db
+          )
+        : { escalated: false, confirmations: 0 };
+      if ((action === "restrict24h" || action === "restrict7d") && locked.subjectUserId) {
+        await this.chatRestrictions.createRestriction({
+          userId: locked.subjectUserId,
+          caseId,
+          source: "manual",
+          reason: note?.trim() || "审核员处置的聊天限言",
+          endsAt: new Date(Date.now() + (action === "restrict7d" ? 7 * 24 : 24) * 60 * 60 * 1000),
+          actorId
+        }, db);
+      }
+      if (action === "liftRestriction" || action === "overturnAppeal") {
+        await this.chatRestrictions.liftForCase(caseId, actorId, note, db);
+      }
 
-    const manualEscalation = action === "confirmViolation" && existing.subjectUserId
-      ? await this.chatRestrictions.recordManualConfirmedViolation(existing.subjectUserId, caseId, actorId)
-      : { escalated: false, confirmations: 0 };
-    if ((action === "restrict24h" || action === "restrict7d") && existing.subjectUserId) {
-      await this.chatRestrictions.createRestriction({
-        userId: existing.subjectUserId,
-        caseId,
-        source: "manual",
-        reason: note?.trim() || "审核员处置的聊天限言",
-        endsAt: new Date(Date.now() + (action === "restrict7d" ? 7 * 24 : 24) * 60 * 60 * 1000),
-        actorId
-      });
-    }
-    if (action === "liftRestriction" || action === "overturnAppeal") {
-      await this.chatRestrictions.liftForCase(caseId, actorId, note);
-    }
+      const finalCase = manualEscalation.escalated && typeof db.moderationCase.findUnique === "function"
+        ? await db.moderationCase.findUnique({
+            where: { id: caseId },
+            include: {
+              evidences: true,
+              actionLogs: { orderBy: { createdAt: "desc" } }
+            }
+          })
+        : updated;
+      return { case: finalCase ?? updated, actionLog, manualEscalation };
+    });
 
     const overviewPayload = await this.overview();
     return {
@@ -290,7 +311,7 @@ export class AdminModerationService {
       },
       action: this.toActionLogDto(result.actionLog),
       overview: overviewPayload.overview,
-      manualEscalation
+      manualEscalation: result.manualEscalation
     };
   }
 
@@ -410,6 +431,34 @@ export class AdminModerationService {
         return { status: "dismissed", resolvedAt: new Date() };
       case "escalate":
         return { status: "humanReview", resolvedAt: null };
+    }
+  }
+
+  private assertActionAllowed(existing: any, action: AdminCaseAction): void {
+    if (
+      [
+        "confirmViolation", "dismiss", "approveMessage", "rejectMessage", "escalate",
+        "restrict24h", "restrict7d"
+      ].includes(action) &&
+      (existing.status === "resolved" || existing.status === "dismissed")
+    ) {
+      throw new AppException("CASE_ALREADY_CLOSED", "The case is already closed", HttpStatus.CONFLICT);
+    }
+    if (action === "escalate" && existing.status === "humanReview") {
+      throw new AppException("CASE_ALREADY_ESCALATED", "The case is already awaiting human review", HttpStatus.CONFLICT);
+    }
+    if ((action === "restrict24h" || action === "restrict7d") && !existing.subjectUserId) {
+      throw new AppException(
+        "CASE_SUBJECT_REQUIRED",
+        "A chat restriction requires an identified message sender",
+        HttpStatus.CONFLICT
+      );
+    }
+    if (action === "upholdAppeal" || action === "overturnAppeal") {
+      const pendingAppeal = (existing.appeals ?? []).find((appeal: any) => appeal.status === "pending");
+      if (!pendingAppeal) {
+        throw new AppException("APPEAL_NOT_PENDING", "No pending appeal exists for this case", HttpStatus.CONFLICT);
+      }
     }
   }
 

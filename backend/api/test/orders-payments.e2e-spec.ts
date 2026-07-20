@@ -108,9 +108,9 @@ describe("Orders and payments (e2e)", () => {
     await prisma.legalConsentReceipt.create({
       data: {
         userId: user.id,
-        version: "1.0-2026-07-19",
-        privacyVersion: "1.0-2026-07-19",
-        termsVersion: "1.0-2026-07-19",
+        version: "2.0-2026-07-20",
+        privacyVersion: "2.0-2026-07-20",
+        termsVersion: "2.0-2026-07-20",
         privacyAccepted: true,
         termsAccepted: true,
         adultConfirmed: true,
@@ -132,9 +132,10 @@ describe("Orders and payments (e2e)", () => {
     return new Date(Date.now() + 60 * 60 * 1000).toISOString();
   }
 
-  async function confirmOrderForPayment(orderId: string): Promise<void> {
+  async function companionOwnerTokenForOrder(orderId: string): Promise<string> {
     const order = await prisma.order.findUniqueOrThrow({ where: { id: orderId } });
     const companion = await prisma.companionProfile.findUniqueOrThrow({ where: { id: order.companionId } });
+    let ownerId = companion.ownerUserId;
     if (!companion.ownerUserId) {
       ownerSequence += 1;
       const owner = await prisma.user.create({
@@ -147,11 +148,39 @@ describe("Orders and payments (e2e)", () => {
         where: { id: companion.id },
         data: { ownerUserId: owner.id }
       });
+      ownerId = owner.id;
     }
-    await prisma.order.update({
-      where: { id: orderId },
-      data: { companionConfirmedAt: new Date() }
-    });
+    const owner = await prisma.user.findUniqueOrThrow({ where: { id: ownerId! } });
+    const consent = await prisma.legalConsentReceipt.findFirst({ where: { userId: owner.id } });
+    if (!consent) {
+      await prisma.legalConsentReceipt.create({
+        data: {
+          userId: owner.id,
+          version: "2.0-2026-07-20",
+          privacyVersion: "2.0-2026-07-20",
+          termsVersion: "2.0-2026-07-20",
+          privacyAccepted: true,
+          termsAccepted: true,
+          adultConfirmed: true,
+          acceptedAt: new Date(),
+          privacyUrl: "https://api.talkandtalk.app/legal/privacy.html",
+          termsUrl: "https://api.talkandtalk.app/legal/terms.html",
+          source: "wechatMiniProgram"
+        }
+      });
+    }
+    return jwt.sign(
+      { sub: owner.id, role: owner.role },
+      { secret: "e2e-access-secret", expiresIn: "15m" }
+    );
+  }
+
+  async function confirmOrderForPayment(orderId: string): Promise<void> {
+    const ownerToken = await companionOwnerTokenForOrder(orderId);
+    await request(app.getHttpServer())
+      .post(`/api/v1/orders/service/${orderId}/confirm`)
+      .set("Authorization", `Bearer ${ownerToken}`)
+      .expect(201);
   }
 
   it("creates order, mock pays, and activates conversation once", async () => {
@@ -396,7 +425,7 @@ describe("Orders and payments (e2e)", () => {
 
   it("serializes concurrent refund approvals and rejection without a second provider submission", async () => {
     const customer = await createUser("+8613800138012");
-    const moderator = await createUser("+8613800138013", "moderator");
+    const moderator = await createUser("+8613800138013", "admin");
     const order = await request(app.getHttpServer())
       .post("/api/v1/orders")
       .set("Authorization", `Bearer ${customer.token}`)
@@ -710,7 +739,7 @@ describe("Orders and payments (e2e)", () => {
     expect(payments.filter((payment) => payment.status === "initiated")).toHaveLength(1);
   });
 
-  it("atomically rejects concurrent prepay for overlapping companion slots", async () => {
+  it("atomically reserves only one concurrently confirmed overlapping companion slot", async () => {
     const firstUser = await createUser("+8613800138001");
     const secondUser = await createUser("+8613800138002");
     const scheduledAt = futureScheduledAt();
@@ -726,21 +755,37 @@ describe("Orders and payments (e2e)", () => {
     ]);
     expect(firstOrder.status).toBe(201);
     expect(secondOrder.status).toBe(201);
-    await confirmOrderForPayment(firstOrder.body.data.id);
-    await confirmOrderForPayment(secondOrder.body.data.id);
-
-    const results = await Promise.all([
+    const ownerToken = await companionOwnerTokenForOrder(firstOrder.body.data.id);
+    const confirmations = await Promise.all([
       request(app.getHttpServer())
-        .post(`/api/v1/orders/${firstOrder.body.data.id}/prepay`)
-        .set("Authorization", `Bearer ${firstUser.token}`),
+        .post(`/api/v1/orders/service/${firstOrder.body.data.id}/confirm`)
+        .set("Authorization", `Bearer ${ownerToken}`),
       request(app.getHttpServer())
-        .post(`/api/v1/orders/${secondOrder.body.data.id}/prepay`)
-        .set("Authorization", `Bearer ${secondUser.token}`)
+        .post(`/api/v1/orders/service/${secondOrder.body.data.id}/confirm`)
+        .set("Authorization", `Bearer ${ownerToken}`)
     ]);
+    expect(confirmations.map((result) => result.status).sort()).toEqual([201, 409]);
+    expect(confirmations.find((result) => result.status === 409)?.body.error.code)
+      .toBe("COMPANION_SLOT_UNAVAILABLE");
 
+    const entries = [
+      { order: firstOrder, user: firstUser, confirmation: confirmations[0] },
+      { order: secondOrder, user: secondUser, confirmation: confirmations[1] }
+    ];
+    const winner = entries.find((entry) => entry.confirmation.status === 201)!;
+    const loser = entries.find((entry) => entry.confirmation.status === 409)!;
+    const winnerPrepay = await request(app.getHttpServer())
+      .post(`/api/v1/orders/${winner.order.body.data.id}/prepay`)
+      .set("Authorization", `Bearer ${winner.user.token}`);
+    const loserPrepay = await request(app.getHttpServer())
+      .post(`/api/v1/orders/${loser.order.body.data.id}/prepay`)
+      .set("Authorization", `Bearer ${loser.user.token}`);
+
+    expect(winnerPrepay.status).toBe(201);
+    expect(loserPrepay.status).toBe(409);
+    expect(loserPrepay.body.error.code).toBe("ORDER_NOT_CONFIRMED");
+    const results = [winnerPrepay, loserPrepay];
     expect(results.map((result) => result.status).sort()).toEqual([201, 409]);
-    const conflict = results.find((result) => result.status === 409);
-    expect(conflict?.body.error.code).toBe("COMPANION_SLOT_UNAVAILABLE");
     const orders = await prisma.order.findMany({
       where: { id: { in: [firstOrder.body.data.id, secondOrder.body.data.id] } }
     });
@@ -767,7 +812,6 @@ describe("Orders and payments (e2e)", () => {
       .send({ companionId: "c1", themeId: "t2", durationMinutes: 30, scheduledAt })
       .expect(201);
     await confirmOrderForPayment(firstOrder.body.data.id);
-    await confirmOrderForPayment(secondOrder.body.data.id);
     const firstPrepay = await request(app.getHttpServer())
       .post(`/api/v1/orders/${firstOrder.body.data.id}/prepay`)
       .set("Authorization", `Bearer ${firstUser.token}`)
@@ -776,6 +820,21 @@ describe("Orders and payments (e2e)", () => {
     await prisma.paymentTransaction.update({
       where: { outTradeNo: firstTradeNo },
       data: { expiresAt: new Date(Date.now() - 1) }
+    });
+    await prisma.order.update({
+      where: { id: firstOrder.body.data.id },
+      data: { paymentReservationExpiresAt: new Date(Date.now() - 1) }
+    });
+    // Simulate a reservation that survived a replica race or historical
+    // deployment. The second prepay must reclaim only after WeChat closes the
+    // authoritative expired payment for the first order.
+    await prisma.order.update({
+      where: { id: secondOrder.body.data.id },
+      data: {
+        companionConfirmedAt: new Date(),
+        companionResponseDeadlineAt: null,
+        paymentReservationExpiresAt: new Date(Date.now() + 10 * 60_000)
+      }
     });
 
     await request(app.getHttpServer())
@@ -787,7 +846,7 @@ describe("Orders and payments (e2e)", () => {
       .set("Authorization", `Bearer ${firstUser.token}`)
       .expect(409);
 
-    expect(firstRetry.body.error.code).toBe("COMPANION_SLOT_UNAVAILABLE");
+    expect(firstRetry.body.error.code).toBe("ORDER_NOT_CONFIRMED");
     const firstPayment = await prisma.paymentTransaction.findUniqueOrThrow({
       where: { outTradeNo: firstTradeNo }
     });
@@ -799,6 +858,10 @@ describe("Orders and payments (e2e)", () => {
     expect(orders.find((order) => order.id === secondOrder.body.data.id)?.status).toBe("paying");
   });
 
+  /*
+   * The pre-reservation test above replaces the former prepay-only race. Keep
+   * the remaining prepay lifecycle tests below focused on provider recovery.
+   */
   it("closes an expired prepay before issuing a replacement", async () => {
     const { token } = await createUser();
     const createRes = await request(app.getHttpServer())
@@ -832,7 +895,7 @@ describe("Orders and payments (e2e)", () => {
     expect(payments[1].expiresAt?.getTime()).toBeGreaterThan(Date.now());
   });
 
-  it("keeps an externally closed prepay closed when replacement creation fails", async () => {
+  it("preserves a durable replacement reference when provider creation is ambiguous", async () => {
     const { token } = await createUser("+8613800138021");
     const created = await request(app.getHttpServer())
       .post("/api/v1/orders")
@@ -856,11 +919,20 @@ describe("Orders and payments (e2e)", () => {
       .post(`/api/v1/orders/${orderId}/prepay`)
       .set("Authorization", `Bearer ${token}`)
       .expect(500);
+    const retry = await request(app.getHttpServer())
+      .post(`/api/v1/orders/${orderId}/prepay`)
+      .set("Authorization", `Bearer ${token}`)
+      .expect(409);
 
-    const payments = await prisma.paymentTransaction.findMany({ where: { orderId } });
-    expect(payments).toHaveLength(1);
-    expect(payments[0].status).toBe("closed");
-    expect((await prisma.order.findUniqueOrThrow({ where: { id: orderId } })).status).toBe("pending");
+    expect(retry.body.error.code).toBe("PAYMENT_PREPAY_IN_PROGRESS");
+    const payments = await prisma.paymentTransaction.findMany({
+      where: { orderId },
+      orderBy: { createdAt: "asc" }
+    });
+    expect(payments.map((payment) => payment.status)).toEqual(["closed", "initiated"]);
+    expect(payments[1].clientParams).toBeNull();
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: orderId } })).status).toBe("paying");
+    expect(createPrepay).toHaveBeenCalledTimes(1);
     createPrepay.mockRestore();
   });
 

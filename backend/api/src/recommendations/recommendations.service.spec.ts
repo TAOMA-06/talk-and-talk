@@ -82,6 +82,15 @@ describe("RecommendationsService", () => {
 
     const result = await service.listCompanions("u1", { placement: "discoverHome", themeId: "t1", pageSize: 10 });
 
+    expect(prisma.companionProfile.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ commercialProfile: { status: "verified" } })
+    }));
+    expect(prisma.recommendationImpression.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        requestId: "request-1",
+        companion: expect.objectContaining({ commercialProfile: { status: "verified" } })
+      })
+    }));
     expect(prisma.recommendationRequest.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ userId: "u1", placement: "discoverHome", personalized: true })
     }));

@@ -43,6 +43,16 @@ export class JwtAuthGuard extends AuthGuard("jwt") {
     if (!skipConsent && currentUser.accountStatus === "banned") {
       throw new AppException("ACCOUNT_BANNED", "Account has been banned", HttpStatus.FORBIDDEN);
     }
+    if (
+      !skipConsent &&
+      currentUser.accountStatus !== "active" &&
+      (currentUser.role === "admin" || currentUser.role === "moderator")
+    ) {
+      // A restricted consumer may inspect existing records, but a suspended
+      // staff credential must not retain read access to user, moderation or
+      // financial data merely because the HTTP method is GET.
+      throw new AppException("ACCOUNT_RESTRICTED", "Staff account is not active", HttpStatus.FORBIDDEN);
+    }
     const method = context.switchToHttp().getRequest<{ method?: string }>().method?.toUpperCase();
     if (
       !skipConsent &&

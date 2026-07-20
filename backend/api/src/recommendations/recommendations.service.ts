@@ -445,9 +445,10 @@ export class RecommendationsService {
     if (!request) {
       throw new AppException("RECOMMENDATION_CURSOR_EXPIRED", "Recommendation result has expired", HttpStatus.GONE);
     }
+    const currentEligibility = this.eligibleCompanionWhere();
     const [impressions, total] = await Promise.all([
       this.prisma.recommendationImpression.findMany({
-        where: { requestId },
+        where: { requestId, companion: currentEligibility },
         include: {
           companion: {
             include: { serviceTags: { include: { tag: true }, orderBy: { tag: { name: "asc" } } } }
@@ -457,7 +458,7 @@ export class RecommendationsService {
         skip: offset,
         take: pageSize
       } as any),
-      this.prisma.recommendationImpression.count({ where: { requestId } })
+      this.prisma.recommendationImpression.count({ where: { requestId, companion: currentEligibility } })
     ]);
     const nextOffset = offset + impressions.length;
     const themeId = typeof (request as any).context?.themeId === "string" ? (request as any).context.themeId : undefined;
@@ -483,10 +484,7 @@ export class RecommendationsService {
   private async loadEligibleCandidates(placement: string): Promise<CompanionCandidate[]> {
     return this.prisma.companionProfile.findMany({
       where: {
-        isPublished: true,
-        isVerified: true,
-        ownerUserId: { not: null },
-        owner: { accountStatus: "active", profile: { isVerified: true } }
+        ...this.eligibleCompanionWhere()
       },
       include: {
         serviceTags: { include: { tag: true }, orderBy: { tag: { name: "asc" } } },
@@ -495,6 +493,16 @@ export class RecommendationsService {
       orderBy: [{ isOnline: "desc" }, { rating: "desc" }, { reviewCount: "desc" }],
       take: MAX_CANDIDATES
     } as any) as any;
+  }
+
+  private eligibleCompanionWhere() {
+    return {
+      isPublished: true,
+      isVerified: true,
+      ownerUserId: { not: null },
+      owner: { accountStatus: "active", profile: { isVerified: true } },
+      commercialProfile: { status: "verified" }
+    } as const;
   }
 
   private async collectExposure(userId: string, companionIds: string[], now: Date): Promise<Map<string, Exposure>> {

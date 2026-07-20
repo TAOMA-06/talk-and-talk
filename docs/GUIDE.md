@@ -27,7 +27,7 @@ AI 内容识别是平台内容安全员，不是陪用户聊天的机器人。
 | `warn` | 轻度越界 | 发出并提醒 |
 | `block` | 高风险 | 拦截并生成安全提醒 |
 
-正式后端已提供聊天与审核 API。`c1`–`c3` 聊天发送以服务端 `decision` 为准；iOS 的 `LocalModerationService` 仅用本地规则处理 DEBUG 失败兜底与尚未后端化的社区内容。DeepSeek 仅由后端可选启用，客户端不保存或直连任何 AI API key。
+正式后端已提供聊天与审核 API。`c1`–`c3` 聊天发送以服务端 `decision` 为准；客户端不保存或直连任何 AI API key。本地与 staging 可选 DeepSeek，生产必须配置真实文本审核提供方并在故障时失败关闭。
 
 ## 3. 当前架构
 
@@ -49,7 +49,7 @@ talk-and-talk/
 | iOS App | SwiftUI, iOS 18+ | UI 与多数业务仍可本地运行 |
 | 正式 API | NestJS, TypeScript | Auth + companions + conversations + moderation |
 | 数据依赖 | Postgres, Redis | Docker Compose 已配置 |
-| 内容审核 | 服务端 RuleEngine + 可选 DeepSeek | 聊天路径以服务端为准；社区/举报仍本地 |
+| 内容审核 | 服务端 RuleEngine + 生产必配 DeepSeek-compatible provider | 聊天、社区、公开昵称、评价和陪伴者资料均以服务端为准 |
 
 ## 4. App 与后端怎么协作
 
@@ -77,7 +77,7 @@ Phase 3（聊天/审核 v2，微信小程序 + NestJS）：
 - 正式聊天与审核 API 已接入微信小程序：`POST /conversations/:id/messages`、媒体直传预留/完成、`POST /moderation/appeals`、`GET /conversations/:id/status` 与 staff 审核接口。
 - 文本、图片、短语音统一走 `queued → pendingReview/published/blocked → 人工复核 → 处置/申诉`；接收方不会看到待审文本或未获批准媒体。
 - 聊天响应只返回用户可理解的审核决定与风险等级，举报响应只返回回执；规则命中、AI 原因和完整案件仅 staff API 可见。
-- 审核流水线：RuleEngine →（高风险 block 跳过）可选 DeepSeek → Case/Evidence/ActionLog。
+- 审核流水线：RuleEngine →（高风险 block 跳过）生产文本审核提供方 → Case/Evidence/ActionLog；提供方故障时不会降级公开。
 - Admin Moderation：概览、筛选队列、详情、会话证据、人工处置、样本标注/导出；动作写 `ModerationActionLog` + `AuditLog`。
 - 用户举报：`POST /moderation/reports`；iOS 举报入口优先提交后端。
 - Web 运营后台与 iOS 完全分离：本地工具入口为 `http://localhost:3000/admin/`，生产部署需独立访问控制。

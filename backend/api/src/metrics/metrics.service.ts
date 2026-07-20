@@ -9,6 +9,9 @@ export type MetricsSnapshot = {
   aiFailures: number;
   wechatNotifyFailures: number;
   wechatNotifySuccess: number;
+  notificationDeliveryFailures: number;
+  notificationDeliverySuccess: number;
+  notificationDeliverySkipped: number;
 };
 
 type DurationSample = {
@@ -23,6 +26,9 @@ export class MetricsService {
   private aiFailures = 0;
   private wechatNotifyFailures = 0;
   private wechatNotifySuccess = 0;
+  private notificationDeliveryFailures = 0;
+  private notificationDeliverySuccess = 0;
+  private notificationDeliverySkipped = 0;
   private latencySumMs = 0;
   private readonly durations: DurationSample[] = [];
   private readonly windowMs = 15 * 60 * 1000;
@@ -49,6 +55,18 @@ export class MetricsService {
     this.wechatNotifySuccess += 1;
   }
 
+  recordNotificationDeliveryFailure() {
+    this.notificationDeliveryFailures += 1;
+  }
+
+  recordNotificationDeliverySuccess() {
+    this.notificationDeliverySuccess += 1;
+  }
+
+  recordNotificationDeliverySkipped() {
+    this.notificationDeliverySkipped += 1;
+  }
+
   snapshot(): MetricsSnapshot {
     this.pruneDurations();
     const samples = this.durations.map((item) => item.durationMs);
@@ -63,7 +81,10 @@ export class MetricsService {
       p95LatencyMs: this.percentile(samples, 0.95),
       aiFailures: this.aiFailures,
       wechatNotifyFailures: this.wechatNotifyFailures,
-      wechatNotifySuccess: this.wechatNotifySuccess
+      wechatNotifySuccess: this.wechatNotifySuccess,
+      notificationDeliveryFailures: this.notificationDeliveryFailures,
+      notificationDeliverySuccess: this.notificationDeliverySuccess,
+      notificationDeliverySkipped: this.notificationDeliverySkipped
     };
   }
 
@@ -93,7 +114,16 @@ export class MetricsService {
       `talk_wechat_notify_failures_total{app_version="${appVersion}",app_env="${appEnv}"} ${metrics.wechatNotifyFailures}`,
       "# HELP talk_wechat_notify_success_total Successful WeChat payment notify callbacks",
       "# TYPE talk_wechat_notify_success_total counter",
-      `talk_wechat_notify_success_total{app_version="${appVersion}",app_env="${appEnv}"} ${metrics.wechatNotifySuccess}`
+      `talk_wechat_notify_success_total{app_version="${appVersion}",app_env="${appEnv}"} ${metrics.wechatNotifySuccess}`,
+      "# HELP talk_notification_delivery_failures_total Failed or indeterminate transactional notification deliveries",
+      "# TYPE talk_notification_delivery_failures_total counter",
+      `talk_notification_delivery_failures_total{app_version="${appVersion}",app_env="${appEnv}"} ${metrics.notificationDeliveryFailures}`,
+      "# HELP talk_notification_delivery_success_total Successful transactional notification deliveries",
+      "# TYPE talk_notification_delivery_success_total counter",
+      `talk_notification_delivery_success_total{app_version="${appVersion}",app_env="${appEnv}"} ${metrics.notificationDeliverySuccess}`,
+      "# HELP talk_notification_delivery_skipped_total Transactional notification deliveries skipped without user authorization",
+      "# TYPE talk_notification_delivery_skipped_total counter",
+      `talk_notification_delivery_skipped_total{app_version="${appVersion}",app_env="${appEnv}"} ${metrics.notificationDeliverySkipped}`
     ];
     return `${lines.join("\n")}\n`;
   }

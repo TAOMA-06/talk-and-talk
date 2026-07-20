@@ -75,6 +75,12 @@ export class OrdersController {
     return this.ordersService.cancel(user.id, id);
   }
 
+  @Post(":id/completion-confirmations")
+  @UseGuards(JwtAuthGuard)
+  confirmCompletion(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
+    return this.ordersService.confirmCompletion(user.id, id);
+  }
+
   @Post(":id/prepay")
   @UseGuards(JwtAuthGuard)
   prepay(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string, @Body() dto: PrepayDto) {

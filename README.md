@@ -29,6 +29,7 @@ talk-and-talk/
 | [docs/staging-acceptance.md](./docs/staging-acceptance.md) | Staging 与小程序联调 |
 | [docs/deploy-rollback.md](./docs/deploy-rollback.md) | 部署与回滚 |
 | [docs/production-checklist.md](./docs/production-checklist.md) | 生产检查清单 |
+| [docs/COMMERCIAL_RELEASE.md](./docs/COMMERCIAL_RELEASE.md) | 正式商用交易模型、代码控制、外部 P0 与放行流程 |
 | [docs/wechat-backend-selection.md](./docs/wechat-backend-selection.md) | 微信后端方案选型、云托管部署与真机验收 |
 | [docs/app-store-metadata.md](./docs/app-store-metadata.md) | App Store Connect 元数据 |
 | [frontend/ios/](./frontend/ios/) | 历史 iOS SwiftUI App（当前不发布） |
@@ -59,7 +60,7 @@ curl http://localhost:3000/api/v1/health
 ```
 
 Web 审核后台：`http://localhost:3000/admin/`（独立用户名、密码和 TOTP；初始化见 `docs/staff-operations.md`）
-法律页：`http://localhost:3000/legal/privacy.html`、`/legal/terms.html`  
+法律页：`http://localhost:3000/legal/privacy.html`、`/legal/terms.html`（稳定入口会跳转到配置化的当前版本）
 开发普通 phone 身份：`13800000001`（admin）、`13800000002`（moderator）；审核后台不使用短信登录。
 
 Docker（本地 API + Postgres + Redis）：
@@ -109,8 +110,8 @@ Release 数据安全规则：正式构建不会编译 `MockData` 或离线身份
 | `SMS_CODE_TTL_SECONDS` | 验证码 TTL，默认 `300` | |
 | `SMS_PROVIDER` | `mock` / `none`（真实厂商见 NEXT_PHASE） | **禁止 mock**；`none` 则无短信登录 |
 | `STAFF_TOTP_ENCRYPTION_KEY` | 加密审核后台 TOTP 种子 | **必填、独立高强度密钥** |
-| `DEEPSEEK_API_KEY` | 可选；空则纯规则审核 | 可选 |
-| `DEEPSEEK_URL` / `DEEPSEEK_MODEL` | DeepSeek 配置 | 有 key 时需要 |
+| `DEEPSEEK_API_KEY` | 文本审核提供方凭据；本地可空 | **生产必填** |
+| `DEEPSEEK_URL` / `DEEPSEEK_MODEL` | 文本审核端点与模型 | **生产显式配置、HTTPS** |
 | `WECHAT_PAY_*` | 微信商户与证书路径、回调 base | 真实收款时必填 |
 | `WECHAT_MINIPROGRAM_APP_ID` / `WECHAT_MINIPROGRAM_APP_SECRET` | 小程序登录与 JSAPI 支付 AppID；AppSecret 仅后端保存 | 小程序发行必填 |
 | `APPLE_SIGN_IN_BUNDLE_ID` | 历史 iOS 登录配置 | 小程序首发不使用 |
@@ -220,7 +221,7 @@ DATABASE_URL=postgres://... ./backend/api/scripts/db-backup.sh
 
 ## DeepSeek
 
-- 可选内容审核增强；`DEEPSEEK_API_KEY` 为空时 **RuleEngine 独立运行**
+- 本地与 staging 可在 `DEEPSEEK_API_KEY` 为空时仅运行 RuleEngine；生产强制真实文本审核提供方，运行时故障时聊天/社区转人工、公开资料写入返回可重试错误，绝不降级公开
 - 高风险 rule `block` 会跳过 AI
 
 ## 短信

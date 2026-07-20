@@ -189,17 +189,42 @@ export class MediaAssetService {
 
   async expireDueAssets(now = new Date()) {
     const assets: any[] = await this.prisma.mediaAsset.findMany({
-      where: { expiresAt: { lte: now }, status: { not: "expired" } },
+      where: {
+        expiresAt: { lte: now },
+        status: { not: "expired" },
+        OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now } }]
+      },
       take: 100
     } as any);
+    let expired = 0;
     for (const asset of assets) {
-      await this.storage.delete(this.toReference(asset)).catch(() => undefined);
-      await this.prisma.mediaAsset.update({
-        where: { id: asset.id },
-        data: { status: "expired", extractedText: null, analysis: null }
-      } as any);
+      try {
+        await this.storage.delete(this.toReference(asset));
+        await this.prisma.mediaAsset.update({
+          where: { id: asset.id },
+          data: {
+            status: "expired",
+            extractedText: null,
+            analysis: null,
+            lastError: null,
+            nextAttemptAt: null
+          }
+        } as any);
+        expired += 1;
+      } catch {
+        const retryCount = Number(asset.retryCount ?? 0) + 1;
+        const retryDelayMs = Math.min(24 * 60 * 60_000, 5 * 60_000 * 2 ** Math.min(retryCount - 1, 8));
+        await this.prisma.mediaAsset.update({
+          where: { id: asset.id },
+          data: {
+            retryCount,
+            nextAttemptAt: new Date(now.getTime() + retryDelayMs),
+            lastError: "storage_delete_failed"
+          }
+        } as any);
+      }
     }
-    return assets.length;
+    return expired;
   }
 
   toReference(asset: any): MediaAssetReference {

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { parseEnv, validateDeploymentConfig } from "./deployment-preflight.mjs";
+import { parseEnv, validateDeploymentConfig, validateMiniProgramReleaseConfig } from "./deployment-preflight.mjs";
 
 function validProduction() {
   return {
@@ -15,6 +15,9 @@ function validProduction() {
     JWT_REFRESH_SECRET: "refresh-secret-that-is-longer-than-32-characters",
     METRICS_TOKEN: "metrics-token-that-is-longer-than-32-characters",
     STAFF_TOTP_ENCRYPTION_KEY: "staff-totp-key-that-is-longer-than-32-characters",
+    DEEPSEEK_API_KEY: "deepseek-production-key-1234567890",
+    DEEPSEEK_URL: "https://api.deepseek.com",
+    DEEPSEEK_MODEL: "deepseek-chat",
     WECHAT_MINIPROGRAM_APP_ID: "wx1234567890abcdef",
     WECHAT_MINIPROGRAM_APP_SECRET: "0123456789abcdef0123456789abcdef",
     WECHAT_PAY_APP_ID: "wx1234567890abcdef",
@@ -24,7 +27,37 @@ function validProduction() {
     WECHAT_PAY_CERT_SERIAL_NO: "ABCDEF123456",
     WECHAT_PAY_NOTIFY_BASE_URL: "https://api.talkandtalk.app",
     SMS_PROVIDER: "none",
-    SEED_ON_STARTUP: "false"
+    SEED_ON_STARTUP: "false",
+    COMMERCIAL_RELEASE_MODE: "commercial",
+    PLATFORM_FEE_BPS: "1200",
+    COMPANION_SETTLEMENT_HOLD_HOURS: "96",
+    REFUND_REQUEST_WINDOW_HOURS: "72",
+    ORDER_RESPONSE_WINDOW_MINUTES: "10",
+    ORDER_MAX_SCHEDULE_DAYS: "30",
+    ORDER_INTAKE_ENABLED: "true",
+    ORDER_MAX_OPEN_TOTAL: "500",
+    ORDER_MAX_OPEN_PER_USER: "3",
+    ORDER_MAX_PENDING_PER_COMPANION: "20",
+    PAYOUT_CLAIMS_ENABLED: "true",
+    SUPPORT_RESPONSE_HOURS: "24",
+    SUPPORT_MAX_OPEN_PER_USER: "5",
+    NOTIFICATION_DELIVERY_ENABLED: "true",
+    WECHAT_SUBSCRIBE_MESSAGES_ENABLED: "true",
+    WECHAT_SUBSCRIBE_TEMPLATES_JSON: JSON.stringify([
+      "newOrder", "orderConfirmed", "orderRejected", "orderResponseExpired", "paymentSuccess",
+      "serviceStarted", "serviceCompleted", "orderCancelled", "reservationExpired", "supportUpdate"
+    ].map((key) => ({ key, templateId: `TEMPLATE_${key}_123456`, page: "pages/orders/index", data: { thing1: "{{title}}" } }))),
+    LEGAL_OPERATOR_NAME: "上海示例网络科技有限公司",
+    LEGAL_CONSENT_VERSION: "2.0-2026-07-20",
+    LEGAL_CONTACT_EMAIL: "privacy@talkandtalk.test",
+    LEGAL_CONTACT_PHONE: "021-12345678",
+    LEGAL_COMPLAINT_CHANNEL: "小程序内客服工单",
+    LEGAL_PRIVACY_URL: "https://api.talkandtalk.app/legal/privacy.html",
+    LEGAL_TERMS_URL: "https://api.talkandtalk.app/legal/terms.html",
+    LEGAL_PLATFORM_RULES_URL: "https://api.talkandtalk.app/api/v1/legal/platform-rules",
+    LEGAL_CONSENT_EFFECTIVE_DATE: "2026-07-20",
+    LEGAL_PRIVACY_RETENTION_DAYS: "1095",
+    PAYMENT_RECONCILIATION_ENABLED: "true"
   };
 }
 
@@ -37,6 +70,29 @@ test("parses quoted env values without exposing comments", () => {
 
 test("accepts a complete production Mini Program deployment", () => {
   assert.deepEqual(validateDeploymentConfig(validProduction()), []);
+});
+
+test("rejects a production deployment without a real HTTPS moderation provider", () => {
+  assert.match(validateDeploymentConfig({ ...validProduction(), DEEPSEEK_API_KEY: "" }).join("\n"), /DEEPSEEK_API_KEY is required/);
+  assert.match(validateDeploymentConfig({ ...validProduction(), DEEPSEEK_API_KEY: "short" }).join("\n"), /at least 24 characters/);
+  assert.match(validateDeploymentConfig({ ...validProduction(), DEEPSEEK_URL: "http:\/\/moderation.internal" }).join("\n"), /HTTPS URL/);
+});
+
+test("rejects Mini Program release backend or legal constants that drift from production", () => {
+  const env = validProduction();
+  const validSource = `
+    const HTTPS_BACKENDS = { release: "https://api.talkandtalk.app/api/v1" };
+    export const LEGAL_URLS = {
+      privacy: "https://api.talkandtalk.app/legal/privacy.html",
+      terms: "https://api.talkandtalk.app/legal/terms.html"
+    };
+    export const LEGAL_CONSENT_VERSION = "2.0-2026-07-20";
+  `;
+  assert.deepEqual(validateMiniProgramReleaseConfig(env, validSource), []);
+  assert.match(
+    validateMiniProgramReleaseConfig(env, validSource.replace("2.0-2026-07-20", "stale-version")).join("\n"),
+    /consent version/
+  );
 });
 
 test("accepts a CloudBase production deployment with an inline PEM private key", () => {
@@ -67,6 +123,14 @@ test("rejects placeholders, shared JWT secrets, insecure Redis, and missing paym
   assert.match(errors, /JWT access and refresh secrets must be different/);
   assert.match(errors, /WECHAT_PAY_MCH_ID is required/);
   assert.match(errors, /production SEED_ON_STARTUP must be false/);
+});
+
+test("rejects an unbounded commercial booking horizon", () => {
+  const errors = validateDeploymentConfig({
+    ...validProduction(),
+    ORDER_MAX_SCHEDULE_DAYS: "366"
+  }).join("\n");
+  assert.match(errors, /ORDER_MAX_SCHEDULE_DAYS must be between 1 and 365/);
 });
 
 test("allows staging Mock payment only when all real payment fields are empty", () => {

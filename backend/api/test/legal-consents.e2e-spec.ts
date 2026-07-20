@@ -53,7 +53,7 @@ describe("Legal consent receipts (e2e)", () => {
   });
 
   const consent = {
-    version: "1.0-2026-07-19",
+    version: "2.0-2026-07-20",
     acceptedAt: new Date(Date.now() - 60_000).toISOString(),
     privacyAccepted: true,
     termsAccepted: true,

@@ -126,4 +126,51 @@ describe("MediaModerationWorker", () => {
     expect(db.message.updateMany).toHaveBeenCalledTimes(1);
     expect(cases.createFromResult).not.toHaveBeenCalled();
   });
+
+  it("commits a blocked-message case and rolling restriction in the same transition transaction", async () => {
+    const message = {
+      id: "message-blocked",
+      conversationId: "conversation-1",
+      senderId: "user-1",
+      content: "",
+      moderationStatus: "queued",
+      attachments: [{ id: "image-1", kind: "image", retryCount: 0, nextAttemptAt: null }]
+    };
+    prisma.message.findUnique.mockResolvedValue(message);
+    prisma.message.updateMany.mockResolvedValue({ count: 1 });
+    analysisProvider.analyzeImage = jest.fn().mockResolvedValue({
+      available: true,
+      score: 0.95,
+      reasons: ["疑似私联二维码"],
+      categories: ["privateContact"],
+      extractedText: "加微信"
+    });
+    moderation.moderateAsync.mockResolvedValue({
+      decision: "block",
+      riskLevel: "high",
+      priority: "high",
+      score: 0.95,
+      reasons: ["疑似私联二维码"],
+      matchedRules: ["private.contact"],
+      categories: ["privateContact"],
+      policyVersion: "chat-v2",
+      usedAI: true
+    });
+    cases.createFromResult.mockResolvedValue({ id: "case-blocked" });
+    const db = {
+      message: { updateMany: jest.fn().mockResolvedValue({ count: 1 }), create: jest.fn() },
+      mediaAsset: { update: jest.fn().mockResolvedValue({}) },
+      conversation: { update: jest.fn().mockResolvedValue({}) }
+    };
+    prisma.$transaction.mockImplementation(async (callback: any) => callback(db));
+
+    await worker.processMessage(message.id);
+
+    expect(cases.createFromResult).toHaveBeenCalledWith(expect.objectContaining({ db }));
+    expect(restrictions.recordAutomaticHighRiskBlock).toHaveBeenCalledWith(
+      "user-1",
+      "case-blocked",
+      db
+    );
+  });
 });

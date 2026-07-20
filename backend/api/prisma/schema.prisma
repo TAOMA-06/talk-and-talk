@@ -157,6 +157,67 @@ enum NotificationType {
   orderStatus
   moderationAlert
   safetyAlert
+  supportUpdate
+}
+
+enum NotificationDeliveryStatus {
+  pending
+  processing
+  sent
+  skipped
+  failed
+}
+
+enum CompanionEarningStatus {
+  pending
+  available
+  held
+  paid
+  void
+}
+
+enum CompanionRecoveryStatus {
+  due
+  pendingVerification
+  recovered
+}
+
+enum CompanionRecoveryReason {
+  confirmedPaidBeforeRefund
+  payoutStateUncertain
+}
+
+enum CompanionCommercialStatus {
+  pendingReview
+  verified
+  suspended
+}
+
+enum SupportTicketCategory {
+  orderIssue
+  refund
+  safety
+  privacy
+  general
+}
+
+enum SupportTicketStatus {
+  open
+  inProgress
+  resolved
+  closed
+}
+
+enum SupportTicketPriority {
+  normal
+  high
+  urgent
+}
+
+enum LegalDocumentKind {
+  terms
+  privacy
+  platformRules
 }
 
 enum DeletionRequestStatus {
@@ -186,33 +247,37 @@ enum RecommendationTagSource {
 }
 
 model User {
-  id            String        @id @default(uuid())
-  role          UserRole      @default(user)
-  accountStatus AccountStatus @default(active)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  identities    AuthIdentity[]
-  staffCredential StaffCredential?
-  profile       UserProfile?
-  refreshTokens RefreshToken[]
-  conversations Conversation[]
-  readStates    MessageReadState[]
-  orders        Order[]
-  notifications Notification[]
-  deletionRequests AccountDeletionRequest[]
-  legalConsentReceipts LegalConsentReceipt[]
-  companionProfile CompanionProfile? @relation("CompanionOwner")
-  communityPosts CommunityPost[]
-  communityLikes CommunityLike[]
-  reviews Review[]
-  mediaAssets MediaAsset[] @relation("MediaAssetUploader")
-  chatRestrictions ChatRestriction[]
-  moderationSubjectCases ModerationCase[] @relation("ModerationSubject")
-  moderationReporterCases ModerationCase[] @relation("ModerationReporter")
-  moderationAppeals ModerationAppeal[] @relation("ModerationAppealer")
+  id                       String                        @id @default(uuid())
+  role                     UserRole                      @default(user)
+  accountStatus            AccountStatus                 @default(active)
+  createdAt                DateTime                      @default(now())
+  updatedAt                DateTime                      @updatedAt
+  identities               AuthIdentity[]
+  staffCredential          StaffCredential?
+  profile                  UserProfile?
+  refreshTokens            RefreshToken[]
+  conversations            Conversation[]
+  readStates               MessageReadState[]
+  orders                   Order[]
+  notifications            Notification[]
+  notificationDeliveries   NotificationDelivery[]
+  subscriptionGrants       WeChatSubscriptionGrant[]
+  supportTickets           SupportTicket[]               @relation("SupportRequester")
+  assignedSupportTickets   SupportTicket[]               @relation("SupportAssignee")
+  deletionRequests         AccountDeletionRequest[]
+  legalConsentReceipts     LegalConsentReceipt[]
+  companionProfile         CompanionProfile?             @relation("CompanionOwner")
+  communityPosts           CommunityPost[]
+  communityLikes           CommunityLike[]
+  reviews                  Review[]
+  mediaAssets              MediaAsset[]                  @relation("MediaAssetUploader")
+  chatRestrictions         ChatRestriction[]
+  moderationSubjectCases   ModerationCase[]              @relation("ModerationSubject")
+  moderationReporterCases  ModerationCase[]              @relation("ModerationReporter")
+  moderationAppeals        ModerationAppeal[]            @relation("ModerationAppealer")
   recommendationPreference UserRecommendationPreference?
-  recommendationTags UserRecommendationTag[]
-  recommendationRequests RecommendationRequest[]
+  recommendationTags       UserRecommendationTag[]
+  recommendationRequests   RecommendationRequest[]
 }
 
 model AuthIdentity {
@@ -257,36 +322,39 @@ model UserProfile {
 }
 
 model CompanionProfile {
-  id               String       @id
-  ownerUserId      String?      @unique
-  name             String
-  role             String
-  initials         String
-  rating           Float        @default(0)
-  reviewCount      Int          @default(0)
-  pricePerHalfHour Int
-  isOnline         Boolean      @default(false)
-  isVerified       Boolean      @default(false)
-  bio              String
-  availableTimes   String[]
-  languages        String[]
-  specialties      String[]
-  completedOrders  Int          @default(0)
-  responseTime     String
-  distanceKm       Float        @default(0)
-  availability     Availability @default(available)
-  cityDistrict     String
-  topicIds         String[]     @default([])
-  isPublished      Boolean      @default(false)
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
-  serviceTags      CompanionServiceTag[]
-  conversations    Conversation[]
-  orders           Order[]
-  owner            User?        @relation("CompanionOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
-  reviews          Review[]
+  id                        String                          @id
+  ownerUserId               String?                         @unique
+  name                      String
+  role                      String
+  initials                  String
+  rating                    Float                           @default(0)
+  reviewCount               Int                             @default(0)
+  pricePerHalfHour          Int
+  isOnline                  Boolean                         @default(false)
+  isVerified                Boolean                         @default(false)
+  bio                       String
+  availableTimes            String[]
+  languages                 String[]
+  specialties               String[]
+  completedOrders           Int                             @default(0)
+  responseTime              String
+  distanceKm                Float                           @default(0)
+  availability              Availability                    @default(available)
+  cityDistrict              String
+  topicIds                  String[]                        @default([])
+  isPublished               Boolean                         @default(false)
+  createdAt                 DateTime                        @default(now())
+  updatedAt                 DateTime                        @updatedAt
+  serviceTags               CompanionServiceTag[]
+  conversations             Conversation[]
+  orders                    Order[]
+  owner                     User?                           @relation("CompanionOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  reviews                   Review[]
   recommendationImpressions RecommendationImpression[]
-  recommendationPolicies CompanionRecommendationPolicy[]
+  recommendationPolicies    CompanionRecommendationPolicy[]
+  earnings                  CompanionEarning[]
+  recoveries                CompanionRecovery[]
+  commercialProfile         CompanionCommercialProfile?
 
   @@index([isPublished, availability])
   @@index([isOnline])
@@ -301,12 +369,12 @@ model Conversation {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  companion CompanionProfile   @relation(fields: [companionId], references: [id], onDelete: Cascade)
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companion   CompanionProfile   @relation(fields: [companionId], references: [id], onDelete: Cascade)
   messages    Message[]
   mediaAssets MediaAsset[]
   readStates  MessageReadState[]
-  orders    Order[]
+  orders      Order[]
 
   @@unique([userId, externalId])
   @@unique([userId, companionId])
@@ -315,40 +383,59 @@ model Conversation {
 }
 
 model Order {
-  id              String      @id @default(uuid())
-  userId          String
-  companionId     String
-  themeId         String
-  durationMinutes Int
-  amountCents     Int
-  currency        String      @default("CNY")
-  status          OrderStatus @default(pending)
-  scheduledAt     DateTime
-  companionNameSnapshot String
-  companionRoleSnapshot String
-  companionInitialsSnapshot String
-  themeNameSnapshot String
-  conversationId  String?
-  recommendationImpressionId String? @unique
-  companionConfirmedAt DateTime?
-  paymentReservationExpiresAt DateTime?
-  paidAt          DateTime?
-  cancelledAt     DateTime?
-  completedAt     DateTime?
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  id                                  String      @id @default(uuid())
+  userId                              String
+  companionId                         String
+  themeId                             String
+  durationMinutes                     Int
+  amountCents                         Int
+  currency                            String      @default("CNY")
+  status                              OrderStatus @default(pending)
+  scheduledAt                         DateTime
+  companionNameSnapshot               String
+  companionRoleSnapshot               String
+  companionInitialsSnapshot           String
+  themeNameSnapshot                   String
+  conversationId                      String?
+  recommendationImpressionId          String?     @unique
+  clientRequestId                     String?
+  companionConfirmedAt                DateTime?
+  companionResponseDeadlineAt         DateTime?
+  paymentReservationExpiresAt         DateTime?
+  serviceStartedAt                    DateTime?
+  platformFeeBps                      Int         @default(0)
+  platformFeeCents                    Int         @default(0)
+  companionPayableCents               Int         @default(0)
+  paidAt                              DateTime?
+  cancelledAt                         DateTime?
+  completedAt                         DateTime?
+  customerConfirmedAt                 DateTime?
+  refundRequestDeadlineAt             DateTime?
+  settlementRecipientRefSnapshot      String?
+  settlementRecipientMaskedSnapshot   String?
+  taxProfileRefSnapshot               String?
+  identityEvidenceRefSnapshot         String?
+  serviceAgreementVersionSnapshot     String?
+  serviceAgreementEvidenceRefSnapshot String?
+  createdAt                           DateTime    @default(now())
+  updatedAt                           DateTime    @updatedAt
 
-  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  companion    CompanionProfile     @relation(fields: [companionId], references: [id], onDelete: Restrict)
-  conversation Conversation?        @relation(fields: [conversationId], references: [id], onDelete: SetNull)
-  payments     PaymentTransaction[]
-  refunds      RefundTransaction[]
-  reviews      Review[]
+  user                     User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companion                CompanionProfile          @relation(fields: [companionId], references: [id], onDelete: Restrict)
+  conversation             Conversation?             @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  payments                 PaymentTransaction[]
+  refunds                  RefundTransaction[]
+  reviews                  Review[]
+  earning                  CompanionEarning?
+  supportTickets           SupportTicket[]
   recommendationImpression RecommendationImpression? @relation("RecommendationAttributedOrder", fields: [recommendationImpressionId], references: [id], onDelete: SetNull)
 
+  @@unique([userId, clientRequestId])
   @@index([userId, createdAt])
   @@index([companionId, status])
   @@index([companionId, paymentReservationExpiresAt])
+  @@index([status, companionResponseDeadlineAt])
+  @@index([status, refundRequestDeadlineAt])
   @@index([status, createdAt])
   @@index([conversationId])
 }
@@ -375,29 +462,39 @@ model PaymentTransaction {
   @@unique([provider, transactionId])
   @@index([orderId])
   @@index([status])
+  @@index([status, expiresAt])
 }
 
 model RefundTransaction {
-  id               String          @id @default(uuid())
-  orderId          String
-  paymentId        String
-  outRefundNo      String          @unique
-  amountCents      Int
-  status           RefundTxnStatus @default(pending)
-  reason           String?
-  providerRefundId String?
-  reviewedById     String?
-  reviewedAt       DateTime?
-  reviewNote       String?
-  failureReason    String?
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
+  id                    String          @id @default(uuid())
+  orderId               String
+  paymentId             String
+  outRefundNo           String          @unique
+  amountCents           Int
+  status                RefundTxnStatus @default(pending)
+  reason                String?
+  providerRefundId      String?         @unique
+  initiatedById         String?
+  supportTicketId       String?
+  exceptionReasonCode   String?
+  reviewedById          String?
+  reviewedAt            DateTime?
+  reviewNote            String?
+  failureReason         String?
+  providerQueryAttempts Int             @default(0)
+  nextReconcileAt       DateTime?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
 
-  order   Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  payment PaymentTransaction @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  order         Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  payment       PaymentTransaction @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  supportTicket SupportTicket?     @relation(fields: [supportTicketId], references: [id], onDelete: SetNull)
+  recovery      CompanionRecovery?
 
   @@index([orderId])
   @@index([paymentId])
+  @@index([supportTicketId])
+  @@index([status, nextReconcileAt])
 }
 
 model CommunityPost {
@@ -409,8 +506,8 @@ model CommunityPost {
   coverImageUrl    String?
   coverAspectRatio Float?
   status           CommunityPostStatus @default(pending)
-  createdAt        DateTime             @default(now())
-  updatedAt        DateTime             @updatedAt
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
 
   author User            @relation(fields: [authorId], references: [id], onDelete: Cascade)
   likes  CommunityLike[]
@@ -449,27 +546,27 @@ model Review {
 }
 
 model UserRecommendationPreference {
-  userId                    String   @id
-  personalizationEnabled    Boolean  @default(true)
-  topicIds                  String[] @default([])
-  city                      String?
-  maxPricePerHalfHour       Int?
-  preferredTimeSlots        String[] @default([])
-  createdAt                 DateTime @default(now())
-  updatedAt                 DateTime @updatedAt
+  userId                 String   @id
+  personalizationEnabled Boolean  @default(true)
+  topicIds               String[] @default([])
+  city                   String?
+  maxPricePerHalfHour    Int?
+  preferredTimeSlots     String[] @default([])
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model UserRecommendationTag {
-  id         String                   @id @default(uuid())
+  id         String                  @id @default(uuid())
   userId     String
   topicId    String
-  source     RecommendationTagSource  @default(behavioral)
-  weight     Float                    @default(0)
+  source     RecommendationTagSource @default(behavioral)
+  weight     Float                   @default(0)
   disabledAt DateTime?
-  createdAt  DateTime                 @default(now())
-  updatedAt  DateTime                 @updatedAt
+  createdAt  DateTime                @default(now())
+  updatedAt  DateTime                @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -495,19 +592,19 @@ model RecommendationRequest {
 }
 
 model RecommendationImpression {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   requestId   String
   companionId String
   position    Int
   score       Float
-  reasonCodes String[] @default([])
-  servedAt    DateTime @default(now())
+  reasonCodes String[]  @default([])
+  servedAt    DateTime  @default(now())
   viewedAt    DateTime?
   clickedAt   DateTime?
 
-  request    RecommendationRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  companion  CompanionProfile      @relation(fields: [companionId], references: [id], onDelete: Cascade)
-  order      Order?                @relation("RecommendationAttributedOrder")
+  request   RecommendationRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  companion CompanionProfile      @relation(fields: [companionId], references: [id], onDelete: Cascade)
+  order     Order?                @relation("RecommendationAttributedOrder")
 
   @@unique([requestId, companionId])
   @@index([requestId, position])
@@ -534,20 +631,20 @@ model CompanionRecommendationPolicy {
 }
 
 model Message {
-  id                 String                   @id @default(uuid())
-  conversationId     String
-  senderId           String
-  senderName         String?
-  content            String
-  type               MessageType              @default(text)
-  moderationStatus   MessageModerationStatus  @default(published)
-  visibility         MessageVisibility        @default(participants)
-  moderationDecision ModerationDecision?
-  policyVersion      String?
-  reviewedAt         DateTime?
+  id                        String                  @id @default(uuid())
+  conversationId            String
+  senderId                  String
+  senderName                String?
+  content                   String
+  type                      MessageType             @default(text)
+  moderationStatus          MessageModerationStatus @default(published)
+  visibility                MessageVisibility       @default(participants)
+  moderationDecision        ModerationDecision?
+  policyVersion             String?
+  reviewedAt                DateTime?
   moderationProcessingToken String?
   moderationProcessingAt    DateTime?
-  createdAt          DateTime                 @default(now())
+  createdAt                 DateTime                @default(now())
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   attachments  MediaAsset[]
@@ -606,38 +703,38 @@ model MessageReadState {
 }
 
 model ModerationCase {
-  id               String               @id @default(uuid())
+  id               String                @id @default(uuid())
   title            String
   category         String
   riskLevel        RiskLevel
-  status           ModerationCaseStatus @default(pending)
+  status           ModerationCaseStatus  @default(pending)
   source           ModerationSource
   content          String
   targetId         String?
   messageId        String?
-  automaticCaseKey String?              @unique
+  automaticCaseKey String?               @unique
   conversationId   String?
   subjectUserId    String?
   reporterUserId   String?
-  priority         ModerationPriority   @default(normal)
+  priority         ModerationPriority    @default(normal)
   dueAt            DateTime?
   assignedToUserId String?
-  policyVersion    String               @default("chat-v2")
+  policyVersion    String                @default("chat-v2")
   provider         String?
   providerVersion  String?
   aiScore          Float
   aiReason         String
   decision         ModerationDecision
   matchedRules     String[]
-  usedAI           Boolean              @default(false)
+  usedAI           Boolean               @default(false)
   resolvedAt       DateTime?
-  createdAt        DateTime             @default(now())
+  createdAt        DateTime              @default(now())
   evidences        ModerationEvidence[]
   actionLogs       ModerationActionLog[]
   appeals          ModerationAppeal[]
   restrictions     ChatRestriction[]
-  subject          User?                @relation("ModerationSubject", fields: [subjectUserId], references: [id], onDelete: SetNull)
-  reporter         User?                @relation("ModerationReporter", fields: [reporterUserId], references: [id], onDelete: SetNull)
+  subject          User?                 @relation("ModerationSubject", fields: [subjectUserId], references: [id], onDelete: SetNull)
+  reporter         User?                 @relation("ModerationReporter", fields: [reporterUserId], references: [id], onDelete: SetNull)
 
   @@index([source, status])
   @@index([targetId])
@@ -651,15 +748,15 @@ model ModerationCase {
 }
 
 model ModerationAppeal {
-  id            String                  @id @default(uuid())
-  caseId        String                  @unique
+  id            String                 @id @default(uuid())
+  caseId        String                 @unique
   subjectUserId String
   reason        String
-  status        ModerationAppealStatus  @default(pending)
+  status        ModerationAppealStatus @default(pending)
   reviewerId    String?
   reviewNote    String?
   reviewedAt    DateTime?
-  createdAt     DateTime                @default(now())
+  createdAt     DateTime               @default(now())
 
   case        ModerationCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
   subjectUser User           @relation("ModerationAppealer", fields: [subjectUserId], references: [id], onDelete: Cascade)
@@ -669,16 +766,16 @@ model ModerationAppeal {
 }
 
 model ChatRestriction {
-  id             String                 @id @default(uuid())
+  id             String                @id @default(uuid())
   userId         String
   caseId         String?
-  source         ChatRestrictionSource  @default(automatic)
+  source         ChatRestrictionSource @default(automatic)
   reason         String
-  startsAt       DateTime               @default(now())
+  startsAt       DateTime              @default(now())
   endsAt         DateTime
   liftedAt       DateTime?
   liftedByUserId String?
-  createdAt      DateTime               @default(now())
+  createdAt      DateTime              @default(now())
 
   user User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   case ModerationCase? @relation(fields: [caseId], references: [id], onDelete: SetNull)
@@ -733,13 +830,169 @@ model Notification {
   title     String
   body      String
   data      Json?
+  // A business-event key makes the inbox row and its external delivery
+  // idempotent across callback retries and worker restarts.
+  eventKey  String?          @unique
   readAt    DateTime?
   createdAt DateTime         @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries NotificationDelivery[]
 
   @@index([userId, createdAt])
   @@index([userId, readAt])
+}
+
+model NotificationDelivery {
+  id                String                     @id @default(uuid())
+  notificationId    String
+  userId            String
+  templateKey       String
+  status            NotificationDeliveryStatus @default(pending)
+  attemptCount      Int                        @default(0)
+  nextAttemptAt     DateTime                   @default(now())
+  leaseToken        String?
+  leaseExpiresAt    DateTime?
+  providerMessageId String?
+  errorCode         String?
+  lastError         String?
+  sentAt            DateTime?
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, templateKey])
+  @@index([status, nextAttemptAt])
+  @@index([userId, createdAt])
+  @@index([leaseExpiresAt])
+}
+
+model WeChatSubscriptionGrant {
+  id                   String    @id @default(uuid())
+  userId               String
+  templateKey          String
+  templateId           String?
+  grantedAt            DateTime  @default(now())
+  consumedAt           DateTime?
+  consumedByDeliveryId String?   @unique
+  createdAt            DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, templateKey, templateId, consumedAt, grantedAt])
+}
+
+model CompanionEarning {
+  id                                  String                 @id @default(uuid())
+  orderId                             String                 @unique
+  companionId                         String
+  grossCents                          Int
+  platformFeeBps                      Int
+  platformFeeCents                    Int
+  payableCents                        Int
+  status                              CompanionEarningStatus @default(pending)
+  availableAt                         DateTime
+  payoutSubmittedAt                   DateTime?
+  payoutSubmittedById                 String?
+  paidAt                              DateTime?
+  paidReference                       String?                @unique
+  holdReason                          String?
+  settlementRecipientRefSnapshot      String?
+  settlementRecipientMaskedSnapshot   String?
+  taxProfileRefSnapshot               String?
+  identityEvidenceRefSnapshot         String?
+  serviceAgreementVersionSnapshot     String?
+  serviceAgreementEvidenceRefSnapshot String?
+  paidAmountCents                     Int?
+  paidRecipientRef                    String?
+  payoutEvidenceDigest                String?
+  createdAt                           DateTime               @default(now())
+  updatedAt                           DateTime               @updatedAt
+
+  order      Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  companion  CompanionProfile    @relation(fields: [companionId], references: [id], onDelete: Restrict)
+  recoveries CompanionRecovery[]
+
+  @@index([companionId, status, availableAt])
+  @@index([status, availableAt])
+}
+
+model CompanionCommercialProfile {
+  companionId                 String                    @id
+  status                      CompanionCommercialStatus @default(pendingReview)
+  settlementRecipientRef      String                    @unique
+  settlementRecipientMasked   String
+  taxProfileRef               String
+  identityEvidenceRef         String
+  serviceAgreementVersion     String
+  serviceAgreementEvidenceRef String
+  submittedAt                 DateTime                  @default(now())
+  submittedById               String
+  verifiedAt                  DateTime?
+  verifiedById                String?
+  suspendedAt                 DateTime?
+  suspendedById               String?
+  suspendedReason             String?
+  createdAt                   DateTime                  @default(now())
+  updatedAt                   DateTime                  @updatedAt
+
+  companion CompanionProfile @relation(fields: [companionId], references: [id], onDelete: Cascade)
+
+  @@index([status, updatedAt])
+}
+
+model CompanionRecovery {
+  id                    String                  @id @default(uuid())
+  refundId              String                  @unique
+  earningId             String
+  companionId           String
+  amountCents           Int
+  status                CompanionRecoveryStatus @default(due)
+  reason                CompanionRecoveryReason @default(confirmedPaidBeforeRefund)
+  evidenceReference     String?                 @unique
+  evidenceSubmittedAt   DateTime?
+  evidenceSubmittedById String?
+  verifiedAt            DateTime?
+  verifiedById          String?
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+
+  refund    RefundTransaction @relation(fields: [refundId], references: [id], onDelete: Restrict)
+  earning   CompanionEarning  @relation(fields: [earningId], references: [id], onDelete: Restrict)
+  companion CompanionProfile  @relation(fields: [companionId], references: [id], onDelete: Restrict)
+
+  @@index([companionId, status, createdAt])
+  @@index([status, createdAt])
+}
+
+model SupportTicket {
+  id               String                @id @default(uuid())
+  userId           String
+  orderId          String?
+  category         SupportTicketCategory
+  priority         SupportTicketPriority @default(normal)
+  status           SupportTicketStatus   @default(open)
+  subject          String
+  body             String
+  assignedToUserId String?
+  dueAt            DateTime?
+  resolution       String?
+  resolutionCode   String?
+  resolvedAt       DateTime?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  requester  User                @relation("SupportRequester", fields: [userId], references: [id], onDelete: Cascade)
+  order      Order?              @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  assignedTo User?               @relation("SupportAssignee", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+  refunds    RefundTransaction[]
+
+  @@index([userId, createdAt])
+  @@index([orderId, status])
+  @@index([status, priority, dueAt])
+  @@index([assignedToUserId, status])
 }
 
 model AccountDeletionRequest {
@@ -778,8 +1031,21 @@ model LegalConsentReceipt {
   @@index([userId, consentedAt])
 }
 
+model LegalDocumentVersion {
+  id           String            @id @default(uuid())
+  documentType LegalDocumentKind
+  version      String
+  contentHash  String
+  html         String
+  publishedAt  DateTime          @default(now())
+  createdAt    DateTime          @default(now())
+
+  @@unique([documentType, version])
+  @@index([version, publishedAt])
+}
+
 model ModerationLabel {
-  id               String              @id @default(uuid())
+  id               String             @id @default(uuid())
   text             String
   expectedDecision ModerationDecision
   actualDecision   ModerationDecision
@@ -787,16 +1053,16 @@ model ModerationLabel {
   caseId           String?
   actorId          String?
   source           ModerationSource?
-  createdAt        DateTime            @default(now())
+  createdAt        DateTime           @default(now())
 
   @@index([createdAt])
   @@index([caseId])
 }
 
 model ServiceTag {
-  id         String   @id @default(uuid())
-  name       String   @unique
-  createdAt  DateTime @default(now())
+  id         String                @id @default(uuid())
+  name       String                @unique
+  createdAt  DateTime              @default(now())
   companions CompanionServiceTag[]
 }
 

@@ -8,7 +8,20 @@ export type NotificationTypeName =
   | "paymentSuccess"
   | "orderStatus"
   | "moderationAlert"
-  | "safetyAlert";
+  | "safetyAlert"
+  | "supportUpdate";
+
+export type TransactionalNotificationInput = {
+  userId: string;
+  type: NotificationTypeName;
+  title: string;
+  body: string;
+  data?: Record<string, unknown> | null;
+  /** Stable business-event id, for example `order:<id>:confirmed`. */
+  eventKey: string;
+  /** A key configured server-side for a WeChat subscription template. */
+  templateKey: string;
+};
 
 @Injectable()
 export class NotificationsService {
@@ -19,9 +32,10 @@ export class NotificationsService {
     type: NotificationTypeName,
     title: string,
     body: string,
-    data?: Record<string, unknown> | null
+    data?: Record<string, unknown> | null,
+    database: any = this.prisma
   ) {
-    const item = await this.prisma.notification.create({
+    const item = await database.notification.create({
       data: {
         userId,
         type,
@@ -30,6 +44,44 @@ export class NotificationsService {
         data: (data ?? undefined) as any
       }
     } as any);
+    return this.toDto(item);
+  }
+
+  /**
+   * Stores the inbox item and a delivery intent in the same database
+   * transaction as the business event. The worker owns remote delivery; the
+   * request path never calls WeChat and therefore cannot lose a paid/order
+   * state merely because a notification provider is unavailable.
+   */
+  async createTransactional(db: any, input: TransactionalNotificationInput) {
+    const item = await db.notification.upsert({
+      where: { eventKey: input.eventKey },
+      create: {
+        userId: input.userId,
+        type: input.type,
+        title: input.title,
+        body: input.body,
+        data: (input.data ?? undefined) as any,
+        eventKey: input.eventKey
+      },
+      update: {}
+    });
+    await db.notificationDelivery.upsert({
+      where: {
+        notificationId_templateKey: {
+          notificationId: item.id,
+          templateKey: input.templateKey
+        }
+      },
+      create: {
+        notificationId: item.id,
+        userId: input.userId,
+        templateKey: input.templateKey,
+        status: "pending",
+        nextAttemptAt: new Date()
+      },
+      update: {}
+    });
     return this.toDto(item);
   }
 

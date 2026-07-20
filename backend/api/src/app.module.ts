@@ -5,6 +5,7 @@ import { AdminModule } from "./admin/admin.module";
 import { AuthModule } from "./auth/auth.module";
 import { CompanionsModule } from "./companions/companions.module";
 import { CommunityModule } from "./community/community.module";
+import { CommercialModule } from "./commercial/commercial.module";
 import { configuration, validateEnvironment } from "./config/configuration";
 import { ConversationsModule } from "./conversations/conversations.module";
 import { AuditModule } from "./common/audit/audit.module";
@@ -12,6 +13,7 @@ import { RequestIdMiddleware } from "./common/middleware/request-id.middleware";
 import { IpRateLimitMiddleware } from "./common/rate-limit/ip-rate-limit.middleware";
 import { DatabaseModule } from "./database/database.module";
 import { HealthModule } from "./health/health.module";
+import { LegalModule } from "./legal/legal.module";
 import { MetricsModule } from "./metrics/metrics.module";
 import { RequestMetricsMiddleware } from "./metrics/request-metrics.middleware";
 import { ModerationModule } from "./moderation/moderation.module";
@@ -20,6 +22,7 @@ import { OrdersModule } from "./orders/orders.module";
 import { PaymentsModule } from "./payments/payments.module";
 import { ReviewsModule } from "./reviews/reviews.module";
 import { RecommendationsModule } from "./recommendations/recommendations.module";
+import { SupportModule } from "./support/support.module";
 import { UsersModule } from "./users/users.module";
 
 @Module({
@@ -41,10 +44,13 @@ import { UsersModule } from "./users/users.module";
     PaymentsModule,
     ReviewsModule,
     RecommendationsModule,
+    CommercialModule,
+    SupportModule,
     AdminModule,
     NotificationsModule,
     MetricsModule,
-    HealthModule
+    HealthModule,
+    LegalModule
   ],
   providers: [IpRateLimitMiddleware]
 })

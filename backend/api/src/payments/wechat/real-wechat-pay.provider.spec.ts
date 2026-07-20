@@ -170,14 +170,15 @@ describe("RealWeChatPayProvider helpers", () => {
     unlinkSync(keyPath);
   });
 
-  it("closes a payment by out_trade_no and accepts an already-closed response", async () => {
+  it("closes a payment by out_trade_no and accepts already-closed or missing responses", async () => {
     const dir = mkdtempSync(join(tmpdir(), "wx-pay-"));
     const keyPath = join(dir, "key.pem");
     const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
     writeFileSync(keyPath, privateKey.export({ type: "pkcs8", format: "pem" }));
     const fetchImpl = jest.fn()
       .mockResolvedValueOnce({ ok: true, text: async () => "" })
-      .mockResolvedValueOnce({ ok: false, status: 400, text: async () => JSON.stringify({ code: "ORDER_CLOSED" }) });
+      .mockResolvedValueOnce({ ok: false, status: 400, text: async () => JSON.stringify({ code: "ORDER_CLOSED" }) })
+      .mockResolvedValueOnce({ ok: false, status: 404, text: async () => JSON.stringify({ code: "ORDER_NOT_EXIST" }) });
     const provider = new RealWeChatPayProvider({
       appId: "wx_app",
       mchId: "1900000000",
@@ -190,10 +191,66 @@ describe("RealWeChatPayProvider helpers", () => {
 
     await expect(provider.closePayment("T/1000")).resolves.toBeUndefined();
     await expect(provider.closePayment("T/1000")).resolves.toBeUndefined();
+    await expect(provider.closePayment("T/1000")).resolves.toBeUndefined();
     expect(fetchImpl.mock.calls[0][0]).toBe(
       "https://example.test/v3/pay/transactions/out-trade-no/T%2F1000/close"
     );
     expect(JSON.parse(fetchImpl.mock.calls[0][1].body)).toEqual({ mchid: "1900000000" });
+
+    unlinkSync(keyPath);
+  });
+
+  it("maps an absent queried trade to authoritative NOTEXIST state", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "wx-pay-"));
+    const keyPath = join(dir, "key.pem");
+    const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+    writeFileSync(keyPath, privateKey.export({ type: "pkcs8", format: "pem" }));
+    const provider = new RealWeChatPayProvider({
+      appId: "wx-app",
+      mchId: "1900000000",
+      apiV3Key: "B".repeat(32),
+      privateKeyPath: keyPath,
+      certSerialNo: "SERIAL1",
+      apiBaseUrl: "https://example.test",
+      fetchImpl: jest.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+        text: async () => JSON.stringify({ code: "ORDER_NOT_EXIST" })
+      }) as unknown as typeof fetch
+    });
+
+    await expect(provider.queryPayment("T-missing")).resolves.toEqual(expect.objectContaining({
+      outTradeNo: "T-missing",
+      tradeState: "NOTEXIST"
+    }));
+
+    unlinkSync(keyPath);
+  });
+
+  it("maps an absent queried refund to authoritative NOTEXIST state", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "wx-pay-"));
+    const keyPath = join(dir, "key.pem");
+    const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+    writeFileSync(keyPath, privateKey.export({ type: "pkcs8", format: "pem" }));
+    const provider = new RealWeChatPayProvider({
+      appId: "wx-app",
+      mchId: "1900000000",
+      apiV3Key: "B".repeat(32),
+      privateKeyPath: keyPath,
+      certSerialNo: "SERIAL1",
+      apiBaseUrl: "https://example.test",
+      fetchImpl: jest.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+        text: async () => JSON.stringify({ code: "RESOURCE_NOT_EXISTS" })
+      }) as unknown as typeof fetch
+    });
+
+    await expect(provider.queryRefund("R/missing")).resolves.toEqual({
+      outRefundNo: "R/missing",
+      refundId: "",
+      status: "NOTEXIST"
+    });
 
     unlinkSync(keyPath);
   });
@@ -388,6 +445,53 @@ describe("RealWeChatPayProvider helpers", () => {
       "wechatpay-nonce": nonce,
       "wechatpay-signature": signer.sign(platformKeys.privateKey, "base64"),
       "wechatpay-serial": "platform-serial"
+    };
+
+    await expect(provider.verifyNotifySignatureAsync(headers, rawBody)).resolves.toBe(true);
+    expect(refresh).toHaveBeenCalledTimes(1);
+
+    unlinkSync(keyPath);
+  });
+
+  it("refreshes an otherwise fresh certificate cache when the callback serial rotates", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "wx-pay-"));
+    const keyPath = join(dir, "key.pem");
+    const merchantKeys = generateKeyPairSync("rsa", { modulusLength: 2048 });
+    const rotatedPlatformKeys = generateKeyPairSync("rsa", { modulusLength: 2048 });
+    writeFileSync(keyPath, merchantKeys.privateKey.export({ type: "pkcs8", format: "pem" }));
+    const provider = new RealWeChatPayProvider({
+      appId: "wx",
+      mchId: "m",
+      apiV3Key: "F".repeat(32),
+      privateKeyPath: keyPath,
+      certSerialNo: "merchant-serial"
+    });
+    (provider as any).platformCerts = [{
+      serialNo: "old-platform-serial",
+      publicKeyPem: rotatedPlatformKeys.publicKey.export({ type: "spki", format: "pem" }).toString(),
+      expireAt: Date.now() + 60_000
+    }];
+    (provider as any).platformCertsFetchedAt = Date.now();
+    const refresh = jest.spyOn(provider as any, "refreshPlatformCertificates")
+      .mockImplementation(async () => {
+        (provider as any).platformCerts = [{
+          serialNo: "rotated-platform-serial",
+          publicKeyPem: rotatedPlatformKeys.publicKey.export({ type: "spki", format: "pem" }).toString(),
+          expireAt: Date.now() + 60_000
+        }];
+        (provider as any).platformCertsFetchedAt = Date.now();
+      });
+    const rawBody = JSON.stringify({ id: "evt-rotated" });
+    const timestamp = String(Math.floor(Date.now() / 1000));
+    const nonce = "nonce-rotated";
+    const signer = createSign("RSA-SHA256");
+    signer.update(`${timestamp}\n${nonce}\n${rawBody}\n`);
+    signer.end();
+    const headers = {
+      "wechatpay-timestamp": timestamp,
+      "wechatpay-nonce": nonce,
+      "wechatpay-signature": signer.sign(rotatedPlatformKeys.privateKey, "base64"),
+      "wechatpay-serial": "rotated-platform-serial"
     };
 
     await expect(provider.verifyNotifySignatureAsync(headers, rawBody)).resolves.toBe(true);

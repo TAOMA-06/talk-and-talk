@@ -18,6 +18,7 @@ describe("ChatRestrictionService", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     prisma.chatRestriction.findFirst.mockResolvedValue(null);
+    prisma.$transaction.mockImplementation(async (callback: any) => callback(prisma));
     service = new ChatRestrictionService(prisma, audit, notifications);
   });
 
@@ -36,7 +37,8 @@ describe("ChatRestrictionService", () => {
       "moderationAlert",
       expect.any(String),
       expect.any(String),
-      expect.objectContaining({ caseId: "case-2" })
+      expect.objectContaining({ caseId: "case-2" }),
+      prisma
     );
   });
 
@@ -66,5 +68,34 @@ describe("ChatRestrictionService", () => {
       data: expect.objectContaining({ action: "manual_escalation_required" })
     }));
     expect(notifications.create).not.toHaveBeenCalled();
+  });
+
+  it("uses the caller transaction for restriction, audit, and notification writes", async () => {
+    const db = {
+      chatRestriction: {
+        create: jest.fn().mockResolvedValue({ id: "restriction-tx" })
+      },
+      notification: { create: jest.fn() }
+    };
+
+    await service.createRestriction({
+      userId: "user-1",
+      caseId: "case-1",
+      source: "manual",
+      reason: "人工限言",
+      endsAt: new Date("2026-07-21T00:00:00.000Z"),
+      actorId: "moderator-1"
+    }, db);
+
+    expect(db.chatRestriction.create).toHaveBeenCalled();
+    expect(audit.record).toHaveBeenCalledWith(expect.any(Object), db);
+    expect(notifications.create).toHaveBeenCalledWith(
+      "user-1",
+      "moderationAlert",
+      expect.any(String),
+      expect.any(String),
+      expect.any(Object),
+      db
+    );
   });
 });

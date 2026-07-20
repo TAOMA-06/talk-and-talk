@@ -4,6 +4,8 @@ import { HttpStatus, Injectable } from "@nestjs/common";
 
 import { AppException } from "../common/errors/app.exception";
 import { PrismaService } from "../database/prisma.service";
+import { ModerationCaseService } from "../moderation/moderation-case.service";
+import { ModerationService } from "../moderation/moderation.service";
 import { CreateCompanionDto, UpdateCompanionDto } from "./dto/companion-profile.dto";
 import { ListCompanionsQueryDto } from "./dto/list-companions.dto";
 import { ApplyCompanionDto, UpdateOwnCompanionDto } from "./dto/apply-companion.dto";
@@ -13,7 +15,11 @@ type CompanionRecord = Awaited<ReturnType<CompanionsService["findRecordOrThrow"]
 
 @Injectable()
 export class CompanionsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly moderation: ModerationService,
+    private readonly moderationCases: ModerationCaseService
+  ) {}
 
   async list(query: ListCompanionsQueryDto) {
     const page = query.page ?? 1;
@@ -53,7 +59,8 @@ export class CompanionsService {
         isPublished: true,
         isVerified: true,
         ownerUserId: { not: null },
-        owner: { accountStatus: "active", profile: { isVerified: true } }
+        owner: { accountStatus: "active", profile: { isVerified: true } },
+        commercialProfile: { status: "verified" }
       },
       include: this.includeTags()
     });
@@ -85,7 +92,8 @@ export class CompanionsService {
       this.prisma.companionProfile.findMany({
         include: {
           ...this.includeTags(),
-          owner: { include: { profile: true } }
+          owner: { include: { profile: true } },
+          commercialProfile: true
         },
         orderBy: [{ isPublished: "asc" }, { createdAt: "asc" }],
         skip: (safePage - 1) * safePageSize,
@@ -101,7 +109,8 @@ export class CompanionsService {
           accountStatus: item.owner.accountStatus,
           isVerified: item.owner.profile?.isVerified === true,
           displayName: item.owner.profile?.displayName ?? null
-        } : null
+        } : null,
+        commercialStatus: item.commercialProfile?.status ?? "missing"
       })),
       pagination: {
         page: safePage,
@@ -123,32 +132,56 @@ export class CompanionsService {
     }
     const name = user.profile.displayName?.trim() || "待审核用户";
     const id = randomUUID();
+    const role = dto.role.trim();
+    const bio = dto.bio.trim();
+    const cityDistrict = dto.cityDistrict.trim();
+    if (!role || !bio || !cityDistrict) {
+      throw new AppException("INVALID_COMPANION_PROFILE", "Public profile text cannot be blank", HttpStatus.BAD_REQUEST);
+    }
+    const tags = this.normalizeRequiredList(dto.tags, "tags");
+    const availableTimes = this.normalizeRequiredList(dto.availableTimes, "availableTimes");
+    const languages = this.normalizeRequiredList(dto.languages, "languages");
+    const specialties = this.normalizeRequiredList(dto.specialties, "specialties");
+    await this.assertPublicContentAllowed({
+      content: this.publicProfileContent({
+        name,
+        role,
+        bio,
+        availableTimes,
+        languages,
+        specialties,
+        cityDistrict
+      }, tags),
+      targetId: id,
+      subjectUserId: userId,
+      title: "陪伴者申请公开资料待处理"
+    });
     await this.prisma.companionProfile.create({
       data: {
         id,
         ownerUserId: userId,
         name,
-        role: dto.role,
+        role,
         initials: name.slice(0, 2),
         rating: 0,
         reviewCount: 0,
         pricePerHalfHour: dto.pricePerHalfHour,
         isOnline: false,
         isVerified: true,
-        bio: dto.bio,
-        availableTimes: dto.availableTimes,
-        languages: dto.languages,
-        specialties: dto.specialties,
-        topicIds: this.resolveTopicIds(dto),
+        bio,
+        availableTimes,
+        languages,
+        specialties,
+        topicIds: this.resolveTopicIds({ ...dto, specialties, tags }),
         completedOrders: 0,
         responseTime: "暂无数据",
         distanceKm: 0,
         availability: "busy",
-        cityDistrict: dto.cityDistrict,
+        cityDistrict,
         isPublished: false
       }
     } as any);
-    await this.replaceTags(id, dto.tags);
+    await this.replaceTags(id, tags);
     return this.getOwn(userId);
   }
 
@@ -157,11 +190,31 @@ export class CompanionsService {
     if (!existing) {
       throw new AppException("COMPANION_PROFILE_NOT_FOUND", "Companion profile not found", HttpStatus.NOT_FOUND);
     }
+    const bio = dto.bio?.trim();
+    const availableTimes = dto.availableTimes === undefined
+      ? undefined
+      : this.normalizeRequiredList(dto.availableTimes, "availableTimes");
+    if (bio !== undefined && !bio) {
+      throw new AppException("INVALID_COMPANION_PROFILE", "Public profile text cannot be blank", HttpStatus.BAD_REQUEST);
+    }
+    if (bio !== undefined || availableTimes !== undefined) {
+      const content = [
+        bio ?? existing.bio,
+        ...(availableTimes ?? existing.availableTimes)
+      ].join("\n");
+      await this.assertPublicContentAllowed({
+        content,
+        targetId: existing.id,
+        subjectUserId: userId,
+        actorId: userId,
+        title: "陪伴者公开资料待处理"
+      });
+    }
     await this.prisma.companionProfile.update({
       where: { id: existing.id },
       data: {
-        ...(dto.bio !== undefined ? { bio: dto.bio } : {}),
-        ...(dto.availableTimes !== undefined ? { availableTimes: dto.availableTimes } : {}),
+        ...(bio !== undefined ? { bio } : {}),
+        ...(availableTimes !== undefined ? { availableTimes } : {}),
         ...(dto.availability !== undefined ? {
           availability: dto.availability,
           isOnline: dto.availability === "online"
@@ -172,7 +225,13 @@ export class CompanionsService {
   }
 
   async create(dto: CreateCompanionDto) {
-    if (dto.isPublished) await this.assertPublishable(dto.ownerUserId, dto.isVerified);
+    if (dto.isPublished) {
+      throw new AppException(
+        "COMMERCIAL_PROFILE_REQUIRED",
+        "Create the companion unpublished, verify its commercial profile, then publish it",
+        HttpStatus.CONFLICT
+      );
+    }
     const id = dto.id ?? randomUUID();
     const data: any = {
       id,
@@ -187,11 +246,28 @@ export class CompanionsService {
 
   async update(id: string, dto: UpdateCompanionDto) {
     const existing = await this.findRecordOrThrow(id);
+    if (existing.isPublished || dto.isPublished) {
+      await this.assertPublicContentAllowed({
+        content: this.publicProfileContent({
+          name: dto.name ?? existing.name,
+          role: dto.role ?? existing.role,
+          bio: dto.bio ?? existing.bio,
+          availableTimes: dto.availableTimes ?? existing.availableTimes,
+          languages: dto.languages ?? existing.languages,
+          specialties: dto.specialties ?? existing.specialties,
+          cityDistrict: dto.cityDistrict ?? existing.cityDistrict
+        }, dto.tags ?? existing.serviceTags.map((entry) => entry.tag.name)),
+        targetId: id,
+        subjectUserId: dto.ownerUserId ?? existing.ownerUserId ?? undefined,
+        title: "已发布陪伴者资料待处理"
+      });
+    }
     if (
       dto.isPublished ||
       (existing.isPublished && (dto.ownerUserId !== undefined || dto.isVerified !== undefined))
     ) {
       await this.assertPublishable(
+        id,
         dto.ownerUserId ?? existing.ownerUserId,
         dto.isVerified ?? existing.isVerified
       );
@@ -210,7 +286,16 @@ export class CompanionsService {
 
   async publish(id: string) {
     const existing = await this.findRecordOrThrow(id);
-    await this.assertPublishable(existing.ownerUserId, existing.isVerified);
+    await this.assertPublicContentAllowed({
+      content: this.publicProfileContent(
+        existing,
+        existing.serviceTags.map((entry) => entry.tag.name)
+      ),
+      targetId: id,
+      subjectUserId: existing.ownerUserId ?? undefined,
+      title: "陪伴者资料发布前待处理"
+    });
+    await this.assertPublishable(id, existing.ownerUserId, existing.isVerified);
     await this.prisma.companionProfile.update({
       where: { id },
       data: { isPublished: true }
@@ -237,7 +322,8 @@ export class CompanionsService {
       isPublished: true,
       isVerified: true,
       ownerUserId: { not: null },
-      owner: { accountStatus: "active", profile: { isVerified: true } }
+      owner: { accountStatus: "active", profile: { isVerified: true } },
+      commercialProfile: { status: "verified" }
     };
     if (query.availability) where.availability = query.availability;
     if (query.isOnline !== undefined) where.isOnline = query.isOnline === "true";
@@ -281,7 +367,11 @@ export class CompanionsService {
     return item;
   }
 
-  private async assertPublishable(ownerUserId: string | null | undefined, profileVerified: boolean) {
+  private async assertPublishable(
+    companionId: string,
+    ownerUserId: string | null | undefined,
+    profileVerified: boolean
+  ) {
     if (!profileVerified) {
       throw new AppException(
         "COMPANION_PROFILE_NOT_VERIFIED",
@@ -296,14 +386,21 @@ export class CompanionsService {
         HttpStatus.CONFLICT
       );
     }
-    const owner = await this.prisma.user.findUnique({
-      where: { id: ownerUserId },
-      include: { profile: true }
-    });
+    const [owner, commercialProfile] = await Promise.all([
+      this.prisma.user.findUnique({ where: { id: ownerUserId }, include: { profile: true } }),
+      this.prisma.companionCommercialProfile.findUnique({ where: { companionId } } as any)
+    ]);
     if (!owner || owner.accountStatus !== "active" || owner.profile?.isVerified !== true) {
       throw new AppException(
         "COMPANION_OWNER_NOT_ELIGIBLE",
         "Companion owner must be active and identity-verified",
+        HttpStatus.CONFLICT
+      );
+    }
+    if (commercialProfile?.status !== "verified") {
+      throw new AppException(
+        "COMPANION_COMMERCIAL_PROFILE_NOT_VERIFIED",
+        "Identity evidence, service agreement, tax profile and settlement recipient must pass commercial review",
         HttpStatus.CONFLICT
       );
     }
@@ -353,6 +450,70 @@ export class CompanionsService {
       return explicit;
     }
     return deriveTopicIds(dto.specialties, dto.tags);
+  }
+
+  private normalizeRequiredList(values: string[], field: string): string[] {
+    const normalized = values.map((value) => value.trim());
+    if (normalized.some((value) => !value)) {
+      throw new AppException(
+        "INVALID_COMPANION_PROFILE",
+        `${field} cannot contain blank values`,
+        HttpStatus.BAD_REQUEST
+      );
+    }
+    return [...new Set(normalized)];
+  }
+
+  private publicProfileContent(
+    profile: {
+      name?: string | null;
+      role?: string | null;
+      bio?: string | null;
+      availableTimes?: string[] | null;
+      languages?: string[] | null;
+      specialties?: string[] | null;
+      cityDistrict?: string | null;
+    },
+    tags: string[] = []
+  ): string {
+    return [
+      profile.name,
+      profile.role,
+      profile.bio,
+      ...(profile.availableTimes ?? []),
+      ...(profile.languages ?? []),
+      ...(profile.specialties ?? []),
+      profile.cityDistrict,
+      ...tags
+    ].map((value) => value?.trim()).filter((value): value is string => Boolean(value)).join("\n");
+  }
+
+  private async assertPublicContentAllowed(input: {
+    content: string;
+    targetId: string;
+    subjectUserId?: string;
+    actorId?: string;
+    title: string;
+  }): Promise<void> {
+    const moderation = await this.moderation.moderateAsync(input.content, "profile");
+    if (moderation.decision === "allow") return;
+
+    const moderationCase = await this.moderationCases.createFromResult({
+      result: moderation,
+      source: "profile",
+      content: input.content,
+      targetId: input.targetId,
+      subjectUserId: input.subjectUserId,
+      actorId: input.actorId,
+      title: input.title,
+      forceCreate: true
+    });
+    throw new AppException(
+      "COMPANION_PROFILE_CONTENT_REQUIRES_REVISION",
+      "Public companion profile content cannot be published; revise it and try again",
+      HttpStatus.UNPROCESSABLE_ENTITY,
+      { moderationCaseId: moderationCase?.id ?? null, decision: moderation.decision }
+    );
   }
 
   private async replaceTags(companionId: string, tags: string[]) {

@@ -170,7 +170,7 @@ export class RealWeChatPayProvider implements WeChatPayProvider {
       "POST",
       `/v3/pay/transactions/out-trade-no/${encoded}/close`,
       { mchid: this.config.mchId },
-      ["ORDER_CLOSED"]
+      ["ORDER_CLOSED", "ORDER_NOT_EXIST"]
     );
   }
 
@@ -179,15 +179,18 @@ export class RealWeChatPayProvider implements WeChatPayProvider {
     const encodedMchId = encodeURIComponent(this.config.mchId);
     const response = await this.requestJson<Record<string, unknown>>(
       "GET",
-      `/v3/pay/transactions/out-trade-no/${encodedTradeNo}?mchid=${encodedMchId}`
+      `/v3/pay/transactions/out-trade-no/${encodedTradeNo}?mchid=${encodedMchId}`,
+      undefined,
+      ["ORDER_NOT_EXIST"]
     );
+    const doesNotExist = Object.keys(response).length === 0;
     const amount = (response.amount as Record<string, unknown> | undefined) ?? {};
     return {
       appId: String(response.appid ?? ""),
       mchId: String(response.mchid ?? ""),
       outTradeNo: String(response.out_trade_no ?? outTradeNo),
       transactionId: String(response.transaction_id ?? ""),
-      tradeState: String(response.trade_state ?? ""),
+      tradeState: doesNotExist ? "NOTEXIST" : String(response.trade_state ?? ""),
       amountCents: Number(amount.total ?? 0),
       currency: String(amount.currency ?? ""),
       raw: response
@@ -239,7 +242,15 @@ export class RealWeChatPayProvider implements WeChatPayProvider {
     headers: Record<string, string | string[] | undefined>,
     rawBody: string
   ): Promise<boolean> {
+    const serial = headerValue(headers, "wechatpay-serial");
+    if (!serial) return false;
     await this.ensurePlatformCertificates();
+    // A valid new certificate can appear before the normal cache TTL expires.
+    // Refresh synchronously once for an unknown serial so the first callback
+    // after a WeChat certificate rotation is not rejected unnecessarily.
+    if (!this.getPlatformPublicKeySync(serial)) {
+      await this.refreshPlatformCertificates();
+    }
     return this.verifyNotifySignature(headers, rawBody);
   }
 
@@ -297,7 +308,15 @@ export class RealWeChatPayProvider implements WeChatPayProvider {
 
   async queryRefund(outRefundNo: string): Promise<WeChatRefundResult> {
     const encoded = encodeURIComponent(outRefundNo);
-    const response = await this.requestJson<any>("GET", `/v3/refund/domestic/refunds/${encoded}`);
+    const response = await this.requestJson<any>(
+      "GET",
+      `/v3/refund/domestic/refunds/${encoded}`,
+      undefined,
+      ["RESOURCE_NOT_EXISTS"]
+    );
+    if (Object.keys(response).length === 0) {
+      return { outRefundNo, refundId: "", status: "NOTEXIST" };
+    }
     return this.refundResult(response);
   }
 

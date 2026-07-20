@@ -2,6 +2,7 @@ import { api, ensureSession } from "../../utils/api";
 import { Order, RecommendedCompanion } from "../../utils/models";
 import { ensurePrivacyAuthorization } from "../../utils/privacy";
 import { flushRecommendationEvents, queueRecommendationEvent, trackRecommendationCardViews } from "../../utils/recommendations";
+import { requestTransactionalSubscriptions } from "../../utils/subscription";
 
 function serviceName(order: Order): string { return order.companionSnapshot?.name || order.companion?.name || "陪伴服务"; }
 
@@ -19,8 +20,27 @@ type DisplayOrder = Order & {
   displayName: string;
   scheduledAtText: string;
   paymentDeadlineText: string;
+  responseDeadlineText: string;
+  completionEligibleAtText: string;
+  canCompleteService: boolean;
+  canRequestRefund: boolean;
+  refundDeadlineText: string;
   amountText: string;
   statusText: string;
+};
+
+type DisplaySupportTicket = {
+  id: string;
+  orderId: string | null;
+  status: string;
+  subject: string;
+  body: string;
+  resolution: string | null;
+  resolutionCode: string | null;
+  dueAt: string | null;
+  updatedAt: string;
+  statusText: string;
+  updatedAtText: string;
 };
 
 function formatDateTime(value?: string): string {
@@ -42,11 +62,24 @@ function displayOrder(order: Order): DisplayOrder {
     .filter((value) => !Number.isNaN(value.getTime()))
     .sort((left, right) => left.getTime() - right.getTime())[0]
     ?.toISOString();
+  const serviceStartedAt = order.serviceStartedAt ? new Date(order.serviceStartedAt) : scheduledAt;
+  const completionEligibleAt = serviceStartedAt && !Number.isNaN(serviceStartedAt.getTime()) && scheduledAt && !Number.isNaN(scheduledAt.getTime())
+    ? new Date(Math.max(serviceStartedAt.getTime(), scheduledAt.getTime()) + order.durationMinutes * 60_000)
+    : null;
+  const refundDeadline = order.refundRequestDeadlineAt ? new Date(order.refundRequestDeadlineAt) : null;
+  const canRequestRefund = ["paid", "inService"].includes(order.status) || (
+    order.status === "completed" && Boolean(refundDeadline && !Number.isNaN(refundDeadline.getTime()) && refundDeadline.getTime() > Date.now())
+  );
   return {
     ...order,
     displayName: serviceName(order),
     scheduledAtText: formatDateTime(order.scheduledAt),
     paymentDeadlineText: formatDateTime(paymentDeadline),
+    responseDeadlineText: formatDateTime(order.companionResponseDeadlineAt ?? undefined),
+    completionEligibleAtText: formatDateTime(completionEligibleAt?.toISOString()),
+    canCompleteService: Boolean(completionEligibleAt && Date.now() >= completionEligibleAt.getTime()),
+    canRequestRefund,
+    refundDeadlineText: formatDateTime(order.refundRequestDeadlineAt ?? undefined),
     amountText: `¥${(order.amountCents / 100).toFixed(2)}`,
     statusText: ORDER_STATUS_LABELS[order.status] || "状态处理中"
   };
@@ -76,7 +109,7 @@ async function confirmPaymentWithBackend(orderId: string): Promise<boolean> {
 
 Page({
   data: {
-    orders: [] as DisplayOrder[], serviceOrders: [] as DisplayOrder[], followupRecommendations: [] as RecommendedCompanion[],
+    orders: [] as DisplayOrder[], serviceOrders: [] as DisplayOrder[], supportTickets: [] as DisplaySupportTicket[], followupRecommendations: [] as RecommendedCompanion[],
     loading: true, error: "", payingId: ""
   },
   stopRecommendationTracking: null as (() => void) | null,
@@ -89,7 +122,11 @@ Page({
     this.setData({ loading: true, error: "" });
     try {
       await ensureSession();
-      const [customer, service] = await Promise.all([api.orders(), api.serviceOrders().catch(() => ({ items: [] as Order[] }))]);
+      const [customer, service, support] = await Promise.all([
+        api.orders(),
+        api.serviceOrders().catch(() => ({ items: [] as Order[] })),
+        api.supportTickets().catch(() => ({ items: [] }))
+      ]);
       const latestCompleted = (customer.items || []).find((order) => order.status === "completed");
       const recommendations = latestCompleted
         ? await api.recommendedCompanions({
@@ -101,6 +138,11 @@ Page({
       this.setData({
         orders: (customer.items || []).map(displayOrder),
         serviceOrders: (service.items || []).map(displayOrder),
+        supportTickets: (support.items || []).map((ticket) => ({
+          ...ticket,
+          statusText: ({ open: "待受理", inProgress: "处理中", resolved: "已处理", closed: "已关闭" } as Record<string, string>)[ticket.status] || ticket.status,
+          updatedAtText: formatDateTime(ticket.updatedAt)
+        })),
         followupRecommendations: recommendations.items || [],
         loading: false
       });
@@ -141,6 +183,7 @@ Page({
     this.setData({ payingId: id });
     try {
       await ensurePrivacyAuthorization();
+      await requestTransactionalSubscriptions(["paymentSuccess", "serviceStarted", "serviceCompleted"]);
       const prepay = await api.prepay(id);
       if (prepay.payment.mock) {
         await api.mockNotify(prepay.payment.outTradeNo);
@@ -178,6 +221,20 @@ Page({
     try { await api.refund(id, "小程序用户申请退款"); wx.showToast({ title: "已提交退款申请", icon: "success" }); await this.load(); }
     catch (error) { wx.showToast({ title: (error as Error).message || "申请失败", icon: "none" }); }
   },
+  async confirmCompletion(event: any) {
+    const confirmation = await new Promise<any>((resolve) => wx.showModal({
+      title: "确认服务完成",
+      content: "确认代表本次服务已按约完成，但不会缩短售后申请期限。已有退款或客服争议时不可确认。",
+      confirmText: "确认完成",
+      success: resolve
+    }));
+    if (!confirmation.confirm) return;
+    try {
+      await api.confirmOrderCompletion(event.currentTarget.dataset.id);
+      wx.showToast({ title: "已确认服务完成", icon: "success" });
+      await this.load();
+    } catch (error) { wx.showToast({ title: (error as Error).message || "确认失败", icon: "none" }); }
+  },
   async startService(event: any) {
     try { await api.startService(event.currentTarget.dataset.id); await this.load(); }
     catch (error) { wx.showToast({ title: (error as Error).message || "无法开始服务", icon: "none" }); }
@@ -199,6 +256,57 @@ Page({
   async completeService(event: any) {
     try { await api.completeService(event.currentTarget.dataset.id); await this.load(); }
     catch (error) { wx.showToast({ title: (error as Error).message || "无法完成服务", icon: "none" }); }
+  },
+  async openSupport(event: any) {
+    const orderId = event.currentTarget.dataset.id;
+    const choice = await new Promise<any>((resolve) => wx.showActionSheet({
+      itemList: ["履约或时间问题", "退款问题", "安全或骚扰问题", "其他问题"],
+      success: resolve,
+      fail: () => resolve(null)
+    }));
+    if (!choice || typeof choice.tapIndex !== "number") return;
+    const category = (["orderIssue", "refund", "safety", "general"] as const)[choice.tapIndex] || "general";
+    const result = await new Promise<any>((resolve) => wx.showModal({
+      title: "联系平台客服",
+      editable: true,
+      placeholderText: "请说明发生的情况，平台会在工单中跟进",
+      confirmText: "提交工单",
+      success: resolve
+    }));
+    if (!result.confirm) return;
+    try {
+      await requestTransactionalSubscriptions(["supportUpdate"]);
+      await api.createSupportTicket({
+        orderId,
+        category,
+        subject: "订单客服请求",
+        body: result.content?.trim() || "用户请求平台客服协助处理订单。"
+      });
+      wx.showToast({ title: "工单已提交", icon: "success" });
+      await this.load();
+    } catch (error) { wx.showToast({ title: (error as Error).message || "提交工单失败", icon: "none" }); }
+  },
+  async enableCustomerNotifications() {
+    const result = await requestTransactionalSubscriptions(["reservationExpired", "serviceStarted", "serviceCompleted"]);
+    wx.showToast({
+      title: result.recorded > 0
+        ? "已记录订单提醒授权"
+        : result.requested
+          ? "未授予订单提醒授权"
+          : "当前无法开启提醒",
+      icon: "none"
+    });
+  },
+  async enableCompanionNotifications() {
+    const result = await requestTransactionalSubscriptions(["newOrder", "orderCancelled", "supportUpdate"]);
+    wx.showToast({
+      title: result.recorded > 0
+        ? "已记录提醒授权"
+        : result.requested
+          ? "未授予提醒授权"
+          : "当前无法开启提醒",
+      icon: "none"
+    });
   },
   review(event: any) {
     const orderId = event.currentTarget.dataset.id;

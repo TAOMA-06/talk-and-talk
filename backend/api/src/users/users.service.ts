@@ -5,6 +5,9 @@ import { AuditService } from "../common/audit/audit.service";
 import { AppException } from "../common/errors/app.exception";
 import { maskPhone } from "../common/logging/redact";
 import { PrismaService } from "../database/prisma.service";
+import { LegalDocumentArchiveService } from "../legal/legal-document-archive.service";
+import { ModerationCaseService } from "../moderation/moderation-case.service";
+import { ModerationService } from "../moderation/moderation.service";
 import { CreateLegalConsentDto } from "./dto/legal-consent.dto";
 import { UpdateMeDto } from "./dto/update-me.dto";
 
@@ -16,7 +19,10 @@ export class UsersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-    private readonly config: ConfigService
+    private readonly config: ConfigService,
+    private readonly legalArchive: LegalDocumentArchiveService,
+    private readonly moderation: ModerationService,
+    private readonly moderationCases: ModerationCaseService
   ) {}
 
   async getMe(userId: string) {
@@ -58,7 +64,30 @@ export class UsersService {
     } = {};
 
     if (dto.displayName !== undefined) {
-      profileData.displayName = dto.displayName;
+      const displayName = dto.displayName.trim();
+      if (!displayName) {
+        throw new AppException("DISPLAY_NAME_REQUIRED", "Display name is required", HttpStatus.BAD_REQUEST);
+      }
+      const moderation = await this.moderation.moderateAsync(displayName, "profile");
+      if (moderation.decision !== "allow") {
+        const moderationCase = await this.moderationCases.createFromResult({
+          result: moderation,
+          source: "profile",
+          content: displayName,
+          targetId: userId,
+          subjectUserId: userId,
+          actorId: userId,
+          title: "公开昵称待处理",
+          forceCreate: true
+        });
+        throw new AppException(
+          "DISPLAY_NAME_REQUIRES_REVISION",
+          "Display name cannot be published; revise it and try again",
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          { moderationCaseId: moderationCase?.id ?? null, decision: moderation.decision }
+        );
+      }
+      profileData.displayName = displayName;
     }
     if (dto.gender !== undefined) {
       profileData.gender = dto.gender;
@@ -425,6 +454,7 @@ export class UsersService {
         HttpStatus.BAD_REQUEST
       );
     }
+    await this.legalArchive.assertVersionPublished(definition.version, ["privacy", "terms"]);
     const acceptedAt = new Date(dto.acceptedAt);
     if (
       !Number.isFinite(acceptedAt.getTime()) ||
@@ -489,6 +519,8 @@ export class UsersService {
           source: created.source,
           acceptedAt: created.acceptedAt.toISOString(),
           consentedAt: created.consentedAt.toISOString(),
+          privacyArchiveUrl: this.legalArchiveUrl(created.privacyUrl, created.privacyVersion),
+          termsArchiveUrl: this.legalArchiveUrl(created.termsUrl, created.termsVersion),
           previousVersion: previous?.version ?? null,
           previousReceiptId: previous?.id ?? null
         }
@@ -498,6 +530,27 @@ export class UsersService {
     });
 
     return { receipt: this.legalConsentReceiptDto(receipt) };
+  }
+
+  private legalArchiveUrl(currentUrl: string, version: string) {
+    const url = new URL(currentUrl);
+    const sourcePath = url.pathname;
+    let archivePath = sourcePath.replace(/\.html$/, "");
+    // The public consent URLs intentionally remain stable .html entry points.
+    // Those files redirect into Nest under API_PREFIX, so audit evidence must
+    // point at the real immutable endpoint rather than a non-existent
+    // /legal/.../versions route at the site root.
+    if (sourcePath.endsWith(".html")) {
+      const apiPrefix = this.config.getOrThrow<string>("API_PREFIX").replace(/^\/+|\/+$/g, "");
+      const prefixedPath = `/${apiPrefix}`;
+      if (!archivePath.startsWith(`${prefixedPath}/`)) {
+        archivePath = `${prefixedPath}${archivePath}`;
+      }
+    }
+    url.pathname = `${archivePath}/versions/${encodeURIComponent(version)}`;
+    url.search = "";
+    url.hash = "";
+    return url.toString();
   }
 
   async getLegalConsent(userId: string, version?: string) {

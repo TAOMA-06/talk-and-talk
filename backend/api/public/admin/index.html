@@ -264,6 +264,11 @@
         </section>
 
         <section id="section-operations" class="section hidden">
+          <div class="panel" style="margin-bottom:16px">
+            <h2>商用运营门禁</h2>
+            <p class="toast">任何非零异常都必须在当天结算、退款或发布前清零或形成经审批的处置记录。</p>
+            <div id="commercialReadiness" class="queue"><div class="empty">仅管理员可见</div></div>
+          </div>
           <div class="grid-2">
             <div class="panel">
               <h2>退款复核</h2>
@@ -281,6 +286,23 @@
             <h2>陪伴者审核与上架</h2>
             <p class="toast">仅管理员可发布或下架陪伴者；发布前服务端再次校验实名、账号状态与资料资格。</p>
             <div id="companionQueue" class="queue"><div class="empty">仅管理员可见</div></div>
+          </div>
+          <div class="grid-2" style="margin-top:16px">
+            <div class="panel">
+              <h2>交易客服工单</h2>
+              <p class="toast">处理订单争议前会冻结关联结算；完成处理后请写明结论。</p>
+              <div id="supportQueue" class="queue"><div class="empty">仅管理员可见</div></div>
+            </div>
+            <div class="panel">
+              <h2>陪伴者结算台账</h2>
+              <p class="toast">先领取结算任务；带外付款前刷新确认仍无工单或退款，再录入凭证并由另一名管理员复核；系统不会自动打款。</p>
+              <div id="earningQueue" class="queue"><div class="empty">仅管理员可见</div></div>
+            </div>
+          </div>
+          <div class="panel" style="margin-top:16px">
+            <h2>退款后追偿台账</h2>
+            <p class="toast">在“已确认付款后退款”或“付款已领取但外部结果尚未落证”时生成。后者必须先核实是否实际转账；回款或未转账证明都必须由另一名管理员复核，未结案时冻结该陪伴者后续结算。</p>
+            <div id="recoveryQueue" class="queue"><div class="empty">仅管理员可见</div></div>
           </div>
           <div id="adminUserControls" class="panel" style="margin-top:16px">
             <h2>账号状态与实名处置</h2>
@@ -322,7 +344,11 @@
         refunds: [],
         deletionRequests: [],
         companions: [],
-        deletionSettlement: null
+        deletionSettlement: null,
+        supportTickets: [],
+        earnings: [],
+        recoveries: [],
+        commercialReadiness: null
       };
 
       const el = {
@@ -367,6 +393,10 @@
         deletionQueue: document.querySelector("#deletionQueue"),
         deletionSettlement: document.querySelector("#deletionSettlement"),
         companionQueue: document.querySelector("#companionQueue"),
+        supportQueue: document.querySelector("#supportQueue"),
+        earningQueue: document.querySelector("#earningQueue"),
+        recoveryQueue: document.querySelector("#recoveryQueue"),
+        commercialReadiness: document.querySelector("#commercialReadiness"),
         adminUserControls: document.querySelector("#adminUserControls"),
         operationUserId: document.querySelector("#operationUserId"),
         operationAccountStatus: document.querySelector("#operationAccountStatus"),
@@ -632,12 +662,14 @@
               <article class="message">
                 <div class="head"><span>${escapeHtml(refund.orderId)} · ${escapeHtml(refund.userId)}</span><span>${badge(refund.status)}</span></div>
                 <div>¥${escapeHtml((Number(refund.amountCents || 0) / 100).toFixed(2))} · ${escapeHtml(refund.reason || "未填写原因")}</div>
-                <div class="evidence-note">订单：${escapeHtml(refund.orderStatus || "-")} · 退款单：${escapeHtml(refund.id)}</div>
+                <div class="evidence-note">订单：${escapeHtml(refund.orderStatus || "-")} · 退款单：${escapeHtml(refund.id)}${refund.supportTicketId ? ` · 工单：${escapeHtml(refund.supportTicketId)}` : ""}${refund.initiatedById ? ` · 发起人：${escapeHtml(refund.initiatedById)}（须由他人审核）` : ""}</div>
                 <div class="toolbar">
                   ${refund.status === "failed"
                     ? `<button class="button warning" type="button" data-refund-action="retry" data-refund-id="${escapeHtml(refund.id)}">重试退款</button>`
-                    : `<button class="button" type="button" data-refund-action="approve" data-refund-id="${escapeHtml(refund.id)}">通过并提交退款</button>
-                       <button class="button danger" type="button" data-refund-action="reject" data-refund-id="${escapeHtml(refund.id)}">驳回退款</button>`}
+                    : refund.status === "pendingReview"
+                      ? `<button class="button" type="button" data-refund-action="approve" data-refund-id="${escapeHtml(refund.id)}">通过并提交退款</button>
+                         <button class="button danger" type="button" data-refund-action="reject" data-refund-id="${escapeHtml(refund.id)}">驳回退款</button>`
+                      : `<button class="button warning" type="button" data-refund-action="sync" data-refund-id="${escapeHtml(refund.id)}">查询微信退款状态</button>`}
                 </div>
               </article>`).join("")
           : `<div class="empty">暂无待处理退款</div>`;
@@ -709,8 +741,11 @@
           ? state.companions.map((companion) => `
               <article class="message">
                 <div class="head"><span>${escapeHtml(companion.name)} · ${escapeHtml(companion.role)}</span><span>${badge(companion.isPublished ? "published" : "unpublished")}</span></div>
-                <div class="evidence-note">资料实名：${companion.isVerified ? "已通过" : "未通过"} · 所有者：${escapeHtml(companion.owner?.displayName || companion.owner?.id || "未绑定")} · 账号：${escapeHtml(companion.owner?.accountStatus || "-")}</div>
+                <div class="evidence-note">资料实名：${companion.isVerified ? "已通过" : "未通过"} · 商业档案：${escapeHtml(companion.commercialStatus || "missing")} · 所有者：${escapeHtml(companion.owner?.displayName || companion.owner?.id || "未绑定")} · 账号：${escapeHtml(companion.owner?.accountStatus || "-")}</div>
                 <div class="toolbar">
+                  ${["missing", "suspended"].includes(companion.commercialStatus || "missing") ? `<button class="button warning" type="button" data-companion-action="submit-commercial" data-companion-id="${escapeHtml(companion.id)}">录入商业档案</button>` : ""}
+                  ${companion.commercialStatus === "pendingReview" ? `<button class="button primary" type="button" data-companion-action="verify-commercial" data-companion-id="${escapeHtml(companion.id)}">复核商业档案</button>` : ""}
+                  ${companion.commercialStatus === "verified" ? `<button class="button danger" type="button" data-companion-action="suspend-commercial" data-companion-id="${escapeHtml(companion.id)}">暂停商业资格</button>` : ""}
                   ${companion.isPublished
                     ? `<button class="button danger" type="button" data-companion-action="unpublish" data-companion-id="${escapeHtml(companion.id)}">下架</button>`
                     : `<button class="button" type="button" data-companion-action="publish" data-companion-id="${escapeHtml(companion.id)}">审核并上架</button>`}
@@ -722,16 +757,120 @@
         }
       }
 
+      function renderSupportQueue() {
+        if (state.user?.role !== "admin") {
+          el.supportQueue.innerHTML = `<div class="empty">此队列仅管理员可处理。</div>`;
+          return;
+        }
+        el.supportQueue.innerHTML = state.supportTickets.length
+          ? state.supportTickets.map((ticket) => `
+              <article class="message">
+                <div class="head"><span>${escapeHtml(ticket.subject)}</span><span>${badge(ticket.status)} ${badge(ticket.priority)}</span></div>
+                <div>${escapeHtml(ticket.body)}</div>
+                <div class="evidence-note">订单：${escapeHtml(ticket.orderId || "无")} · 用户：${escapeHtml(ticket.requester?.displayName || ticket.requester?.id || "-")} · ${slaText(ticket.dueAt)}</div>
+                <div class="toolbar">
+                  ${ticket.status === "open" ? `<button class="button secondary" type="button" data-support-action="assign" data-support-id="${escapeHtml(ticket.id)}">由我处理</button>` : ""}
+                  ${ticket.orderId && ticket.status === "inProgress" ? `<button class="button warning" type="button" data-support-action="initiate-refund" data-support-id="${escapeHtml(ticket.id)}">发起工单退款</button>` : ""}
+                  ${["open", "inProgress"].includes(ticket.status) ? `<button class="button" type="button" data-support-action="resolve" data-support-id="${escapeHtml(ticket.id)}">填写处理结论</button>` : ""}
+                </div>
+              </article>`).join("")
+          : `<div class="empty">暂无待处理交易客服工单</div>`;
+        for (const button of el.supportQueue.querySelectorAll("[data-support-action]")) {
+          button.addEventListener("click", () => void handleSupportAction(button.dataset.supportId, button.dataset.supportAction));
+        }
+      }
+
+      function renderEarningQueue() {
+        if (state.user?.role !== "admin") {
+          el.earningQueue.innerHTML = `<div class="empty">此队列仅管理员可处理。</div>`;
+          return;
+        }
+        el.earningQueue.innerHTML = state.earnings.length
+          ? state.earnings.map((earning) => `
+              <article class="message">
+                <div class="head"><span>${escapeHtml(earning.companion?.name || earning.companionId)} · 订单 ${escapeHtml(earning.orderId)}</span><span>${badge(earning.status)}</span></div>
+                <div>应结 ¥${escapeHtml((Number(earning.payableCents || 0) / 100).toFixed(2))}（订单 ¥${escapeHtml((Number(earning.grossCents || 0) / 100).toFixed(2))}，平台费 ¥${escapeHtml((Number(earning.platformFeeCents || 0) / 100).toFixed(2))}）</div>
+                <div class="evidence-note">收款对象：${escapeHtml(earning.settlementRecipientMaskedSnapshot || "缺少快照")} · 协议 ${escapeHtml(earning.serviceAgreementVersionSnapshot || "缺失")} · 可结算时间：${escapeHtml(formatTime(earning.availableAt))}${earning.holdReason ? ` · 冻结原因：${escapeHtml(earning.holdReason)}` : ""}${earning.paidReference ? ` · 付款凭证：${escapeHtml(earning.paidReference)}` : ""}${earning.payoutSubmittedAt ? ` · 待复核：${escapeHtml(formatTime(earning.payoutSubmittedAt))}` : ""}</div>
+                <div class="toolbar">
+                  ${earning.status === "available" ? `<button class="button warning" type="button" data-earning-action="claim-payout" data-earning-id="${escapeHtml(earning.id)}">领取结算任务</button>` : ""}
+                  ${earning.status === "held" && earning.holdReason === "payout_execution_claimed" ? `<button class="button warning" type="button" data-earning-action="submit-payout" data-earning-id="${escapeHtml(earning.id)}">录入带外付款凭证</button>` : ""}
+                  ${earning.status === "held" && earning.holdReason === "payout_execution_claimed" ? `<button class="button danger" type="button" data-earning-action="cancel-payout-claim" data-earning-id="${escapeHtml(earning.id)}">复核未转账并释放</button>` : ""}
+                  ${earning.status === "held" && earning.holdReason === "payout_verification_pending" ? `<button class="button primary" type="button" data-earning-action="verify-payout" data-earning-id="${escapeHtml(earning.id)}">复核并标记已付款</button>` : ""}
+                </div>
+              </article>`).join("")
+          : `<div class="empty">暂无陪伴者结算记录</div>`;
+        for (const button of el.earningQueue.querySelectorAll("[data-earning-action]")) {
+          button.addEventListener("click", () => void handleEarningAction(button.dataset.earningId, button.dataset.earningAction));
+        }
+      }
+
+      function renderRecoveryQueue() {
+        if (state.user?.role !== "admin") {
+          el.recoveryQueue.innerHTML = `<div class="empty">此队列仅管理员可处理。</div>`;
+          return;
+        }
+        el.recoveryQueue.innerHTML = state.recoveries.length
+          ? state.recoveries.map((recovery) => `
+              <article class="message">
+                <div class="head"><span>${escapeHtml(recovery.companion?.name || recovery.companionId)} · 退款 ${escapeHtml(recovery.refundId)}</span><span>${badge(recovery.status)}</span></div>
+                <div>${recovery.reason === "payoutStateUncertain" ? "待核实外部付款状态" : "待追偿"} ¥${escapeHtml((Number(recovery.amountCents || 0) / 100).toFixed(2))}</div>
+                <div class="evidence-note">订单：${escapeHtml(recovery.orderId || "-")}${recovery.evidenceReference ? ` · 凭证：${escapeHtml(recovery.evidenceReference)}` : ""}</div>
+                <div class="toolbar">
+                  ${recovery.status === "due" ? `<button class="button warning" type="button" data-recovery-action="evidence" data-recovery-id="${escapeHtml(recovery.id)}">录入回款/未转账证明</button>` : ""}
+                  ${recovery.status === "pendingVerification" ? `<button class="button primary" type="button" data-recovery-action="verify" data-recovery-id="${escapeHtml(recovery.id)}">独立复核追偿</button>` : ""}
+                </div>
+              </article>`).join("")
+          : `<div class="empty">暂无退款后追偿记录</div>`;
+        for (const button of el.recoveryQueue.querySelectorAll("[data-recovery-action]")) {
+          button.addEventListener("click", () => void handleRecoveryAction(button.dataset.recoveryId, button.dataset.recoveryAction));
+        }
+      }
+
+      function renderCommercialReadiness() {
+        const readiness = state.commercialReadiness;
+        if (!readiness) {
+          el.commercialReadiness.innerHTML = `<div class="empty">暂无运营门禁数据</div>`;
+          return;
+        }
+        const labels = {
+          orderIntakeDisabled: "新订单入口已暂停",
+          payoutClaimsDisabled: "新结算领取已暂停",
+          failedRefunds: "失败退款",
+          staleRefunds: "超时退款待对账",
+          overdueSupport: "超时工单",
+          failedNotifications: "未读且失败的推送",
+          staleNotificationLeases: "过期推送租约",
+          pendingCommercialProfiles: "待复核商业档案",
+          unresolvedRecoveries: "未结追偿",
+          stalePayoutClaims: "超时结算任务",
+          moderationProviderUnavailable: "审核提供方故障待复核",
+          criticalModeration: "未结严重内容风险",
+          overdueModeration: "超时内容审核",
+          mediaDeletionBacklog: "媒体到期删除失败",
+          stalePrepays: "过期支付待对账",
+          expiredOrderRequests: "超时未响应预约",
+          expiredPaymentReservations: "超时支付保留",
+          expiredPaidServiceWindows: "已过履约窗口待退款",
+          staleInService: "超时服务中订单"
+        };
+        el.commercialReadiness.innerHTML = `<article class="message">
+          <div class="head"><span>状态：${escapeHtml(readiness.status)}</span><span>${escapeHtml(formatTime(readiness.checkedAt))}</span></div>
+          <div>${Object.entries(readiness.blockers || {}).map(([key, value]) => `${escapeHtml(labels[key] || key)}：${escapeHtml(value)}`).join(" · ")}</div>
+        </article>`;
+      }
+
       async function handleRefundAction(id, action) {
         if (!id || !action) return;
-        const note = window.prompt(action === "reject" ? "请输入驳回原因（将通知用户）" : action === "retry" ? "请输入重试备注（可选）" : "请输入处理备注（可选）", "");
+        const note = action === "sync"
+          ? (window.confirm("将向微信查询这笔退款的权威状态，是否继续？") ? "" : null)
+          : window.prompt(action === "reject" ? "请输入驳回原因（将通知用户）" : action === "retry" ? "请输入重试备注（可选）" : "请输入处理备注（可选）", "");
         if (note === null || (action === "reject" && !note.trim())) return;
         try {
           await api(`/payments/refunds/${encodeURIComponent(id)}/${action}`, {
             method: "POST",
-            body: JSON.stringify({ note: note.trim() })
+            ...(action === "sync" ? {} : { body: JSON.stringify({ note: note.trim() }) })
           });
-          el.toast.textContent = action === "approve" ? "退款已通过并提交支付渠道" : action === "retry" ? "退款已重新提交支付渠道" : "退款已驳回";
+          el.toast.textContent = action === "approve" ? "退款已通过并提交支付渠道" : action === "retry" ? "退款已重新提交支付渠道" : action === "sync" ? "微信退款状态已同步" : "退款已驳回";
           await loadOperations();
         } catch (error) {
           el.toast.textContent = error.message;
@@ -786,6 +925,40 @@
 
       async function handleCompanionAction(id, action) {
         if (!id || !action) return;
+        if (action === "submit-commercial") {
+          const raw = window.prompt("粘贴商业档案 JSON：settlementRecipientRef、settlementRecipientMasked、taxProfileRef、identityEvidenceRef、serviceAgreementVersion、serviceAgreementEvidenceRef。仅保存外部受控引用，不得粘贴银行卡号或证件原文。", "");
+          if (!raw) return;
+          try {
+            const payload = JSON.parse(raw);
+            await api(`/admin/commercial/companions/${encodeURIComponent(id)}/profile-submissions`, {
+              method: "POST", body: JSON.stringify(payload)
+            });
+            el.toast.textContent = "商业档案已提交，必须由另一名管理员复核";
+            await loadOperations();
+          } catch (error) { el.toast.textContent = error.message || "商业档案 JSON 无效"; }
+          return;
+        }
+        if (action === "verify-commercial") {
+          if (!window.confirm("确认已独立核验实名证据、服务协议、税务档案与收款对象，且你不是本档案提交人？")) return;
+          try {
+            await api(`/admin/commercial/companions/${encodeURIComponent(id)}/profile-verifications`, { method: "POST" });
+            el.toast.textContent = "商业档案已通过双人复核；仍需单独执行上架";
+            await loadOperations();
+          } catch (error) { el.toast.textContent = error.message; }
+          return;
+        }
+        if (action === "suspend-commercial") {
+          const reason = window.prompt("填写暂停商业资格的理由（将自动下架）", "");
+          if (!reason?.trim()) return;
+          try {
+            await api(`/admin/commercial/companions/${encodeURIComponent(id)}/profile-suspensions`, {
+              method: "POST", body: JSON.stringify({ reason: reason.trim() })
+            });
+            el.toast.textContent = "商业资格已暂停并自动下架";
+            await loadOperations();
+          } catch (error) { el.toast.textContent = error.message; }
+          return;
+        }
         const label = action === "publish" ? "上架" : "下架";
         if (!window.confirm(`确认${label}该陪伴者资料？`)) return;
         try {
@@ -795,6 +968,128 @@
         } catch (error) {
           el.toast.textContent = error.message;
         }
+      }
+
+      async function handleSupportAction(id, action) {
+        if (!id || !action) return;
+        try {
+          if (action === "assign") {
+            await api(`/admin/commercial/support/tickets/${encodeURIComponent(id)}/assign`, {
+              method: "POST", body: JSON.stringify({ assignedToUserId: state.user.id })
+            });
+            el.toast.textContent = "工单已分配给当前管理员";
+          } else if (action === "initiate-refund") {
+            const reason = window.prompt("填写基于工单证据的退款原因。发起后必须由另一名管理员审核", "");
+            if (reason === null || reason.trim().length < 5) return;
+            if (!window.confirm("确认你是当前工单负责人，且同意冻结结算并发起退款复核？")) return;
+            await api(`/admin/commercial/support/tickets/${encodeURIComponent(id)}/refunds`, {
+              method: "POST", body: JSON.stringify({ reason: reason.trim() })
+            });
+            el.toast.textContent = "工单退款已发起，等待另一名管理员审核";
+          } else {
+            const resolution = window.prompt("填写处理结论（将通知发起人）", "");
+            if (resolution === null || !resolution.trim()) return;
+            const resolutionCode = window.prompt("填写结论代码：noRefund / refundInProgress / safetyEscalated / privacyRouted", "noRefund");
+            if (!resolutionCode || !["noRefund", "refundInProgress", "safetyEscalated", "privacyRouted"].includes(resolutionCode.trim())) return;
+            await api(`/admin/commercial/support/tickets/${encodeURIComponent(id)}/resolve`, {
+              method: "POST", body: JSON.stringify({
+                status: "resolved",
+                resolution: resolution.trim(),
+                resolutionCode: resolutionCode.trim()
+              })
+            });
+            el.toast.textContent = "工单已处理并通知用户";
+          }
+          await loadOperations();
+        } catch (error) { el.toast.textContent = error.message; }
+      }
+
+      async function handleEarningAction(id, action) {
+        if (!id) return;
+        if (action === "claim-payout") {
+          if (!window.confirm("领取后该笔结算会冻结。带外付款前必须刷新确认仍无未处理争议或退款；状态变化时不得付款。确认领取？")) return;
+          try {
+            await api(`/admin/commercial/earnings/${encodeURIComponent(id)}/payout-claims`, { method: "POST" });
+            el.toast.textContent = "结算任务已领取；带外付款前请刷新确认状态仍可执行，完成付款后再录入凭证";
+            await loadOperations();
+          } catch (error) { el.toast.textContent = error.message; }
+          return;
+        }
+        if (action === "submit-payout") {
+          const earning = state.earnings.find((item) => item.id === id);
+          if (!earning?.settlementRecipientRefSnapshot) {
+            el.toast.textContent = "结算记录缺少不可变收款对象快照，禁止付款";
+            return;
+          }
+          const reference = window.prompt("确认已在带外完成付款后，填写付款凭证号 / 交易流水号", "");
+          if (reference === null || !reference.trim()) return;
+          const evidenceDigest = window.prompt("填写付款凭证文件的 SHA-256（64 位十六进制），用于复核文件完整性", "");
+          if (evidenceDigest === null || !/^[a-fA-F0-9]{64}$/.test(evidenceDigest.trim())) return;
+          if (!window.confirm("仅当款项已实际付出时才可录入。另一名管理员仍需复核，确认继续？")) return;
+          try {
+            await api(`/admin/commercial/earnings/${encodeURIComponent(id)}/payout-submissions`, {
+              method: "POST", body: JSON.stringify({
+                paidReference: reference.trim(),
+                paidAmountCents: Number(earning.payableCents),
+                paidRecipientRef: earning.settlementRecipientRefSnapshot,
+                payoutEvidenceDigest: evidenceDigest.trim().toLowerCase()
+              })
+            });
+            el.toast.textContent = "已记录付款凭证，等待另一名管理员复核";
+            await loadOperations();
+          } catch (error) { el.toast.textContent = error.message; }
+          return;
+        }
+        if (action === "cancel-payout-claim") {
+          const reason = window.prompt("仅限另一名管理员在独立核实未转账后操作。填写释放原因", "");
+          if (reason === null || !reason.trim()) return;
+          const reference = window.prompt("填写财务渠道未转账证明的受控引用（不得粘贴银行卡或证件原文）", "");
+          if (reference === null || !reference.trim()) return;
+          const digest = window.prompt("填写未转账证明文件的 SHA-256（64 位十六进制）", "");
+          if (digest === null || !/^[a-fA-F0-9]{64}$/.test(digest.trim())) return;
+          if (!window.confirm("确认你不是原领取人，并已独立核实款项从未转出？该操作会写入不可抵赖审计。")) return;
+          try {
+            await api(`/admin/commercial/earnings/${encodeURIComponent(id)}/payout-cancellations`, {
+              method: "POST",
+              body: JSON.stringify({
+                reason: reason.trim(),
+                noTransferEvidenceReference: reference.trim(),
+                evidenceDigest: digest.trim().toLowerCase()
+              })
+            });
+            el.toast.textContent = "未转账证明已完成第二人复核，结算领取已安全释放";
+            await loadOperations();
+          } catch (error) { el.toast.textContent = error.message; }
+          return;
+        }
+        if (action !== "verify-payout") return;
+        if (!window.confirm("请确认你不是凭证录入人，且已独立核验带外付款凭证。复核后才会标记为已付款。")) return;
+        try {
+          await api(`/admin/commercial/earnings/${encodeURIComponent(id)}/payout-verifications`, {
+            method: "POST"
+          });
+          el.toast.textContent = "付款凭证已完成双人复核并写入审计日志";
+          await loadOperations();
+        } catch (error) { el.toast.textContent = error.message; }
+      }
+
+      async function handleRecoveryAction(id, action) {
+        if (!id || !action) return;
+        try {
+          if (action === "evidence") {
+            const reference = window.prompt("填写已收回款项的唯一凭证号 / 交易流水号", "");
+            if (!reference?.trim()) return;
+            await api(`/admin/commercial/recoveries/${encodeURIComponent(id)}/evidence`, {
+              method: "POST", body: JSON.stringify({ evidenceReference: reference.trim() })
+            });
+            el.toast.textContent = "追偿凭证已记录，等待另一名管理员复核";
+          } else {
+            if (!window.confirm("确认你不是凭证录入人，且已独立核验款项实际收回？")) return;
+            await api(`/admin/commercial/recoveries/${encodeURIComponent(id)}/verify`, { method: "POST" });
+            el.toast.textContent = "追偿已完成双人复核";
+          }
+          await loadOperations();
+        } catch (error) { el.toast.textContent = error.message; }
       }
 
       async function updateAccountStatus() {
@@ -819,14 +1114,19 @@
       async function updateVerification() {
         const userId = el.operationUserId.value.trim();
         const reason = el.operationReason.value.trim();
+        const isVerified = el.operationVerification.value === "true";
         if (!userId || !reason) {
           el.toast.textContent = "请填写用户 ID 和处置理由";
           return;
         }
+        const evidenceReference = isVerified
+          ? window.prompt("填写实名核验服务中的外部证据引用（不得粘贴证件原文）", "")
+          : null;
+        if (isVerified && !evidenceReference?.trim()) return;
         try {
           await api(`/admin/users/${encodeURIComponent(userId)}/verification`, {
             method: "PATCH",
-            body: JSON.stringify({ isVerified: el.operationVerification.value === "true", reason })
+            body: JSON.stringify({ isVerified, reason, evidenceReference: evidenceReference?.trim() || undefined })
           });
           el.toast.textContent = "实名状态已更新";
           el.operationReason.value = "";
@@ -846,7 +1146,16 @@
         if (state.user?.role !== "admin") {
           renderDeletionQueue();
           renderCompanionQueue();
+          renderSupportQueue();
+          renderEarningQueue();
+          renderRecoveryQueue();
           return;
+        }
+        try {
+          state.commercialReadiness = await api("/admin/commercial/readiness");
+          renderCommercialReadiness();
+        } catch (error) {
+          el.commercialReadiness.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`;
         }
         try {
           const data = await api("/admin/account-deletions?pageSize=100");
@@ -861,6 +1170,28 @@
           renderCompanionQueue();
         } catch (error) {
           el.companionQueue.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`;
+        }
+        try {
+          const data = await api("/admin/commercial/support/tickets?status=open&pageSize=100");
+          const inProgress = await api("/admin/commercial/support/tickets?status=inProgress&pageSize=100");
+          state.supportTickets = [...(data.items || []), ...(inProgress.items || [])];
+          renderSupportQueue();
+        } catch (error) {
+          el.supportQueue.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`;
+        }
+        try {
+          const data = await api("/admin/commercial/earnings?pageSize=100");
+          state.earnings = data.items || [];
+          renderEarningQueue();
+        } catch (error) {
+          el.earningQueue.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`;
+        }
+        try {
+          const data = await api("/admin/commercial/recoveries");
+          state.recoveries = data.items || [];
+          renderRecoveryQueue();
+        } catch (error) {
+          el.recoveryQueue.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`;
         }
       }
 

@@ -38,7 +38,7 @@ Day 1 routes currently available:
 | `GET /api/v1/companions/status` | Companions module skeleton status |
 | `GET /api/v1/conversations/status` | Conversations module skeleton status |
 | `GET /api/v1/moderation/status` | Moderation module status (`active`, includes `aiConfigured`) |
-| `POST /api/v1/moderation/check` | Standalone text moderation (JWT); RuleEngine + optional DeepSeek |
+| `POST /api/v1/moderation/check` | Standalone text moderation (JWT); RuleEngine + production text-review provider |
 | `POST /api/v1/moderation/reports` | User report → create `source=report` case (JWT user) |
 | `GET /api/v1/moderation/cases` | List moderation cases (`moderator`/`admin` only) |
 | `GET /api/v1/admin/moderation/overview` | Staff overview stats + queue |
@@ -129,8 +129,8 @@ Chat send (`POST /conversations/:id/messages`) and `POST /moderation/check` shar
 
 1. **RuleEngine** — private contact, offline meetup, transfers, privacy asks, ads, harassment (with normalization for spaces / `vx` / `加v` / 谐音).
 2. If rule result is `block` + `high` risk → **skip AI**.
-3. Otherwise call **DeepSeek** when `DEEPSEEK_API_KEY` is set; on failure / timeout / missing key → **rule result fallback**.
+3. Otherwise call the configured **DeepSeek-compatible text review provider**. Development/staging can fall back to rules; production requires credentials and fails closed: chat/community become pending human review, while non-durable public-profile writes return retryable `503 CONTENT_MODERATION_UNAVAILABLE`.
 4. Merge scores with `max(rule, ai)`; `usedAI` is true only when AI returns successfully.
 5. Non-`allow` decisions create `ModerationCase` plus `ModerationEvidence` and `ModerationActionLog(action: created)`.
 
-User-facing `safetyMessage` text stays generic (no rule IDs or raw AI dumps). Without an API key the service still starts and moderates with rules only.
+User-facing `safetyMessage` text stays generic (no rule IDs or raw AI dumps). Development and staging may start without an API key and use rules only; production refuses to start without real moderation credentials.

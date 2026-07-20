@@ -141,12 +141,17 @@ describe("Companions and me (e2e)", () => {
 
   it("allows admins to create, edit, publish and unpublish companions", async () => {
     const { token } = await createUser("admin");
+    const { token: reviewerToken } = await createUser("admin");
     const { user: owner } = await createUser("user");
 
     await request(app.getHttpServer())
       .patch(`/api/v1/admin/users/${owner.id}/verification`)
       .set("Authorization", `Bearer ${token}`)
-      .send({ isVerified: true, reason: "test identity review" })
+      .send({
+        isVerified: true,
+        reason: "test identity review",
+        evidenceReference: "kyc://test/c-admin-owner"
+      })
       .expect(200);
 
     await request(app.getHttpServer())
@@ -185,6 +190,24 @@ describe("Companions and me (e2e)", () => {
         expect(body.data.pricePerHalfHour).toBe(35);
         expect(body.data.tags).toEqual(expect.arrayContaining(["测试", "情绪倾听"]));
       });
+
+    await request(app.getHttpServer())
+      .post("/api/v1/admin/commercial/companions/c-admin/profile-submissions")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        settlementRecipientRef: "settlement://test/c-admin",
+        settlementRecipientMasked: "测试账户（尾号 0001）",
+        taxProfileRef: "tax://test/c-admin",
+        identityEvidenceRef: "kyc://test/c-admin-owner",
+        serviceAgreementVersion: "test-v1",
+        serviceAgreementEvidenceRef: "agreement://test/c-admin/v1"
+      })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post("/api/v1/admin/commercial/companions/c-admin/profile-verifications")
+      .set("Authorization", `Bearer ${reviewerToken}`)
+      .expect(201);
 
     await request(app.getHttpServer())
       .post("/api/v1/admin/companions/c-admin/publish")

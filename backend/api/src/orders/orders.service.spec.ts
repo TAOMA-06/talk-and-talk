@@ -10,6 +10,8 @@ describe("OrdersService", () => {
     },
     order: {
       create: jest.fn(),
+      count: jest.fn(),
+      findFirst: jest.fn(),
       findMany: jest.fn(),
       findUnique: jest.fn(),
       update: jest.fn(),
@@ -32,6 +34,8 @@ describe("OrdersService", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    prisma.order.findFirst.mockResolvedValue(null);
+    prisma.order.count.mockResolvedValue(0);
     prisma.$transaction.mockImplementation(async (fn: any) => fn({
       ...prisma,
       $queryRaw: jest.fn().mockResolvedValue([])
@@ -80,6 +84,128 @@ describe("OrdersService", () => {
     );
     expect(result.amountYuan).toBe(78);
     expect(result.status).toBe("pending");
+    expect(prisma.companionProfile.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        id: "c1",
+        commercialProfile: { status: "verified" }
+      })
+    }));
+  });
+
+  it("returns the original order for a matching client retry without duplicating side effects", async () => {
+    const scheduledAt = new Date(Date.now() + 3_600_000);
+    prisma.order.findFirst.mockResolvedValue({
+      id: "o-existing", userId: "u1", companionId: "c1", themeId: "t1", durationMinutes: 30,
+      amountCents: 3900, currency: "CNY", status: "pending", scheduledAt,
+      companionNameSnapshot: "林屿", companionRoleSnapshot: "倾听者", companionInitialsSnapshot: "LY",
+      themeNameSnapshot: "轻松闲聊", conversationId: null, companionConfirmedAt: null,
+      paymentReservationExpiresAt: null, paidAt: null, cancelledAt: null, completedAt: null,
+      clientRequestId: "order_retry_1234567890", refunds: [], createdAt: new Date(), updatedAt: new Date()
+    });
+
+    const result = await service.create("u1", {
+      companionId: "c1", themeId: "t1", durationMinutes: 30,
+      scheduledAt: scheduledAt.toISOString(), clientRequestId: "order_retry_1234567890"
+    });
+
+    expect(result.id).toBe("o-existing");
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.order.create).not.toHaveBeenCalled();
+  });
+
+  it("returns an existing idempotent order even while new intake is paused", async () => {
+    const scheduledAt = new Date(Date.now() + 3_600_000);
+    const config = { get: jest.fn((key: string, fallback?: unknown) => key === "ORDER_INTAKE_ENABLED" ? false : fallback) } as any;
+    service = new OrdersService(prisma, notifications, wechat, undefined, config);
+    prisma.order.findFirst.mockResolvedValue({
+      id: "o-existing", userId: "u1", companionId: "c1", themeId: "t1", durationMinutes: 30,
+      amountCents: 3900, currency: "CNY", status: "pending", scheduledAt,
+      companionNameSnapshot: "林屿", companionRoleSnapshot: "倾听者", companionInitialsSnapshot: "LY",
+      themeNameSnapshot: "轻松闲聊", conversationId: null, refunds: [],
+      clientRequestId: "order_retry_1234567890", createdAt: new Date(), updatedAt: new Date()
+    });
+
+    await expect(service.create("u1", {
+      companionId: "c1", themeId: "t1", durationMinutes: 30,
+      scheduledAt: scheduledAt.toISOString(), clientRequestId: "order_retry_1234567890"
+    })).resolves.toMatchObject({ id: "o-existing" });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("requires a client idempotency key when commercial release mode is enabled", async () => {
+    const config = {
+      get: jest.fn((key: string, fallback?: unknown) => key === "COMMERCIAL_RELEASE_MODE" ? "commercial" : fallback)
+    } as any;
+    service = new OrdersService(prisma, notifications, wechat, undefined, config);
+
+    await expect(service.create("u1", {
+      companionId: "c1", themeId: "t1", durationMinutes: 30,
+      scheduledAt: new Date(Date.now() + 3_600_000).toISOString()
+    })).rejects.toMatchObject({
+      code: "ORDER_CLIENT_REQUEST_ID_REQUIRED",
+      status: HttpStatus.UNPROCESSABLE_ENTITY
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects reservations beyond the controlled booking horizon", async () => {
+    const config = {
+      get: jest.fn((key: string, fallback?: unknown) => key === "ORDER_MAX_SCHEDULE_DAYS" ? 14 : fallback)
+    } as any;
+    service = new OrdersService(prisma, notifications, wechat, undefined, config);
+
+    await expect(service.create("u1", {
+      companionId: "c1",
+      themeId: "t1",
+      durationMinutes: 30,
+      scheduledAt: new Date(Date.now() + 15 * 24 * 60 * 60_000).toISOString()
+    })).rejects.toMatchObject({
+      code: "ORDER_SCHEDULE_TOO_FAR",
+      status: HttpStatus.BAD_REQUEST,
+      details: { maxScheduleDays: 14 }
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects reusing an order idempotency key with different business input", async () => {
+    prisma.order.findFirst.mockResolvedValue({
+      companionId: "c-other", themeId: "t1", durationMinutes: 30,
+      scheduledAt: new Date(Date.now() + 3_600_000)
+    });
+
+    await expect(service.create("u1", {
+      companionId: "c1", themeId: "t1", durationMinutes: 30,
+      scheduledAt: new Date(Date.now() + 3_600_000).toISOString(),
+      clientRequestId: "order_retry_1234567890"
+    })).rejects.toMatchObject({ code: "ORDER_IDEMPOTENCY_KEY_REUSED" });
+  });
+
+  it("enforces the controlled global open-order capacity under the intake lock", async () => {
+    const config = {
+      get: jest.fn((key: string, fallback?: unknown) => ({
+        ORDER_INTAKE_ENABLED: true,
+        ORDER_MAX_OPEN_TOTAL: 2,
+        ORDER_MAX_OPEN_PER_USER: 3,
+        ORDER_MAX_PENDING_PER_COMPANION: 20,
+        ORDER_RESPONSE_WINDOW_MINUTES: 10,
+        PLATFORM_FEE_BPS: 0
+      } as Record<string, unknown>)[key] ?? fallback)
+    } as any;
+    service = new OrdersService(prisma, notifications, wechat, undefined, config);
+    prisma.companionProfile.findFirst.mockResolvedValue({
+      id: "c1", name: "林屿", role: "倾听者", initials: "LY", pricePerHalfHour: 39,
+      commercialProfile: { status: "verified" }
+    });
+    prisma.order.count
+      .mockResolvedValueOnce(2)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0);
+
+    await expect(service.create("u1", {
+      companionId: "c1", themeId: "t1", durationMinutes: 30,
+      scheduledAt: new Date(Date.now() + 3_600_000).toISOString()
+    })).rejects.toMatchObject({ code: "ORDER_INTAKE_CAPACITY_REACHED" });
+    expect(prisma.order.create).not.toHaveBeenCalled();
   });
 
   it("persists validated recommendation attribution without changing old order inputs", async () => {
@@ -300,7 +426,8 @@ describe("OrdersService", () => {
         ownerUserId: "u-companion",
         availability: "online",
         availableTimes: ["全天"],
-        owner: { accountStatus: "active", profile: { isVerified: true } }
+        owner: { accountStatus: "active", profile: { isVerified: true } },
+        commercialProfile: { status: "verified" }
       },
       conversation: null
     };
@@ -354,5 +481,117 @@ describe("OrdersService", () => {
       expect.any(String),
       expect.objectContaining({ orderId: "o-expired", companionConfirmed: false })
     );
+  });
+
+  it("creates a held-period settlement ledger entry atomically when a service completes", async () => {
+    const config = { get: jest.fn((key: string) => key === "COMPANION_SETTLEMENT_HOLD_HOURS" ? 24 : 0) } as any;
+    service = new OrdersService(prisma, notifications, wechat, undefined, config);
+    const completedAt = new Date();
+    const serviceStartedAt = new Date(completedAt.getTime() - 31 * 60 * 1000);
+    const order = {
+      id: "o-complete", userId: "u1", companionId: "c1", amountCents: 10000,
+      platformFeeBps: 1000, platformFeeCents: 1000, companionPayableCents: 9000,
+      status: "inService", companion: {
+        ownerUserId: "u-companion"
+      }, conversation: null,
+      settlementRecipientRefSnapshot: "recipient-c1",
+      settlementRecipientMaskedSnapshot: "****1234",
+      taxProfileRefSnapshot: "tax-c1",
+      identityEvidenceRefSnapshot: "identity-evidence-c1",
+      serviceAgreementVersionSnapshot: "v1",
+      serviceAgreementEvidenceRefSnapshot: "agreement-evidence-c1",
+      durationMinutes: 30, scheduledAt: serviceStartedAt, serviceStartedAt,
+      createdAt: completedAt, updatedAt: completedAt
+    };
+    const db = {
+      $queryRaw: jest.fn(),
+      order: {
+        findUnique: jest.fn().mockResolvedValue(order),
+        update: jest.fn().mockResolvedValue({ ...order, status: "completed", completedAt })
+      },
+      companionEarning: { upsert: jest.fn().mockResolvedValue({ id: "earning-1" }) }
+    };
+    prisma.$transaction.mockImplementation(async (fn: any) => fn(db));
+
+    await service.completeService("u-companion", "o-complete");
+
+    expect(db.companionEarning.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: { orderId: "o-complete" },
+      create: expect.objectContaining({ payableCents: 9000, platformFeeCents: 1000, status: "pending" })
+    }));
+    expect(notifications.create).toHaveBeenCalledWith(
+      "u1", "orderStatus", "服务已完成", expect.any(String), expect.objectContaining({ orderId: "o-complete" })
+    );
+  });
+
+  it("holds a historical order instead of reconstructing missing settlement evidence from the current profile", async () => {
+    const config = { get: jest.fn((key: string) => key === "COMPANION_SETTLEMENT_HOLD_HOURS" ? 24 : 72) } as any;
+    service = new OrdersService(prisma, notifications, wechat, undefined, config);
+    const startedAt = new Date(Date.now() - 31 * 60 * 1000);
+    const order = {
+      id: "o-historical", userId: "u1", companionId: "c1", amountCents: 10000,
+      platformFeeBps: 0, platformFeeCents: 0, companionPayableCents: 10000,
+      status: "inService", durationMinutes: 30, scheduledAt: startedAt, serviceStartedAt: startedAt,
+      settlementRecipientRefSnapshot: null, settlementRecipientMaskedSnapshot: null,
+      taxProfileRefSnapshot: null, identityEvidenceRefSnapshot: null,
+      serviceAgreementVersionSnapshot: null, serviceAgreementEvidenceRefSnapshot: null,
+      companion: {
+        ownerUserId: "u-companion",
+        commercialProfile: {
+          status: "verified",
+          settlementRecipientRef: "current-recipient-must-not-be-used",
+          settlementRecipientMasked: "****9999",
+          taxProfileRef: "current-tax-must-not-be-used",
+          serviceAgreementVersion: "current-agreement-must-not-be-used"
+        }
+      },
+      conversation: null,
+      createdAt: startedAt,
+      updatedAt: startedAt
+    };
+    const db = {
+      $queryRaw: jest.fn(),
+      order: {
+        findUnique: jest.fn().mockResolvedValue(order),
+        update: jest.fn().mockResolvedValue({ ...order, status: "completed", completedAt: new Date() })
+      },
+      companionEarning: { upsert: jest.fn().mockResolvedValue({ id: "earning-historical" }) }
+    };
+    prisma.$transaction.mockImplementation(async (fn: any) => fn(db));
+
+    await service.completeService("u-companion", "o-historical");
+
+    expect(db.companionEarning.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      create: expect.objectContaining({
+        status: "held",
+        holdReason: "commercial_profile_snapshot_missing",
+        settlementRecipientRefSnapshot: null,
+        taxProfileRefSnapshot: null
+      })
+    }));
+  });
+
+  it("refuses to complete a service before its booked duration has elapsed", async () => {
+    const startedAt = new Date(Date.now() - 5 * 60 * 1000);
+    const db = {
+      $queryRaw: jest.fn(),
+      order: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "o-too-early", userId: "u1", companionId: "c1", status: "inService",
+          durationMinutes: 30, scheduledAt: startedAt, serviceStartedAt: startedAt,
+          companion: { ownerUserId: "u-companion" }, conversation: null
+        }),
+        update: jest.fn()
+      },
+      companionEarning: { upsert: jest.fn() }
+    };
+    prisma.$transaction.mockImplementation(async (fn: any) => fn(db));
+
+    await expect(service.completeService("u-companion", "o-too-early")).rejects.toMatchObject({
+      code: "ORDER_SERVICE_NOT_COMPLETE",
+      status: HttpStatus.CONFLICT
+    });
+    expect(db.order.update).not.toHaveBeenCalled();
+    expect(db.companionEarning.upsert).not.toHaveBeenCalled();
   });
 });

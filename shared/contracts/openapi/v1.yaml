@@ -24,11 +24,73 @@ tags:
   - name: conversations
   - name: moderation
   - name: notifications
+  - name: legal
+  - name: support
+  - name: commercial
   - name: community
   - name: reviews
   - name: admin
   - name: admin-moderation
 paths:
+  /legal/terms:
+    get:
+      tags: [legal]
+      summary: Current immutable terms snapshot
+      operationId: getCurrentTerms
+      security: []
+      responses:
+        "200":
+          description: HTML terms document; serving it publishes an immutable versioned snapshot
+          content:
+            text/html:
+              schema: { type: string }
+  /legal/privacy:
+    get:
+      tags: [legal]
+      summary: Current immutable privacy-policy snapshot
+      operationId: getCurrentPrivacyPolicy
+      security: []
+      responses:
+        "200":
+          description: HTML privacy-policy document; serving it publishes an immutable versioned snapshot
+          content:
+            text/html:
+              schema: { type: string }
+  /legal/platform-rules:
+    get:
+      tags: [legal]
+      summary: Current immutable platform-rules snapshot
+      operationId: getCurrentPlatformRules
+      security: []
+      responses:
+        "200":
+          description: HTML platform-rules document; serving it publishes an immutable versioned snapshot
+          content:
+            text/html:
+              schema: { type: string }
+  /legal/{document}/versions/{version}:
+    get:
+      tags: [legal]
+      summary: Retrieve a previously published immutable legal-document version
+      operationId: getLegalDocumentVersion
+      security: []
+      parameters:
+        - name: document
+          in: path
+          required: true
+          schema: { type: string, enum: [terms, privacy, platform-rules] }
+        - name: version
+          in: path
+          required: true
+          schema: { type: string, maxLength: 64 }
+      responses:
+        "200":
+          description: Archived HTML legal document
+          content:
+            text/html:
+              schema: { type: string }
+        "404":
+          $ref: "#/components/responses/Error"
   /health:
     get:
       tags: [health]
@@ -281,8 +343,9 @@ paths:
             schema:
               type: object
               properties:
-                displayName: { type: string }
-                gender: { type: string, enum: [female, male, other, undisclosed] }
+                displayName: { type: string, minLength: 1, maxLength: 40 }
+                gender: { type: string, enum: [female, male] }
+                age: { type: integer, minimum: 18, maximum: 120 }
       responses:
         "200":
           description: Updated user
@@ -290,6 +353,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuccessEnvelope"
+        "422":
+          description: Display name failed public-profile moderation and was not published
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "503":
+          description: Production content moderation provider is temporarily unavailable; the profile was not changed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
   /me/deletion-request:
     post:
       tags: [users]
@@ -344,6 +419,121 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuccessEnvelope"
+  /companions/me/profile:
+    get:
+      tags: [companions]
+      summary: Get the current user's companion profile
+      operationId: getOwnCompanionProfile
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current companion profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+    patch:
+      tags: [companions]
+      summary: Update availability or moderated public companion profile content
+      operationId: updateOwnCompanionProfile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                bio: { type: string, minLength: 1, maxLength: 500 }
+                availableTimes:
+                  type: array
+                  minItems: 1
+                  maxItems: 30
+                  items: { type: string, maxLength: 40 }
+                availability: { type: string, enum: [online, available, busy] }
+      responses:
+        "200":
+          description: Updated companion profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+        "422":
+          description: Public profile content failed moderation and was not published
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "503":
+          description: Production content moderation provider is temporarily unavailable; the profile was not changed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /companions/me/application:
+    post:
+      tags: [companions]
+      summary: Submit an unpublished companion application for staff review
+      operationId: applyForCompanion
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role, bio, pricePerHalfHour, tags, availableTimes, languages, specialties, cityDistrict]
+              properties:
+                role: { type: string, minLength: 1, maxLength: 80 }
+                bio: { type: string, minLength: 1, maxLength: 500 }
+                pricePerHalfHour: { type: integer, minimum: 1, maximum: 10000 }
+                tags:
+                  type: array
+                  minItems: 1
+                  maxItems: 20
+                  items: { type: string, maxLength: 40 }
+                availableTimes:
+                  type: array
+                  minItems: 1
+                  maxItems: 30
+                  items: { type: string, maxLength: 40 }
+                languages:
+                  type: array
+                  minItems: 1
+                  maxItems: 10
+                  items: { type: string, maxLength: 40 }
+                specialties:
+                  type: array
+                  minItems: 1
+                  maxItems: 20
+                  items: { type: string, maxLength: 60 }
+                topicIds:
+                  type: array
+                  maxItems: 20
+                  items: { type: string, maxLength: 80 }
+                cityDistrict: { type: string, minLength: 1, maxLength: 80 }
+      responses:
+        "200":
+          description: Unpublished companion application
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+        "422":
+          description: Application public content failed moderation and was not submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "503":
+          description: Production content moderation provider is temporarily unavailable; the application was not submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
   /companions/{id}:
     get:
       tags: [companions]
@@ -534,15 +724,45 @@ paths:
                 companionId: { type: string }
                 themeId: { type: string }
                 durationMinutes: { type: integer, minimum: 30, maximum: 240 }
-                scheduledAt: { type: string, format: date-time }
+                scheduledAt: { type: string, format: date-time, description: Must fall within the server-configured commercial booking horizon. }
+                clientRequestId:
+                  type: string
+                  minLength: 16
+                  maxLength: 64
+                  pattern: "^[A-Za-z0-9_-]+$"
+                  description: Required in commercial release mode and stable across retries so one user action creates at most one order.
                 recommendationImpressionId: { type: string, format: uuid, description: Optional card impression attribution, valid for 24 hours. }
       responses:
+        "400":
+          description: Invalid duration or schedule outside the allowed booking window
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
         "200":
           description: Created order
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuccessEnvelope"
+        "409":
+          description: Per-user or companion intake limit reached, or an idempotency key was reused with different data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "422":
+          description: Commercial intake requires a clientRequestId
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "503":
+          description: Order intake is paused or the controlled global open-order capacity is reached
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
   /orders/{id}:
     get:
       tags: [orders]
@@ -575,6 +795,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuccessEnvelope"
+  /orders/{id}/completion-confirmations:
+    post:
+      tags: [orders]
+      summary: Let the customer explicitly confirm a completed service without shortening the refund window
+      operationId: confirmOrderCompletion
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Completion confirmation recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+        "409":
+          $ref: "#/components/responses/Error"
   /orders/{id}/prepay:
     post:
       tags: [orders]
@@ -632,7 +870,6 @@ paths:
                 kind: { type: string, enum: [femaleRequest, malePromotion] }
                 topic: { type: string, maxLength: 80 }
                 content: { type: string, maxLength: 2000 }
-                coverImageUrl: { type: string }
       responses:
         "200":
           description: Moderated post
@@ -640,6 +877,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuccessEnvelope"
+        "409":
+          description: Community media is fail-closed until the approved media review pipeline is enabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
   /community/posts/{id}/like:
     post:
       tags: [community]
@@ -696,7 +939,7 @@ paths:
               properties:
                 orderId: { type: string }
                 rating: { type: integer, minimum: 1, maximum: 5 }
-                content: { type: string, maxLength: 1000 }
+                content: { type: string, minLength: 1, maxLength: 1000 }
       responses:
         "200":
           description: Created review
@@ -704,6 +947,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuccessEnvelope"
+        "422":
+          description: Review content failed moderation and was not published
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "503":
+          description: Production content moderation provider is temporarily unavailable; the review was not created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
   /orders/{id}/refund:
     post:
       tags: [orders]
@@ -785,13 +1040,13 @@ paths:
   /payments/refunds/review-queue:
     get:
       tags: [payments]
-      summary: List refunds awaiting staff action
+      summary: List refunds awaiting administrator action
       operationId: listRefundReviewQueue
       security:
         - bearerAuth: []
       responses:
         "200":
-          description: Pending-review and failed refunds (moderator/admin only)
+          description: Pending-review, failed, and stale submitted refunds (administrator only)
           content:
             application/json:
               schema:
@@ -799,7 +1054,7 @@ paths:
   /payments/refunds/{id}/approve:
     post:
       tags: [payments]
-      summary: Approve a pending refund
+      summary: Approve a pending refund (administrator only)
       operationId: approveRefund
       security:
         - bearerAuth: []
@@ -822,7 +1077,7 @@ paths:
   /payments/refunds/{id}/reject:
     post:
       tags: [payments]
-      summary: Reject a pending refund
+      summary: Reject a pending refund (administrator only)
       operationId: rejectRefund
       security:
         - bearerAuth: []
@@ -833,8 +1088,9 @@ paths:
           application/json:
             schema:
               type: object
+              required: [note]
               properties:
-                note: { type: string, maxLength: 500 }
+                note: { type: string, minLength: 3, maxLength: 500 }
       responses:
         "200":
           description: Refund rejected
@@ -845,7 +1101,7 @@ paths:
   /payments/refunds/{id}/retry:
     post:
       tags: [payments]
-      summary: Retry a failed refund with its original refund reference
+      summary: Retry a failed refund with its original refund reference (administrator only)
       operationId: retryRefund
       security:
         - bearerAuth: []
@@ -865,6 +1121,28 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuccessEnvelope"
+  /payments/refunds/{id}/sync:
+    post:
+      tags: [payments]
+      summary: Query WeChat for a submitted refund's authoritative state (administrator only)
+      operationId: syncRefundForAdmin
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Refund state reconciled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+        "409":
+          description: Refund has not been submitted or was rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
   /conversations/status:
     get:
       tags: [conversations]
@@ -1184,6 +1462,48 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuccessEnvelope"
+  /notifications/subscription-templates:
+    get:
+      tags: [notifications]
+      summary: List server-approved WeChat subscription templates available to the current user
+      operationId: listSubscriptionTemplates
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: keys
+          schema: { type: string, description: Comma-separated notification event keys }
+      responses:
+        "200":
+          description: Enabled flag and template IDs; an empty list means no prompt is available
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /notifications/subscription-grants:
+    post:
+      tags: [notifications]
+      summary: Record one-time WeChat subscription authorization after an explicit client prompt
+      operationId: recordSubscriptionGrant
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [templateKey, granted]
+              properties:
+                templateKey: { type: string }
+                granted: { type: boolean }
+      responses:
+        "200":
+          description: Authorization recorded or explicitly declined
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
   /notifications/{id}/read:
     post:
       tags: [notifications]
@@ -1196,6 +1516,60 @@ paths:
       responses:
         "200":
           description: Done
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /support/tickets:
+    post:
+      tags: [support]
+      summary: Create a customer or companion support ticket; an associated order is protected from settlement
+      operationId: createSupportTicket
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [category, subject, body]
+              properties:
+                orderId: { type: string, format: uuid, nullable: true }
+                category: { type: string, enum: [orderIssue, refund, safety, privacy, general] }
+                subject: { type: string, minLength: 2, maxLength: 120 }
+                body: { type: string, minLength: 5, maxLength: 3000 }
+      responses:
+        "201":
+          description: Ticket created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /support/tickets/me:
+    get:
+      tags: [support]
+      summary: List the current user's support tickets
+      operationId: listMySupportTickets
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Ticket list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /commercial/earnings/me:
+    get:
+      tags: [commercial]
+      summary: List the current companion owner's settlement ledger entries
+      operationId: listMyCompanionEarnings
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Ledger entries; this endpoint never creates a payout
           content:
             application/json:
               schema:
@@ -1214,6 +1588,401 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuccessEnvelope"
+  /admin/commercial/readiness:
+    get:
+      tags: [admin, commercial]
+      summary: Aggregate operational blockers that must be clear before commercial traffic continues
+      operationId: adminCommercialReadiness
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current commercial operational gate status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /admin/commercial/companions:
+    get:
+      tags: [admin, commercial]
+      summary: List companion commercial identity, agreement, tax and settlement profiles
+      operationId: adminListCompanionCommercialProfiles
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [pendingReview, verified, suspended] }
+      responses:
+        "200":
+          description: Commercial profile review queue
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /admin/commercial/companions/{id}/profile-submissions:
+    post:
+      tags: [admin, commercial]
+      summary: Submit or replace a companion commercial profile and automatically unpublish it for review
+      operationId: adminSubmitCompanionCommercialProfile
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [settlementRecipientRef, settlementRecipientMasked, taxProfileRef, identityEvidenceRef, serviceAgreementVersion, serviceAgreementEvidenceRef]
+              properties:
+                settlementRecipientRef: { type: string, minLength: 4, maxLength: 200, description: Opaque reference only; never raw bank details. }
+                settlementRecipientMasked: { type: string, minLength: 2, maxLength: 120 }
+                taxProfileRef: { type: string, minLength: 4, maxLength: 200 }
+                identityEvidenceRef: { type: string, minLength: 4, maxLength: 200 }
+                serviceAgreementVersion: { type: string, minLength: 1, maxLength: 80 }
+                serviceAgreementEvidenceRef: { type: string, minLength: 4, maxLength: 200 }
+      responses:
+        "200":
+          description: Profile stored in pending-review state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+        "409":
+          $ref: "#/components/responses/Error"
+  /admin/commercial/companions/{id}/profile-verifications:
+    post:
+      tags: [admin, commercial]
+      summary: Independently verify a submitted companion commercial profile
+      operationId: adminVerifyCompanionCommercialProfile
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Commercial profile verified by a different administrator
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+        "403":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /admin/commercial/companions/{id}/profile-suspensions:
+    post:
+      tags: [admin, commercial]
+      summary: Suspend a companion commercial profile and automatically unpublish the companion
+      operationId: adminSuspendCompanionCommercialProfile
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, minLength: 2, maxLength: 500 }
+      responses:
+        "200":
+          description: Commercial profile suspended
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /admin/commercial/earnings:
+    get:
+      tags: [admin, commercial]
+      summary: List companion settlement ledger entries (admin only)
+      operationId: adminListCompanionEarnings
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+        - name: status
+          in: query
+          schema: { type: string, enum: [pending, available, held, paid, void] }
+      responses:
+        "200":
+          description: Ledger queue
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /admin/commercial/earnings/{id}/payout-claims:
+    post:
+      tags: [admin, commercial]
+      summary: Claim and freeze an available ledger entry before an out-of-band payout
+      operationId: adminClaimCompanionEarningPayout
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Audit-backed payout-execution claim; no payment is sent by this endpoint
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+        "409":
+          $ref: "#/components/responses/Error"
+  /admin/commercial/earnings/{id}/payout-submissions:
+    post:
+      tags: [admin, commercial]
+      summary: Record evidence of an out-of-band payout claimed by the current administrator
+      operationId: adminRecordCompanionEarningPayoutEvidence
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [paidReference, paidAmountCents, paidRecipientRef, payoutEvidenceDigest]
+              properties:
+                paidReference: { type: string, minLength: 4, maxLength: 160 }
+                paidAmountCents: { type: integer, minimum: 0 }
+                paidRecipientRef: { type: string, minLength: 4, maxLength: 200 }
+                payoutEvidenceDigest: { type: string, pattern: "^[a-fA-F0-9]{64}$", description: SHA-256 digest of the controlled payout evidence. }
+      responses:
+        "200":
+          description: Evidence recorded; a different administrator must verify before paid status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+        "403":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /admin/commercial/earnings/{id}/payout-cancellations:
+    post:
+      tags: [admin, commercial]
+      summary: Let a different administrator release an abandoned payout claim after independently proving no transfer occurred
+      operationId: adminCancelCompanionEarningPayoutClaim
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason, noTransferEvidenceReference, evidenceDigest]
+              properties:
+                reason: { type: string, minLength: 4, maxLength: 500 }
+                noTransferEvidenceReference: { type: string, minLength: 6, maxLength: 200 }
+                evidenceDigest: { type: string, pattern: "^[a-fA-F0-9]{64}$" }
+      responses:
+        "200":
+          description: Claim released or moved to the next applicable protective hold
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+        "403":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /admin/commercial/earnings/{id}/payout-verifications:
+    post:
+      tags: [admin, commercial]
+      summary: Independently verify a submitted manual payout and mark its ledger entry paid
+      operationId: adminVerifyCompanionEarningPayout
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Second-review audit completed; no payment is sent by this endpoint
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+        "403":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /admin/commercial/recoveries:
+    get:
+      tags: [admin, commercial]
+      summary: List recovery or uncertain-payout ledger entries created when a refund follows a confirmed or claimed payout
+      operationId: adminListCompanionRecoveries
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [due, pendingVerification, recovered] }
+      responses:
+        "200":
+          description: Recovery queue
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /admin/commercial/recoveries/{id}/evidence:
+    post:
+      tags: [admin, commercial]
+      summary: Record unique evidence of recovery or proof that an uncertain claimed payout was never transferred
+      operationId: adminRecordCompanionRecoveryEvidence
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [evidenceReference]
+              properties:
+                evidenceReference: { type: string, minLength: 4, maxLength: 200 }
+      responses:
+        "200":
+          description: Recovery evidence recorded for independent verification
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+        "409":
+          $ref: "#/components/responses/Error"
+  /admin/commercial/recoveries/{id}/verify:
+    post:
+      tags: [admin, commercial]
+      summary: Independently verify recovery evidence and release the companion recovery hold
+      operationId: adminVerifyCompanionRecovery
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Recovery independently verified
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+        "403":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /admin/commercial/support/tickets:
+    get:
+      tags: [admin, support]
+      summary: List support tickets for operations (admin only)
+      operationId: adminListSupportTickets
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Ticket queue
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /admin/commercial/support/tickets/{id}/assign:
+    post:
+      tags: [admin, support]
+      summary: Assign a support ticket to an active staff member
+      operationId: adminAssignSupportTicket
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [assignedToUserId]
+              properties:
+                assignedToUserId: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Ticket assigned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /admin/commercial/support/tickets/{id}/resolve:
+    post:
+      tags: [admin, support]
+      summary: Resolve or close a support ticket and notify its requester
+      operationId: adminResolveSupportTicket
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status, resolution, resolutionCode]
+              properties:
+                status: { type: string, enum: [resolved, closed] }
+                resolution: { type: string, minLength: 2, maxLength: 3000 }
+                resolutionCode: { type: string, enum: [noRefund, refundInProgress, safetyEscalated, privacyRouted] }
+      responses:
+        "200":
+          description: Ticket resolved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /admin/commercial/support/tickets/{id}/refunds:
+    post:
+      tags: [admin, support, commercial]
+      summary: Initiate an order-linked refund from an active support ticket, including after the self-service window
+      description: Only the active ticket assignee can initiate it; a different administrator must approve or reject the resulting refund.
+      operationId: adminInitiateSupportRefund
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, minLength: 5, maxLength: 500 }
+      responses:
+        "200":
+          description: Refund created in pending-review state or the existing refund returned idempotently
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+        "403":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
   /admin/recommendations/metrics:
     get:
       tags: [admin, recommendations]

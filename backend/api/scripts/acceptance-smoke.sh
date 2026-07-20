@@ -35,7 +35,7 @@ MOCK_SMS_RETRY_INTERVAL_SECONDS="${MOCK_SMS_RETRY_INTERVAL_SECONDS:-5}"
 MOCK_SMS_MAX_ATTEMPTS="${MOCK_SMS_MAX_ATTEMPTS:-13}"
 
 # These must match the server environment. Defaults match configuration.ts.
-LEGAL_CONSENT_VERSION="${LEGAL_CONSENT_VERSION:-1.0-2026-07-19}"
+LEGAL_CONSENT_VERSION="${LEGAL_CONSENT_VERSION:-2.0-2026-07-20}"
 LEGAL_PRIVACY_URL="${LEGAL_PRIVACY_URL:-https://api.talkandtalk.app/legal/privacy.html}"
 LEGAL_TERMS_URL="${LEGAL_TERMS_URL:-https://api.talkandtalk.app/legal/terms.html}"
 

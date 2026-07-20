@@ -1,4 +1,4 @@
-import { Inject, Injectable, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
+import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 
 import { PrismaService } from "../../database/prisma.service";
@@ -19,6 +19,7 @@ const PROCESSING_LEASE_MS = 10 * 60_000;
 
 @Injectable()
 export class MediaModerationWorker implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(MediaModerationWorker.name);
   private timer: NodeJS.Timeout | null = null;
   private processingPending = false;
 
@@ -34,9 +35,9 @@ export class MediaModerationWorker implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit() {
     if (!this.mediaAssets.isFeatureEnabled()) return;
-    this.timer = setInterval(() => void this.processPending(), 30_000);
+    this.timer = setInterval(() => this.processPendingSafely(), 30_000);
     this.timer.unref?.();
-    void this.processPending();
+    this.processPendingSafely();
   }
 
   onModuleDestroy() {
@@ -46,14 +47,14 @@ export class MediaModerationWorker implements OnModuleInit, OnModuleDestroy {
 
   enqueue(messageId: string) {
     if (!this.mediaAssets.isFeatureEnabled()) return;
-    setTimeout(() => void this.processMessage(messageId), 0).unref?.();
+    setTimeout(() => this.processMessageSafely(messageId), 0).unref?.();
   }
 
   async processPending() {
     if (!this.mediaAssets.isFeatureEnabled() || this.processingPending) return;
     this.processingPending = true;
     try {
-      await this.mediaAssets.expireDueAssets().catch(() => undefined);
+      await this.mediaAssets.expireDueAssets();
       const staleBefore = new Date(Date.now() - PROCESSING_LEASE_MS);
       const messages: any[] = await this.prisma.message.findMany({
         where: {
@@ -72,6 +73,18 @@ export class MediaModerationWorker implements OnModuleInit, OnModuleDestroy {
     } finally {
       this.processingPending = false;
     }
+  }
+
+  private processPendingSafely(): void {
+    void this.processPending().catch((error) => {
+      this.logger.error(`Media moderation scan failed (${error instanceof Error ? error.name : "unknown_error"})`);
+    });
+  }
+
+  private processMessageSafely(messageId: string): void {
+    void this.processMessage(messageId).catch((error) => {
+      this.logger.error(`Media moderation enqueue failed for ${messageId} (${error instanceof Error ? error.name : "unknown_error"})`);
+    });
   }
 
   async processMessage(messageId: string): Promise<void> {
@@ -147,7 +160,7 @@ export class MediaModerationWorker implements OnModuleInit, OnModuleDestroy {
           });
         }
         if (moderation.decision !== "allow") {
-          await this.cases.createFromResult({
+          const moderationCase = await this.cases.createFromResult({
             result: moderation,
             source: "chat",
             content: this.evidenceText(message.content, analysis),
@@ -158,6 +171,13 @@ export class MediaModerationWorker implements OnModuleInit, OnModuleDestroy {
             actorId: message.senderId,
             db
           });
+          if (moderation.decision === "block" && moderationCase) {
+            await this.restrictions.recordAutomaticHighRiskBlock(
+              message.senderId,
+              moderationCase.id,
+              db
+            );
+          }
         }
         if (moderation.priority === "critical") {
           await this.createCriticalSafetyMessage(db, message);
@@ -167,15 +187,6 @@ export class MediaModerationWorker implements OnModuleInit, OnModuleDestroy {
       });
       if (!transitioned) return;
 
-      if (moderation.decision === "block") {
-        const moderationCase: any = await this.prisma.moderationCase.findFirst({
-          where: { messageId: message.id },
-          orderBy: { createdAt: "desc" }
-        } as any);
-        if (moderationCase) {
-          await this.restrictions.recordAutomaticHighRiskBlock(message.senderId, moderationCase.id);
-        }
-      }
     } catch (error) {
       await this.scheduleRetryOrReview(message, {
         available: false,

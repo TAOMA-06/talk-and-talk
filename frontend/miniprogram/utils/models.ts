@@ -49,7 +49,14 @@ export type Order = {
   id: string; companionId: string; themeId: string; durationMinutes: number; amountCents: number; status: string;
   scheduledAt?: string; createdAt: string; companion?: Companion; companionSnapshot?: { name: string; role: string; initials: string };
   companionConfirmedAt?: string | null;
+  companionResponseDeadlineAt?: string | null;
   paymentReservationExpiresAt?: string | null;
+  serviceStartedAt?: string | null;
+  refundRequestDeadlineAt?: string | null;
+  customerConfirmedAt?: string | null;
+  platformFeeBps?: number;
+  platformFeeCents?: number;
+  companionPayableCents?: number;
 };
 
 export type Conversation = {

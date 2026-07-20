@@ -3,7 +3,9 @@ import { MediaAssetService } from "./media-asset.service";
 describe("MediaAssetService retention and presentation", () => {
   const prisma = {
     mediaAsset: {
-      updateMany: jest.fn()
+      updateMany: jest.fn(),
+      findMany: jest.fn(),
+      update: jest.fn()
     }
   } as any;
   const storage = {
@@ -48,5 +50,38 @@ describe("MediaAssetService retention and presentation", () => {
 
     expect(attachment.url).toBeNull();
     expect(storage.createReadUrl).not.toHaveBeenCalled();
+  });
+
+  it("marks media expired only after object storage confirms deletion", async () => {
+    const now = new Date("2026-07-20T00:00:00.000Z");
+    prisma.mediaAsset.findMany.mockResolvedValue([{ id: "asset-1", storageKey: "chat/c1/asset-1", retryCount: 0 }]);
+    storage.delete.mockResolvedValue(undefined);
+    prisma.mediaAsset.update.mockResolvedValue({});
+
+    await expect(service.expireDueAssets(now)).resolves.toBe(1);
+
+    expect(prisma.mediaAsset.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "asset-1" },
+      data: expect.objectContaining({ status: "expired", extractedText: null, analysis: null })
+    }));
+  });
+
+  it("keeps failed storage deletions retryable instead of claiming they expired", async () => {
+    const now = new Date("2026-07-20T00:00:00.000Z");
+    prisma.mediaAsset.findMany.mockResolvedValue([{ id: "asset-1", storageKey: "chat/c1/asset-1", retryCount: 2 }]);
+    storage.delete.mockRejectedValue(new Error("storage unavailable"));
+    prisma.mediaAsset.update.mockResolvedValue({});
+
+    await expect(service.expireDueAssets(now)).resolves.toBe(0);
+
+    expect(prisma.mediaAsset.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "asset-1" },
+      data: expect.objectContaining({
+        retryCount: 3,
+        nextAttemptAt: expect.any(Date),
+        lastError: "storage_delete_failed"
+      })
+    }));
+    expect(prisma.mediaAsset.update.mock.calls[0][0].data.status).toBeUndefined();
   });
 });

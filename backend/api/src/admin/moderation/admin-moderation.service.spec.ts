@@ -32,7 +32,8 @@ describe("AdminModerationService", () => {
   };
   const chatRestrictions = {
     createRestriction: jest.fn(),
-    liftForCase: jest.fn()
+    liftForCase: jest.fn(),
+    recordManualConfirmedViolation: jest.fn()
   };
   const mediaAssets = {
     toAttachmentDto: jest.fn(async (asset: any) => asset)
@@ -42,6 +43,7 @@ describe("AdminModerationService", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    chatRestrictions.recordManualConfirmedViolation.mockResolvedValue({ escalated: false, confirmations: 1 });
     service = new AdminModerationService(prisma as any, chatRestrictions as any, mediaAssets as any);
   });
 
@@ -92,6 +94,26 @@ describe("AdminModerationService", () => {
   });
 
   describe("applyAction", () => {
+    it("rejects a stale moderator decision after re-reading the locked case", async () => {
+      const opened = {
+        id: "case-race", status: "pending", source: "community", targetId: "post-race",
+        messageId: null, subjectUserId: null, appeals: []
+      };
+      prisma.moderationCase.findUnique.mockResolvedValue(opened);
+      const db = {
+        $queryRaw: jest.fn().mockResolvedValue([]),
+        moderationCase: {
+          findUnique: jest.fn().mockResolvedValue({ ...opened, status: "dismissed" }),
+          update: jest.fn()
+        }
+      };
+      prisma.$transaction.mockImplementation(async (callback: any) => callback(db));
+
+      await expect(service.applyAction("case-race", "mod-2", "rejectMessage", "拒绝"))
+        .rejects.toMatchObject({ code: "CASE_ALREADY_CLOSED" });
+      expect(db.moderationCase.update).not.toHaveBeenCalled();
+    });
+
     it("updates case and writes action + audit logs", async () => {
       const existing = {
         id: "case-1",
@@ -195,6 +217,47 @@ describe("AdminModerationService", () => {
       }));
     });
 
+    it("publishes a pending community post only after a moderator dismisses its review case", async () => {
+      const existing = {
+        id: "case-community",
+        status: "pending",
+        title: "社区内容待审核",
+        category: "社区内容",
+        riskLevel: "low",
+        priority: "normal",
+        source: "community",
+        content: "正常内容",
+        targetId: "post-1",
+        messageId: null,
+        aiScore: 0.4,
+        aiReason: "待人工确认",
+        decision: "review",
+        matchedRules: [],
+        usedAI: false,
+        resolvedAt: null,
+        createdAt: new Date("2026-07-01T00:00:00.000Z"),
+        appeals: []
+      };
+      prisma.moderationCase.findUnique.mockResolvedValue(existing);
+      const db = {
+        moderationCase: { update: jest.fn().mockResolvedValue({ ...existing, status: "dismissed", actionLogs: [] }) },
+        moderationActionLog: { create: jest.fn().mockResolvedValue({ id: "log-community", action: "dismiss", createdAt: new Date() }) },
+        auditLog: { create: jest.fn().mockResolvedValue({}) },
+        communityPost: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) }
+      };
+      prisma.$transaction.mockImplementation(async (callback: any) => callback(db));
+      prisma.moderationCase.findMany.mockResolvedValueOnce([{ ...existing, status: "dismissed" }]).mockResolvedValueOnce([]);
+      prisma.conversation.count.mockResolvedValue(1);
+      prisma.moderationLabel.count.mockResolvedValue(0);
+
+      await service.applyAction("case-community", "mod-1", "dismiss", "人工确认可发布");
+
+      expect(db.communityPost.updateMany).toHaveBeenCalledWith({
+        where: { id: "post-1" },
+        data: { status: "approved" }
+      });
+    });
+
     it("overturns an appeal by releasing the held message and lifting linked chat restrictions", async () => {
       const existing = {
         id: "case-appeal",
@@ -237,7 +300,7 @@ describe("AdminModerationService", () => {
       expect(db.moderationAppeal.update).toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({ status: "overturned", reviewerId: "mod-1" })
       }));
-      expect(chatRestrictions.liftForCase).toHaveBeenCalledWith("case-appeal", "mod-1", "复核成立");
+      expect(chatRestrictions.liftForCase).toHaveBeenCalledWith("case-appeal", "mod-1", "复核成立", db);
     });
   });
 

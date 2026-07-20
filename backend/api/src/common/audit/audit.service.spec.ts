@@ -37,7 +37,7 @@ describe("AuditService", () => {
         action: "legal.consent_recorded",
         resourceType: "legalConsentReceipt",
         resourceId: "lc1",
-        metadata: { version: "1.0-2026-07-19" }
+        metadata: { version: "2.0-2026-07-20" }
       },
       { auditLog: { create: transactionCreate } } as any
     );

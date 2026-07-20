@@ -11,15 +11,46 @@ describe("validateEnvironment", () => {
     JWT_REFRESH_SECRET: "b".repeat(32),
     METRICS_TOKEN: "m".repeat(32),
     STAFF_TOTP_ENCRYPTION_KEY: "t".repeat(32),
+    DEEPSEEK_API_KEY: "deepseek-production-key-1234567890",
+    DEEPSEEK_URL: "https://api.deepseek.com",
+    DEEPSEEK_MODEL: "deepseek-chat",
     SMS_PROVIDER: "none",
-    WECHAT_MINIPROGRAM_APP_ID: "wx-mini-app",
-    WECHAT_MINIPROGRAM_APP_SECRET: "mini-secret",
-    WECHAT_PAY_APP_ID: "wx-mini-app",
+    WECHAT_MINIPROGRAM_APP_ID: "wx1234567890abcdef",
+    WECHAT_MINIPROGRAM_APP_SECRET: "0123456789abcdef0123456789abcdef",
+    WECHAT_PAY_APP_ID: "wx1234567890abcdef",
     WECHAT_PAY_MCH_ID: "1900000000",
     WECHAT_PAY_API_V3_KEY: "k".repeat(32),
     WECHAT_PAY_PRIVATE_KEY_PATH: "/run/secrets/wechat-pay-key.pem",
     WECHAT_PAY_CERT_SERIAL_NO: "SERIAL1",
-    WECHAT_PAY_NOTIFY_BASE_URL: "https://api.talkandtalk.example"
+    WECHAT_PAY_NOTIFY_BASE_URL: "https://api.talkandtalk.example",
+    COMMERCIAL_RELEASE_MODE: "commercial",
+    PLATFORM_FEE_BPS: "1200",
+    COMPANION_SETTLEMENT_HOLD_HOURS: "96",
+    REFUND_REQUEST_WINDOW_HOURS: "72",
+    ORDER_RESPONSE_WINDOW_MINUTES: "10",
+    ORDER_MAX_SCHEDULE_DAYS: "30",
+    ORDER_INTAKE_ENABLED: "true",
+    ORDER_MAX_OPEN_TOTAL: "500",
+    ORDER_MAX_OPEN_PER_USER: "3",
+    ORDER_MAX_PENDING_PER_COMPANION: "20",
+    PAYOUT_CLAIMS_ENABLED: "true",
+    SUPPORT_RESPONSE_HOURS: "24",
+    SUPPORT_MAX_OPEN_PER_USER: "5",
+    NOTIFICATION_DELIVERY_ENABLED: "true",
+    WECHAT_SUBSCRIBE_MESSAGES_ENABLED: "true",
+    WECHAT_SUBSCRIBE_TEMPLATES_JSON: JSON.stringify([
+      "newOrder", "orderConfirmed", "orderRejected", "orderResponseExpired", "paymentSuccess",
+      "serviceStarted", "serviceCompleted", "orderCancelled", "reservationExpired", "supportUpdate"
+    ].map((key) => ({ key, templateId: `TEMPLATE_${key}_123456`, page: "pages/orders/index", data: { thing1: "{{title}}" } }))),
+    LEGAL_CONSENT_VERSION: "2.0-2026-07-20",
+    LEGAL_OPERATOR_NAME: "上海示例网络科技有限公司",
+    LEGAL_CONTACT_EMAIL: "privacy@example.com",
+    LEGAL_CONTACT_PHONE: "021-12345678",
+    LEGAL_COMPLAINT_CHANNEL: "小程序内客服工单",
+    LEGAL_CONSENT_EFFECTIVE_DATE: "2026-07-20",
+    LEGAL_PLATFORM_RULES_URL: "https://api.talkandtalk.example/api/v1/legal/platform-rules",
+    LEGAL_PRIVACY_RETENTION_DAYS: "1095",
+    PAYMENT_RECONCILIATION_ENABLED: "true"
   };
 
   it("applies defaults", () => {
@@ -42,9 +73,21 @@ describe("validateEnvironment", () => {
     expect(env.PAYMENT_RECONCILIATION_INTERVAL_SECONDS).toBe(60);
     expect(env.PAYMENT_RECONCILIATION_BATCH_SIZE).toBe(50);
     expect(env.METRICS_TOKEN).toBe("");
-    expect(env.LEGAL_CONSENT_VERSION).toBe("1.0-2026-07-19");
+    expect(env.LEGAL_CONSENT_VERSION).toBe("2.0-2026-07-20");
+    expect(env.LEGAL_CONSENT_EFFECTIVE_DATE).toBe("2026-07-20");
     expect(env.LEGAL_PRIVACY_URL).toBe("https://api.talkandtalk.app/legal/privacy.html");
     expect(env.LEGAL_TERMS_URL).toBe("https://api.talkandtalk.app/legal/terms.html");
+    expect(env.COMMERCIAL_RELEASE_MODE).toBe("internal");
+    expect(env.PLATFORM_FEE_BPS).toBe(0);
+    expect(env.ORDER_RESPONSE_WINDOW_MINUTES).toBe(10);
+    expect(env.ORDER_MAX_SCHEDULE_DAYS).toBe(30);
+    expect(env.SUPPORT_MAX_OPEN_PER_USER).toBe(5);
+    expect(env.ORDER_INTAKE_ENABLED).toBe(true);
+    expect(env.ORDER_MAX_OPEN_TOTAL).toBe(500);
+    expect(env.ORDER_MAX_OPEN_PER_USER).toBe(3);
+    expect(env.PAYOUT_CLAIMS_ENABLED).toBe(true);
+    expect(env.REFUND_REQUEST_WINDOW_HOURS).toBe(72);
+    expect(env.WECHAT_SUBSCRIBE_MESSAGES_ENABLED).toBe(false);
   });
 
   it("defaults staging app env and seed flag", () => {
@@ -68,6 +111,28 @@ describe("validateEnvironment", () => {
         SMS_PROVIDER: "mock"
       })
     ).toThrow("SMS_PROVIDER=mock");
+  });
+
+  it("cannot run production app policy under a test or development runtime", () => {
+    expect(() => validateEnvironment({ ...productionEnv, NODE_ENV: "test" }))
+      .toThrow("NODE_ENV=production");
+    expect(() => validateEnvironment({ ...productionEnv, NODE_ENV: "development" }))
+      .toThrow("NODE_ENV=production");
+  });
+
+  it("requires a concrete HTTPS content moderation provider in production", () => {
+    expect(() => validateEnvironment({ ...productionEnv, DEEPSEEK_API_KEY: "" }))
+      .toThrow("DEEPSEEK_API_KEY");
+    expect(() => validateEnvironment({ ...productionEnv, DEEPSEEK_API_KEY: "too-short" }))
+      .toThrow("at least 24");
+    expect(() => validateEnvironment({ ...productionEnv, DEEPSEEK_URL: "" }))
+      .toThrow("DEEPSEEK_URL");
+    expect(() => validateEnvironment({ ...productionEnv, DEEPSEEK_MODEL: "" }))
+      .toThrow("DEEPSEEK_MODEL");
+    expect(() => validateEnvironment({ ...productionEnv, DEEPSEEK_API_KEY: "REPLACE_ME_WITH_PRODUCTION_KEY" }))
+      .toThrow("placeholder");
+    expect(() => validateEnvironment({ ...productionEnv, DEEPSEEK_URL: "http://moderation.internal" }))
+      .toThrow("absolute HTTPS");
   });
 
   it("rejects demo seed in production app env", () => {
@@ -192,11 +257,61 @@ describe("validateEnvironment", () => {
       .toThrow("LEGAL_TERMS_URL");
   });
 
+  it("blocks a production commercial release without concrete legal disclosures and transactional notifications", () => {
+    expect(() => validateEnvironment({
+      ...productionEnv,
+      LEGAL_OPERATOR_NAME: ""
+    })).toThrow("LEGAL_OPERATOR_NAME");
+    expect(() => validateEnvironment({
+      ...productionEnv,
+      WECHAT_SUBSCRIBE_MESSAGES_ENABLED: "false"
+    })).toThrow("Production commercial release requires");
+  });
+
+  it("keeps a 24-hour operational buffer after the production refund window", () => {
+    expect(() => validateEnvironment({
+      ...productionEnv,
+      COMPANION_SETTLEMENT_HOLD_HOURS: "95"
+    })).toThrow("REFUND_REQUEST_WINDOW_HOURS + 24");
+  });
+
+  it("requires an explicit commercial mode in production", () => {
+    expect(() => validateEnvironment({
+      ...productionEnv,
+      COMMERCIAL_RELEASE_MODE: "internal"
+    })).toThrow("COMMERCIAL_RELEASE_MODE=commercial");
+  });
+
+  it("requires the complete, non-duplicated transactional notification template map in production", () => {
+    expect(() => validateEnvironment({
+      ...productionEnv,
+      WECHAT_SUBSCRIBE_TEMPLATES_JSON: JSON.stringify([
+        { key: "orderConfirmed", templateId: "TEMPLATE_123456", page: "pages/orders/index", data: { thing1: "{{title}}" } }
+      ])
+    })).toThrow("missing event keys");
+    expect(() => validateEnvironment({
+      ...productionEnv,
+      WECHAT_SUBSCRIBE_TEMPLATES_JSON: JSON.stringify([
+        { key: "newOrder", templateId: "TEMPLATE_123456", page: "pages/orders/index", data: { thing1: "{{title}}" } },
+        { key: "orderConfirmed", templateId: "TEMPLATE_123456", page: "pages/orders/index", data: { thing1: "{{title}}" } }
+      ])
+    })).toThrow("templateId is invalid");
+  });
+
   it("requires explicit database and Redis URLs in production", () => {
     expect(() => validateEnvironment({
       ...productionEnv,
       DATABASE_URL: ""
     })).toThrow("DATABASE_URL and REDIS_URL");
+  });
+
+  it("requires explicit bounded order intake and payout controls in production", () => {
+    expect(() => validateEnvironment({ ...productionEnv, ORDER_INTAKE_ENABLED: "" }))
+      .toThrow("ORDER_INTAKE_ENABLED");
+    expect(() => validateEnvironment({ ...productionEnv, ORDER_MAX_OPEN_PER_USER: "0" }))
+      .toThrow("ORDER_MAX_OPEN_PER_USER");
+    expect(() => validateEnvironment({ ...productionEnv, PAYOUT_CLAIMS_ENABLED: "" }))
+      .toThrow("PAYOUT_CLAIMS_ENABLED");
   });
 
   it("rejects invalid dependency protocols and numeric limits", () => {
@@ -217,6 +332,15 @@ describe("validateEnvironment", () => {
       ...productionEnv,
       WECHAT_PAY_MCH_ID: ""
     })).toThrow("WECHAT_PAY_MCH_ID");
+  });
+
+  it("rejects implausible production WeChat identity fields before serving traffic", () => {
+    expect(() => validateEnvironment({ ...productionEnv, WECHAT_MINIPROGRAM_APP_ID: "wx-short" }))
+      .toThrow("real WeChat AppID");
+    expect(() => validateEnvironment({ ...productionEnv, WECHAT_MINIPROGRAM_APP_SECRET: "short" }))
+      .toThrow("unexpectedly short");
+    expect(() => validateEnvironment({ ...productionEnv, WECHAT_PAY_MCH_ID: "merchant" }))
+      .toThrow("6-32 digits");
   });
 
   it("requires a WeChat payment app id in production", () => {

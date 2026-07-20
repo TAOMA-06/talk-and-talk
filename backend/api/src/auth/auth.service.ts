@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomInt, randomUUID } from "node:crypto";
 
 import { HttpStatus, Inject, Injectable, OnModuleDestroy } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -116,7 +116,7 @@ export class AuthService implements OnModuleDestroy {
       }
     }
 
-    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const code = String(randomInt(100000, 1_000_000));
     const ttl = this.config.get<number>("SMS_CODE_TTL_SECONDS", 300);
     const codeHash = await bcrypt.hash(code, 10);
 

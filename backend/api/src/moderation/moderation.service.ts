@@ -1,5 +1,7 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { HttpStatus, Inject, Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 
+import { AppException } from "../common/errors/app.exception";
 import { AI_PROVIDER, AIProvider } from "./ai/ai-provider.interface";
 import {
   ModerationContext,
@@ -38,7 +40,8 @@ export interface ModerationResult {
 export class ModerationService {
   constructor(
     private readonly ruleEngine: RuleEngine,
-    @Inject(AI_PROVIDER) private readonly aiProvider: AIProvider
+    @Inject(AI_PROVIDER) private readonly aiProvider: AIProvider,
+    private readonly config: ConfigService
   ) {}
 
   /** Sync rule-only path for callers that cannot await (prefer moderateAsync). */
@@ -82,6 +85,38 @@ export class ModerationService {
 
     const ai = await this.aiProvider.moderate(text, context);
     if (!ai.available) {
+      if (this.config.get<string>("APP_ENV", "development") === "production") {
+        // Profile-like writes do not have a durable pending-draft workflow. A
+        // retryable 503 is safer than mislabelling a provider outage as a user
+        // violation or allowing content to become public on rule checks alone.
+        if (source === "profile") {
+          throw new AppException(
+            "CONTENT_MODERATION_UNAVAILABLE",
+            "Content review is temporarily unavailable; retry without changing your content",
+            HttpStatus.SERVICE_UNAVAILABLE,
+            { provider: ai.provider ?? "configured-provider" }
+          );
+        }
+
+        // Chat and community both have durable pending-review states. Preserve
+        // the submission but never expose it to another user until staff review.
+        const score = Math.max(rule.score, 0.35);
+        return {
+          decision: "review",
+          riskLevel: this.ruleEngine.riskLevelFor(score),
+          priority: rule.priority === "critical" ? "critical" : "high",
+          score,
+          reasons: [...new Set([
+            ...rule.reasons.filter((reason) => reason !== "内容正常"),
+            "外部内容审核服务暂不可用，已转人工复核"
+          ])],
+          matchedRules: [...new Set([...rule.matchedRules, "provider.unavailable"])],
+          categories: rule.categories,
+          policyVersion: rule.policyVersion,
+          provider: ai.provider ?? "configured-provider",
+          usedAI: false
+        };
+      }
       return {
         decision: rule.decision,
         riskLevel: rule.riskLevel,
@@ -116,7 +151,7 @@ export class ModerationService {
   }
 
   isAIConfigured(): boolean {
-    return process.env.DEEPSEEK_API_KEY?.trim() !== undefined && process.env.DEEPSEEK_API_KEY.trim() !== "";
+    return Boolean(this.config.get<string>("DEEPSEEK_API_KEY")?.trim());
   }
 }
 

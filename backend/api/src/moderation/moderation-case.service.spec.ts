@@ -15,6 +15,7 @@ describe("ModerationCaseService", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    prisma.$transaction.mockImplementation(async (callback: any) => callback(prisma));
     service = new ModerationCaseService(prisma, audit, notifications, mediaAssets);
   });
 
@@ -206,7 +207,8 @@ describe("ModerationCaseService", () => {
         action: "create_report",
         resourceType: "moderation_case",
         resourceId: "report-1"
-      })
+      }),
+      prisma
     );
   });
 

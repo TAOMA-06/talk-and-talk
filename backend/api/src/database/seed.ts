@@ -143,6 +143,7 @@ type SeedClient = {
   user: Pick<PrismaClient["user"], "upsert">;
   authIdentity: Pick<PrismaClient["authIdentity"], "upsert">;
   companionProfile: Pick<PrismaClient["companionProfile"], "upsert">;
+  companionCommercialProfile: Pick<PrismaClient["companionCommercialProfile"], "upsert">;
   companionServiceTag: Pick<PrismaClient["companionServiceTag"], "deleteMany" | "upsert">;
   serviceTag: Pick<PrismaClient["serviceTag"], "upsert">;
 };
@@ -280,7 +281,7 @@ export async function seedDatabase(client: SeedClient = prisma) {
         distanceKm: companion.distanceKm,
         availability: companion.availability,
         cityDistrict: companion.cityDistrict,
-        isPublished: true
+        isPublished: companion.isVerified
       },
       update: {
         ownerUserId,
@@ -302,7 +303,35 @@ export async function seedDatabase(client: SeedClient = prisma) {
         distanceKm: companion.distanceKm,
         availability: companion.availability,
         cityDistrict: companion.cityDistrict,
-        isPublished: true
+        isPublished: companion.isVerified
+      }
+    });
+    await client.companionCommercialProfile.upsert({
+      where: { companionId: companion.id },
+      create: {
+        companionId: companion.id,
+        status: companion.isVerified ? "verified" : "pendingReview",
+        settlementRecipientRef: `seed-recipient-${companion.id}`,
+        settlementRecipientMasked: `STAGING-****-${companion.id.toUpperCase()}`,
+        taxProfileRef: `seed-tax-${companion.id}`,
+        identityEvidenceRef: `seed-identity-${companion.id}`,
+        serviceAgreementVersion: "staging-v1",
+        serviceAgreementEvidenceRef: `seed-agreement-${companion.id}`,
+        submittedById: "seed-system",
+        verifiedAt: companion.isVerified ? new Date() : null,
+        verifiedById: companion.isVerified ? "seed-second-review" : null
+      },
+      update: {
+        status: companion.isVerified ? "verified" : "pendingReview",
+        settlementRecipientRef: `seed-recipient-${companion.id}`,
+        settlementRecipientMasked: `STAGING-****-${companion.id.toUpperCase()}`,
+        taxProfileRef: `seed-tax-${companion.id}`,
+        identityEvidenceRef: `seed-identity-${companion.id}`,
+        serviceAgreementVersion: "staging-v1",
+        serviceAgreementEvidenceRef: `seed-agreement-${companion.id}`,
+        submittedById: "seed-system",
+        verifiedAt: companion.isVerified ? new Date() : null,
+        verifiedById: companion.isVerified ? "seed-second-review" : null
       }
     });
 

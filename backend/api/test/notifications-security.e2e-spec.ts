@@ -169,6 +169,17 @@ describe("Notifications and security (e2e)", () => {
     expect(response.body.error.code).toBe("ACCOUNT_BANNED");
   });
 
+  it("removes staff read access immediately when the account is restricted", async () => {
+    const { user, token } = await createUser("admin");
+    await prisma.user.update({ where: { id: user.id }, data: { accountStatus: "restricted" } });
+
+    const response = await request(app.getHttpServer())
+      .get("/api/v1/admin/status")
+      .set("Authorization", `Bearer ${token}`)
+      .expect(403);
+    expect(response.body.error.code).toBe("ACCOUNT_RESTRICTED");
+  });
+
   it("writes audit log on account deletion request", async () => {
     const { user, token } = await createUser();
     const res = await request(app.getHttpServer())

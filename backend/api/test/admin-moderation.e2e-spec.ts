@@ -737,6 +737,7 @@ describe("Admin Moderation (e2e)", () => {
   it("allows users to submit reports while keeping case list staff-only", async () => {
     const { token: userToken } = await createUser("user");
     const { token: modToken } = await createUser("moderator");
+    const { token: adminToken } = await createUser("admin");
 
     const report = await request(app.getHttpServer())
       .post("/api/v1/moderation/reports")
@@ -786,6 +787,11 @@ describe("Admin Moderation (e2e)", () => {
     await request(app.getHttpServer())
       .get("/api/v1/payments/refunds/review-queue")
       .set("Authorization", `Bearer ${modToken}`)
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .get("/api/v1/payments/refunds/review-queue")
+      .set("Authorization", `Bearer ${adminToken}`)
       .expect(200);
   });
 

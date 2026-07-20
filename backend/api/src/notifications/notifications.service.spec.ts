@@ -4,12 +4,14 @@ describe("NotificationsService", () => {
   const prisma = {
     notification: {
       create: jest.fn(),
+      upsert: jest.fn(),
       findMany: jest.fn(),
       count: jest.fn(),
       findUnique: jest.fn(),
       update: jest.fn(),
       updateMany: jest.fn()
-    }
+    },
+    notificationDelivery: { upsert: jest.fn() }
   } as any;
 
   let service: NotificationsService;
@@ -43,5 +45,26 @@ describe("NotificationsService", () => {
     prisma.notification.updateMany.mockResolvedValue({ count: 3 });
     const result = await service.markAllRead("u1");
     expect(result.updated).toBe(3);
+  });
+
+  it("persists an idempotent delivery intent with the notification transaction", async () => {
+    prisma.notification.upsert.mockResolvedValue({
+      id: "n-outbox", userId: "u1", type: "orderStatus", title: "预约已确认", body: "请支付",
+      data: { orderId: "o1" }, eventKey: "order:o1:confirmed", readAt: null, createdAt: new Date()
+    });
+    prisma.notificationDelivery.upsert.mockResolvedValue({ id: "d1" });
+
+    await service.createTransactional(prisma, {
+      userId: "u1", type: "orderStatus", title: "预约已确认", body: "请支付",
+      data: { orderId: "o1" }, eventKey: "order:o1:confirmed", templateKey: "orderConfirmed"
+    });
+
+    expect(prisma.notification.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: { eventKey: "order:o1:confirmed" },
+      create: expect.objectContaining({ eventKey: "order:o1:confirmed" })
+    }));
+    expect(prisma.notificationDelivery.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: { notificationId_templateKey: { notificationId: "n-outbox", templateKey: "orderConfirmed" } }
+    }));
   });
 });

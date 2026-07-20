@@ -374,6 +374,7 @@ export const api = {
   serviceOrders: () => request<{ items: Order[] }>("/orders/service"),
   createOrder: (data: Record<string, unknown>) => request<Order>("/orders", { method: "POST", data }),
   cancelOrder: (id: string) => request<Order>(`/orders/${encodeURIComponent(id)}/cancel`, { method: "POST" }),
+  confirmOrderCompletion: (id: string) => request<Order>(`/orders/${encodeURIComponent(id)}/completion-confirmations`, { method: "POST" }),
   startService: (id: string) => request<Order>(`/orders/service/${encodeURIComponent(id)}/start`, { method: "POST" }),
   completeService: (id: string) => request<Order>(`/orders/service/${encodeURIComponent(id)}/complete`, { method: "POST" }),
   confirmServiceOrder: (id: string) => request<Order>(`/orders/service/${encodeURIComponent(id)}/confirm`, { method: "POST" }),
@@ -433,6 +434,28 @@ export const api = {
   ),
   notifications: () => request<{ items: Notification[] }>("/notifications"),
   notificationUnreadCount: () => request<{ count: number }>("/notifications/unread-count"),
+  subscriptionTemplates: (keys: string[]) => request<{
+    enabled: boolean;
+    templates: Array<{ key: string; templateId: string }>;
+  }>(`/notifications/subscription-templates?keys=${encodeURIComponent(keys.join(","))}`),
+  recordSubscriptionGrant: (templateKey: string, granted: boolean) => request<{
+    recorded: boolean;
+    reason?: "not_granted";
+  }>("/notifications/subscription-grants", { method: "POST", data: { templateKey, granted } }),
   markNotificationRead: (id: string) => request<Notification>(`/notifications/${encodeURIComponent(id)}/read`, { method: "POST" }),
-  markAllNotificationsRead: () => request<{ updated: number }>("/notifications/read-all", { method: "POST" })
+  markAllNotificationsRead: () => request<{ updated: number }>("/notifications/read-all", { method: "POST" }),
+  createSupportTicket: (data: { orderId?: string; category: "orderIssue" | "refund" | "safety" | "privacy" | "general"; subject: string; body: string }) =>
+    request<{ id: string; status: string }>("/support/tickets", { method: "POST", data }),
+  supportTickets: () => request<{ items: Array<{
+    id: string;
+    orderId: string | null;
+    status: string;
+    subject: string;
+    body: string;
+    resolution: string | null;
+    resolutionCode: string | null;
+    dueAt: string | null;
+    updatedAt: string;
+  }> }>("/support/tickets/me"),
+  companionEarnings: () => request<{ items: Array<{ id: string; payableCents: number; status: string; availableAt: string }> }>("/commercial/earnings/me")
 };
