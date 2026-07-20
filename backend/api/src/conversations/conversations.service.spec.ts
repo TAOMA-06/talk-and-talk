@@ -7,7 +7,12 @@ describe("ConversationsService.ensureConversation", () => {
     },
     companionProfile: {
       findFirst: jest.fn()
-    }
+    },
+    message: {
+      findFirst: jest.fn(),
+      findMany: jest.fn()
+    },
+    $executeRaw: jest.fn()
   } as any;
 
   const moderation = {
@@ -18,12 +23,22 @@ describe("ConversationsService.ensureConversation", () => {
   const moderationCases = {
     createFromResult: jest.fn()
   } as any;
+  const chatRestrictions = { assertCanSend: jest.fn() } as any;
+  const mediaAssets = { isFeatureEnabled: jest.fn(() => false) } as any;
+  const mediaWorker = { enqueue: jest.fn() } as any;
 
   let service: ConversationsService;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new ConversationsService(prisma, moderation, moderationCases);
+    service = new ConversationsService(
+      prisma,
+      moderation,
+      moderationCases,
+      chatRestrictions,
+      mediaAssets,
+      mediaWorker
+    );
   });
 
   it("returns an activated conversation for an authorized participant", async () => {
@@ -75,5 +90,52 @@ describe("ConversationsService.ensureConversation", () => {
     await expect((service as any).ensureConversation("third-party", "conv-private")).rejects.toMatchObject({
       code: "CONVERSATION_NOT_FOUND"
     });
+  });
+
+  it("filters message pages so a recipient cannot use a hidden message as a cursor", async () => {
+    prisma.conversation.findFirst.mockResolvedValue({
+      id: "conv-1",
+      externalId: "c1",
+      userId: "u1",
+      companion: { ownerUserId: "companion-owner" }
+    });
+    prisma.message.findFirst.mockResolvedValue(null);
+
+    await expect(service.messages("companion-owner", "conv-1", { cursor: "hidden-message" })).rejects.toMatchObject({
+      code: "INVALID_CURSOR"
+    });
+    expect(prisma.message.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        id: "hidden-message",
+        conversationId: "conv-1",
+        AND: [expect.objectContaining({ OR: expect.any(Array) })]
+      })
+    }));
+  });
+
+  it("queries only published participant messages plus the viewer's own held messages", async () => {
+    prisma.conversation.findFirst.mockResolvedValue({
+      id: "conv-1",
+      externalId: "c1",
+      userId: "u1",
+      companion: { ownerUserId: "companion-owner" }
+    });
+    prisma.message.findMany.mockResolvedValue([]);
+
+    await service.messages("companion-owner", "conv-1", {});
+
+    expect(prisma.message.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        conversationId: "conv-1",
+        AND: [
+          {
+            OR: [
+              { moderationStatus: "published", visibility: "participants" },
+              { senderId: "companion-owner" }
+            ]
+          }
+        ]
+      })
+    }));
   });
 });

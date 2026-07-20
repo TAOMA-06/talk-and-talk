@@ -19,6 +19,7 @@ import { NotificationsModule } from "./notifications/notifications.module";
 import { OrdersModule } from "./orders/orders.module";
 import { PaymentsModule } from "./payments/payments.module";
 import { ReviewsModule } from "./reviews/reviews.module";
+import { RecommendationsModule } from "./recommendations/recommendations.module";
 import { UsersModule } from "./users/users.module";
 
 @Module({
@@ -39,6 +40,7 @@ import { UsersModule } from "./users/users.module";
     OrdersModule,
     PaymentsModule,
     ReviewsModule,
+    RecommendationsModule,
     AdminModule,
     NotificationsModule,
     MetricsModule,

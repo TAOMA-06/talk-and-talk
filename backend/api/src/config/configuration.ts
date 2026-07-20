@@ -19,6 +19,8 @@ interface Environment {
   DEEPSEEK_API_KEY: string;
   DEEPSEEK_URL: string;
   DEEPSEEK_MODEL: string;
+  MEDIA_FEATURE_ENABLED: boolean;
+  MEDIA_PROVIDER: string;
   WECHAT_PAY_APP_ID: string;
   WECHAT_PAY_MCH_ID: string;
   WECHAT_PAY_API_V3_KEY: string;
@@ -34,6 +36,9 @@ interface Environment {
   RATE_LIMIT_PER_MINUTE: number;
   BODY_SIZE_LIMIT: string;
   SEED_ON_STARTUP: boolean;
+  PAYMENT_RECONCILIATION_ENABLED: boolean;
+  PAYMENT_RECONCILIATION_INTERVAL_SECONDS: number;
+  PAYMENT_RECONCILIATION_BATCH_SIZE: number;
   METRICS_TOKEN: string;
   LEGAL_CONSENT_VERSION: string;
   LEGAL_PRIVACY_URL: string;
@@ -260,6 +265,22 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
   if (appEnv === "production" && seedOnStartup) {
     throw new Error("SEED_ON_STARTUP is not allowed when APP_ENV=production");
   }
+  // This worker is database-driven and idempotent: it is safe for multiple
+  // replicas and resumes any overdue order after a restart. Keep it off under
+  // NODE_ENV=test so unit/e2e processes do not leave live timers behind.
+  const paymentReconciliationEnabled = parseBoolean(
+    env.PAYMENT_RECONCILIATION_ENABLED,
+    nodeEnv !== "test"
+  );
+  const paymentReconciliationIntervalSeconds = positiveInteger(
+    "PAYMENT_RECONCILIATION_INTERVAL_SECONDS",
+    env.PAYMENT_RECONCILIATION_INTERVAL_SECONDS,
+    60
+  );
+  const paymentReconciliationBatchSize = Math.min(
+    positiveInteger("PAYMENT_RECONCILIATION_BATCH_SIZE", env.PAYMENT_RECONCILIATION_BATCH_SIZE, 50),
+    200
+  );
 
   const miniProgramAppId = optionalString(env.WECHAT_MINIPROGRAM_APP_ID);
   const miniProgramAppSecret = optionalString(env.WECHAT_MINIPROGRAM_APP_SECRET);
@@ -319,6 +340,14 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     DEFAULT_LEGAL_TERMS_URL,
     ["https:"]
   );
+  const mediaFeatureEnabled = parseBoolean(env.MEDIA_FEATURE_ENABLED, false);
+  const mediaProvider = env.MEDIA_PROVIDER?.trim() || "disabled";
+  if (!["disabled", "mock"].includes(mediaProvider)) {
+    throw new Error("MEDIA_PROVIDER must be disabled or mock until a production media adapter is installed");
+  }
+  if (appEnv === "production" && mediaFeatureEnabled) {
+    throw new Error("MEDIA_FEATURE_ENABLED requires a configured production media adapter and cannot use the bundled mock provider");
+  }
 
   return {
     NODE_ENV: nodeEnv,
@@ -343,6 +372,8 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     DEEPSEEK_API_KEY: optionalString(env.DEEPSEEK_API_KEY),
     DEEPSEEK_URL: requiredUrl("DEEPSEEK_URL", env.DEEPSEEK_URL, DEFAULT_DEEPSEEK_URL),
     DEEPSEEK_MODEL: env.DEEPSEEK_MODEL?.trim() || DEFAULT_DEEPSEEK_MODEL,
+    MEDIA_FEATURE_ENABLED: mediaFeatureEnabled,
+    MEDIA_PROVIDER: mediaProvider,
     WECHAT_PAY_APP_ID: optionalString(env.WECHAT_PAY_APP_ID),
     WECHAT_PAY_MCH_ID: wechatPayMchId,
     WECHAT_PAY_API_V3_KEY: wechatPayApiV3Key,
@@ -358,6 +389,9 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     RATE_LIMIT_PER_MINUTE: positiveInteger("RATE_LIMIT_PER_MINUTE", env.RATE_LIMIT_PER_MINUTE, 120),
     BODY_SIZE_LIMIT: env.BODY_SIZE_LIMIT?.trim() || "1mb",
     SEED_ON_STARTUP: seedOnStartup,
+    PAYMENT_RECONCILIATION_ENABLED: paymentReconciliationEnabled,
+    PAYMENT_RECONCILIATION_INTERVAL_SECONDS: paymentReconciliationIntervalSeconds,
+    PAYMENT_RECONCILIATION_BATCH_SIZE: paymentReconciliationBatchSize,
     METRICS_TOKEN: metricsToken,
     LEGAL_CONSENT_VERSION: legalConsentVersion,
     LEGAL_PRIVACY_URL: legalPrivacyUrl,

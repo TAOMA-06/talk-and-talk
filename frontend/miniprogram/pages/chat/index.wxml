@@ -1,20 +1,37 @@
 <view class="page chat-page">
   <view class="notice">请在平台内完成沟通，勿交换私人联系方式、线下见面或私下转账。</view>
+  <view wx:if="{{restrictionNotice}}" class="restriction-notice">{{restrictionNotice}}。到期后可恢复发送。</view>
+  <view wx:if="{{appealCaseId}}" class="appeal-notice">
+    <text>严重处置可申请一次人工复核。</text>
+    <button size="mini" bindtap="appeal">申请复核</button>
+  </view>
   <view wx:if="{{loading}}" class="empty">正在加载…</view>
   <view wx:elif="{{error}}" class="empty">{{error}}</view>
   <view wx:else class="messages">
     <view wx:if="{{loadingOlder}}" class="history-status">正在加载更早消息…</view>
     <view wx:elif="{{hasMore}}" class="history-status">上拉加载更早消息</view>
     <view wx:elif="{{messages.length}}" class="history-status">已显示全部消息</view>
-    <view wx:for="{{messages}}" wx:key="id" class="message {{item.type === 'system' || item.type === 'safety' ? 'system' : ''}}">
+    <view wx:for="{{messages}}" wx:key="id" class="message {{item.type === 'system' || item.type === 'safety' ? 'system' : ''}} {{item.moderationStatus !== 'published' ? 'held' : ''}}">
       <view class="sender">{{item.senderName || item.senderId}}</view>
-      <view class="bubble">{{item.content}}</view>
+      <view class="bubble" bindlongpress="reportMessage" data-message-id="{{item.id}}">
+        <view wx:if="{{item.content}}" class="message-content">{{item.content}}</view>
+        <view wx:for="{{item.attachments}}" wx:for-item="attachment" wx:key="id" class="attachment">
+          <image wx:if="{{attachment.kind === 'image' && attachment.url}}" class="attachment-image" mode="widthFix" src="{{attachment.url}}" bindtap="previewImage" data-url="{{attachment.url}}" />
+          <button wx:elif="{{attachment.kind === 'audio' && attachment.url}}" class="audio-play" size="mini" bindtap="playAudio" data-url="{{attachment.url}}">播放语音</button>
+          <view wx:else class="attachment-placeholder">{{attachment.kind === 'image' ? '图片' : '语音'}}{{attachment.status === 'expired' ? '已过期' : '审核中，暂不展示'}}</view>
+        </view>
+      </view>
+      <view wx:if="{{item.moderationStatus === 'queued' || item.moderationStatus === 'pendingReview'}}" class="delivery-status">审核中，仅自己可见</view>
+      <view wx:elif="{{item.moderationStatus === 'blocked'}}" class="delivery-status blocked">未送达</view>
+      <view wx:elif="{{item.moderationStatus === 'removed'}}" class="delivery-status blocked">内容已移除</view>
     </view>
     <view wx:if="{{syncing}}" class="sync-status">正在同步新消息…</view>
   </view>
   <view class="composer">
-    <input value="{{draft}}" bindinput="setDraft" maxlength="2000" placeholder="输入消息…" confirm-type="send" bindconfirm="send" />
-    <button class="send" loading="{{sending}}" bindtap="send">发送</button>
+    <input value="{{draft}}" bindinput="setDraft" maxlength="2000" placeholder="输入消息…" confirm-type="send" bindconfirm="send" disabled="{{restrictionEndsAt !== ''}}" />
+    <button wx:if="{{mediaEnabled}}" class="media" disabled="{{sending || mediaUploading || restrictionEndsAt}}" bindtap="chooseImage">图片</button>
+    <button wx:if="{{mediaEnabled}}" class="media {{recording ? 'recording' : ''}}" disabled="{{sending || mediaUploading || restrictionEndsAt}}" bindtap="toggleRecord">{{recording ? '结束' : '语音'}}</button>
+    <button class="send" loading="{{sending || mediaUploading}}" disabled="{{restrictionEndsAt !== ''}}" bindtap="send">发送</button>
   </view>
   <button class="report" bindtap="report">举报此会话</button>
 </view>

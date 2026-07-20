@@ -36,11 +36,28 @@ const modalInvocations = [];
 const navigations = [];
 let cloudRunCall = null;
 let environmentVersion = "release";
+const recommendationEvents = [];
+let recommendationPreference = {
+  personalizationEnabled: true,
+  topicIds: ["t1"],
+  city: null,
+  maxPricePerHalfHour: 50,
+  preferredTimeSlots: ["21:00"],
+  behavioralTags: [{ id: "inferred:t1", topicId: "t1", name: "情绪倾听", weight: 3, source: "inferredOrder", updatedAt: null }]
+};
 
 const companion = {
   id: "companion-1", name: "小安", role: "情绪倾听者", initials: "小安", bio: "安全、耐心地倾听",
   rating: 4.9, reviewCount: 12, pricePerHalfHour: 39, isOnline: true, isVerified: true,
-  availability: "online", tags: ["情绪倾听"], availableTimes: ["今晚"]
+  availability: "online", tags: ["情绪倾听"], availableTimes: ["今晚"], topicIds: ["t1"], specialties: ["情绪倾听"]
+};
+const recommendedCompanion = {
+  ...companion,
+  impressionId: "00000000-0000-4000-8000-000000000001",
+  position: 1,
+  score: 0.91,
+  reasonCodes: ["theme", "quality"],
+  reasonText: "适合情绪倾听"
 };
 const order = {
   id: "order-1", companionId: companion.id, themeId: "t1", durationMinutes: 30, amountCents: 3900,
@@ -98,6 +115,35 @@ function responseFor(path, method, data, query = new URLSearchParams()) {
   if (path === "/users/me/legal-consents" && method === "GET") {
     return { valid: true, receipt: { id: "consent-1", version: "1.0-2026-07-19" } };
   }
+  if (path === "/recommendations/topics" && method === "GET") {
+    return { algorithmVersion: "companion-ranking-v1", items: [
+      { id: "t1", name: "情绪倾听" }, { id: "t2", name: "职场减压" }, { id: "t3", name: "睡前语音" }
+    ] };
+  }
+  if (path === "/recommendations/me/preferences" && method === "GET") return recommendationPreference;
+  if (path === "/recommendations/me/preferences" && method === "PATCH") {
+    recommendationPreference = { ...recommendationPreference, ...data };
+    return recommendationPreference;
+  }
+  if (path.startsWith("/recommendations/me/tags/") && method === "DELETE") {
+    const id = decodeURIComponent(path.split("/").at(-1));
+    recommendationPreference = {
+      ...recommendationPreference,
+      behavioralTags: recommendationPreference.behavioralTags.filter((tag) => tag.id !== id)
+    };
+    return { deleted: true, topicId: id.replace("inferred:", "") };
+  }
+  if (path === "/recommendations/companions" && method === "GET") {
+    return {
+      algorithmVersion: "companion-ranking-v1", personalized: true, items: [recommendedCompanion],
+      pagination: { pageSize: 20, total: 1, nextCursor: null }
+    };
+  }
+  if (path === "/recommendations/events" && method === "POST") {
+    assert.ok(Array.isArray(data.events), "recommendation events must be batched");
+    recommendationEvents.push(...data.events);
+    return { updated: data.events.length };
+  }
   if (path === "/companions" && method === "GET") return { items: [companion], pagination: { total: 1 } };
   if (path === `/companions/${companion.id}`) return companion;
   if (path === `/reviews/companion/${companion.id}`) return { items: [] };
@@ -127,6 +173,9 @@ function responseFor(path, method, data, query = new URLSearchParams()) {
   if (path === "/conversations") return { conversations: [{
     id: companion.id, participant: { ...companion }, lastMessage: message, unreadCount: 1, updatedAt: new Date().toISOString()
   }] };
+  if (path === `/conversations/${companion.id}/status` && method === "GET") {
+    return { mediaEnabled: false, chatRestriction: null };
+  }
   if (path === `/conversations/${companion.id}/messages` && method === "GET") return messagePage(query.get("cursor"));
   if (path === `/conversations/${companion.id}/messages` && method === "POST") {
     const sentMessage = {
@@ -235,10 +284,18 @@ assert.equal(legal.data.src, "https://api.talkandtalk.app/legal/privacy.html");
 
 const discover = blockedDiscover;
 await discover.load();
+await new Promise((resolve) => setTimeout(resolve, 10));
 assert.equal(discover.data.companions.length, 1);
+assert.equal(discover.data.companions[0].impressionId, recommendedCompanion.impressionId);
 assert.ok(calls.some((call) => call.path === "/users/me/legal-consents" && call.method === "POST"));
 
 const runtimeApi = await import(pathToFileURL(join(output, "utils/api.js")).href);
+const sha256 = await import(pathToFileURL(join(output, "utils/sha256.js")).href);
+assert.equal(
+  sha256.sha256Hex(new TextEncoder().encode("abc").buffer),
+  "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+  "media reservations must use a standard SHA-256 digest"
+);
 const restoredAccessToken = storage.get("talkandtalk.accessToken");
 const restoredRefreshToken = storage.get("talkandtalk.refreshToken");
 const restoredUser = storage.get("talkandtalk.user");
@@ -303,6 +360,7 @@ assert.equal(createdOrderPayload.themeId, "t1");
 const community = await loadPage("community/index");
 await community.load();
 assert.equal(community.data.posts.length, 1);
+assert.equal(community.data.recommendations.length, 1);
 
 const orders = await loadPage("orders/index");
 await orders.load();
@@ -324,6 +382,12 @@ assert.ok(calls.some((call) => call.path === `/orders/${order.id}/payment/sync` 
 const profile = await loadPage("profile/index");
 await profile.load();
 assert.equal(profile.data.user.id, "user-1");
+assert.equal(profile.data.recommendationPreferences.personalizationEnabled, true);
+profile.toggleRecommendationTopic({ currentTarget: { dataset: { id: "t2" } } });
+await profile.saveRecommendations();
+assert.ok(recommendationPreference.topicIds.includes("t2"));
+await profile.deleteRecommendationTag({ currentTarget: { dataset: { id: "inferred:t1" } } });
+assert.equal(recommendationPreference.behavioralTags.length, 0);
 profile.setGender({ detail: { value: "1" } });
 profile.data.displayName = "微信用户";
 await profile.saveProfile();
@@ -353,5 +417,6 @@ assert.equal(cloudResponse.data.data.status, "ok");
 assert.equal(cloudRunCall.path, "/api/v1/health");
 assert.equal(cloudRunCall.header["X-WX-SERVICE"], "talk-and-talk-api");
 assert.equal(cloudRunCall.config.env, "smoke-env");
+assert.ok(recommendationEvents.some((event) => event.type === "view"), "recommendation card views should be reported");
 
 console.log(`Mini Program runtime smoke passed: consent/legal gates, ${calls.length} API calls, mock/real payment branches and HTTPS/Cloud Run transport coverage`);

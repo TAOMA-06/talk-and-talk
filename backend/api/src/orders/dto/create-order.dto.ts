@@ -1,4 +1,4 @@
-import { IsDateString, IsInt, IsString, Max, Min, MinLength } from "class-validator";
+import { IsDateString, IsInt, IsOptional, IsString, IsUUID, Max, Min, MinLength } from "class-validator";
 
 export class CreateOrderDto {
   @IsString()
@@ -16,4 +16,8 @@ export class CreateOrderDto {
 
   @IsDateString()
   scheduledAt!: string;
+
+  @IsOptional()
+  @IsUUID()
+  recommendationImpressionId?: string;
 }

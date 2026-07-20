@@ -133,7 +133,7 @@ describe("Conversations (e2e)", () => {
     return conversation;
   }
 
-  it("writes a normal user message without exposing internal moderation data", async () => {
+  it("keeps the legacy text request compatible while returning delivery state without internal evidence", async () => {
     const { user, token } = await createUser();
     await activateConversation(user.id, "c1");
 
@@ -144,7 +144,13 @@ describe("Conversations (e2e)", () => {
       .expect(201)
       .expect(({ body }) => {
         expect(body.data.moderation.decision).toBe("allow");
-        expect(Object.keys(body.data.moderation).sort()).toEqual(["decision", "riskLevel"]);
+        expect(body.data.moderation).toEqual({
+          decision: "allow",
+          riskLevel: "low",
+          deliveryStatus: "published",
+          caseId: null,
+          appealEligible: false
+        });
         expect(body.data.message.content).toBe("今天有点累，想有人听我说。");
         expect(body.data.safetyMessage).toBeNull();
         expect(body.data.companionReply).toBeNull();
@@ -162,7 +168,7 @@ describe("Conversations (e2e)", () => {
       });
   });
 
-  it("blocks risky content without writing the original chat message", async () => {
+  it("keeps a blocked message sender-only while never delivering it to the other participant", async () => {
     const { user, token } = await createUser();
     await activateConversation(user.id, "c1");
 
@@ -184,8 +190,10 @@ describe("Conversations (e2e)", () => {
       .set("Authorization", `Bearer ${token}`)
       .expect(200)
       .expect(({ body }) => {
-        const contents = body.data.messages.map((item: { content: string }) => item.content);
-        expect(contents).not.toContain("我们加微信线下见面吧");
+        const messages = body.data.messages as Array<{ content: string; moderationStatus: string; visibility: string }>;
+        const blocked = messages.find((item) => item.content === "我们加微信线下见面吧");
+        expect(blocked).toEqual(expect.objectContaining({ moderationStatus: "blocked", visibility: "senderOnly" }));
+        const contents = messages.map((item) => item.content);
         expect(contents.some((content: string) => content.includes("安全提醒"))).toBe(true);
       });
   });
@@ -239,6 +247,32 @@ describe("Conversations (e2e)", () => {
         expect(body.data.conversations[0].participant.name).toBe("许澈");
         expect(body.data.conversations[0].lastMessage.content).toBe("可以聊聊职场压力吗");
         expect(body.data.conversations[0].unreadCount).toBe(0);
+      });
+  });
+
+  it("does not expose a sender's pending-review message or safety notice to the companion owner", async () => {
+    const customer = await createUser("待审客户");
+    const owner = await createUser("陪伴者实名", "companion");
+    await prisma.companionProfile.update({ where: { id: "c1" }, data: { ownerUserId: owner.user.id } });
+    const conversation = await activateConversation(customer.user.id, "c1");
+
+    await request(app.getHttpServer())
+      .post("/api/v1/conversations/c1/messages")
+      .set("Authorization", `Bearer ${customer.token}`)
+      .send({ content: "你真废物" })
+      .expect(201)
+      .expect(({ body }) => {
+        expect(body.data.moderation.deliveryStatus).toBe("pendingReview");
+        expect(body.data.message).toMatchObject({ visibility: "senderOnly" });
+      });
+
+    await request(app.getHttpServer())
+      .get(`/api/v1/conversations/${conversation.id}/messages`)
+      .set("Authorization", `Bearer ${owner.token}`)
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body.data.messages.map((item: { content: string }) => item.content)).not.toContain("你真废物");
+        expect(body.data.messages.some((item: { type: string }) => item.type === "safety")).toBe(false);
       });
   });
 

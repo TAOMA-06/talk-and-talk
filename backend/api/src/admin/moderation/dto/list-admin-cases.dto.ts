@@ -11,6 +11,10 @@ export class ListAdminCasesQueryDto {
   riskLevel?: "low" | "medium" | "high";
 
   @IsOptional()
+  @IsIn(["normal", "high", "critical"])
+  priority?: "normal" | "high" | "critical";
+
+  @IsOptional()
   @IsIn(["chat", "community", "report", "profile"])
   source?: "chat" | "community" | "report" | "profile";
 

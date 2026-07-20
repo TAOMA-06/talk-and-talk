@@ -31,6 +31,11 @@ export class ApplyCompanionDto {
   @IsString({ each: true })
   specialties!: string[];
 
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  topicIds?: string[];
+
   @IsString()
   cityDistrict!: string;
 }

@@ -1,0 +1,170 @@
+import { HttpStatus, Injectable } from "@nestjs/common";
+
+import { AuditService } from "../common/audit/audit.service";
+import { AppException } from "../common/errors/app.exception";
+import { PrismaService } from "../database/prisma.service";
+import { NotificationsService } from "../notifications/notifications.service";
+
+const AUTO_STRIKE_WINDOW_MS = 24 * 60 * 60 * 1000;
+const AUTO_RESTRICTION_MS = 24 * 60 * 60 * 1000;
+const MANUAL_CONFIRM_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+
+@Injectable()
+export class ChatRestrictionService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+    private readonly notifications: NotificationsService
+  ) {}
+
+  async assertCanSend(userId: string) {
+    const restriction = await this.activeForUser(userId);
+    if (!restriction) return;
+
+    throw new AppException(
+      "CHAT_RESTRICTED",
+      `Chat sending is restricted until ${restriction.endsAt.toISOString()}`,
+      HttpStatus.FORBIDDEN,
+      { endsAt: restriction.endsAt.toISOString(), reason: restriction.reason }
+    );
+  }
+
+  async activeForUser(userId: string) {
+    const now = new Date();
+    return this.prisma.chatRestriction.findFirst({
+      where: {
+        userId,
+        startsAt: { lte: now },
+        endsAt: { gt: now },
+        liftedAt: null
+      },
+      orderBy: { endsAt: "desc" }
+    } as any);
+  }
+
+  /** Two high-risk blocks in 24 hours result in a chat-only 24 hour restriction. */
+  async recordAutomaticHighRiskBlock(userId: string, caseId: string) {
+    const existing = await this.activeForUser(userId);
+    if (existing) return existing;
+
+    const since = new Date(Date.now() - AUTO_STRIKE_WINDOW_MS);
+    const strikes = await this.prisma.moderationCase.count({
+      where: {
+        subjectUserId: userId,
+        decision: "block",
+        riskLevel: "high",
+        createdAt: { gte: since }
+      }
+    } as any);
+    if (strikes < 2) return null;
+
+    return this.createRestriction({
+      userId,
+      caseId,
+      source: "automatic",
+      reason: "24 小时内多次高风险聊天内容被拦截",
+      endsAt: new Date(Date.now() + AUTO_RESTRICTION_MS),
+      actorId: "system"
+    });
+  }
+
+  async createRestriction(input: {
+    userId: string;
+    caseId?: string | null;
+    source: "automatic" | "manual";
+    reason: string;
+    endsAt: Date;
+    actorId?: string | null;
+  }) {
+    const restriction = await this.prisma.chatRestriction.create({
+      data: {
+        userId: input.userId,
+        caseId: input.caseId ?? null,
+        source: input.source,
+        reason: input.reason,
+        endsAt: input.endsAt
+      }
+    } as any);
+    await this.audit.record({
+      actorId: input.actorId ?? "system",
+      action: "moderation.chat_restriction_created",
+      resourceType: "chat_restriction",
+      resourceId: restriction.id,
+      metadata: {
+        userId: input.userId,
+        caseId: input.caseId ?? null,
+        source: input.source,
+        endsAt: input.endsAt.toISOString()
+      }
+    });
+    await this.notifications.create(
+      input.userId,
+      "moderationAlert",
+      "聊天功能暂时受限",
+      "检测到重复高风险内容，聊天发送功能将暂时受限。",
+      { restrictionId: restriction.id, endsAt: input.endsAt.toISOString(), caseId: input.caseId ?? null }
+    );
+    return restriction;
+  }
+
+  /**
+   * Three independent staff confirmations within 30 days do not auto-ban the
+   * account. They reopen the latest case as a critical human-disposition task,
+   * leaving any global account action to an authorized reviewer.
+   */
+  async recordManualConfirmedViolation(userId: string, caseId: string, actorId: string) {
+    const since = new Date(Date.now() - MANUAL_CONFIRM_WINDOW_MS);
+    const confirmations = await this.prisma.moderationActionLog.count({
+      where: {
+        action: "confirmViolation",
+        createdAt: { gte: since },
+        case: { subjectUserId: userId }
+      }
+    } as any);
+    if (confirmations < 3) return { escalated: false, confirmations };
+
+    await this.prisma.$transaction(async (tx) => {
+      const db = tx as any;
+      await db.moderationCase.update({
+        where: { id: caseId },
+        data: { status: "humanReview", priority: "critical", resolvedAt: null }
+      });
+      await db.moderationActionLog.create({
+        data: {
+          caseId,
+          actorId: "system",
+          action: "manual_escalation_required",
+          note: "30 天内已累计三次人工确认违规，需审核员决定是否采用既有全局账号处置。"
+        }
+      });
+      await db.auditLog.create({
+        data: {
+          actorId,
+          action: "moderation.manual_escalation_required",
+          resourceType: "moderation_case",
+          resourceId: caseId,
+          metadata: { userId, confirmations, windowDays: 30 }
+        }
+      });
+    });
+    return { escalated: true, confirmations };
+  }
+
+  async liftForCase(caseId: string, actorId: string, note?: string) {
+    const now = new Date();
+    const result = await this.prisma.chatRestriction.updateMany({
+      where: { caseId, liftedAt: null, endsAt: { gt: now } },
+      data: { liftedAt: now, liftedByUserId: actorId }
+    } as any);
+    if (result.count) {
+      await this.audit.record({
+        actorId,
+        action: "moderation.chat_restriction_lifted",
+        resourceType: "moderation_case",
+        resourceId: caseId,
+        metadata: { note: note?.trim() || null, count: result.count }
+      });
+    }
+    return result.count;
+  }
+}

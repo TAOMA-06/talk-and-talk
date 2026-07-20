@@ -1,4 +1,4 @@
-import { forwardRef, HttpStatus, Inject, Injectable } from "@nestjs/common";
+import { forwardRef, HttpStatus, Inject, Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { randomUUID } from "node:crypto";
 
@@ -32,9 +32,12 @@ const MIN_PREPAY_USABLE_WINDOW_MS = 60 * 1000;
 // Keep a small issuance allowance so the client still receives at least a
 // full minute after the WeChat create-order round trip completes.
 const PREPAY_ISSUANCE_ALLOWANCE_MS = 25 * 1000;
+const FAILED_REFUND_RETRY_BACKOFF_MINUTES = 5;
 
 @Injectable()
 export class PaymentsService {
+  private readonly logger = new Logger(PaymentsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
@@ -272,10 +275,10 @@ export class PaymentsService {
   }
 
   async mockNotify(userId: string, body: { outTradeNo: string; amountCents?: number; transactionId?: string }) {
-    if (this.config.getOrThrow<string>("APP_ENV") === "production") {
+    if (this.config.getOrThrow<string>("APP_ENV") === "production" || !this.wechat.isMock) {
       throw new AppException(
         "MOCK_PAY_DISABLED",
-        "Mock WeChat notify is disabled in production",
+        "Mock WeChat notify is only available when the mock payment provider is active",
         HttpStatus.FORBIDDEN
       );
     }
@@ -569,6 +572,38 @@ export class PaymentsService {
     return { refund: this.refundDto(updated), order: this.ordersService.toDto(refund.order) };
   }
 
+  async retryRefund(actorId: string, refundId: string, note?: string) {
+    const refund = await this.prisma.$transaction(async (tx) => {
+      const db = tx as any;
+      await db.$queryRaw`SELECT "id" FROM "RefundTransaction" WHERE "id" = ${refundId} FOR UPDATE`;
+      const current = await db.refundTransaction.findUnique({
+        where: { id: refundId },
+        include: { order: true }
+      });
+      if (!current) throw new AppException("REFUND_NOT_FOUND", "Refund not found", HttpStatus.NOT_FOUND);
+      if (current.status !== "failed") {
+        throw new AppException("REFUND_INVALID_STATE", "Only a failed refund can be retried", HttpStatus.CONFLICT);
+      }
+      return db.refundTransaction.update({
+        where: { id: refundId },
+        data: {
+          status: "pending",
+          failureReason: null,
+          reviewNote: note?.trim() || current.reviewNote
+        },
+        include: { order: true }
+      });
+    }, { maxWait: 5_000, timeout: 10_000 });
+    await this.audit.record({
+      actorId,
+      action: "refund.retry_requested",
+      resourceType: "refund",
+      resourceId: refundId,
+      metadata: { note: note?.trim() || null }
+    });
+    return this.submitRefundToWechat(refund.id);
+  }
+
   async syncRefund(userId: string, orderId: string) {
     const refund: any = await this.prisma.refundTransaction.findFirst({
       where: { orderId, order: { userId } }, orderBy: { createdAt: "desc" }
@@ -847,7 +882,8 @@ export class PaymentsService {
         data: {
           status: "paid",
           paidAt,
-          conversationId: conversation.id
+          conversationId: conversation.id,
+          paymentReservationExpiresAt: null
         }
       });
 
@@ -945,6 +981,16 @@ export class PaymentsService {
         HttpStatus.CONFLICT
       );
     }
+    if (
+      order.paymentReservationExpiresAt instanceof Date &&
+      order.paymentReservationExpiresAt.getTime() <= Date.now()
+    ) {
+      throw new AppException(
+        "ORDER_RESERVATION_EXPIRED",
+        "The companion confirmation reservation has expired; ask the companion to confirm again",
+        HttpStatus.CONFLICT
+      );
+    }
   }
 
   private async assertCompanionSlotAvailable(
@@ -984,6 +1030,22 @@ export class PaymentsService {
       if (["paid", "inService"].includes(candidate.status) ||
           candidate.payments.some((payment: any) => payment.status === "success")) {
         this.throwCompanionSlotUnavailable();
+      }
+
+      if (candidate.companionConfirmedAt) {
+        const reservationExpiresAt = candidate.paymentReservationExpiresAt as Date | null;
+        if (!reservationExpiresAt || reservationExpiresAt.getTime() > Date.now()) {
+          this.throwCompanionSlotUnavailable();
+        }
+        await db.order.updateMany({
+          where: {
+            id: candidate.id,
+            status: "pending",
+            companionConfirmedAt: { not: null },
+            paymentReservationExpiresAt: { lte: new Date() }
+          },
+          data: { companionConfirmedAt: null, paymentReservationExpiresAt: null }
+        });
       }
 
       const activePayment = candidate.payments.find((payment: any) => payment.status === "initiated");
@@ -1087,16 +1149,59 @@ export class PaymentsService {
     }, { maxWait: 5_000, timeout: 10_000 });
   }
 
-  private async refundIfServiceWindowExpired(orderId: string): Promise<void> {
+  /**
+   * Database-driven reconciliation means no scheduled work is lost on a
+   * process restart: every due paid order remains eligible until a guarded
+   * refund transaction is created or successfully completed.
+   */
+  async reconcileExpiredServiceWindows(limit = 50): Promise<{
+    scanned: number;
+    refundAttempts: number;
+    failures: number;
+  }> {
+    const safeLimit = Math.min(Math.max(Math.floor(limit) || 1, 1), 200);
+    const candidates: Array<{ id: string }> = await this.prisma.$queryRaw`
+      SELECT candidate."id"
+      FROM "Order" AS candidate
+      WHERE candidate."status" = 'paid'
+        AND candidate."scheduledAt" + candidate."durationMinutes" * INTERVAL '1 minute' <= NOW()
+        AND NOT EXISTS (
+          SELECT 1
+          FROM "RefundTransaction" AS refund
+          WHERE refund."orderId" = candidate."id"
+            AND refund."status" = 'failed'
+            AND refund."updatedAt" > NOW() - ${FAILED_REFUND_RETRY_BACKOFF_MINUTES} * INTERVAL '1 minute'
+        )
+      ORDER BY candidate."scheduledAt" ASC, candidate."id" ASC
+      LIMIT ${safeLimit}
+    `;
+
+    let refundAttempts = 0;
+    let failures = 0;
+    for (const candidate of candidates ?? []) {
+      try {
+        if (await this.refundIfServiceWindowExpired(candidate.id)) refundAttempts += 1;
+      } catch (error) {
+        failures += 1;
+        this.logger.error(
+          `Failed to reconcile expired service order ${candidate.id} (${error instanceof Error ? error.name : "unknown_error"})`
+        );
+      }
+    }
+    return { scanned: candidates?.length ?? 0, refundAttempts, failures };
+  }
+
+  private async refundIfServiceWindowExpired(orderId: string): Promise<boolean> {
     const order: any = await this.prisma.order.findUnique({ where: { id: orderId } } as any);
-    if (!order || order.status !== "paid" || !(order.scheduledAt instanceof Date)) return;
+    if (!order || order.status !== "paid" || !(order.scheduledAt instanceof Date)) return false;
     const scheduledEnd = order.scheduledAt.getTime() + order.durationMinutes * 60_000;
-    if (Date.now() < scheduledEnd) return;
+    if (Date.now() < scheduledEnd) return false;
     await this.requestRefund(
       order.userId,
       order.id,
       "支付回调到达时预约服务窗口已结束，系统自动原路退款"
     );
+    return true;
   }
 
   private validateWechatCallbackIdentity(

@@ -1,7 +1,8 @@
-import { HttpStatus, Inject, Injectable } from "@nestjs/common";
+import { HttpStatus, Inject, Injectable, Optional } from "@nestjs/common";
 import { AppException } from "../common/errors/app.exception";
 import { PrismaService } from "../database/prisma.service";
 import { NotificationsService } from "../notifications/notifications.service";
+import { RecommendationsService } from "../recommendations/recommendations.service";
 import {
   WECHAT_PAY_PROVIDER,
   WECHAT_PREPAY_TTL_MS,
@@ -10,6 +11,8 @@ import {
 import { CreateOrderDto } from "./dto/create-order.dto";
 
 const SERVICE_EARLY_START_MS = 15 * 60 * 1000;
+export const COMPANION_PAYMENT_RESERVATION_MS = 15 * 60 * 1000;
+const MIN_RESERVATION_PAYMENT_WINDOW_MS = 60 * 1000;
 
 type OrderRecord = {
   id: string;
@@ -27,6 +30,7 @@ type OrderRecord = {
   themeNameSnapshot: string;
   conversationId: string | null;
   companionConfirmedAt: Date | null;
+  paymentReservationExpiresAt: Date | null;
   paidAt: Date | null;
   cancelledAt: Date | null;
   completedAt: Date | null;
@@ -42,7 +46,8 @@ export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
-    @Inject(WECHAT_PAY_PROVIDER) private readonly wechat: WeChatPayProvider
+    @Inject(WECHAT_PAY_PROVIDER) private readonly wechat: WeChatPayProvider,
+    @Optional() private readonly recommendations?: RecommendationsService
   ) {}
 
   async create(userId: string, dto: CreateOrderDto) {
@@ -69,6 +74,10 @@ export class OrdersService {
       throw new AppException("COMPANION_NOT_FOUND", "Companion not found", HttpStatus.NOT_FOUND);
     }
 
+    const recommendationImpressionId = dto.recommendationImpressionId
+      ? await this.validateRecommendationAttribution(userId, dto.recommendationImpressionId, companion.id)
+      : null;
+
     const units = Math.max(1, Math.ceil(durationMinutes / 30));
     const amountCents = companion.pricePerHalfHour * units * 100;
     const scheduledAt = new Date(dto.scheduledAt);
@@ -89,11 +98,23 @@ export class OrdersService {
         companionNameSnapshot: companion.name,
         companionRoleSnapshot: companion.role,
         companionInitialsSnapshot: companion.initials,
-        themeNameSnapshot: this.themeName(dto.themeId)
+        themeNameSnapshot: this.themeName(dto.themeId),
+        recommendationImpressionId
       }
     } as any);
 
     return this.toDto(order);
+  }
+
+  private async validateRecommendationAttribution(userId: string, impressionId: string, companionId: string) {
+    if (!this.recommendations) {
+      throw new AppException(
+        "RECOMMENDATIONS_UNAVAILABLE",
+        "Recommendation attribution is unavailable",
+        HttpStatus.SERVICE_UNAVAILABLE
+      );
+    }
+    return this.recommendations.validateOrderAttribution(userId, impressionId, companionId);
   }
 
   async list(userId: string) {
@@ -187,6 +208,16 @@ export class OrdersService {
   async confirmOrder(userId: string, orderId: string) {
     const updated = await this.prisma.$transaction(async (tx) => {
       const db = tx as any;
+      // The companion lock serializes confirmation and prepay for every one of
+      // their bookings.  Without it two overlapping pending orders can both
+      // be confirmed before either customer reaches the payment screen.
+      const target: any = await db.order.findUnique({
+        where: { id: orderId },
+        select: { companionId: true }
+      });
+      if (target?.companionId) {
+        await db.$queryRaw`SELECT "id" FROM "CompanionProfile" WHERE "id" = ${target.companionId} FOR UPDATE`;
+      }
       await db.$queryRaw`SELECT "id" FROM "Order" WHERE "id" = ${orderId} FOR UPDATE`;
       const order = await db.order.findUnique({
         where: { id: orderId },
@@ -198,8 +229,8 @@ export class OrdersService {
       if (order.status !== "pending") {
         throw new AppException("ORDER_INVALID_STATE", "Only pending orders can be confirmed", HttpStatus.CONFLICT);
       }
-      if (order.companionConfirmedAt) return order;
-      if (order.scheduledAt.getTime() <= Date.now()) {
+      const now = new Date();
+      if (order.scheduledAt.getTime() <= now.getTime()) {
         throw new AppException("ORDER_SCHEDULE_EXPIRED", "Past bookings cannot be confirmed", HttpStatus.CONFLICT);
       }
       if (
@@ -210,9 +241,18 @@ export class OrdersService {
       ) {
         throw new AppException("COMPANION_UNAVAILABLE", "Companion is not accepting this booking", HttpStatus.CONFLICT);
       }
+      if (
+        order.companionConfirmedAt &&
+        (!order.paymentReservationExpiresAt || order.paymentReservationExpiresAt.getTime() > now.getTime())
+      ) {
+        return order;
+      }
+
+      const reservationExpiresAt = this.paymentReservationExpiresAt(order.scheduledAt, now);
+      await this.assertCompanionSlotReservable(db, order, now);
       return db.order.update({
         where: { id: orderId },
-        data: { companionConfirmedAt: new Date() },
+        data: { companionConfirmedAt: now, paymentReservationExpiresAt: reservationExpiresAt },
         include: { conversation: { select: { externalId: true } } }
       });
     });
@@ -220,8 +260,13 @@ export class OrdersService {
       updated.userId,
       "orderStatus",
       "预约已确认",
-      "陪伴者已确认本次预约，现在可以安全支付。",
-      { orderId, status: "pending", companionConfirmed: true }
+      "陪伴者已确认本次预约，请在保留时段结束前完成支付。",
+      {
+        orderId,
+        status: "pending",
+        companionConfirmed: true,
+        paymentReservationExpiresAt: updated.paymentReservationExpiresAt?.toISOString() ?? null
+      }
     );
     return this.toDto(updated);
   }
@@ -253,7 +298,11 @@ export class OrdersService {
       }
       return db.order.update({
         where: { id: orderId },
-        data: { status: "cancelled", cancelledAt: new Date() },
+        data: {
+          status: "cancelled",
+          cancelledAt: new Date(),
+          paymentReservationExpiresAt: null
+        },
         include: { conversation: { select: { externalId: true } } }
       });
     });
@@ -355,7 +404,8 @@ export class OrdersService {
         where: { id: orderId },
         data: {
           status: "cancelled",
-          cancelledAt: new Date()
+          cancelledAt: new Date(),
+          paymentReservationExpiresAt: null
         },
         include: { conversation: { select: { externalId: true } } }
       });
@@ -406,6 +456,7 @@ export class OrdersService {
       } : null,
       conversationId: order.conversation?.externalId ?? null,
       companionConfirmedAt: order.companionConfirmedAt?.toISOString() ?? null,
+      paymentReservationExpiresAt: order.paymentReservationExpiresAt?.toISOString() ?? null,
       paidAt: order.paidAt?.toISOString() ?? null,
       cancelledAt: order.cancelledAt?.toISOString() ?? null,
       completedAt: order.completedAt?.toISOString() ?? null,
@@ -436,6 +487,106 @@ export class OrdersService {
       throw new AppException("ORDER_NOT_FOUND", "Order not found", HttpStatus.NOT_FOUND);
     }
     return order;
+  }
+
+  /**
+   * Clears reservations that have not produced a payment.  This is safe to run
+   * from every application replica: the guarded update is the ownership claim
+   * and only its winner sends the customer-facing expiry notification.
+   */
+  async expireUnpaidReservations(limit = 100): Promise<number> {
+    const now = new Date();
+    const candidates: Array<{ id: string; userId: string }> = await this.prisma.order.findMany({
+      where: {
+        status: "pending",
+        companionConfirmedAt: { not: null },
+        paymentReservationExpiresAt: { lte: now }
+      },
+      select: { id: true, userId: true },
+      orderBy: { paymentReservationExpiresAt: "asc" },
+      take: Math.min(Math.max(limit, 1), 200)
+    } as any);
+
+    let expired = 0;
+    for (const candidate of candidates) {
+      const released = await this.prisma.order.updateMany({
+        where: {
+          id: candidate.id,
+          status: "pending",
+          companionConfirmedAt: { not: null },
+          paymentReservationExpiresAt: { lte: now }
+        },
+        data: { companionConfirmedAt: null, paymentReservationExpiresAt: null }
+      } as any);
+      if (released.count !== 1) continue;
+      expired += 1;
+      await this.notifications.create(
+        candidate.userId,
+        "orderStatus",
+        "预约保留已结束",
+        "本次预约未在保留时间内完成支付，已释放时段；如仍需要服务，请等待陪伴者再次确认。",
+        { orderId: candidate.id, status: "pending", companionConfirmed: false }
+      );
+    }
+    return expired;
+  }
+
+  private paymentReservationExpiresAt(scheduledAt: Date, now: Date): Date {
+    const latestPaymentTime = scheduledAt.getTime() - 5 * 60_000;
+    const reservationExpiresAt = new Date(Math.min(now.getTime() + COMPANION_PAYMENT_RESERVATION_MS, latestPaymentTime));
+    if (reservationExpiresAt.getTime() <= now.getTime() + MIN_RESERVATION_PAYMENT_WINDOW_MS) {
+      throw new AppException(
+        "ORDER_PAYMENT_WINDOW_EXPIRED",
+        "The booking is too close to its payment cutoff to reserve",
+        HttpStatus.CONFLICT
+      );
+    }
+    return reservationExpiresAt;
+  }
+
+  private async assertCompanionSlotReservable(db: any, order: any, now: Date): Promise<void> {
+    const scheduledEnd = new Date(order.scheduledAt.getTime() + order.durationMinutes * 60_000);
+    const candidateRefs: Array<{ id: string }> = await db.$queryRaw`
+      SELECT candidate."id"
+      FROM "Order" AS candidate
+      WHERE candidate."companionId" = ${order.companionId}
+        AND candidate."id" <> ${order.id}
+        AND candidate."scheduledAt" < ${scheduledEnd}
+        AND candidate."scheduledAt" + candidate."durationMinutes" * INTERVAL '1 minute' > ${order.scheduledAt}
+        AND candidate."status" IN ('pending', 'paying', 'paid', 'inService', 'completed')
+      ORDER BY candidate."id"
+    `;
+
+    for (const candidateRef of candidateRefs ?? []) {
+      const candidateId = String(candidateRef.id);
+      await db.$queryRaw`SELECT "id" FROM "Order" WHERE "id" = ${candidateId} FOR UPDATE`;
+      const candidate = await db.order.findUnique({ where: { id: candidateId } });
+      if (!candidate || !["pending", "paying", "paid", "inService", "completed"].includes(candidate.status)) continue;
+      if (["paying", "paid", "inService", "completed"].includes(candidate.status)) {
+        this.throwCompanionSlotUnavailable();
+      }
+      if (!candidate.companionConfirmedAt) continue;
+      if (!candidate.paymentReservationExpiresAt || candidate.paymentReservationExpiresAt.getTime() > now.getTime()) {
+        this.throwCompanionSlotUnavailable();
+      }
+      await db.order.updateMany({
+        where: {
+          id: candidate.id,
+          status: "pending",
+          companionConfirmedAt: { not: null },
+          paymentReservationExpiresAt: { lte: now }
+        },
+        data: { companionConfirmedAt: null, paymentReservationExpiresAt: null }
+      });
+    }
+  }
+
+  private throwCompanionSlotUnavailable(): never {
+    throw new AppException(
+      "COMPANION_SLOT_UNAVAILABLE",
+      "The companion already has a reservation, payment, or service for this time slot",
+      HttpStatus.CONFLICT
+    );
   }
 
   private themeName(themeId: string) {

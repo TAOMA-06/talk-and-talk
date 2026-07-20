@@ -4,16 +4,18 @@ import { ModerationResult } from "./moderation.service";
 describe("ModerationCaseService", () => {
   const create = jest.fn();
   const prisma = {
-    moderationCase: { create }
+    moderationCase: { create, findUnique: jest.fn() },
+    $transaction: jest.fn()
   } as any;
   const audit = { record: jest.fn().mockResolvedValue({}) } as any;
   const notifications = { create: jest.fn().mockResolvedValue({}) } as any;
+  const mediaAssets = { preserveEvidenceForMessage: jest.fn().mockResolvedValue({ count: 0 }) } as any;
 
   let service: ModerationCaseService;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new ModerationCaseService(prisma, audit, notifications);
+    service = new ModerationCaseService(prisma, audit, notifications, mediaAssets);
   });
 
   it("uses the provided transaction client when creating a case", async () => {
@@ -24,9 +26,12 @@ describe("ModerationCaseService", () => {
       result: {
         decision: "block",
         riskLevel: "high",
+        priority: "high",
         score: 0.92,
         reasons: ["疑似引导私下联系"],
         matchedRules: ["contact.wechat"],
+        categories: ["privateContact"],
+        policyVersion: "chat-v2",
         usedAI: false
       },
       source: "chat",
@@ -42,9 +47,12 @@ describe("ModerationCaseService", () => {
     const result: ModerationResult = {
       decision: "allow",
       riskLevel: "low",
+      priority: "normal",
       score: 0.05,
       reasons: ["内容正常"],
       matchedRules: [],
+      categories: ["normal"],
+      policyVersion: "chat-v2",
       usedAI: false
     };
 
@@ -62,9 +70,12 @@ describe("ModerationCaseService", () => {
     const result: ModerationResult = {
       decision: "block",
       riskLevel: "high",
+      priority: "high",
       score: 0.92,
       reasons: ["疑似引导私下联系"],
       matchedRules: ["contact.wechat"],
+      categories: ["privateContact"],
+      policyVersion: "chat-v2",
       usedAI: false
     };
     const created = { id: "case-1", decision: "block", evidences: [], actionLogs: [] };
@@ -110,9 +121,12 @@ describe("ModerationCaseService", () => {
       result: {
         decision: "review",
         riskLevel: "low",
+        priority: "normal",
         score: 0.42,
         reasons: ["疑似广告或引流"],
         matchedRules: ["ads.promo"],
+        categories: ["fraudOrSpam"],
+        policyVersion: "chat-v2",
         usedAI: true
       },
       source: "chat",
@@ -132,6 +146,29 @@ describe("ModerationCaseService", () => {
     );
   });
 
+  it("routes critical safety signals directly to human review", async () => {
+    create.mockResolvedValue({ id: "case-critical" });
+    await service.createFromResult({
+      result: {
+        decision: "review",
+        riskLevel: "low",
+        priority: "critical",
+        score: 0.5,
+        reasons: ["检测到自伤风险，需要优先关怀"],
+        matchedRules: ["selfharm.risk"],
+        categories: ["selfHarm"],
+        policyVersion: "chat-v2",
+        usedAI: false
+      },
+      source: "chat",
+      content: "我不想活了"
+    });
+
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: "humanReview", priority: "critical" })
+    }));
+  });
+
   it("force-creates report cases even for allow decisions", async () => {
     const created = { id: "report-1", status: "pending", source: "report" };
     create.mockResolvedValue(created);
@@ -140,9 +177,12 @@ describe("ModerationCaseService", () => {
       result: {
         decision: "allow",
         riskLevel: "low",
+        priority: "normal",
         score: 0.1,
         reasons: ["内容正常"],
         matchedRules: [],
+        categories: ["normal"],
+        policyVersion: "chat-v2",
         usedAI: false
       },
       reason: "对方索要联系方式",
@@ -168,5 +208,37 @@ describe("ModerationCaseService", () => {
         resourceId: "report-1"
       })
     );
+  });
+
+  it("allows one appeal after an auditor confirms a violation", async () => {
+    prisma.moderationCase.findUnique.mockResolvedValue({
+      id: "case-confirmed",
+      subjectUserId: "user-1",
+      decision: "warn",
+      restrictions: [],
+      actionLogs: [{ action: "confirmViolation" }]
+    });
+    const appeal = {
+      id: "appeal-1",
+      caseId: "case-confirmed",
+      subjectUserId: "user-1",
+      status: "pending",
+      createdAt: new Date("2026-07-19T00:00:00.000Z")
+    };
+    const db = {
+      moderationAppeal: { create: jest.fn().mockResolvedValue(appeal) },
+      moderationActionLog: { create: jest.fn().mockResolvedValue({}) },
+      auditLog: { create: jest.fn().mockResolvedValue({}) }
+    };
+    prisma.$transaction.mockImplementation(async (callback: any) => callback(db));
+
+    await expect(service.createAppeal({
+      caseId: "case-confirmed",
+      subjectUserId: "user-1",
+      reason: "审核结论与实际情况不符"
+    })).resolves.toEqual(appeal);
+    expect(db.moderationAppeal.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ caseId: "case-confirmed", subjectUserId: "user-1" })
+    }));
   });
 });

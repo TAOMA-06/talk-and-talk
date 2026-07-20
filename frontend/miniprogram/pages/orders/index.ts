@@ -1,6 +1,7 @@
 import { api, ensureSession } from "../../utils/api";
-import { Order } from "../../utils/models";
+import { Order, RecommendedCompanion } from "../../utils/models";
 import { ensurePrivacyAuthorization } from "../../utils/privacy";
+import { flushRecommendationEvents, queueRecommendationEvent, trackRecommendationCardViews } from "../../utils/recommendations";
 
 function serviceName(order: Order): string { return order.companionSnapshot?.name || order.companion?.name || "陪伴服务"; }
 
@@ -31,9 +32,16 @@ function formatDateTime(value?: string): string {
 
 function displayOrder(order: Order): DisplayOrder {
   const scheduledAt = order.scheduledAt ? new Date(order.scheduledAt) : null;
-  const paymentDeadline = scheduledAt && !Number.isNaN(scheduledAt.getTime())
+  const scheduledPaymentCutoff = scheduledAt && !Number.isNaN(scheduledAt.getTime())
     ? new Date(scheduledAt.getTime() - 5 * 60_000).toISOString()
     : undefined;
+  const reservationDeadline = order.paymentReservationExpiresAt;
+  const paymentDeadline = [scheduledPaymentCutoff, reservationDeadline]
+    .filter((value): value is string => Boolean(value))
+    .map((value) => new Date(value))
+    .filter((value) => !Number.isNaN(value.getTime()))
+    .sort((left, right) => left.getTime() - right.getTime())[0]
+    ?.toISOString();
   return {
     ...order,
     displayName: serviceName(order),
@@ -67,21 +75,47 @@ async function confirmPaymentWithBackend(orderId: string): Promise<boolean> {
 }
 
 Page({
-  data: { orders: [] as DisplayOrder[], serviceOrders: [] as DisplayOrder[], loading: true, error: "", payingId: "" },
+  data: {
+    orders: [] as DisplayOrder[], serviceOrders: [] as DisplayOrder[], followupRecommendations: [] as RecommendedCompanion[],
+    loading: true, error: "", payingId: ""
+  },
+  stopRecommendationTracking: null as (() => void) | null,
   onShow() { void this.load(); },
+  onHide() { this.stopTracking(); },
+  onUnload() { this.stopTracking(); },
   onPullDownRefresh() { void this.load(true); },
   async load(stopRefresh = false) {
+    this.stopTracking();
     this.setData({ loading: true, error: "" });
     try {
       await ensureSession();
       const [customer, service] = await Promise.all([api.orders(), api.serviceOrders().catch(() => ({ items: [] as Order[] }))]);
+      const latestCompleted = (customer.items || []).find((order) => order.status === "completed");
+      const recommendations = latestCompleted
+        ? await api.recommendedCompanions({
+            placement: "orderFollowup",
+            themeId: latestCompleted.themeId,
+            pageSize: 4
+          }).catch(() => ({ items: [] as RecommendedCompanion[] }))
+        : { items: [] as RecommendedCompanion[] };
       this.setData({
         orders: (customer.items || []).map(displayOrder),
         serviceOrders: (service.items || []).map(displayOrder),
+        followupRecommendations: recommendations.items || [],
         loading: false
       });
+      setTimeout(() => this.startTracking(), 0);
     } catch (error) { this.setData({ loading: false, error: (error as Error).message || "加载订单失败" }); }
     finally { if (stopRefresh) wx.stopPullDownRefresh(); }
+  },
+  startTracking() {
+    if (!this.data.followupRecommendations.length) return;
+    this.stopRecommendationTracking = trackRecommendationCardViews(this, this.data.followupRecommendations, "order-followup-recommendation");
+  },
+  stopTracking() {
+    this.stopRecommendationTracking?.();
+    this.stopRecommendationTracking = null;
+    void flushRecommendationEvents();
   },
   async pay(event: any) {
     const id = event.currentTarget.dataset.id;
@@ -97,7 +131,7 @@ Page({
         `预约时间：${order.scheduledAtText}`,
         `服务时长：${order.durationMinutes} 分钟`,
         `支付金额：${order.amountText}`,
-        `支付单截止：${order.paymentDeadlineText}（预约前 5 分钟失效；请至少提前 7 分钟发起支付）`,
+        `支付截止：${order.paymentDeadlineText}（确认保留或预约前 5 分钟截止，以更早者为准）`,
         "未开始服务可申请全额原路退款；服务中或完成后申请将进入人工审核。"
       ].join("\n"),
       confirmText: "确认支付",
@@ -183,5 +217,16 @@ Page({
         });
       }
     });
+  },
+  openRecommendedCompanion(event: any) {
+    const { id, impressionId, themeId } = event.currentTarget.dataset;
+    queueRecommendationEvent(impressionId, "click");
+    void flushRecommendationEvents();
+    const params = [
+      `id=${encodeURIComponent(id)}`,
+      `rid=${encodeURIComponent(impressionId)}`,
+      themeId ? `themeId=${encodeURIComponent(themeId)}` : ""
+    ].filter(Boolean).join("&");
+    wx.navigateTo({ url: `/pages/companion/detail?${params}` });
   }
 });

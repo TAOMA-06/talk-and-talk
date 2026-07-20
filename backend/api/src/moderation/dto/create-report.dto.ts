@@ -20,4 +20,14 @@ export class CreateReportDto {
   @IsString()
   @MaxLength(2000)
   recentContext?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  messageId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  reasonCode?: string;
 }

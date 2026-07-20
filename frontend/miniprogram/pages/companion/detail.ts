@@ -13,7 +13,14 @@ Page({
     bookingDate: bookingDefaults().date, bookingTime: bookingDefaults().time
   },
   companionId: "",
-  onLoad(query: any) { this.companionId = query.id || ""; void this.load(); },
+  recommendationImpressionId: "",
+  themeId: "t1",
+  onLoad(query: any) {
+    this.companionId = query.id || "";
+    this.recommendationImpressionId = query.rid || "";
+    this.themeId = ["t1", "t2", "t3", "t4", "t5", "t6"].includes(query.themeId) ? query.themeId : "t1";
+    void this.load();
+  },
   async load() {
     this.setData({ loading: true, error: "" });
     try {
@@ -32,7 +39,13 @@ Page({
     }
     this.setData({ booking: true });
     try {
-      await api.createOrder({ companionId: this.companionId, themeId: "t1", durationMinutes: 30, scheduledAt: scheduledAt.toISOString() });
+      await api.createOrder({
+        companionId: this.companionId,
+        themeId: this.themeId,
+        durationMinutes: 30,
+        scheduledAt: scheduledAt.toISOString(),
+        ...(this.recommendationImpressionId ? { recommendationImpressionId: this.recommendationImpressionId } : {})
+      });
       wx.showToast({ title: "订单已创建", icon: "success" });
       setTimeout(() => wx.switchTab({ url: "/pages/orders/index" }), 500);
     } catch (error) {

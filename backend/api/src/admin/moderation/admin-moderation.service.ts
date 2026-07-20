@@ -2,6 +2,8 @@ import { HttpStatus, Injectable } from "@nestjs/common";
 
 import { AppException } from "../../common/errors/app.exception";
 import { PrismaService } from "../../database/prisma.service";
+import { ChatRestrictionService } from "../../moderation/chat-restriction.service";
+import { MediaAssetService } from "../../moderation/media/media-asset.service";
 import { AdminCaseAction } from "./dto/case-action.dto";
 import { CreateLabelDto } from "./dto/create-label.dto";
 import { ListAdminCasesQueryDto } from "./dto/list-admin-cases.dto";
@@ -10,7 +12,11 @@ const OPEN_STATUSES = ["pending", "autoReviewing", "humanReview"] as const;
 
 @Injectable()
 export class AdminModerationService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly chatRestrictions: ChatRestrictionService,
+    private readonly mediaAssets: MediaAssetService
+  ) {}
 
   async overview() {
     const [cases, conversationCount, labelCount, queue] = await Promise.all([
@@ -33,7 +39,7 @@ export class AdminModerationService {
       this.prisma.moderationLabel.count(),
       this.prisma.moderationCase.findMany({
         where: { status: { in: [...OPEN_STATUSES] } },
-        orderBy: [{ createdAt: "desc" }],
+        orderBy: [{ priority: "desc" }, { dueAt: "asc" }, { createdAt: "desc" }],
         take: 8
       } as any)
     ]);
@@ -75,7 +81,9 @@ export class AdminModerationService {
       where: { id },
       include: {
         evidences: { orderBy: { createdAt: "asc" } },
-        actionLogs: { orderBy: { createdAt: "desc" } }
+        actionLogs: { orderBy: { createdAt: "desc" } },
+        appeals: true,
+        restrictions: { orderBy: { createdAt: "desc" } }
       }
     } as any);
 
@@ -92,7 +100,9 @@ export class AdminModerationService {
           payload: ev.payload,
           createdAt: ev.createdAt.toISOString()
         })),
-        actionLog: (item.actionLogs ?? []).map((log: any) => this.toActionLogDto(log))
+        actionLog: (item.actionLogs ?? []).map((log: any) => this.toActionLogDto(log)),
+        appeals: (item.appeals ?? []).map((appeal: any) => this.toAppealDto(appeal)),
+        restrictions: (item.restrictions ?? []).map((restriction: any) => this.toRestrictionDto(restriction))
       }
     };
   }
@@ -115,7 +125,8 @@ export class AdminModerationService {
     const messages = await this.prisma.message.findMany({
       where: { conversationId: conversation.id },
       orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-      take: Math.min(Math.max(limit, 1), 200)
+      take: Math.min(Math.max(limit, 1), 200),
+      include: { attachments: true }
     } as any);
 
     return {
@@ -128,22 +139,51 @@ export class AdminModerationService {
         userId: conversation.userId,
         updatedAt: conversation.updatedAt.toISOString()
       },
-      messages: messages.map((message: any) => ({
+      messages: await Promise.all(messages.map(async (message: any) => ({
         id: message.id,
         conversationId: conversation.externalId,
         senderId: message.senderId,
         senderName: message.senderName,
         content: message.content,
         type: message.type,
+        moderationStatus: message.moderationStatus,
+        visibility: message.visibility,
+        attachments: await Promise.all((message.attachments ?? []).map(async (asset: any) => ({
+          ...(await this.mediaAssets.toAttachmentDto(asset)),
+          extractedText: asset.extractedText ?? null,
+          analysis: asset.analysis ?? null
+        }))),
         timestamp: message.createdAt.toISOString()
-      }))
+      })))
     };
   }
 
   async applyAction(caseId: string, actorId: string, action: AdminCaseAction, note?: string) {
-    const existing = await this.prisma.moderationCase.findUnique({ where: { id: caseId } } as any);
+    const existing: any = await this.prisma.moderationCase.findUnique({
+      where: { id: caseId },
+      include: { appeals: true }
+    } as any);
     if (!existing) {
       throw new AppException("NOT_FOUND", `Moderation case ${caseId} was not found`, HttpStatus.NOT_FOUND);
+    }
+    if (
+      ["confirmViolation", "dismiss", "approveMessage", "rejectMessage", "escalate"].includes(action) &&
+      (existing.status === "resolved" || existing.status === "dismissed")
+    ) {
+      throw new AppException("CASE_ALREADY_CLOSED", "The case is already closed", HttpStatus.CONFLICT);
+    }
+    if ((action === "restrict24h" || action === "restrict7d") && !existing.subjectUserId) {
+      throw new AppException(
+        "CASE_SUBJECT_REQUIRED",
+        "A chat restriction requires an identified message sender",
+        HttpStatus.CONFLICT
+      );
+    }
+    if (action === "upholdAppeal" || action === "overturnAppeal") {
+      const pendingAppeal = (existing.appeals ?? []).find((appeal: any) => appeal.status === "pending");
+      if (!pendingAppeal) {
+        throw new AppException("APPEAL_NOT_PENDING", "No pending appeal exists for this case", HttpStatus.CONFLICT);
+      }
     }
 
     const statusUpdate = this.statusForAction(action);
@@ -184,8 +224,63 @@ export class AdminModerationService {
         }
       });
 
+      if (existing.messageId && publishesMessage(action)) {
+        await db.message.update({
+          where: { id: existing.messageId },
+          data: {
+            moderationStatus: "published",
+            visibility: "participants",
+            moderationDecision: "allow",
+            reviewedAt: new Date()
+          }
+        });
+      }
+      if (existing.messageId && blocksMessage(action)) {
+        await db.message.update({
+          where: { id: existing.messageId },
+          data: {
+            // A direct automated rejection was never delivered and remains
+            // `blocked`; a reviewer confirmation can also take down a message
+            // that had already been delivered, which must be represented as
+            // `removed` for sender-facing status and audit clarity.
+            moderationStatus: action === "confirmViolation" ? "removed" : "blocked",
+            visibility: "senderOnly",
+            moderationDecision: "block",
+            reviewedAt: new Date()
+          }
+        });
+      }
+      if (action === "upholdAppeal" || action === "overturnAppeal") {
+        await db.moderationAppeal.update({
+          where: { caseId },
+          data: {
+            status: action === "overturnAppeal" ? "overturned" : "upheld",
+            reviewerId: actorId,
+            reviewNote: note?.trim() || null,
+            reviewedAt: new Date()
+          }
+        });
+      }
+
       return { case: updated, actionLog };
     });
+
+    const manualEscalation = action === "confirmViolation" && existing.subjectUserId
+      ? await this.chatRestrictions.recordManualConfirmedViolation(existing.subjectUserId, caseId, actorId)
+      : { escalated: false, confirmations: 0 };
+    if ((action === "restrict24h" || action === "restrict7d") && existing.subjectUserId) {
+      await this.chatRestrictions.createRestriction({
+        userId: existing.subjectUserId,
+        caseId,
+        source: "manual",
+        reason: note?.trim() || "审核员处置的聊天限言",
+        endsAt: new Date(Date.now() + (action === "restrict7d" ? 7 * 24 : 24) * 60 * 60 * 1000),
+        actorId
+      });
+    }
+    if (action === "liftRestriction" || action === "overturnAppeal") {
+      await this.chatRestrictions.liftForCase(caseId, actorId, note);
+    }
 
     const overviewPayload = await this.overview();
     return {
@@ -194,7 +289,8 @@ export class AdminModerationService {
         actionLog: [this.toActionLogDto(result.actionLog), ...((result.case.actionLogs ?? []) as any[]).map((log) => this.toActionLogDto(log))]
       },
       action: this.toActionLogDto(result.actionLog),
-      overview: overviewPayload.overview
+      overview: overviewPayload.overview,
+      manualEscalation
     };
   }
 
@@ -262,6 +358,7 @@ export class AdminModerationService {
 
     if (query.status) where.status = query.status;
     if (query.riskLevel) where.riskLevel = query.riskLevel;
+    if (query.priority) where.priority = query.priority;
     if (query.source) where.source = query.source;
 
     if (query.from || query.to) {
@@ -301,8 +398,15 @@ export class AdminModerationService {
   } {
     switch (action) {
       case "confirmViolation":
+      case "rejectMessage":
+      case "restrict24h":
+      case "restrict7d":
+      case "upholdAppeal":
         return { status: "resolved", resolvedAt: new Date() };
       case "dismiss":
+      case "approveMessage":
+      case "liftRestriction":
+      case "overturnAppeal":
         return { status: "dismissed", resolvedAt: new Date() };
       case "escalate":
         return { status: "humanReview", resolvedAt: null };
@@ -395,6 +499,8 @@ export class AdminModerationService {
       decision: item.decision,
       content: item.content,
       aiScore: item.aiScore,
+      priority: item.priority ?? "normal",
+      dueAt: item.dueAt ? item.dueAt.toISOString() : null,
       createdAt: item.createdAt?.toISOString?.() ?? item.createdAt
     };
   }
@@ -410,6 +516,15 @@ export class AdminModerationService {
       content: item.content,
       targetId: item.targetId ?? null,
       messageId: item.messageId ?? null,
+      conversationId: item.conversationId ?? null,
+      subjectUserId: item.subjectUserId ?? null,
+      reporterUserId: item.reporterUserId ?? null,
+      assignedToUserId: item.assignedToUserId ?? null,
+      priority: item.priority ?? "normal",
+      dueAt: item.dueAt ? item.dueAt.toISOString() : null,
+      policyVersion: item.policyVersion ?? null,
+      provider: item.provider ?? null,
+      providerVersion: item.providerVersion ?? null,
       aiScore: item.aiScore,
       aiReason: item.aiReason,
       decision: item.decision,
@@ -430,6 +545,35 @@ export class AdminModerationService {
     };
   }
 
+  private toAppealDto(appeal: any) {
+    return {
+      id: appeal.id,
+      caseId: appeal.caseId,
+      subjectUserId: appeal.subjectUserId,
+      reason: appeal.reason,
+      status: appeal.status,
+      reviewerId: appeal.reviewerId ?? null,
+      reviewNote: appeal.reviewNote ?? null,
+      reviewedAt: appeal.reviewedAt ? appeal.reviewedAt.toISOString() : null,
+      createdAt: appeal.createdAt.toISOString()
+    };
+  }
+
+  private toRestrictionDto(restriction: any) {
+    return {
+      id: restriction.id,
+      userId: restriction.userId,
+      caseId: restriction.caseId ?? null,
+      source: restriction.source,
+      reason: restriction.reason,
+      startsAt: restriction.startsAt.toISOString(),
+      endsAt: restriction.endsAt.toISOString(),
+      liftedAt: restriction.liftedAt ? restriction.liftedAt.toISOString() : null,
+      liftedByUserId: restriction.liftedByUserId ?? null,
+      createdAt: restriction.createdAt.toISOString()
+    };
+  }
+
   private toLabelDto(item: any) {
     return {
       id: item.id,
@@ -443,4 +587,12 @@ export class AdminModerationService {
       createdAt: item.createdAt.toISOString()
     };
   }
+}
+
+function publishesMessage(action: AdminCaseAction): boolean {
+  return action === "dismiss" || action === "approveMessage" || action === "overturnAppeal";
+}
+
+function blocksMessage(action: AdminCaseAction): boolean {
+  return action === "confirmViolation" || action === "rejectMessage";
 }

@@ -2,6 +2,7 @@ import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../../generated/prisma/client";
 import { validateEnvironment } from "../config/configuration";
+import { deriveTopicIds } from "../recommendations/recommendation-topics";
 
 const environment = validateEnvironment(process.env);
 const prisma = new PrismaClient({
@@ -273,6 +274,7 @@ export async function seedDatabase(client: SeedClient = prisma) {
         availableTimes: companion.availableTimes,
         languages: companion.languages,
         specialties: companion.specialties,
+        topicIds: deriveTopicIds(companion.specialties, companion.tags),
         completedOrders: companion.completedOrders,
         responseTime: companion.responseTime,
         distanceKm: companion.distanceKm,
@@ -294,6 +296,7 @@ export async function seedDatabase(client: SeedClient = prisma) {
         availableTimes: companion.availableTimes,
         languages: companion.languages,
         specialties: companion.specialties,
+        topicIds: deriveTopicIds(companion.specialties, companion.tags),
         completedOrders: companion.completedOrders,
         responseTime: companion.responseTime,
         distanceKm: companion.distanceKm,

@@ -78,6 +78,13 @@ export class PaymentsController {
     return this.paymentsService.rejectRefund(user.id, id, body.note);
   }
 
+  @Post("refunds/:id/retry")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("moderator", "admin")
+  retryRefund(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string, @Body() body: { note?: string }) {
+    return this.paymentsService.retryRefund(user.id, id, body.note);
+  }
+
   @Post("wechat/mock-notify")
   @UseGuards(JwtAuthGuard)
   mockNotify(

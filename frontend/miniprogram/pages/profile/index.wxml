@@ -8,13 +8,30 @@
       <picker mode="selector" range="{{genderLabels}}" bindchange="setGender"><view class="picker">性别：{{genderLabel}}</view></picker>
       <button class="primary-button" loading="{{saving}}" bindtap="saveProfile">保存资料</button>
     </view>
+    <view class="card" wx:if="{{recommendationPreferences}}">
+      <view class="recommendation-header"><view><view class="title small">个性化推荐</view><view class="muted">只使用你主动填写的偏好、卡片互动和订单主题，不读取聊天内容。</view></view><switch checked="{{recommendationPreferences.personalizationEnabled}}" color="#B94A68" bindchange="setPersonalization" /></view>
+      <view wx:if="{{recommendationPreferences.personalizationEnabled}}">
+        <view class="recommendation-label">感兴趣的主题</view>
+        <view class="choices"><view wx:for="{{recommendationTopics}}" wx:key="id" class="choice {{item.selected ? 'selected' : ''}}" bindtap="toggleRecommendationTopic" data-id="{{item.id}}">{{item.selected ? '✓ ' : ''}}{{item.name}}</view></view>
+        <input value="{{recommendationCity}}" bindinput="setRecommendationCity" placeholder="常用城市（可选）" maxlength="40" />
+        <input value="{{recommendationMaxPrice}}" bindinput="setRecommendationMaxPrice" placeholder="每 30 分钟预算上限（可选）" type="number" />
+        <view class="recommendation-label">偏好的服务时段</view>
+        <view class="choices"><view wx:for="{{recommendationTimeOptions}}" wx:key="value" class="choice {{item.selected ? 'selected' : ''}}" bindtap="toggleRecommendationTime" data-value="{{item.value}}">{{item.selected ? '✓ ' : ''}}{{item.value}}</view></view>
+        <button class="primary-button" loading="{{recommendationSaving}}" bindtap="saveRecommendations">保存推荐设置</button>
+      </view>
+      <view wx:else class="muted recommendation-off">已关闭个性化排序；发现页将仅按当前场景、可用状态和服务质量展示。</view>
+      <view wx:if="{{recommendationPreferences.behavioralTags.length}}" class="behavior-tags"><view class="recommendation-label">行为标签</view><view class="muted">可随时删除；删除后不会再用该主题的历史互动或订单做排序。</view><view class="choices"><view wx:for="{{recommendationPreferences.behavioralTags}}" wx:key="id" class="behavior-tag" bindtap="deleteRecommendationTag" data-id="{{item.id}}">{{item.name}} ×</view></view></view>
+    </view>
     <view class="card">
       <view class="title small">陪伴者入驻</view>
       <view class="muted">首发阶段仅开放平台已完成实名与资质审核的预配置陪伴者，暂不接受小程序内自助申请。</view>
     </view>
-    <view class="title section-title">通知</view>
+    <view class="notification-header">
+      <view class="title section-title">通知<text wx:if="{{unreadNotificationCount}}">（{{unreadNotificationCount}} 未读）</text></view>
+      <button wx:if="{{unreadNotificationCount}}" class="text-button" loading="{{markingNotificationsRead}}" bindtap="markAllNotificationsRead">全部已读</button>
+    </view>
     <view wx:if="{{!notifications.length}}" class="empty compact">暂无新通知</view>
-    <view wx:for="{{notifications}}" wx:key="id" class="card notification"><view class="name">{{item.title}}</view><view class="muted">{{item.body}}</view></view>
+    <view wx:for="{{notifications}}" wx:key="id" class="card notification {{!item.readAt ? 'unread' : ''}}" bindtap="openNotification" data-id="{{item.id}}"><view class="name">{{item.title}}</view><view class="muted">{{item.body}}</view><view wx:if="{{!item.readAt}}" class="unread-marker">未读</view></view>
     <view class="legal-links">
       <button class="legal" bindtap="openTerms">用户协议</button>
       <button class="legal" bindtap="openPrivacy">Talk&amp;Talk 隐私政策</button>

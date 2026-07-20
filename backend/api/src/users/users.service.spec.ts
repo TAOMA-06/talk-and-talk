@@ -12,6 +12,12 @@ describe("UsersService", () => {
       findUnique: jest.fn(),
       findFirst: jest.fn(),
       create: jest.fn()
+    },
+    accountDeletionRequest: {
+      findUnique: jest.fn()
+    },
+    order: {
+      findMany: jest.fn()
     }
   } as any;
 
@@ -502,5 +508,39 @@ describe("UsersService", () => {
     expect(tx.authIdentity.deleteMany).not.toHaveBeenCalled();
     expect(tx.userProfile.updateMany).not.toHaveBeenCalled();
     expect(tx.user.update).not.toHaveBeenCalled();
+  });
+
+  it("returns deletion settlement details without exposing user profile data", async () => {
+    prisma.accountDeletionRequest.findUnique.mockResolvedValue({
+      id: "dr1",
+      userId: "u1",
+      status: "processing",
+      note: null,
+      createdAt: new Date("2026-07-19T00:00:00.000Z"),
+      updatedAt: new Date("2026-07-19T00:05:00.000Z"),
+      user: { id: "u1", role: "user", accountStatus: "restricted", createdAt: new Date("2026-07-01T00:00:00.000Z") }
+    });
+    prisma.order.findMany.mockResolvedValue([{
+      id: "o1",
+      status: "paid",
+      amountCents: 3900,
+      scheduledAt: new Date("2026-07-20T10:00:00.000Z"),
+      payments: [{ id: "p1", outTradeNo: "T1", status: "success", expiresAt: null }],
+      refunds: []
+    }]);
+
+    const result = await service.getDeletionSettlementDetails("dr1");
+
+    expect(result).toEqual(expect.objectContaining({
+      request: expect.objectContaining({ id: "dr1", userId: "u1", status: "processing" }),
+      orders: [expect.objectContaining({
+        id: "o1",
+        payment: { id: "p1", outTradeNo: "T1", status: "success", expiresAt: null },
+        refund: null
+      })]
+    }));
+    expect(prisma.order.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { userId: "u1" }
+    }));
   });
 });

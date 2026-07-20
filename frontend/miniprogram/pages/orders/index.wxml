@@ -9,11 +9,19 @@
       <view class="schedule">预约：{{item.scheduledAtText}}</view>
       <view class="muted">{{item.durationMinutes}} 分钟 · {{item.amountText}}</view>
       <view wx:if="{{item.status === 'pending' && !item.companionConfirmedAt}}" class="muted">等待陪伴者确认预约，确认前不会扣款。</view>
+      <view wx:if="{{item.status === 'pending' && item.companionConfirmedAt}}" class="muted">已为你保留时段，请在 {{item.paymentDeadlineText}} 前支付；超时后需要重新确认。</view>
       <view class="actions">
         <button wx:if="{{(item.status === 'pending' || item.status === 'paying') && item.companionConfirmedAt}}" class="primary-button action" loading="{{payingId === item.id}}" bindtap="pay" data-id="{{item.id}}">去支付</button>
         <button wx:if="{{item.status === 'pending' || item.status === 'paying'}}" class="plain action" bindtap="cancel" data-id="{{item.id}}">取消订单</button>
         <button wx:if="{{item.status === 'paid' || item.status === 'inService' || item.status === 'completed'}}" class="plain action" bindtap="refund" data-id="{{item.id}}">申请退款</button>
         <button wx:if="{{item.status === 'completed'}}" class="primary-button action" bindtap="review" data-id="{{item.id}}">提交评价</button>
+      </view>
+    </view>
+    <view wx:if="{{followupRecommendations.length}}" class="followup-section">
+      <view class="section-title">继续探索</view>
+      <view id="order-followup-recommendation-{{item.impressionId}}" class="card recommendation-card" wx:for="{{followupRecommendations}}" wx:key="impressionId" bindtap="openRecommendedCompanion" data-id="{{item.id}}" data-impression-id="{{item.impressionId}}" data-theme-id="{{item.topicIds[0]}}">
+        <view class="row"><text class="name">{{item.name}} · {{item.role}}</text><text class="status">查看</text></view>
+        <view class="muted">{{item.reasonText || '为你推荐'}} · ¥{{item.pricePerHalfHour}} / 30 分钟</view>
       </view>
     </view>
     <view wx:if="{{serviceOrders.length}}" class="section-title">作为陪伴者</view>
@@ -24,7 +32,7 @@
       <view class="actions">
         <button wx:if="{{item.status === 'pending' && !item.companionConfirmedAt}}" class="primary-button action" bindtap="confirmServiceOrder" data-id="{{item.id}}">确认预约</button>
         <button wx:if="{{item.status === 'pending' && !item.companionConfirmedAt}}" class="plain action" bindtap="rejectServiceOrder" data-id="{{item.id}}">无法接单</button>
-        <view wx:if="{{item.status === 'pending' && item.companionConfirmedAt}}" class="muted">已确认，等待客户支付</view>
+        <view wx:if="{{item.status === 'pending' && item.companionConfirmedAt}}" class="muted">已确认，客户需在 {{item.paymentDeadlineText}} 前支付，超时自动释放时段</view>
         <button wx:if="{{item.status === 'paid'}}" class="primary-button action" bindtap="startService" data-id="{{item.id}}">开始服务</button>
         <button wx:if="{{item.status === 'inService'}}" class="primary-button action" bindtap="completeService" data-id="{{item.id}}">完成服务</button>
       </view>

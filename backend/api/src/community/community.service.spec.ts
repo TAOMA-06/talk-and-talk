@@ -7,7 +7,8 @@ describe("CommunityService", () => {
     user: { findUnique: jest.fn() }
   } as any;
   const moderation = { moderateAsync: jest.fn() } as any;
-  const service = new CommunityService(prisma, moderation);
+  const moderationCases = { createFromResult: jest.fn().mockResolvedValue({ id: "case-1" }) } as any;
+  const service = new CommunityService(prisma, moderation, moderationCases);
 
   beforeEach(() => jest.clearAllMocks());
 
@@ -36,5 +37,35 @@ describe("CommunityService", () => {
 
     expect(moderation.moderateAsync).toHaveBeenCalledWith("聊天 今晚想找人聊聊", "community");
     expect(result.moderationStatus).toBe("approved");
+    expect(moderationCases.createFromResult).not.toHaveBeenCalled();
+  });
+
+  it("keeps warned community posts out of the public feed and creates a review case", async () => {
+    prisma.user.findUnique.mockResolvedValue({ id: "user-1", profile: { displayName: "小安" }, companionProfile: null });
+    moderation.moderateAsync.mockResolvedValue({
+      decision: "warn",
+      riskLevel: "medium",
+      priority: "high",
+      score: 0.7,
+      reasons: ["疑似引流"],
+      matchedRules: ["community.promotion"],
+      categories: ["fraudOrSpam"],
+      policyVersion: "chat-v2",
+      usedAI: false
+    });
+    prisma.communityPost.create.mockResolvedValue({
+      id: "post-pending", authorId: "user-1", kind: "femaleRequest", topic: "兼职", content: "请私聊我",
+      coverImageUrl: null, status: "pending", createdAt: new Date(),
+      author: { profile: { displayName: "小安" }, companionProfile: null }, likes: []
+    });
+
+    const result = await service.create("user-1", { kind: "femaleRequest", topic: "兼职", content: "请私聊我" });
+
+    expect(result.moderationStatus).toBe("pending");
+    expect(moderationCases.createFromResult).toHaveBeenCalledWith(expect.objectContaining({
+      source: "community",
+      targetId: "post-pending",
+      subjectUserId: "user-1"
+    }));
   });
 });

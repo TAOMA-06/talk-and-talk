@@ -34,8 +34,39 @@ enum Availability {
 
 enum MessageType {
   text
+  image
+  audio
   system
   safety
+}
+
+enum MessageModerationStatus {
+  queued
+  pendingReview
+  published
+  blocked
+  removed
+}
+
+enum MessageVisibility {
+  participants
+  senderOnly
+  staffOnly
+}
+
+enum MediaAssetKind {
+  image
+  audio
+}
+
+enum MediaAssetStatus {
+  reserved
+  uploaded
+  scanning
+  approved
+  blocked
+  expired
+  failed
 }
 
 enum ModerationDecision {
@@ -64,6 +95,24 @@ enum ModerationCaseStatus {
   humanReview
   resolved
   dismissed
+}
+
+enum ModerationPriority {
+  normal
+  high
+  critical
+}
+
+enum ModerationAppealStatus {
+  pending
+  upheld
+  overturned
+  dismissed
+}
+
+enum ChatRestrictionSource {
+  automatic
+  manual
 }
 
 enum OrderStatus {
@@ -121,6 +170,21 @@ enum LegalConsentSource {
   wechatMiniProgram
 }
 
+enum RecommendationPlacement {
+  discoverHome
+  communityRelated
+  orderFollowup
+}
+
+enum RecommendationPolicyStatus {
+  active
+  paused
+}
+
+enum RecommendationTagSource {
+  behavioral
+}
+
 model User {
   id            String        @id @default(uuid())
   role          UserRole      @default(user)
@@ -141,6 +205,14 @@ model User {
   communityPosts CommunityPost[]
   communityLikes CommunityLike[]
   reviews Review[]
+  mediaAssets MediaAsset[] @relation("MediaAssetUploader")
+  chatRestrictions ChatRestriction[]
+  moderationSubjectCases ModerationCase[] @relation("ModerationSubject")
+  moderationReporterCases ModerationCase[] @relation("ModerationReporter")
+  moderationAppeals ModerationAppeal[] @relation("ModerationAppealer")
+  recommendationPreference UserRecommendationPreference?
+  recommendationTags UserRecommendationTag[]
+  recommendationRequests RecommendationRequest[]
 }
 
 model AuthIdentity {
@@ -204,6 +276,7 @@ model CompanionProfile {
   distanceKm       Float        @default(0)
   availability     Availability @default(available)
   cityDistrict     String
+  topicIds         String[]     @default([])
   isPublished      Boolean      @default(false)
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
@@ -212,6 +285,8 @@ model CompanionProfile {
   orders           Order[]
   owner            User?        @relation("CompanionOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
   reviews          Review[]
+  recommendationImpressions RecommendationImpression[]
+  recommendationPolicies CompanionRecommendationPolicy[]
 
   @@index([isPublished, availability])
   @@index([isOnline])
@@ -228,8 +303,9 @@ model Conversation {
 
   user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   companion CompanionProfile   @relation(fields: [companionId], references: [id], onDelete: Cascade)
-  messages  Message[]
-  readStates MessageReadState[]
+  messages    Message[]
+  mediaAssets MediaAsset[]
+  readStates  MessageReadState[]
   orders    Order[]
 
   @@unique([userId, externalId])
@@ -253,7 +329,9 @@ model Order {
   companionInitialsSnapshot String
   themeNameSnapshot String
   conversationId  String?
+  recommendationImpressionId String? @unique
   companionConfirmedAt DateTime?
+  paymentReservationExpiresAt DateTime?
   paidAt          DateTime?
   cancelledAt     DateTime?
   completedAt     DateTime?
@@ -266,9 +344,11 @@ model Order {
   payments     PaymentTransaction[]
   refunds      RefundTransaction[]
   reviews      Review[]
+  recommendationImpression RecommendationImpression? @relation("RecommendationAttributedOrder", fields: [recommendationImpressionId], references: [id], onDelete: SetNull)
 
   @@index([userId, createdAt])
   @@index([companionId, status])
+  @@index([companionId, paymentReservationExpiresAt])
   @@index([status, createdAt])
   @@index([conversationId])
 }
@@ -368,19 +448,147 @@ model Review {
   @@index([userId, createdAt])
 }
 
+model UserRecommendationPreference {
+  userId                    String   @id
+  personalizationEnabled    Boolean  @default(true)
+  topicIds                  String[] @default([])
+  city                      String?
+  maxPricePerHalfHour       Int?
+  preferredTimeSlots        String[] @default([])
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UserRecommendationTag {
+  id         String                   @id @default(uuid())
+  userId     String
+  topicId    String
+  source     RecommendationTagSource  @default(behavioral)
+  weight     Float                    @default(0)
+  disabledAt DateTime?
+  createdAt  DateTime                 @default(now())
+  updatedAt  DateTime                 @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, topicId, source])
+  @@index([userId, disabledAt, updatedAt])
+}
+
+model RecommendationRequest {
+  id               String                  @id @default(uuid())
+  userId           String
+  placement        RecommendationPlacement
+  context          Json?
+  algorithmVersion String
+  personalized     Boolean
+  expiresAt        DateTime
+  createdAt        DateTime                @default(now())
+
+  user        User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  impressions RecommendationImpression[]
+
+  @@index([userId, expiresAt])
+  @@index([placement, createdAt])
+}
+
+model RecommendationImpression {
+  id          String   @id @default(uuid())
+  requestId   String
+  companionId String
+  position    Int
+  score       Float
+  reasonCodes String[] @default([])
+  servedAt    DateTime @default(now())
+  viewedAt    DateTime?
+  clickedAt   DateTime?
+
+  request    RecommendationRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  companion  CompanionProfile      @relation(fields: [companionId], references: [id], onDelete: Cascade)
+  order      Order?                @relation("RecommendationAttributedOrder")
+
+  @@unique([requestId, companionId])
+  @@index([requestId, position])
+  @@index([companionId, viewedAt])
+  @@index([servedAt])
+}
+
+model CompanionRecommendationPolicy {
+  id          String                     @id @default(uuid())
+  companionId String
+  placement   RecommendationPlacement
+  status      RecommendationPolicyStatus @default(active)
+  boostBps    Int                        @default(0)
+  dailyCap    Int?
+  startsAt    DateTime?
+  endsAt      DateTime?
+  createdAt   DateTime                   @default(now())
+  updatedAt   DateTime                   @updatedAt
+
+  companion CompanionProfile @relation(fields: [companionId], references: [id], onDelete: Cascade)
+
+  @@unique([companionId, placement])
+  @@index([placement, status, startsAt, endsAt])
+}
+
 model Message {
-  id             String      @id @default(uuid())
-  conversationId String
-  senderId       String
-  senderName     String?
-  content        String
-  type           MessageType @default(text)
-  createdAt      DateTime    @default(now())
+  id                 String                   @id @default(uuid())
+  conversationId     String
+  senderId           String
+  senderName         String?
+  content            String
+  type               MessageType              @default(text)
+  moderationStatus   MessageModerationStatus  @default(published)
+  visibility         MessageVisibility        @default(participants)
+  moderationDecision ModerationDecision?
+  policyVersion      String?
+  reviewedAt         DateTime?
+  moderationProcessingToken String?
+  moderationProcessingAt    DateTime?
+  createdAt          DateTime                 @default(now())
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  attachments  MediaAsset[]
 
   @@index([conversationId, createdAt, id])
+  @@index([conversationId, moderationStatus, createdAt])
+  @@index([moderationStatus, moderationProcessingAt])
   @@index([senderId])
+}
+
+model MediaAsset {
+  id              String           @id @default(uuid())
+  uploaderId      String
+  conversationId  String
+  messageId       String?
+  kind            MediaAssetKind
+  status          MediaAssetStatus @default(reserved)
+  storageKey      String           @unique
+  mimeType        String
+  sizeBytes       Int
+  sha256          String
+  durationMs      Int?
+  extractedText   String?
+  analysis        Json?
+  provider        String?
+  providerVersion String?
+  retryCount      Int              @default(0)
+  nextAttemptAt   DateTime?
+  lastError       String?
+  expiresAt       DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  uploader     User         @relation("MediaAssetUploader", fields: [uploaderId], references: [id], onDelete: Cascade)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  message      Message?     @relation(fields: [messageId], references: [id], onDelete: SetNull)
+
+  @@index([conversationId, status, createdAt])
+  @@index([uploaderId, createdAt])
+  @@index([messageId])
+  @@index([expiresAt])
 }
 
 model MessageReadState {
@@ -398,30 +606,85 @@ model MessageReadState {
 }
 
 model ModerationCase {
-  id           String               @id @default(uuid())
-  title        String
-  category     String
-  riskLevel    RiskLevel
-  status       ModerationCaseStatus @default(pending)
-  source       ModerationSource
-  content      String
-  targetId     String?
-  messageId    String?
-  aiScore      Float
-  aiReason     String
-  decision     ModerationDecision
-  matchedRules String[]
-  usedAI       Boolean              @default(false)
-  resolvedAt   DateTime?
-  createdAt    DateTime             @default(now())
-  evidences    ModerationEvidence[]
-  actionLogs   ModerationActionLog[]
+  id               String               @id @default(uuid())
+  title            String
+  category         String
+  riskLevel        RiskLevel
+  status           ModerationCaseStatus @default(pending)
+  source           ModerationSource
+  content          String
+  targetId         String?
+  messageId        String?
+  automaticCaseKey String?              @unique
+  conversationId   String?
+  subjectUserId    String?
+  reporterUserId   String?
+  priority         ModerationPriority   @default(normal)
+  dueAt            DateTime?
+  assignedToUserId String?
+  policyVersion    String               @default("chat-v2")
+  provider         String?
+  providerVersion  String?
+  aiScore          Float
+  aiReason         String
+  decision         ModerationDecision
+  matchedRules     String[]
+  usedAI           Boolean              @default(false)
+  resolvedAt       DateTime?
+  createdAt        DateTime             @default(now())
+  evidences        ModerationEvidence[]
+  actionLogs       ModerationActionLog[]
+  appeals          ModerationAppeal[]
+  restrictions     ChatRestriction[]
+  subject          User?                @relation("ModerationSubject", fields: [subjectUserId], references: [id], onDelete: SetNull)
+  reporter         User?                @relation("ModerationReporter", fields: [reporterUserId], references: [id], onDelete: SetNull)
 
   @@index([source, status])
   @@index([targetId])
+  @@index([conversationId])
+  @@index([subjectUserId, createdAt])
+  @@index([reporterUserId, createdAt])
+  @@index([priority, dueAt])
   @@index([status, createdAt])
   @@index([riskLevel, createdAt])
   @@index([createdAt])
+}
+
+model ModerationAppeal {
+  id            String                  @id @default(uuid())
+  caseId        String                  @unique
+  subjectUserId String
+  reason        String
+  status        ModerationAppealStatus  @default(pending)
+  reviewerId    String?
+  reviewNote    String?
+  reviewedAt    DateTime?
+  createdAt     DateTime                @default(now())
+
+  case        ModerationCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  subjectUser User           @relation("ModerationAppealer", fields: [subjectUserId], references: [id], onDelete: Cascade)
+
+  @@index([subjectUserId, createdAt])
+  @@index([status, createdAt])
+}
+
+model ChatRestriction {
+  id             String                 @id @default(uuid())
+  userId         String
+  caseId         String?
+  source         ChatRestrictionSource  @default(automatic)
+  reason         String
+  startsAt       DateTime               @default(now())
+  endsAt         DateTime
+  liftedAt       DateTime?
+  liftedByUserId String?
+  createdAt      DateTime               @default(now())
+
+  user User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  case ModerationCase? @relation(fields: [caseId], references: [id], onDelete: SetNull)
+
+  @@index([userId, endsAt])
+  @@index([caseId])
 }
 
 model ModerationEvidence {

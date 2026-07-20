@@ -2,12 +2,17 @@ import { HttpStatus, Injectable } from "@nestjs/common";
 
 import { AppException } from "../common/errors/app.exception";
 import { PrismaService } from "../database/prisma.service";
+import { ModerationCaseService } from "../moderation/moderation-case.service";
 import { ModerationService } from "../moderation/moderation.service";
 import { CreateCommunityPostDto } from "./dto/community.dto";
 
 @Injectable()
 export class CommunityService {
-  constructor(private readonly prisma: PrismaService, private readonly moderation: ModerationService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly moderation: ModerationService,
+    private readonly moderationCases: ModerationCaseService
+  ) {}
 
   async list(userId?: string) {
     const items = await this.prisma.communityPost.findMany({
@@ -28,7 +33,14 @@ export class CommunityService {
       throw new AppException("COMPANION_PROFILE_REQUIRED", "Approved companion profile is required", HttpStatus.FORBIDDEN);
     }
     const result = await this.moderation.moderateAsync(`${dto.topic} ${dto.content}`, "community");
-    const status = result.decision === "allow" || result.decision === "warn" ? "approved" : "rejected";
+    // Public posts follow the same safe delivery principle as chat: only an
+    // allow decision is published. Warn/review awaits a staff decision; block
+    // remains private and is never inserted into the public feed.
+    const status = result.decision === "allow"
+      ? "approved"
+      : result.decision === "block"
+        ? "rejected"
+        : "pending";
     const item = await this.prisma.communityPost.create({
       data: {
         authorId: userId, kind: dto.kind, topic: dto.topic.trim(), content: dto.content.trim(),
@@ -37,6 +49,17 @@ export class CommunityService {
       },
       include: { author: { include: { profile: true, companionProfile: true } }, likes: true }
     } as any);
+    if (status !== "approved") {
+      await this.moderationCases.createFromResult({
+        result,
+        source: "community",
+        content: `${item.topic}\n${item.content}`,
+        targetId: item.id,
+        subjectUserId: userId,
+        actorId: userId,
+        forceCreate: true
+      });
+    }
     return this.toDto(item, userId);
   }
 

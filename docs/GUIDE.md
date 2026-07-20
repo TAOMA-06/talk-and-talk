@@ -12,7 +12,7 @@
 - 禁止引导私联、线下见面、私下转账。
 - 需要内容安全审查，保护用户不被骚扰、诱骗或引流到平台外。
 
-当前仓库正在从演示工程迁移到正式后端。旧 Node demo 后端已移除，正式后端位于 `backend/api`。
+当前发行范围是微信小程序与正式 NestJS 后端。历史 iOS 工程保留作参考，不纳入聊天审核 v2 的实现或发布验收；旧 Node demo 后端已移除，正式后端位于 `backend/api`。
 
 ## 2. AI 内容识别做什么
 
@@ -72,16 +72,16 @@ Phase 2（Auth）：
 - Release 使用 `Config/Release.xcconfig` 中的生产 `BACKEND_BASE_URL`，CI 会扫描产物并拒绝 Demo/Mock 标记。
 - 详见 [docs/auth-api.md](./auth-api.md)。
 
-Phase 3（聊天/审核）：
+Phase 3（聊天/审核 v2，微信小程序 + NestJS）：
 
-- 正式聊天与审核 API 已接入：`POST /conversations/:id/messages`、`POST /moderation/check`、`GET /moderation/cases`（staff）。
-- iOS 是用户/陪伴者客户端，不编译管理员页面、审核队列或处置动作；用户只能查看本人安全状态并提交举报。
+- 正式聊天与审核 API 已接入微信小程序：`POST /conversations/:id/messages`、媒体直传预留/完成、`POST /moderation/appeals`、`GET /conversations/:id/status` 与 staff 审核接口。
+- 文本、图片、短语音统一走 `queued → pendingReview/published/blocked → 人工复核 → 处置/申诉`；接收方不会看到待审文本或未获批准媒体。
 - 聊天响应只返回用户可理解的审核决定与风险等级，举报响应只返回回执；规则命中、AI 原因和完整案件仅 staff API 可见。
 - 审核流水线：RuleEngine →（高风险 block 跳过）可选 DeepSeek → Case/Evidence/ActionLog。
 - Admin Moderation：概览、筛选队列、详情、会话证据、人工处置、样本标注/导出；动作写 `ModerationActionLog` + `AuditLog`。
 - 用户举报：`POST /moderation/reports`；iOS 举报入口优先提交后端。
 - Web 运营后台与 iOS 完全分离：本地工具入口为 `http://localhost:3000/admin/`，生产部署需独立访问控制。
-- iOS `c1`–`c3` 以服务端 decision 为准（含 `review` 反馈「内容已进入平台复核」）。
+- 历史 iOS `c1`–`c3` 不在本次 v2 范围；小程序以服务端投递状态与审核结果为准。
 - 会话、消息、审核工单持久化到 Postgres。
 
 ## 5. 启动方式

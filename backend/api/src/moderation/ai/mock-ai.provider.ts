@@ -9,6 +9,9 @@ export class MockAIProvider implements AIProvider {
     return {
       score: 0.05,
       reasons: [],
+      categories: [],
+      provider: "mock",
+      providerVersion: "rule-only",
       available: false
     };
   }

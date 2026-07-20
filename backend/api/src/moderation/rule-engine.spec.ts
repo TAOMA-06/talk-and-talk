@@ -50,4 +50,13 @@ describe("RuleEngine", () => {
     expect(engine.normalize("加 V x")).toContain("微");
     expect(engine.normalize("薇信")).toContain("微信");
   });
+
+  it("puts self-harm and violence signals into critical priority without contacting anyone automatically", () => {
+    const selfHarm = engine.moderate("我真的不想活了", "chat");
+    const violence = engine.moderate("我会弄死你", "chat");
+    expect(selfHarm.categories).toContain("selfHarm");
+    expect(selfHarm.priority).toBe("critical");
+    expect(violence.categories).toContain("violence");
+    expect(violence.priority).toBe("critical");
+  });
 });

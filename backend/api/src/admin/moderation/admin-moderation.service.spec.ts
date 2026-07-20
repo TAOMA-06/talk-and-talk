@@ -30,12 +30,19 @@ describe("AdminModerationService", () => {
     },
     $transaction: jest.fn()
   };
+  const chatRestrictions = {
+    createRestriction: jest.fn(),
+    liftForCase: jest.fn()
+  };
+  const mediaAssets = {
+    toAttachmentDto: jest.fn(async (asset: any) => asset)
+  };
 
   let service: AdminModerationService;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new AdminModerationService(prisma as any);
+    service = new AdminModerationService(prisma as any, chatRestrictions as any, mediaAssets as any);
   });
 
   describe("statusForAction", () => {
@@ -95,7 +102,7 @@ describe("AdminModerationService", () => {
         source: "chat",
         content: "加我微信",
         targetId: "c1",
-        messageId: null,
+        messageId: "message-1",
         aiScore: 0.9,
         aiReason: "私联",
         decision: "block",
@@ -128,6 +135,9 @@ describe("AdminModerationService", () => {
           },
           auditLog: {
             create: jest.fn().mockResolvedValue({ id: "audit-1" })
+          },
+          message: {
+            update: jest.fn().mockResolvedValue({ id: "message-1" })
           }
         };
         return fn(tx);
@@ -145,6 +155,89 @@ describe("AdminModerationService", () => {
       expect(result.action.action).toBe("confirmViolation");
       expect(result.overview.resolved).toBe(1);
       expect(prisma.$transaction).toHaveBeenCalled();
+    });
+
+    it("marks a manually confirmed delivered message as removed", async () => {
+      const existing = {
+        id: "case-remove",
+        status: "humanReview",
+        title: "t",
+        category: "实时风控",
+        riskLevel: "high",
+        source: "chat",
+        content: "违规内容",
+        targetId: "c1",
+        messageId: "message-remove",
+        aiScore: 0.9,
+        aiReason: "高风险",
+        decision: "review",
+        matchedRules: [],
+        usedAI: true,
+        resolvedAt: null,
+        createdAt: new Date("2026-07-01T00:00:00.000Z")
+      };
+      prisma.moderationCase.findUnique.mockResolvedValue(existing);
+      const db = {
+        moderationCase: { update: jest.fn().mockResolvedValue({ ...existing, status: "resolved", actionLogs: [] }) },
+        moderationActionLog: { create: jest.fn().mockResolvedValue({ id: "log-remove", action: "confirmViolation", createdAt: new Date() }) },
+        auditLog: { create: jest.fn().mockResolvedValue({}) },
+        message: { update: jest.fn().mockResolvedValue({}) }
+      };
+      prisma.$transaction.mockImplementation(async (callback: any) => callback(db));
+      prisma.moderationCase.findMany.mockResolvedValueOnce([{ ...existing, status: "resolved" }]).mockResolvedValueOnce([]);
+      prisma.conversation.count.mockResolvedValue(1);
+      prisma.moderationLabel.count.mockResolvedValue(0);
+
+      await service.applyAction("case-remove", "mod-1", "confirmViolation", "确认违规");
+
+      expect(db.message.update).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ moderationStatus: "removed", visibility: "senderOnly" })
+      }));
+    });
+
+    it("overturns an appeal by releasing the held message and lifting linked chat restrictions", async () => {
+      const existing = {
+        id: "case-appeal",
+        status: "resolved",
+        title: "t",
+        category: "实时风控",
+        riskLevel: "high",
+        source: "chat",
+        content: "加我微信",
+        targetId: "c1",
+        messageId: "message-1",
+        subjectUserId: "user-1",
+        aiScore: 0.9,
+        aiReason: "私联",
+        decision: "block",
+        matchedRules: ["private.contact"],
+        usedAI: false,
+        resolvedAt: new Date("2026-07-01T00:00:00.000Z"),
+        createdAt: new Date("2026-07-01T00:00:00.000Z"),
+        appeals: [{ id: "appeal-1", status: "pending" }]
+      };
+      prisma.moderationCase.findUnique.mockResolvedValue(existing);
+      const db = {
+        moderationCase: { update: jest.fn().mockResolvedValue({ ...existing, status: "dismissed", actionLogs: [] }) },
+        moderationActionLog: { create: jest.fn().mockResolvedValue({ id: "log-appeal", action: "overturnAppeal", createdAt: new Date() }) },
+        auditLog: { create: jest.fn().mockResolvedValue({}) },
+        message: { update: jest.fn().mockResolvedValue({}) },
+        moderationAppeal: { update: jest.fn().mockResolvedValue({}) }
+      };
+      prisma.$transaction.mockImplementation(async (callback: any) => callback(db));
+      prisma.moderationCase.findMany.mockResolvedValueOnce([{ ...existing, status: "dismissed" }]).mockResolvedValueOnce([]);
+      prisma.conversation.count.mockResolvedValue(1);
+      prisma.moderationLabel.count.mockResolvedValue(0);
+
+      await service.applyAction("case-appeal", "mod-1", "overturnAppeal", "复核成立");
+
+      expect(db.message.update).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ moderationStatus: "published", visibility: "participants" })
+      }));
+      expect(db.moderationAppeal.update).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ status: "overturned", reviewerId: "mod-1" })
+      }));
+      expect(chatRestrictions.liftForCase).toHaveBeenCalledWith("case-appeal", "mod-1", "复核成立");
     });
   });
 

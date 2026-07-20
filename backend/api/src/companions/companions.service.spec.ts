@@ -102,4 +102,29 @@ describe("CompanionsService", () => {
     });
     expect(result.isPublished).toBe(false);
   });
+
+  it("lists unpublished profiles with owner eligibility for the admin review queue", async () => {
+    prisma.companionProfile.findMany.mockResolvedValue([{
+      ...companionRecord,
+      isPublished: false,
+      owner: {
+        id: "owner-1",
+        accountStatus: "active",
+        profile: { isVerified: true, displayName: "林屿" }
+      }
+    }] as any);
+    prisma.companionProfile.count.mockResolvedValue(1);
+
+    const result = await service.listAdmin();
+
+    expect(prisma.companionProfile.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      orderBy: [{ isPublished: "asc" }, { createdAt: "asc" }],
+      take: 50
+    }));
+    expect(result.items[0]).toEqual(expect.objectContaining({
+      id: "c1",
+      isPublished: false,
+      owner: { id: "owner-1", accountStatus: "active", isVerified: true, displayName: "林屿" }
+    }));
+  });
 });

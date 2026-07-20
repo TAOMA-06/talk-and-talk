@@ -179,6 +179,48 @@ export class UsersService {
     });
   }
 
+  async getDeletionSettlementDetails(requestId: string) {
+    const request: any = await this.prisma.accountDeletionRequest.findUnique({
+      where: { id: requestId },
+      include: { user: { select: { id: true, role: true, accountStatus: true, createdAt: true } } }
+    } as any);
+    if (!request) {
+      throw new AppException("DELETION_REQUEST_NOT_FOUND", "Account deletion request not found", HttpStatus.NOT_FOUND);
+    }
+    const orders: any[] = await this.prisma.order.findMany({
+      where: { userId: request.userId },
+      orderBy: { createdAt: "asc" },
+      include: {
+        payments: { orderBy: { createdAt: "desc" }, take: 1 },
+        refunds: { orderBy: { createdAt: "desc" }, take: 1 }
+      }
+    } as any);
+    return {
+      request: this.deletionRequestDto(request),
+      orders: orders.map((order) => ({
+        id: order.id,
+        status: order.status,
+        amountCents: order.amountCents,
+        scheduledAt: order.scheduledAt.toISOString(),
+        payment: order.payments[0]
+          ? {
+              id: order.payments[0].id,
+              outTradeNo: order.payments[0].outTradeNo,
+              status: order.payments[0].status,
+              expiresAt: order.payments[0].expiresAt?.toISOString() ?? null
+            }
+          : null,
+        refund: order.refunds[0]
+          ? {
+              id: order.refunds[0].id,
+              status: order.refunds[0].status,
+              outRefundNo: order.refunds[0].outRefundNo
+            }
+          : null
+      }))
+    };
+  }
+
   async startDeletionRequest(requestId: string, actorId: string) {
     return this.prisma.$transaction(async (tx) => {
       const db = tx as any;

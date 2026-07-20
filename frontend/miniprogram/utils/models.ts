@@ -12,7 +12,29 @@ export type AuthSession = { accessToken: string; refreshToken: string; expiresIn
 export type Companion = {
   id: string; name: string; role: string; initials: string; bio: string;
   rating: number; reviewCount: number; pricePerHalfHour: number; isOnline: boolean;
-  isVerified: boolean; availability: string; serviceTags?: string[]; availableTimes?: string[];
+  isVerified: boolean; availability: string; tags?: string[]; serviceTags?: string[]; availableTimes?: string[];
+  topicIds?: string[]; specialties?: string[]; cityDistrict?: string;
+};
+
+export type RecommendationPlacement = "discoverHome" | "communityRelated" | "orderFollowup";
+export type RecommendationTopic = { id: string; name: string };
+export type RecommendationBehavioralTag = {
+  id: string; topicId: string; name: string; weight: number; source: "behavioral" | "inferredOrder"; updatedAt: string | null;
+};
+export type RecommendationPreference = {
+  personalizationEnabled: boolean;
+  topicIds: string[];
+  city: string | null;
+  maxPricePerHalfHour: number | null;
+  preferredTimeSlots: string[];
+  behavioralTags: RecommendationBehavioralTag[];
+};
+export type RecommendedCompanion = Companion & {
+  impressionId: string;
+  position: number;
+  score: number;
+  reasonCodes: string[];
+  reasonText: string;
 };
 
 export type CommunityPost = {
@@ -27,6 +49,7 @@ export type Order = {
   id: string; companionId: string; themeId: string; durationMinutes: number; amountCents: number; status: string;
   scheduledAt?: string; createdAt: string; companion?: Companion; companionSnapshot?: { name: string; role: string; initials: string };
   companionConfirmedAt?: string | null;
+  paymentReservationExpiresAt?: string | null;
 };
 
 export type Conversation = {
@@ -37,8 +60,37 @@ export type Conversation = {
   updatedAt: string;
 };
 
-export type ChatMessage = { id: string; content: string; senderId: string; senderName?: string; type: string; timestamp: string };
+export type MediaAttachment = {
+  id: string;
+  kind: "image" | "audio";
+  status: "reserved" | "uploaded" | "scanning" | "approved" | "blocked" | "failed" | "expired";
+  mimeType: string;
+  sizeBytes: number;
+  durationMs?: number | null;
+  url?: string | null;
+  expiresAt?: string | null;
+};
 
-export type Notification = { id: string; type: string; title: string; body: string; readAt?: string | null; createdAt: string };
+export type ChatMessage = {
+  id: string;
+  content: string;
+  senderId: string;
+  senderName?: string;
+  type: "text" | "image" | "audio" | "system" | "safety" | string;
+  moderationStatus?: "queued" | "pendingReview" | "published" | "blocked" | "removed";
+  visibility?: "participants" | "senderOnly" | "staffOnly";
+  attachments?: MediaAttachment[];
+  timestamp: string;
+};
+
+export type Notification = {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  data?: Record<string, unknown> | null;
+  readAt?: string | null;
+  createdAt: string;
+};
 
 export type MiniProgramPayParams = { timeStamp: string; nonceStr: string; package: string; signType: "RSA"; paySign: string };

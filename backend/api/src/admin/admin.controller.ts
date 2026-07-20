@@ -38,6 +38,11 @@ export class AdminController {
     return this.usersService.listDeletionRequests(query.status, query.page, query.pageSize);
   }
 
+  @Get("account-deletions/:id/settlement")
+  deletionSettlement(@Param("id") requestId: string) {
+    return this.usersService.getDeletionSettlementDetails(requestId);
+  }
+
   @Post("account-deletions/:id/start")
   startAccountDeletion(
     @CurrentUser() actor: AuthenticatedUser,
@@ -204,6 +209,14 @@ export class AdminController {
       metadata: { isVerified: dto.isVerified, reason: dto.reason?.trim() || null }
     });
     return { userId, isVerified: profile.isVerified };
+  }
+
+  @Get("companions")
+  listCompanions(@Query("page") page?: string, @Query("pageSize") pageSize?: string) {
+    return this.companionsService.listAdmin(
+      Number.parseInt(page ?? "1", 10),
+      Number.parseInt(pageSize ?? "50", 10)
+    );
   }
 
   @Post("companions")

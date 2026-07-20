@@ -4,10 +4,23 @@ textarea { min-height: 130rpx; }
 .small { font-size: 32rpx; }
 .text-button, .legal { margin: 0; padding: 0; background: transparent; color: #b94a68; font-size: 26rpx; }
 .section-title { margin: 32rpx 0 16rpx; }
+.notification-header { display: flex; align-items: center; justify-content: space-between; gap: 20rpx; }
+.notification-header .section-title { flex: 1; }
 .compact { padding: 40rpx 10rpx; }
-.notification { margin-bottom: 14rpx; }
+.notification { position: relative; margin-bottom: 14rpx; }
+.notification.unread { border-left: 6rpx solid #b94a68; }
+.unread-marker { position: absolute; right: 20rpx; top: 20rpx; color: #b94a68; font-size: 22rpx; }
 .name { font-weight: 700; }
 .legal-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 12rpx 28rpx; margin-top: 32rpx; }
 .legal { display: block; margin: 0; color: #8d6e73; }
 .account-actions { display: flex; flex-direction: column; align-items: center; gap: 20rpx; margin-top: 32rpx; }
 .danger { color: #a53c55; }
+.recommendation-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 18rpx; }
+.recommendation-header > view { flex: 1; }
+.recommendation-label { margin-top: 22rpx; color: #584147; font-size: 27rpx; font-weight: 700; }
+.choices { display: flex; flex-wrap: wrap; gap: 12rpx; margin-top: 14rpx; }
+.choice, .behavior-tag { padding: 10rpx 16rpx; border: 1rpx solid #ead4d9; border-radius: 999rpx; color: #765b60; font-size: 25rpx; }
+.choice.selected { border-color: #b94a68; background: #fce8ed; color: #a43f5c; }
+.behavior-tag { border-color: #efd8aa; background: #fff7e8; color: #986420; }
+.recommendation-off { margin-top: 18rpx; line-height: 1.6; }
+.behavior-tags { margin-top: 22rpx; }

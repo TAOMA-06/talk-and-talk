@@ -7,3 +7,9 @@
 .content { margin: 12rpx 0 18rpx; line-height: 1.65; }
 .like { margin: 0; padding: 0; background: transparent; color: #8d6e73; font-size: 25rpx; }
 .liked { color: #b94a68; }
+.related-section { margin: 28rpx 0; }
+.section-title { margin: 0 4rpx 16rpx; font-size: 34rpx; font-weight: 700; }
+.recommendation-card { margin-bottom: 14rpx; }
+.recommendation-row { display: flex; align-items: center; justify-content: space-between; gap: 20rpx; }
+.recommendation-reason { margin-top: 10rpx; color: #a36519; font-size: 23rpx; }
+.go { color: #b94a68; font-size: 26rpx; }

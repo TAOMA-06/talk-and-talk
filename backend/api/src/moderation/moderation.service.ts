@@ -3,20 +3,34 @@ import { Inject, Injectable } from "@nestjs/common";
 import { AI_PROVIDER, AIProvider } from "./ai/ai-provider.interface";
 import {
   ModerationContext,
+  ModerationCategory,
   ModerationDecision,
+  ModerationPriority,
   ModerationSource,
   RiskLevel,
   RuleEngine
 } from "./rule-engine";
 
-export type { ModerationContext, ModerationDecision, ModerationSource, RiskLevel };
+export type {
+  ModerationCategory,
+  ModerationContext,
+  ModerationDecision,
+  ModerationPriority,
+  ModerationSource,
+  RiskLevel
+};
 
 export interface ModerationResult {
   decision: ModerationDecision;
   riskLevel: RiskLevel;
+  priority: ModerationPriority;
   score: number;
   reasons: string[];
   matchedRules: string[];
+  categories: ModerationCategory[];
+  policyVersion: string;
+  provider?: string;
+  providerVersion?: string;
   usedAI: boolean;
 }
 
@@ -33,9 +47,13 @@ export class ModerationService {
     return {
       decision: rule.decision,
       riskLevel: rule.riskLevel,
+      priority: rule.priority,
       score: rule.score,
       reasons: rule.reasons,
       matchedRules: rule.matchedRules,
+      categories: rule.categories,
+      policyVersion: rule.policyVersion,
+      provider: "rule-engine",
       usedAI: false
     };
   }
@@ -51,9 +69,13 @@ export class ModerationService {
       return {
         decision: rule.decision,
         riskLevel: rule.riskLevel,
+        priority: rule.priority,
         score: rule.score,
         reasons: rule.reasons,
         matchedRules: rule.matchedRules,
+        categories: rule.categories,
+        policyVersion: rule.policyVersion,
+        provider: "rule-engine",
         usedAI: false
       };
     }
@@ -63,21 +85,32 @@ export class ModerationService {
       return {
         decision: rule.decision,
         riskLevel: rule.riskLevel,
+        priority: rule.priority,
         score: rule.score,
         reasons: rule.reasons,
         matchedRules: rule.matchedRules,
+        categories: rule.categories,
+        policyVersion: rule.policyVersion,
+        provider: "rule-engine",
         usedAI: false
       };
     }
 
     const score = Math.max(rule.score, ai.score);
     const reasons = [...new Set([...rule.reasons.filter((r) => r !== "内容正常"), ...ai.reasons])];
+    const categories = normalizeCategories([...rule.categories, ...(ai.categories ?? [])]);
+    const decision = this.ruleEngine.decisionFor(score);
     return {
-      decision: this.ruleEngine.decisionFor(score),
+      decision,
       riskLevel: this.ruleEngine.riskLevelFor(score),
+      priority: priorityFor(decision, categories),
       score,
       reasons: reasons.length ? reasons : ["内容正常"],
       matchedRules: rule.matchedRules,
+      categories,
+      policyVersion: rule.policyVersion,
+      provider: ai.provider,
+      providerVersion: ai.providerVersion,
       usedAI: true
     };
   }
@@ -85,4 +118,19 @@ export class ModerationService {
   isAIConfigured(): boolean {
     return process.env.DEEPSEEK_API_KEY?.trim() !== undefined && process.env.DEEPSEEK_API_KEY.trim() !== "";
   }
+}
+
+function normalizeCategories(categories: ModerationCategory[]): ModerationCategory[] {
+  const unique = [...new Set(categories)];
+  const nonNormal = unique.filter((category) => category !== "normal");
+  return nonNormal.length ? nonNormal : ["normal"];
+}
+
+function priorityFor(
+  decision: ModerationDecision,
+  categories: ModerationCategory[]
+): ModerationPriority {
+  if (categories.includes("selfHarm") || categories.includes("violence")) return "critical";
+  if (decision === "block" || decision === "warn") return "high";
+  return "normal";
 }

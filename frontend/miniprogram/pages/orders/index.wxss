@@ -7,3 +7,5 @@
 .actions { display: flex; gap: 16rpx; margin-top: 22rpx; }
 .action { flex: 1; margin: 0; font-size: 27rpx; }
 .plain { background: #f9edef; color: #a43f5c; }
+.followup-section { margin-top: 32rpx; }
+.recommendation-card { margin-bottom: 14rpx; }

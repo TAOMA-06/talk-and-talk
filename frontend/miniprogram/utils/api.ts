@@ -1,7 +1,7 @@
 import { BackendConfig, backendConfig } from "./config";
 import {
-  AuthSession, AuthUser, ChatMessage, CommunityPost, Companion, Conversation, MiniProgramPayParams,
-  Notification, Order, Review
+  AuthSession, AuthUser, ChatMessage, CommunityPost, Companion, Conversation, MediaAttachment, MiniProgramPayParams,
+  Notification, Order, RecommendationPlacement, RecommendationPreference, RecommendationTopic, RecommendedCompanion, Review
 } from "./models";
 import {
   bindLegalConsentToUser, currentLegalConsent, requireLegalConsent, withdrawLegalConsent
@@ -13,8 +13,13 @@ export type RequestOptions = {
   authenticated?: boolean;
   retry?: boolean;
 };
-type ApiError = Error & { statusCode?: number; code?: string };
+export type ApiError = Error & { statusCode?: number; code?: string; details?: Record<string, unknown> };
 type TransportResponse = { statusCode: number; data?: any };
+
+export type MediaUploadReservation = {
+  asset: Omit<MediaAttachment, "url">;
+  upload: { url: string; method: "PUT" | "POST"; headers: Record<string, string>; expiresAt: string };
+};
 
 const ACCESS_TOKEN_KEY = "talkandtalk.accessToken";
 const REFRESH_TOKEN_KEY = "talkandtalk.refreshToken";
@@ -178,7 +183,41 @@ async function rawRequest<T>(path: string, options: RequestOptions = {}): Promis
   const error = new Error(body.error?.message || "服务暂时不可用") as ApiError;
   error.statusCode = response.statusCode;
   error.code = body.error?.code;
+  error.details = body.error?.details;
   throw error;
+}
+
+export function readLocalFile(path: string): Promise<ArrayBuffer> {
+  return new Promise((resolve, reject) => {
+    wx.getFileSystemManager().readFile({
+      filePath: path,
+      success: (result: { data: ArrayBuffer }) => resolve(result.data),
+      fail: () => reject(new Error("无法读取待上传的媒体文件"))
+    });
+  });
+}
+
+export function uploadAuthorizedMedia(
+  upload: MediaUploadReservation["upload"],
+  bytes: ArrayBuffer
+): Promise<void> {
+  // The bundled mock adapter deliberately has no backing store. Completing its
+  // reservation exercises the moderation lifecycle without leaking a bypass
+  // into real environments.
+  if (upload.url.startsWith("mock://")) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    wx.request({
+      url: upload.url,
+      method: upload.method,
+      data: bytes,
+      header: upload.headers,
+      success: (response: { statusCode: number }) => {
+        if (response.statusCode >= 200 && response.statusCode < 300) resolve();
+        else reject(new Error("媒体上传失败，请重试"));
+      },
+      fail: () => reject(new Error("媒体上传失败，请检查网络"))
+    });
+  });
 }
 
 async function refreshSession(): Promise<void> {
@@ -294,6 +333,35 @@ export const api = {
   requestDeletion: () => request<{ id: string; status: string; message: string }>("/me/deletion-request", { method: "POST" }),
   withdrawLegalConsent: () => rawRequest<{ withdrawn: boolean; withdrawnAt: string | null }>("/users/me/legal-consents/current", { method: "DELETE" }),
   companions: () => request<{ items: Companion[] }>("/companions"),
+  recommendationTopics: () => request<{ algorithmVersion: string; items: RecommendationTopic[] }>("/recommendations/topics"),
+  recommendationPreferences: () => request<RecommendationPreference>("/recommendations/me/preferences"),
+  updateRecommendationPreferences: (data: Partial<Pick<RecommendationPreference,
+    "personalizationEnabled" | "topicIds" | "city" | "maxPricePerHalfHour" | "preferredTimeSlots">>) =>
+    request<RecommendationPreference>("/recommendations/me/preferences", { method: "PATCH", data }),
+  deleteRecommendationTag: (id: string) => request<{ deleted: boolean; topicId: string }>(
+    `/recommendations/me/tags/${encodeURIComponent(id)}`, { method: "DELETE" }
+  ),
+  recommendedCompanions: (options: {
+    placement: RecommendationPlacement;
+    pageSize?: number;
+    cursor?: string;
+    themeId?: string;
+  }) => {
+    const query = [
+      `placement=${encodeURIComponent(options.placement)}`,
+      options.pageSize ? `pageSize=${encodeURIComponent(String(options.pageSize))}` : "",
+      options.cursor ? `cursor=${encodeURIComponent(options.cursor)}` : "",
+      options.themeId ? `themeId=${encodeURIComponent(options.themeId)}` : ""
+    ].filter(Boolean).join("&");
+    return request<{
+      algorithmVersion: string;
+      personalized: boolean;
+      items: RecommendedCompanion[];
+      pagination: { pageSize: number; total: number; nextCursor: string | null };
+    }>(`/recommendations/companions?${query}`);
+  },
+  recordRecommendationEvents: (events: Array<{ impressionId: string; type: "view" | "click" }>) =>
+    request<{ updated: number }>("/recommendations/events", { method: "POST", data: { events } }),
   companion: (id: string) => request<Companion>(`/companions/${encodeURIComponent(id)}`, { authenticated: false }),
   ownCompanion: () => request<Companion>("/companions/me/profile"),
   applyCompanion: (data: Record<string, unknown>) => request<Companion>("/companions/me/application", { method: "POST", data }),
@@ -319,6 +387,10 @@ export const api = {
   mockNotify: (outTradeNo: string) => request("/payments/wechat/mock-notify", { method: "POST", data: { outTradeNo } }),
   refund: (id: string, reason: string) => request(`/orders/${encodeURIComponent(id)}/refund`, { method: "POST", data: { reason } }),
   conversations: () => request<{ conversations: Conversation[] }>("/conversations"),
+  conversationStatus: (id: string) => request<{
+    mediaEnabled: boolean;
+    chatRestriction: { id: string; reason: string; endsAt: string } | null;
+  }>(`/conversations/${encodeURIComponent(id)}/status`),
   messages: (id: string, options: { cursor?: string; limit?: number } = {}) => {
     const query = [
       options.cursor ? `cursor=${encodeURIComponent(options.cursor)}` : "",
@@ -329,11 +401,38 @@ export const api = {
       `/conversations/${encodeURIComponent(id)}/messages${suffix}`
     );
   },
-  sendMessage: (id: string, content: string) => request<{
-    moderation: { decision: "allow" | "warn" | "review" | "block"; riskLevel: string };
+  sendMessage: (id: string, content?: string, attachmentIds?: string[]) => request<{
+    moderation: {
+      decision: "allow" | "warn" | "review" | "block";
+      riskLevel: string;
+      deliveryStatus: "queued" | "pendingReview" | "published" | "blocked" | "removed";
+      caseId: string | null;
+      appealEligible: boolean;
+    };
     message: ChatMessage | null;
     safetyMessage: ChatMessage | null;
-  }>(`/conversations/${encodeURIComponent(id)}/messages`, { method: "POST", data: { content } }),
+  }>(`/conversations/${encodeURIComponent(id)}/messages`, {
+    method: "POST",
+    data: { ...(content?.trim() ? { content: content.trim() } : {}), ...(attachmentIds?.length ? { attachmentIds } : {}) }
+  }),
+  reserveMediaUpload: (id: string, data: {
+    kind: "image" | "audio";
+    mimeType: string;
+    sizeBytes: number;
+    sha256: string;
+    durationMs?: number;
+  }) => request<MediaUploadReservation>(`/conversations/${encodeURIComponent(id)}/media-uploads`, { method: "POST", data }),
+  completeMediaUpload: (id: string, assetId: string) => request<{ asset: MediaAttachment }>(
+    `/conversations/${encodeURIComponent(id)}/media-uploads/${encodeURIComponent(assetId)}/complete`,
+    { method: "POST" }
+  ),
   report: (data: Record<string, unknown>) => request("/moderation/reports", { method: "POST", data }),
-  notifications: () => request<{ items: Notification[] }>("/notifications")
+  appeal: (caseId: string, reason: string) => request<{ appeal: { id: string; caseId: string; status: string; createdAt: string } }>(
+    "/moderation/appeals",
+    { method: "POST", data: { caseId, reason } }
+  ),
+  notifications: () => request<{ items: Notification[] }>("/notifications"),
+  notificationUnreadCount: () => request<{ count: number }>("/notifications/unread-count"),
+  markNotificationRead: (id: string) => request<Notification>(`/notifications/${encodeURIComponent(id)}/read`, { method: "POST" }),
+  markAllNotificationsRead: () => request<{ updated: number }>("/notifications/read-all", { method: "POST" })
 };

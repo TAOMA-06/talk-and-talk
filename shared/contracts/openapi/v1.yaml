@@ -360,6 +360,137 @@ paths:
                 $ref: "#/components/schemas/SuccessEnvelope"
         "404":
           $ref: "#/components/responses/Error"
+  /recommendations/topics:
+    get:
+      tags: [recommendations]
+      summary: List the stable companion recommendation topics
+      operationId: listRecommendationTopics
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Topic catalog and algorithm version
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /recommendations/me/preferences:
+    get:
+      tags: [recommendations]
+      summary: Read the current user's recommendation settings and removable behavioral tags
+      operationId: getRecommendationPreferences
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Recommendation preferences
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+    patch:
+      tags: [recommendations]
+      summary: Update recommendation settings
+      description: Disabling personalization keeps non-personalized discovery available and stops preference/history-based ranking.
+      operationId: updateRecommendationPreferences
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                personalizationEnabled: { type: boolean }
+                topicIds: { type: array, maxItems: 6, items: { type: string, enum: [t1, t2, t3, t4, t5, t6] } }
+                city: { type: string, nullable: true }
+                maxPricePerHalfHour: { type: integer, minimum: 1, maximum: 10000, nullable: true }
+                preferredTimeSlots: { type: array, maxItems: 12, items: { type: string, pattern: "^[0-2][0-9]:[0-5][0-9]$" } }
+      responses:
+        "200":
+          description: Updated recommendation preferences
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /recommendations/me/tags/{id}:
+    delete:
+      tags: [recommendations]
+      summary: Delete one behavioral recommendation tag
+      operationId: deleteRecommendationBehavioralTag
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Tag deleted and excluded from future behavioral ranking
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /recommendations/companions:
+    get:
+      tags: [recommendations]
+      summary: Get a snapshot-backed ranked companion card feed
+      operationId: listRecommendedCompanions
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: placement
+          schema: { type: string, enum: [discoverHome, communityRelated, orderFollowup], default: discoverHome }
+        - in: query
+          name: pageSize
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+        - in: query
+          name: cursor
+          schema: { type: string }
+        - in: query
+          name: themeId
+          schema: { type: string, enum: [t1, t2, t3, t4, t5, t6] }
+      responses:
+        "200":
+          description: Ranked companion cards with opaque impression ids, reason codes, and a short-lived cursor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+        "410":
+          $ref: "#/components/responses/Error"
+  /recommendations/events:
+    post:
+      tags: [recommendations]
+      summary: Record idempotent recommendation card view/click events
+      operationId: recordRecommendationEvents
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [events]
+              properties:
+                events:
+                  type: array
+                  minItems: 1
+                  maxItems: 50
+                  items:
+                    type: object
+                    required: [impressionId, type]
+                    properties:
+                      impressionId: { type: string, format: uuid }
+                      type: { type: string, enum: [view, click] }
+      responses:
+        "200":
+          description: Number of newly recorded events
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
   /orders/status:
     get:
       tags: [orders]
@@ -398,11 +529,13 @@ paths:
           application/json:
             schema:
               type: object
-              required: [companionId, themeId, durationMinutes]
+              required: [companionId, themeId, durationMinutes, scheduledAt]
               properties:
                 companionId: { type: string }
                 themeId: { type: string }
                 durationMinutes: { type: integer, minimum: 30, maximum: 240 }
+                scheduledAt: { type: string, format: date-time }
+                recommendationImpressionId: { type: string, format: uuid, description: Optional card impression attribution, valid for 24 hours. }
       responses:
         "200":
           description: Created order
@@ -629,7 +762,7 @@ paths:
   /payments/wechat/mock-notify:
     post:
       tags: [payments]
-      summary: Simulate successful payment (non-production)
+      summary: Simulate successful payment only when the mock provider is active
       operationId: wechatMockNotify
       security:
         - bearerAuth: []
@@ -649,6 +782,89 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuccessEnvelope"
+  /payments/refunds/review-queue:
+    get:
+      tags: [payments]
+      summary: List refunds awaiting staff action
+      operationId: listRefundReviewQueue
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Pending-review and failed refunds (moderator/admin only)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /payments/refunds/{id}/approve:
+    post:
+      tags: [payments]
+      summary: Approve a pending refund
+      operationId: approveRefund
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note: { type: string, maxLength: 500 }
+      responses:
+        "200":
+          description: Refund approved and submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /payments/refunds/{id}/reject:
+    post:
+      tags: [payments]
+      summary: Reject a pending refund
+      operationId: rejectRefund
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note: { type: string, maxLength: 500 }
+      responses:
+        "200":
+          description: Refund rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /payments/refunds/{id}/retry:
+    post:
+      tags: [payments]
+      summary: Retry a failed refund with its original refund reference
+      operationId: retryRefund
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note: { type: string, maxLength: 500 }
+      responses:
+        "200":
+          description: Refund retry submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
   /conversations/status:
     get:
       tags: [conversations]
@@ -656,11 +872,37 @@ paths:
       operationId: conversationsStatus
       responses:
         "200":
-          description: Status
+          description: Status including whether media messaging is configured
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuccessEnvelope"
+  /conversations/{id}/status:
+    get:
+      tags: [conversations]
+      summary: Viewer-specific chat delivery status
+      operationId: conversationDeliveryStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Media availability and active chat-only restriction, if any
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          mediaEnabled: { type: boolean }
+                          chatRestriction:
+                            nullable: true
+                            $ref: "#/components/schemas/ChatRestriction"
   /conversations:
     get:
       tags: [conversations]
@@ -711,13 +953,70 @@ paths:
           application/json:
             schema:
               type: object
-              required: [content]
               properties:
                 content: { type: string, maxLength: 2000 }
-                senderId: { type: string }
+                attachmentIds:
+                  type: array
+                  minItems: 1
+                  maxItems: 3
+                  items: { type: string }
+              anyOf:
+                - required: [content]
+                - required: [attachmentIds]
       responses:
         "200":
           description: Message + moderation decision
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /conversations/{id}/media-uploads:
+    post:
+      tags: [conversations]
+      summary: Reserve a short-lived direct media upload
+      operationId: reserveConversationMediaUpload
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind, mimeType, sizeBytes, sha256]
+              properties:
+                kind: { type: string, enum: [image, audio] }
+                mimeType: { type: string }
+                sizeBytes: { type: integer, minimum: 1, maximum: 10485760 }
+                sha256: { type: string, pattern: "^[a-fA-F0-9]{64}$" }
+                durationMs: { type: integer, minimum: 1, maximum: 60000 }
+      responses:
+        "200":
+          description: Upload instruction with an opaque storage credential
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+        "503":
+          $ref: "#/components/responses/Error"
+  /conversations/{id}/media-uploads/{assetId}/complete:
+    post:
+      tags: [conversations]
+      summary: Verify a direct media upload before it may be attached
+      operationId: completeConversationMediaUpload
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - name: assetId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Uploaded asset ready to attach
           content:
             application/json:
               schema:
@@ -776,7 +1075,8 @@ paths:
               properties:
                 reason: { type: string }
                 conversationId: { type: string }
-                recentContext: { type: string }
+                messageId: { type: string, description: Specific visible message being reported }
+                recentContext: { type: string, deprecated: true, description: Ignored; evidence is derived server-side }
       responses:
         "200":
           description: Report case created
@@ -784,6 +1084,32 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuccessEnvelope"
+  /moderation/appeals:
+    post:
+      tags: [moderation]
+      summary: Submit the single allowed appeal for blocked content or a chat restriction
+      operationId: createModerationAppeal
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [caseId, reason]
+              properties:
+                caseId: { type: string }
+                reason: { type: string, minLength: 1, maxLength: 1000 }
+      responses:
+        "200":
+          description: Appeal receipt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+        "409":
+          $ref: "#/components/responses/Error"
   /moderation/cases:
     get:
       tags: [moderation]
@@ -888,7 +1214,277 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuccessEnvelope"
+  /admin/recommendations/metrics:
+    get:
+      tags: [admin, recommendations]
+      summary: Inspect served/view/click/order/payment metrics by placement and companion
+      operationId: adminRecommendationMetrics
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: from
+          schema: { type: string, format: date-time }
+        - in: query
+          name: to
+          schema: { type: string, format: date-time }
+      responses:
+        "200":
+          description: Capped at the newest 5000 impressions in a maximum 90-day range
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+        "403":
+          $ref: "#/components/responses/Error"
+  /admin/recommendations/companions/{id}/policies/{placement}:
+    patch:
+      tags: [admin, recommendations]
+      summary: Pause or apply a bounded manual operational policy to a companion placement
+      operationId: adminUpdateRecommendationPolicy
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - in: path
+          name: placement
+          required: true
+          schema: { type: string, enum: [discoverHome, communityRelated, orderFollowup] }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status: { type: string, enum: [active, paused] }
+                boostBps: { type: integer, minimum: -1000, maximum: 1000, description: Bounded ±10% score adjustment; no paid bidding. }
+                dailyCap: { type: integer, minimum: 1, maximum: 10000, nullable: true }
+                startsAt: { type: string, format: date-time, nullable: true }
+                endsAt: { type: string, format: date-time, nullable: true }
+      responses:
+        "200":
+          description: Updated companion recommendation policy and audit record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+        "403":
+          $ref: "#/components/responses/Error"
+  /admin/account-deletions:
+    get:
+      tags: [admin]
+      summary: List pending account deletion requests
+      operationId: adminListAccountDeletions
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string, enum: [pending, processing] }
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1 }
+        - in: query
+          name: pageSize
+          schema: { type: integer, minimum: 1, maximum: 100 }
+      responses:
+        "200":
+          description: Deletion request queue (admin only)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /admin/account-deletions/{id}/settlement:
+    get:
+      tags: [admin]
+      summary: View a deletion request's retained orders, payments, and refunds
+      operationId: adminDeletionSettlementDetails
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Financial settlement details (admin only)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /admin/account-deletions/{id}/start:
+    post:
+      tags: [admin]
+      summary: Start account-deletion settlement and restrict the account
+      operationId: adminStartAccountDeletion
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Settlement started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /admin/account-deletions/{id}/complete:
+    post:
+      tags: [admin]
+      summary: Complete a settled account deletion
+      operationId: adminCompleteAccountDeletion
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [note]
+              properties:
+                note: { type: string, minLength: 1, maxLength: 500 }
+      responses:
+        "200":
+          description: Deletion completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /admin/account-deletions/{id}/orders/{orderId}/payment/sync:
+    post:
+      tags: [admin]
+      summary: Synchronize a deletion-order payment
+      operationId: adminSyncDeletionPayment
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - in: path
+          name: orderId
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Payment synchronized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /admin/account-deletions/{id}/orders/{orderId}/refund/sync:
+    post:
+      tags: [admin]
+      summary: Synchronize a deletion-order refund
+      operationId: adminSyncDeletionRefund
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - in: path
+          name: orderId
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Refund synchronized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /admin/account-deletions/{id}/orders/{orderId}/refund/initiate:
+    post:
+      tags: [admin]
+      summary: Initiate a deletion-order refund
+      operationId: adminInitiateDeletionRefund
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - in: path
+          name: orderId
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Refund initiated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /admin/users/{id}/account-status:
+    patch:
+      tags: [admin]
+      summary: Update an account's restrictive status
+      operationId: adminUpdateAccountStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [active, restricted, banned] }
+                reason: { type: string, maxLength: 500 }
+      responses:
+        "200":
+          description: Account status updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /admin/users/{id}/verification:
+    patch:
+      tags: [admin]
+      summary: Update a user's identity-verification status
+      operationId: adminUpdateUserVerification
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [isVerified]
+              properties:
+                isVerified: { type: boolean }
+                reason: { type: string, maxLength: 500 }
+      responses:
+        "200":
+          description: Verification updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
   /admin/companions:
+    get:
+      tags: [admin]
+      summary: List published and unpublished companion profiles (admin)
+      operationId: adminListCompanions
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1 }
+        - in: query
+          name: pageSize
+          schema: { type: integer, minimum: 1, maximum: 100 }
+      responses:
+        "200":
+          description: Companion review queue
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
     post:
       tags: [admin]
       summary: Create companion (admin)
@@ -991,6 +1587,9 @@ paths:
           name: riskLevel
           schema: { type: string }
         - in: query
+          name: priority
+          schema: { type: string, enum: [normal, high, critical] }
+        - in: query
           name: source
           schema: { type: string }
         - in: query
@@ -1066,7 +1665,7 @@ paths:
               properties:
                 action:
                   type: string
-                  enum: [confirmViolation, dismiss, escalate]
+                  enum: [confirmViolation, dismiss, escalate, approveMessage, rejectMessage, restrict24h, restrict7d, liftRestriction, upholdAppeal, overturnAppeal]
                 note: { type: string }
       responses:
         "200":
@@ -1177,3 +1776,38 @@ components:
                 gender: { type: string, nullable: true }
                 isVerified: { type: boolean }
                 safetyScore: { type: integer }
+    MediaAttachment:
+      type: object
+      required: [id, kind, status, mimeType, sizeBytes]
+      properties:
+        id: { type: string }
+        kind: { type: string, enum: [image, audio] }
+        status: { type: string, enum: [reserved, uploaded, scanning, approved, blocked, failed, expired] }
+        mimeType: { type: string }
+        sizeBytes: { type: integer }
+        durationMs: { type: integer, nullable: true }
+        url: { type: string, nullable: true, description: Short-lived authorized read URL only when viewer is permitted }
+        expiresAt: { type: string, format: date-time, nullable: true }
+    ChatMessage:
+      type: object
+      required: [id, senderId, content, type, moderationStatus, visibility, attachments, timestamp]
+      properties:
+        id: { type: string }
+        conversationId: { type: string }
+        senderId: { type: string }
+        senderName: { type: string, nullable: true }
+        content: { type: string }
+        type: { type: string, enum: [text, image, audio, system, safety] }
+        moderationStatus: { type: string, enum: [queued, pendingReview, published, blocked, removed] }
+        visibility: { type: string, enum: [participants, senderOnly, staffOnly] }
+        attachments:
+          type: array
+          items: { $ref: "#/components/schemas/MediaAttachment" }
+        timestamp: { type: string, format: date-time }
+    ChatRestriction:
+      type: object
+      required: [id, reason, endsAt]
+      properties:
+        id: { type: string }
+        reason: { type: string }
+        endsAt: { type: string, format: date-time }

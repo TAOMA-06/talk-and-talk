@@ -71,6 +71,11 @@ export class CreateCompanionDto {
   @IsString({ each: true })
   specialties!: string[];
 
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  topicIds?: string[];
+
   @IsInt()
   @Min(0)
   completedOrders!: number;
@@ -161,6 +166,11 @@ export class UpdateCompanionDto {
   @ArrayNotEmpty()
   @IsString({ each: true })
   specialties?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  topicIds?: string[];
 
   @IsOptional()
   @IsInt()

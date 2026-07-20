@@ -6,6 +6,13 @@
     <textarea placeholder="请勿留下联系方式、引导私联或线下见面" value="{{content}}" bindinput="setContent" maxlength="2000" auto-height="true" />
     <button class="primary-button" loading="{{submitting}}" bindtap="submit">发布到广场</button>
   </view>
+  <view wx:if="{{recommendations.length}}" class="related-section">
+    <view class="section-title">相关陪伴者</view>
+    <view id="community-recommendation-{{item.impressionId}}" class="card recommendation-card" wx:for="{{recommendations}}" wx:key="impressionId" bindtap="openRecommendedCompanion" data-id="{{item.id}}" data-impression-id="{{item.impressionId}}" data-theme-id="{{item.topicIds[0]}}">
+      <view class="recommendation-row"><view><view class="author">{{item.name}} · {{item.role}}</view><view class="muted">¥{{item.pricePerHalfHour}} / 30 分钟 · ★ {{item.rating}}</view></view><text class="go">查看</text></view>
+      <view class="recommendation-reason">{{item.reasonText || '为你推荐'}}</view>
+    </view>
+  </view>
   <view wx:if="{{loading}}" class="empty">正在加载…</view>
   <view wx:elif="{{error}}" class="empty">{{error}}</view>
   <view wx:elif="{{!posts.length}}" class="empty">广场还很安静，发第一条内容吧。</view>

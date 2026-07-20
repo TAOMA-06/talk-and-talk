@@ -54,6 +54,8 @@
       .badge.medium, .badge.warn, .badge.warning { background: rgba(204,125,23,.12); color: var(--warning); }
       .badge.low, .badge.allow, .badge.resolved { background: rgba(41,158,87,.12); color: var(--success); }
       .badge.pending, .badge.humanReview, .badge.review { background: var(--primary-soft); color: var(--primary); }
+      .badge.critical { background: rgba(209,46,43,.16); color: var(--danger); }
+      .badge.normal { background: #eef3f0; color: var(--muted); }
       .stats { display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: 12px; }
       .stat, .panel, .card {
         background: var(--surface); border: 1px solid var(--line);
@@ -98,6 +100,11 @@
       .message.user { background: var(--primary-soft); }
       .message.safety { background: rgba(204,125,23,.1); }
       .message .head { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; margin-bottom: 4px; }
+      .evidence-media { display: grid; gap: 8px; margin-top: 8px; }
+      .evidence-media img { max-width: min(280px, 100%); border-radius: 8px; border: 1px solid var(--line); }
+      .evidence-media audio { max-width: 100%; }
+      .evidence-note { color: var(--muted); font-size: 12px; white-space: pre-wrap; }
+      .sla.overdue { color: var(--danger); font-weight: 600; }
       .export-box { min-height: 160px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
       .toast { color: var(--muted); font-size: 13px; min-height: 1.2em; }
       .login-wrap {
@@ -150,6 +157,7 @@
         <nav class="nav">
           <button class="nav-item active" data-section="section-queue" type="button">工单队列</button>
           <button class="nav-item" data-section="section-labels" type="button">样本标注</button>
+          <button class="nav-item" data-section="section-operations" type="button">运营处置</button>
         </nav>
         <div>
           <div class="badge" id="roleBadge">role</div>
@@ -195,6 +203,12 @@
                   <option value="high">high</option>
                   <option value="medium">medium</option>
                   <option value="low">low</option>
+                </select>
+                <select id="filterPriority">
+                  <option value="">全部优先级</option>
+                  <option value="critical">critical</option>
+                  <option value="high">high</option>
+                  <option value="normal">normal</option>
                 </select>
                 <select id="filterSource">
                   <option value="">全部来源</option>
@@ -248,6 +262,48 @@
             <textarea id="exportBox" class="export-box" readonly></textarea>
           </div>
         </section>
+
+        <section id="section-operations" class="section hidden">
+          <div class="grid-2">
+            <div class="panel">
+              <h2>退款复核</h2>
+              <p class="toast">待人工复核、提交失败的退款都在此处理；每次操作均写入退款与审计日志。</p>
+              <div id="refundQueue" class="queue"><div class="empty">加载中…</div></div>
+            </div>
+            <div class="panel">
+              <h2>账号注销结算</h2>
+              <p class="toast">仅管理员可启动、完成账号注销。完成前系统会校验在途订单与退款。</p>
+              <div id="deletionQueue" class="queue"><div class="empty">仅管理员可见</div></div>
+              <div id="deletionSettlement" class="queue" style="margin-top:12px"></div>
+            </div>
+          </div>
+          <div class="panel" style="margin-top:16px">
+            <h2>陪伴者审核与上架</h2>
+            <p class="toast">仅管理员可发布或下架陪伴者；发布前服务端再次校验实名、账号状态与资料资格。</p>
+            <div id="companionQueue" class="queue"><div class="empty">仅管理员可见</div></div>
+          </div>
+          <div id="adminUserControls" class="panel" style="margin-top:16px">
+            <h2>账号状态与实名处置</h2>
+            <p class="toast">仅管理员可操作。使用来自工单、注销队列或受控运营流程的用户 ID，并填写处置理由。</p>
+            <div class="filters">
+              <input id="operationUserId" placeholder="用户 ID" style="min-width:260px" />
+              <select id="operationAccountStatus">
+                <option value="active">active</option>
+                <option value="restricted">restricted</option>
+                <option value="banned">banned</option>
+              </select>
+              <select id="operationVerification">
+                <option value="true">实名已通过</option>
+                <option value="false">实名未通过</option>
+              </select>
+              <input id="operationReason" placeholder="处置理由（必填）" style="min-width:260px" />
+            </div>
+            <div class="toolbar">
+              <button class="button warning" type="button" id="updateAccountStatusBtn">更新账号状态</button>
+              <button class="button" type="button" id="updateVerificationBtn">更新实名状态</button>
+            </div>
+          </div>
+        </section>
       </main>
     </div>
 
@@ -262,7 +318,11 @@
         overview: null,
         cases: [],
         selectedCaseId: null,
-        messages: []
+        messages: [],
+        refunds: [],
+        deletionRequests: [],
+        companions: [],
+        deletionSettlement: null
       };
 
       const el = {
@@ -290,6 +350,7 @@
         messageList: document.querySelector("#messageList"),
         filterStatus: document.querySelector("#filterStatus"),
         filterRisk: document.querySelector("#filterRisk"),
+        filterPriority: document.querySelector("#filterPriority"),
         filterSource: document.querySelector("#filterSource"),
         filterKeyword: document.querySelector("#filterKeyword"),
         applyFilterBtn: document.querySelector("#applyFilterBtn"),
@@ -301,7 +362,18 @@
         labelNote: document.querySelector("#labelNote"),
         saveLabelBtn: document.querySelector("#saveLabelBtn"),
         exportBtn: document.querySelector("#exportBtn"),
-        exportBox: document.querySelector("#exportBox")
+        exportBox: document.querySelector("#exportBox"),
+        refundQueue: document.querySelector("#refundQueue"),
+        deletionQueue: document.querySelector("#deletionQueue"),
+        deletionSettlement: document.querySelector("#deletionSettlement"),
+        companionQueue: document.querySelector("#companionQueue"),
+        adminUserControls: document.querySelector("#adminUserControls"),
+        operationUserId: document.querySelector("#operationUserId"),
+        operationAccountStatus: document.querySelector("#operationAccountStatus"),
+        operationVerification: document.querySelector("#operationVerification"),
+        operationReason: document.querySelector("#operationReason"),
+        updateAccountStatusBtn: document.querySelector("#updateAccountStatusBtn"),
+        updateVerificationBtn: document.querySelector("#updateVerificationBtn")
       };
 
       function escapeHtml(value) {
@@ -323,6 +395,30 @@
         return `<span class="badge ${escapeHtml(value)}">${escapeHtml(value)}</span>`;
       }
 
+      function slaText(dueAt) {
+        if (!dueAt) return "未设置 SLA";
+        const milliseconds = new Date(dueAt).getTime() - Date.now();
+        if (!Number.isFinite(milliseconds)) return "SLA 时间无效";
+        const minutes = Math.ceil(Math.abs(milliseconds) / 60000);
+        if (milliseconds < 0) return `<span class="sla overdue">已超时 ${minutes} 分钟</span>`;
+        return `SLA 剩余 ${minutes >= 60 ? `${Math.ceil(minutes / 60)} 小时` : `${minutes} 分钟`}`;
+      }
+
+      function renderEvidenceMedia(attachments) {
+        if (!attachments?.length) return "";
+        return `<div class="evidence-media">${attachments.map((asset) => {
+          const label = `${asset.kind} · ${asset.status}`;
+          const preview = asset.url && asset.kind === "image"
+            ? `<img src="${escapeHtml(asset.url)}" alt="${escapeHtml(label)}" />`
+            : asset.url && asset.kind === "audio"
+              ? `<audio controls preload="none" src="${escapeHtml(asset.url)}"></audio>`
+              : `<div class="evidence-note">${escapeHtml(label)}（无可用预览）</div>`;
+          const extracted = asset.extractedText ? `<div class="evidence-note">OCR / 转写：${escapeHtml(asset.extractedText)}</div>` : "";
+          const analysis = asset.analysis ? `<div class="evidence-note">媒体分析：${escapeHtml(JSON.stringify(asset.analysis))}</div>` : "";
+          return `<div>${preview}${extracted}${analysis}</div>`;
+        }).join("")}</div>`;
+      }
+
       function clearSession() {
         state.token = "";
         state.user = null;
@@ -340,7 +436,7 @@
         const response = await fetch(API + path, { ...options, headers });
         const body = await response.json().catch(() => ({}));
 
-        if (response.status === 401 || response.status === 403) {
+        if (response.status === 401) {
           if (path !== "/auth/staff/login") {
             clearSession();
             showLogin(body.error?.message || "登录已失效或无权限");
@@ -364,6 +460,7 @@
         el.loginView.classList.add("hidden");
         el.appView.classList.remove("hidden");
         el.roleBadge.textContent = state.user?.role || "staff";
+        el.adminUserControls.classList.toggle("hidden", state.user?.role !== "admin");
       }
 
       function renderOverview() {
@@ -392,10 +489,12 @@
                   <p>${escapeHtml(item.content)}</p>
                   <div class="meta">
                     ${badge(item.riskLevel)}
+                    ${badge(item.priority || "normal")}
                     ${badge(item.decision)}
                     ${badge(item.status)}
                     <span class="badge">${escapeHtml(item.source)}</span>
                   </div>
+                  <p>${slaText(item.dueAt)}</p>
                 </button>`;
             }).join("")
           : `<div class="empty">暂无工单</div>`;
@@ -427,22 +526,49 @@
             : "<p>暂无处理记录</p>";
 
           const closed = item.status === "resolved" || item.status === "dismissed";
+          const activeRestriction = (item.restrictions || []).find((restriction) =>
+            !restriction.liftedAt && new Date(restriction.endsAt).getTime() > Date.now()
+          );
+          const pendingAppeal = (item.appeals || []).find((appeal) => appeal.status === "pending");
+          const actions = [];
+          if (!closed) {
+            actions.push(`<button class="button danger" type="button" data-action="confirmViolation">确认违规并拦截</button>`);
+            actions.push(`<button class="button secondary" type="button" data-action="dismiss">误报驳回并放行</button>`);
+            actions.push(`<button class="button warning" type="button" data-action="escalate">升级人工</button>`);
+          }
+          if (item.subjectUserId && !activeRestriction) {
+            actions.push(`<button class="button warning" type="button" data-action="restrict24h">限言 24 小时</button>`);
+            actions.push(`<button class="button danger" type="button" data-action="restrict7d">限言 7 天</button>`);
+          }
+          if (activeRestriction) {
+            actions.push(`<button class="button secondary" type="button" data-action="liftRestriction">解除限言</button>`);
+          }
+          if (pendingAppeal) {
+            actions.push(`<button class="button danger" type="button" data-action="upholdAppeal">驳回申诉</button>`);
+            actions.push(`<button class="button secondary" type="button" data-action="overturnAppeal">申诉成立并撤销处置</button>`);
+          }
+          const appeals = (item.appeals || []).length
+            ? item.appeals.map((appeal) => `<p>${badge(appeal.status)} ${escapeHtml(formatTime(appeal.createdAt))} · ${escapeHtml(appeal.reason)}</p>`).join("")
+            : "<p>暂无申诉</p>";
+          const restrictions = (item.restrictions || []).length
+            ? item.restrictions.map((restriction) => `<p>${badge(restriction.source)} ${escapeHtml(restriction.reason)} · 至 ${escapeHtml(formatTime(restriction.endsAt))}${restriction.liftedAt ? "（已解除）" : ""}</p>`).join("")
+            : "<p>暂无聊天限言</p>";
           el.caseDetail.innerHTML = `
             <div class="field"><span>标题</span><strong>${escapeHtml(item.title)}</strong></div>
             <div class="field"><span>证据内容</span><strong>${escapeHtml(item.content)}</strong></div>
-            <div class="meta" style="margin-bottom:12px">${badge(item.riskLevel)}${badge(item.decision)}${badge(item.source)}${rules}</div>
+            <div class="meta" style="margin-bottom:12px">${badge(item.riskLevel)}${badge(item.priority || "normal")}${badge(item.decision)}${badge(item.source)}${rules}</div>
             <div class="field"><span>审查原因</span><strong>${escapeHtml(item.aiReason)}</strong></div>
+            <div class="field"><span>SLA</span><strong>${slaText(item.dueAt)}</strong></div>
+            <div class="field"><span>策略 / 模型</span><strong>${escapeHtml(item.policyVersion || "-")} · ${escapeHtml(item.provider || "rule-engine")} ${escapeHtml(item.providerVersion || "")}</strong></div>
+            <div class="field"><span>违规主体 / 举报人</span><strong>${escapeHtml(item.subjectUserId || "-")} / ${escapeHtml(item.reporterUserId || "-")}</strong></div>
             <div class="field"><span>创建时间</span><strong>${escapeHtml(formatTime(item.createdAt))}</strong></div>
-            ${closed ? "" : `
-              <label class="field">
-                <span>处理备注</span>
-                <textarea id="caseActionNote" placeholder="记录确认违规、误报驳回或升级人工的原因"></textarea>
-              </label>
-              <div class="toolbar">
-                <button class="button danger" type="button" data-action="confirmViolation">确认违规</button>
-                <button class="button secondary" type="button" data-action="dismiss">误报驳回</button>
-                <button class="button warning" type="button" data-action="escalate">升级人工</button>
-              </div>`}
+            <label class="field">
+              <span>处理备注</span>
+              <textarea id="caseActionNote" placeholder="记录处置、限言或申诉裁决依据"></textarea>
+            </label>
+            ${actions.length ? `<div class="toolbar">${actions.join("")}</div>` : ""}
+            <div class="field" style="margin-top:12px"><span>申诉</span>${appeals}</div>
+            <div class="field"><span>聊天限言</span>${restrictions}</div>
             <div class="field" style="margin-top:12px"><span>处理记录</span>${logs}</div>
           `;
 
@@ -474,9 +600,10 @@
               <article class="message ${klass}">
                 <div class="head">
                   <span>${escapeHtml(message.senderName || message.senderId)} · ${escapeHtml(formatTime(message.timestamp))}</span>
-                  <span>${escapeHtml(message.type)}</span>
+                  <span>${escapeHtml(message.type)} · ${escapeHtml(message.moderationStatus || "published")}</span>
                 </div>
                 <div>${escapeHtml(message.content)}</div>
+                ${renderEvidenceMedia(message.attachments)}
               </article>`;
           }).join("");
         } catch (error) {
@@ -499,6 +626,244 @@
         }
       }
 
+      function renderRefundQueue() {
+        el.refundQueue.innerHTML = state.refunds.length
+          ? state.refunds.map((refund) => `
+              <article class="message">
+                <div class="head"><span>${escapeHtml(refund.orderId)} · ${escapeHtml(refund.userId)}</span><span>${badge(refund.status)}</span></div>
+                <div>¥${escapeHtml((Number(refund.amountCents || 0) / 100).toFixed(2))} · ${escapeHtml(refund.reason || "未填写原因")}</div>
+                <div class="evidence-note">订单：${escapeHtml(refund.orderStatus || "-")} · 退款单：${escapeHtml(refund.id)}</div>
+                <div class="toolbar">
+                  ${refund.status === "failed"
+                    ? `<button class="button warning" type="button" data-refund-action="retry" data-refund-id="${escapeHtml(refund.id)}">重试退款</button>`
+                    : `<button class="button" type="button" data-refund-action="approve" data-refund-id="${escapeHtml(refund.id)}">通过并提交退款</button>
+                       <button class="button danger" type="button" data-refund-action="reject" data-refund-id="${escapeHtml(refund.id)}">驳回退款</button>`}
+                </div>
+              </article>`).join("")
+          : `<div class="empty">暂无待处理退款</div>`;
+        for (const button of el.refundQueue.querySelectorAll("[data-refund-action]")) {
+          button.addEventListener("click", () => handleRefundAction(button.dataset.refundId, button.dataset.refundAction));
+        }
+      }
+
+      function renderDeletionQueue() {
+        if (state.user?.role !== "admin") {
+          el.deletionQueue.innerHTML = `<div class="empty">此队列仅管理员可处理。</div>`;
+          return;
+        }
+        el.deletionQueue.innerHTML = state.deletionRequests.length
+          ? state.deletionRequests.map((request) => `
+              <article class="message">
+                <div class="head"><span>${escapeHtml(request.user?.id || request.userId)}</span><span>${badge(request.status)}</span></div>
+                <div class="evidence-note">申请：${escapeHtml(formatTime(request.createdAt))} · 账号：${escapeHtml(request.user?.accountStatus || "-")}</div>
+                <div class="toolbar">
+                  ${request.status === "pending" ? `<button class="button warning" type="button" data-deletion-action="start" data-deletion-id="${escapeHtml(request.id)}">启动结算</button>` : ""}
+                  ${request.status === "processing" ? `<button class="button secondary" type="button" data-deletion-details="${escapeHtml(request.id)}">查看资金结算</button>
+                  <button class="button danger" type="button" data-deletion-action="complete" data-deletion-id="${escapeHtml(request.id)}">完成注销</button>` : ""}
+                </div>
+              </article>`).join("")
+          : `<div class="empty">暂无待处理注销申请</div>`;
+        for (const button of el.deletionQueue.querySelectorAll("[data-deletion-action]")) {
+          button.addEventListener("click", () => handleDeletionAction(button.dataset.deletionId, button.dataset.deletionAction));
+        }
+        for (const button of el.deletionQueue.querySelectorAll("[data-deletion-details]")) {
+          button.addEventListener("click", () => void loadDeletionSettlement(button.dataset.deletionDetails));
+        }
+      }
+
+      function renderDeletionSettlement() {
+        const settlement = state.deletionSettlement;
+        if (!settlement) {
+          el.deletionSettlement.innerHTML = "";
+          return;
+        }
+        const requestId = settlement.request.id;
+        el.deletionSettlement.innerHTML = `
+          <h3>资金结算 · ${escapeHtml(requestId)}</h3>
+          ${settlement.orders.length ? settlement.orders.map((order) => `
+            <article class="message">
+              <div class="head"><span>${escapeHtml(order.id)}</span><span>${badge(order.status)}</span></div>
+              <div class="evidence-note">支付：${escapeHtml(order.payment?.status || "无")} · 退款：${escapeHtml(order.refund?.status || "无")}</div>
+              <div class="toolbar">
+                ${order.payment?.status === "initiated" ? `<button class="button secondary" type="button" data-deletion-order-action="payment/sync" data-deletion-order-id="${escapeHtml(order.id)}">同步支付</button>` : ""}
+                ${["paid", "inService", "completed"].includes(order.status) && !order.refund ? `<button class="button warning" type="button" data-deletion-order-action="refund/initiate" data-deletion-order-id="${escapeHtml(order.id)}">发起退款</button>` : ""}
+                ${order.refund && ["pending", "processing"].includes(order.refund.status) ? `<button class="button secondary" type="button" data-deletion-order-action="refund/sync" data-deletion-order-id="${escapeHtml(order.id)}">同步退款</button>` : ""}
+              </div>
+            </article>`).join("") : `<div class="empty">该账号没有需要结算的订单。</div>`}
+        `;
+        for (const button of el.deletionSettlement.querySelectorAll("[data-deletion-order-action]")) {
+          button.addEventListener("click", () => void handleDeletionOrderAction(
+            requestId,
+            button.dataset.deletionOrderId,
+            button.dataset.deletionOrderAction
+          ));
+        }
+      }
+
+      function renderCompanionQueue() {
+        if (state.user?.role !== "admin") {
+          el.companionQueue.innerHTML = `<div class="empty">此队列仅管理员可处理。</div>`;
+          return;
+        }
+        el.companionQueue.innerHTML = state.companions.length
+          ? state.companions.map((companion) => `
+              <article class="message">
+                <div class="head"><span>${escapeHtml(companion.name)} · ${escapeHtml(companion.role)}</span><span>${badge(companion.isPublished ? "published" : "unpublished")}</span></div>
+                <div class="evidence-note">资料实名：${companion.isVerified ? "已通过" : "未通过"} · 所有者：${escapeHtml(companion.owner?.displayName || companion.owner?.id || "未绑定")} · 账号：${escapeHtml(companion.owner?.accountStatus || "-")}</div>
+                <div class="toolbar">
+                  ${companion.isPublished
+                    ? `<button class="button danger" type="button" data-companion-action="unpublish" data-companion-id="${escapeHtml(companion.id)}">下架</button>`
+                    : `<button class="button" type="button" data-companion-action="publish" data-companion-id="${escapeHtml(companion.id)}">审核并上架</button>`}
+                </div>
+              </article>`).join("")
+          : `<div class="empty">暂无陪伴者资料</div>`;
+        for (const button of el.companionQueue.querySelectorAll("[data-companion-action]")) {
+          button.addEventListener("click", () => handleCompanionAction(button.dataset.companionId, button.dataset.companionAction));
+        }
+      }
+
+      async function handleRefundAction(id, action) {
+        if (!id || !action) return;
+        const note = window.prompt(action === "reject" ? "请输入驳回原因（将通知用户）" : action === "retry" ? "请输入重试备注（可选）" : "请输入处理备注（可选）", "");
+        if (note === null || (action === "reject" && !note.trim())) return;
+        try {
+          await api(`/payments/refunds/${encodeURIComponent(id)}/${action}`, {
+            method: "POST",
+            body: JSON.stringify({ note: note.trim() })
+          });
+          el.toast.textContent = action === "approve" ? "退款已通过并提交支付渠道" : action === "retry" ? "退款已重新提交支付渠道" : "退款已驳回";
+          await loadOperations();
+        } catch (error) {
+          el.toast.textContent = error.message;
+        }
+      }
+
+      async function handleDeletionAction(id, action) {
+        if (!id || !action) return;
+        const note = action === "complete"
+          ? window.prompt("填写完成注销的核验备注（必填）", "")
+          : "";
+        if (note === null || (action === "complete" && !note.trim())) return;
+        try {
+          await api(`/admin/account-deletions/${encodeURIComponent(id)}/${action}`, {
+            method: "POST",
+            ...(action === "complete" ? { body: JSON.stringify({ note: note.trim() }) } : {})
+          });
+          el.toast.textContent = action === "start" ? "已启动注销结算" : "账号注销已完成";
+          await loadOperations();
+          if (action === "start") await loadDeletionSettlement(id);
+        } catch (error) {
+          el.toast.textContent = error.message;
+        }
+      }
+
+      async function loadDeletionSettlement(id) {
+        if (!id) return;
+        try {
+          const data = await api(`/admin/account-deletions/${encodeURIComponent(id)}/settlement`);
+          state.deletionSettlement = data;
+          renderDeletionSettlement();
+        } catch (error) {
+          el.deletionSettlement.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`;
+        }
+      }
+
+      async function handleDeletionOrderAction(requestId, orderId, action) {
+        if (!requestId || !orderId || !action) return;
+        const label = action === "refund/initiate" ? "发起退款" : action === "payment/sync" ? "同步支付" : "同步退款";
+        if (!window.confirm(`确认${label}？`)) return;
+        try {
+          await api(`/admin/account-deletions/${encodeURIComponent(requestId)}/orders/${encodeURIComponent(orderId)}/${action}`, {
+            method: "POST"
+          });
+          el.toast.textContent = `${label}已提交`;
+          await loadDeletionSettlement(requestId);
+          await loadOperations();
+        } catch (error) {
+          el.toast.textContent = error.message;
+        }
+      }
+
+      async function handleCompanionAction(id, action) {
+        if (!id || !action) return;
+        const label = action === "publish" ? "上架" : "下架";
+        if (!window.confirm(`确认${label}该陪伴者资料？`)) return;
+        try {
+          await api(`/admin/companions/${encodeURIComponent(id)}/${action}`, { method: "POST" });
+          el.toast.textContent = `已${label}陪伴者资料`;
+          await loadOperations();
+        } catch (error) {
+          el.toast.textContent = error.message;
+        }
+      }
+
+      async function updateAccountStatus() {
+        const userId = el.operationUserId.value.trim();
+        const reason = el.operationReason.value.trim();
+        if (!userId || !reason) {
+          el.toast.textContent = "请填写用户 ID 和处置理由";
+          return;
+        }
+        try {
+          await api(`/admin/users/${encodeURIComponent(userId)}/account-status`, {
+            method: "PATCH",
+            body: JSON.stringify({ status: el.operationAccountStatus.value, reason })
+          });
+          el.toast.textContent = "账号状态已更新";
+          el.operationReason.value = "";
+        } catch (error) {
+          el.toast.textContent = error.message;
+        }
+      }
+
+      async function updateVerification() {
+        const userId = el.operationUserId.value.trim();
+        const reason = el.operationReason.value.trim();
+        if (!userId || !reason) {
+          el.toast.textContent = "请填写用户 ID 和处置理由";
+          return;
+        }
+        try {
+          await api(`/admin/users/${encodeURIComponent(userId)}/verification`, {
+            method: "PATCH",
+            body: JSON.stringify({ isVerified: el.operationVerification.value === "true", reason })
+          });
+          el.toast.textContent = "实名状态已更新";
+          el.operationReason.value = "";
+        } catch (error) {
+          el.toast.textContent = error.message;
+        }
+      }
+
+      async function loadOperations() {
+        try {
+          const data = await api("/payments/refunds/review-queue");
+          state.refunds = data.items || [];
+          renderRefundQueue();
+        } catch (error) {
+          el.refundQueue.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`;
+        }
+        if (state.user?.role !== "admin") {
+          renderDeletionQueue();
+          renderCompanionQueue();
+          return;
+        }
+        try {
+          const data = await api("/admin/account-deletions?pageSize=100");
+          state.deletionRequests = data.items || [];
+          renderDeletionQueue();
+        } catch (error) {
+          el.deletionQueue.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`;
+        }
+        try {
+          const data = await api("/admin/companions?pageSize=100");
+          state.companions = data.items || [];
+          renderCompanionQueue();
+        } catch (error) {
+          el.companionQueue.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`;
+        }
+      }
+
       async function loadOverview() {
         const data = await api("/admin/moderation/overview");
         state.overview = data.overview;
@@ -509,6 +874,7 @@
         const params = new URLSearchParams();
         if (el.filterStatus.value) params.set("status", el.filterStatus.value);
         if (el.filterRisk.value) params.set("riskLevel", el.filterRisk.value);
+        if (el.filterPriority.value) params.set("priority", el.filterPriority.value);
         if (el.filterSource.value) params.set("source", el.filterSource.value);
         if (el.filterKeyword.value.trim()) params.set("keyword", el.filterKeyword.value.trim());
         params.set("pageSize", "100");
@@ -564,12 +930,15 @@
       el.applyFilterBtn.addEventListener("click", () => loadCases().catch((e) => { el.toast.textContent = e.message; }));
 
       for (const button of document.querySelectorAll(".nav-item")) {
-        button.addEventListener("click", () => {
-          for (const item of document.querySelectorAll(".nav-item")) item.classList.remove("active");
-          button.classList.add("active");
-          for (const section of document.querySelectorAll(".section")) section.classList.add("hidden");
-          document.querySelector(`#${button.dataset.section}`)?.classList.remove("hidden");
-        });
+          button.addEventListener("click", () => {
+            for (const item of document.querySelectorAll(".nav-item")) item.classList.remove("active");
+            button.classList.add("active");
+            for (const section of document.querySelectorAll(".section")) section.classList.add("hidden");
+            document.querySelector(`#${button.dataset.section}`)?.classList.remove("hidden");
+            if (button.dataset.section === "section-operations") {
+              void loadOperations();
+            }
+          });
       }
 
       el.saveLabelBtn.addEventListener("click", async () => {
@@ -600,6 +969,8 @@
           el.toast.textContent = error.message;
         }
       });
+      el.updateAccountStatusBtn.addEventListener("click", () => void updateAccountStatus());
+      el.updateVerificationBtn.addEventListener("click", () => void updateVerification());
 
       (async function boot() {
         if (!state.token) {

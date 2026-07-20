@@ -32,10 +32,15 @@ describe("validateEnvironment", () => {
     expect(env.CORS_ORIGINS).toContain("http://localhost:3000");
     expect(env.DEEPSEEK_URL).toBe("https://api.deepseek.com");
     expect(env.DEEPSEEK_MODEL).toBe("deepseek-chat");
+    expect(env.MEDIA_FEATURE_ENABLED).toBe(false);
+    expect(env.MEDIA_PROVIDER).toBe("disabled");
     expect(env.APP_ENV).toBe("development");
     expect(env.SMS_PROVIDER).toBe("mock");
     expect(env.STAFF_TOTP_ENCRYPTION_KEY).toContain("development-staff-totp-key");
     expect(env.SEED_ON_STARTUP).toBe(false);
+    expect(env.PAYMENT_RECONCILIATION_ENABLED).toBe(true);
+    expect(env.PAYMENT_RECONCILIATION_INTERVAL_SECONDS).toBe(60);
+    expect(env.PAYMENT_RECONCILIATION_BATCH_SIZE).toBe(50);
     expect(env.METRICS_TOKEN).toBe("");
     expect(env.LEGAL_CONSENT_VERSION).toBe("1.0-2026-07-19");
     expect(env.LEGAL_PRIVACY_URL).toBe("https://api.talkandtalk.app/legal/privacy.html");
@@ -116,6 +121,15 @@ describe("validateEnvironment", () => {
     expect(() => validateEnvironment({ DEEPSEEK_URL: "not-a-url" })).toThrow("DEEPSEEK_URL");
   });
 
+  it("keeps media closed by default and rejects an unregistered production media provider", () => {
+    const development = validateEnvironment({ MEDIA_FEATURE_ENABLED: "true", MEDIA_PROVIDER: "mock" });
+    expect(development.MEDIA_FEATURE_ENABLED).toBe(true);
+    expect(() => validateEnvironment({ ...productionEnv, MEDIA_FEATURE_ENABLED: "true", MEDIA_PROVIDER: "mock" }))
+      .toThrow("MEDIA_FEATURE_ENABLED");
+    expect(() => validateEnvironment({ MEDIA_PROVIDER: "unknown" }))
+      .toThrow("MEDIA_PROVIDER");
+  });
+
   it("provides JWT defaults in development", () => {
     const env = validateEnvironment({});
     expect(env.JWT_ACCESS_SECRET).toBe("dev-access-secret");
@@ -190,6 +204,7 @@ describe("validateEnvironment", () => {
     expect(() => validateEnvironment({ REDIS_URL: "https://redis.example" })).toThrow("REDIS_URL");
     expect(() => validateEnvironment({ RATE_LIMIT_PER_MINUTE: "-1" })).toThrow("positive integer");
     expect(() => validateEnvironment({ SMS_CODE_TTL_SECONDS: "not-a-number" })).toThrow("positive integer");
+    expect(() => validateEnvironment({ PAYMENT_RECONCILIATION_INTERVAL_SECONDS: "0" })).toThrow("positive integer");
   });
 
   it("requires WeChat Mini Program credentials to be configured together", () => {

@@ -23,6 +23,7 @@ describe("PaymentsService", () => {
       update: jest.fn(),
       updateMany: jest.fn()
     },
+    $queryRaw: jest.fn(),
     $transaction: jest.fn()
   } as any;
 
@@ -118,6 +119,48 @@ describe("PaymentsService", () => {
       provider: "mock",
       productionReady: false
     });
+  });
+
+  it("refuses the mock payment callback whenever the active provider is real", async () => {
+    const realProvider = { isMock: false, mode: "real" } as any;
+    const realService = new PaymentsService(
+      prisma,
+      config,
+      ordersService,
+      realProvider,
+      notifications,
+      audit,
+      metrics
+    );
+
+    await expect(realService.mockNotify("u1", { outTradeNo: "T100" })).rejects.toMatchObject({
+      code: "MOCK_PAY_DISABLED",
+      status: HttpStatus.FORBIDDEN
+    });
+    expect(prisma.paymentTransaction.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("reconciles paid orders whose service window has elapsed", async () => {
+    prisma.$queryRaw.mockResolvedValue([{ id: "o-expired" }]);
+    prisma.order.findUnique.mockResolvedValue({
+      id: "o-expired",
+      userId: "u1",
+      status: "paid",
+      scheduledAt: new Date(Date.now() - 2 * 60 * 60_000),
+      durationMinutes: 30
+    });
+    const refund = jest.spyOn(service, "requestRefund").mockResolvedValue({} as any);
+
+    await expect(service.reconcileExpiredServiceWindows(10)).resolves.toEqual({
+      scanned: 1,
+      refundAttempts: 1,
+      failures: 0
+    });
+    expect(refund).toHaveBeenCalledWith(
+      "u1",
+      "o-expired",
+      "支付回调到达时预约服务窗口已结束，系统自动原路退款"
+    );
   });
 
   it("fulfills mock notify: paying -> paid and activates conversation once", async () => {

@@ -4,6 +4,7 @@ import { ConfigService } from "@nestjs/config";
 import { NotificationsModule } from "../notifications/notifications.module";
 import { OrdersModule } from "../orders/orders.module";
 import { PaymentsController } from "./payments.controller";
+import { PaymentsReconciliationWorker } from "./payments-reconciliation.worker";
 import { PaymentsService } from "./payments.service";
 import { DisabledWeChatPayProvider } from "./wechat/disabled-wechat-pay.provider";
 import { MockWeChatPayProvider } from "./wechat/mock-wechat-pay.provider";
@@ -15,6 +16,7 @@ import { WECHAT_PAY_PROVIDER } from "./wechat/wechat-pay.provider";
   controllers: [PaymentsController],
   providers: [
     PaymentsService,
+    PaymentsReconciliationWorker,
     {
       provide: WECHAT_PAY_PROVIDER,
       useFactory: (config: ConfigService) => {

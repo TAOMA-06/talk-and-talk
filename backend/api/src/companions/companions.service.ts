@@ -7,6 +7,7 @@ import { PrismaService } from "../database/prisma.service";
 import { CreateCompanionDto, UpdateCompanionDto } from "./dto/companion-profile.dto";
 import { ListCompanionsQueryDto } from "./dto/list-companions.dto";
 import { ApplyCompanionDto, UpdateOwnCompanionDto } from "./dto/apply-companion.dto";
+import { deriveTopicIds, normalizeTopicIds } from "../recommendations/recommendation-topics";
 
 type CompanionRecord = Awaited<ReturnType<CompanionsService["findRecordOrThrow"]>>;
 
@@ -75,6 +76,42 @@ export class CompanionsService {
     return this.toDto(item as CompanionRecord);
   }
 
+  /** Staff-only view: includes unpublished applications so they can be
+   * approved or taken down without relying on a direct database/API call. */
+  async listAdmin(page = 1, pageSize = 50) {
+    const safePage = Math.max(1, Math.floor(page) || 1);
+    const safePageSize = Math.min(Math.max(1, Math.floor(pageSize) || 50), 100);
+    const [items, total] = await Promise.all([
+      this.prisma.companionProfile.findMany({
+        include: {
+          ...this.includeTags(),
+          owner: { include: { profile: true } }
+        },
+        orderBy: [{ isPublished: "asc" }, { createdAt: "asc" }],
+        skip: (safePage - 1) * safePageSize,
+        take: safePageSize
+      } as any),
+      this.prisma.companionProfile.count()
+    ]);
+    return {
+      items: items.map((item: any) => ({
+        ...this.toDto(item),
+        owner: item.owner ? {
+          id: item.owner.id,
+          accountStatus: item.owner.accountStatus,
+          isVerified: item.owner.profile?.isVerified === true,
+          displayName: item.owner.profile?.displayName ?? null
+        } : null
+      })),
+      pagination: {
+        page: safePage,
+        pageSize: safePageSize,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / safePageSize))
+      }
+    };
+  }
+
   async apply(userId: string, dto: ApplyCompanionDto) {
     const user: any = await this.prisma.user.findUnique({ where: { id: userId }, include: { profile: true } });
     if (!user?.profile?.isVerified) {
@@ -102,6 +139,7 @@ export class CompanionsService {
         availableTimes: dto.availableTimes,
         languages: dto.languages,
         specialties: dto.specialties,
+        topicIds: this.resolveTopicIds(dto),
         completedOrders: 0,
         responseTime: "暂无数据",
         distanceKm: 0,
@@ -287,6 +325,7 @@ export class CompanionsService {
       "availableTimes",
       "languages",
       "specialties",
+      "topicIds",
       "completedOrders",
       "responseTime",
       "distanceKm",
@@ -296,7 +335,24 @@ export class CompanionsService {
     ] as const) {
       if (dto[key] !== undefined) data[key] = dto[key];
     }
+    if (dto.topicIds !== undefined) {
+      data.topicIds = this.resolveTopicIds(dto);
+    } else if (dto.specialties !== undefined || dto.tags !== undefined) {
+      data.topicIds = this.resolveTopicIds(dto);
+    }
     return data;
+  }
+
+  private resolveTopicIds(dto: { topicIds?: string[]; specialties?: string[]; tags?: string[] }) {
+    if (dto.topicIds !== undefined) {
+      const supplied = [...new Set(dto.topicIds.map((topicId) => topicId.trim()).filter(Boolean))];
+      const explicit = normalizeTopicIds(supplied);
+      if (explicit.length !== supplied.length) {
+        throw new AppException("INVALID_RECOMMENDATION_TOPIC", "One or more companion topics are invalid", HttpStatus.BAD_REQUEST);
+      }
+      return explicit;
+    }
+    return deriveTopicIds(dto.specialties, dto.tags);
   }
 
   private async replaceTags(companionId: string, tags: string[]) {
@@ -332,6 +388,7 @@ export class CompanionsService {
       availableTimes: item.availableTimes,
       languages: item.languages,
       specialties: item.specialties,
+      topicIds: item.topicIds,
       completedOrders: item.completedOrders,
       responseTime: item.responseTime,
       distanceKm: item.distanceKm,
