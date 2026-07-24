@@ -7,9 +7,17 @@ import { AuditService } from "../common/audit/audit.service";
 import { AppException } from "../common/errors/app.exception";
 import { PrismaService } from "../database/prisma.service";
 import { NotificationsService } from "../notifications/notifications.service";
+import { AddOrderSupportFactDto } from "./dto/add-order-support-fact.dto";
 import { CreateSupportTicketDto } from "./dto/create-support-ticket.dto";
 import { ListSupportTicketsDto } from "./dto/list-support-tickets.dto";
 import { ResolveSupportTicketDto } from "./dto/resolve-support-ticket.dto";
+
+// This is a narrow prevention layer, not content moderation. It keeps obvious
+// identity-document, direct-contact, and health/medical material out of a
+// field whose only allowed purpose is describing time, fulfillment, or payment
+// facts. Attachments and chat imports are not supported at all.
+const ORDER_FACT_SENSITIVE_CONTENT = /(?:\b\d{15}\b|\b\d{17}[\dXx]\b|(?:^|[^\d])1[3-9]\d{9}(?:$|[^\d])|身份证|护照|驾驶证|社保(?:卡|号)?|银行卡|银行账户|病历|诊断|健康(?:证明|码|状况)?|疾病|医疗|就诊|处方)/u;
+const MAX_ORDER_FACTS_PER_TICKET = 10;
 
 @Injectable()
 export class SupportService {
@@ -85,7 +93,16 @@ export class SupportService {
   async listMine(userId: string) {
     const items = await this.prisma.supportTicket.findMany({
       where: { userId },
-      include: { order: true },
+      include: {
+        order: true,
+        // A requester sees only their own voluntary statements. In particular,
+        // the other order participant cannot use this list to read a private
+        // support submission or even infer its content.
+        orderFacts: {
+          where: { submittedByUserId: userId },
+          orderBy: { createdAt: "asc" }
+        }
+      },
       orderBy: { updatedAt: "desc" },
       take: 100
     } as any);
@@ -102,7 +119,8 @@ export class SupportService {
         include: {
           order: true,
           requester: { include: { profile: true } },
-          assignedTo: { include: { profile: true } }
+          assignedTo: { include: { profile: true } },
+          orderFacts: { orderBy: { createdAt: "asc" } }
         },
         orderBy: [{ priority: "desc" }, { dueAt: "asc" }, { createdAt: "asc" }],
         skip: (page - 1) * pageSize,
@@ -114,6 +132,94 @@ export class SupportService {
       items: items.map((ticket: any) => this.toDto(ticket, true)),
       pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) }
     };
+  }
+
+  async addOrderFact(user: AuthenticatedUser, ticketId: string, dto: AddOrderSupportFactDto) {
+    const statement = dto.statement.trim();
+    if (statement.length < 5) {
+      throw new AppException(
+        "SUPPORT_ORDER_FACT_INVALID",
+        "Order support fact must contain at least five non-whitespace characters",
+        HttpStatus.BAD_REQUEST
+      );
+    }
+    if (ORDER_FACT_SENSITIVE_CONTENT.test(statement)) {
+      throw new AppException(
+        "SUPPORT_ORDER_FACT_SENSITIVE_CONTENT",
+        "Order support facts may not include identity, contact, document, or health material",
+        HttpStatus.BAD_REQUEST
+      );
+    }
+    const fact = await this.prisma.$transaction(async (tx) => {
+      const db = tx as any;
+      // Read only the opaque order pointer before acquiring the canonical
+      // Order → SupportTicket locks. All authorization is re-checked after the
+      // locks, and every unauthorized branch uses the same non-probing result.
+      const pointer = await db.supportTicket.findUnique({
+        where: { id: ticketId },
+        select: { orderId: true }
+      });
+      if (!pointer?.orderId) {
+        throw new AppException("SUPPORT_TICKET_NOT_FOUND", "Support ticket not found", HttpStatus.NOT_FOUND);
+      }
+      await db.$queryRaw`SELECT "id" FROM "Order" WHERE "id" = ${pointer.orderId} FOR UPDATE`;
+      await db.$queryRaw`SELECT "id" FROM "SupportTicket" WHERE "id" = ${ticketId} FOR UPDATE`;
+      const ticket = await db.supportTicket.findUnique({
+        where: { id: ticketId },
+        include: { order: { include: { companion: { select: { ownerUserId: true } } } } }
+      });
+      const isCurrentOrderParticipant = ticket?.order
+        && (ticket.order.userId === user.id || ticket.order.companion.ownerUserId === user.id);
+      if (
+        !ticket
+        || !ticket.orderId
+        || !ticket.order
+        || ticket.userId !== user.id
+        || !isCurrentOrderParticipant
+        || !["orderIssue", "refund"].includes(ticket.category)
+      ) {
+        throw new AppException("SUPPORT_TICKET_NOT_FOUND", "Support ticket not found", HttpStatus.NOT_FOUND);
+      }
+      if (["resolved", "closed"].includes(ticket.status)) {
+        throw new AppException(
+          "SUPPORT_TICKET_CLOSED",
+          "Resolved tickets cannot receive additional order facts",
+          HttpStatus.CONFLICT
+        );
+      }
+      const existingFacts = await db.orderSupportFact.count({ where: { supportTicketId: ticket.id } });
+      if (existingFacts >= MAX_ORDER_FACTS_PER_TICKET) {
+        throw new AppException(
+          "SUPPORT_ORDER_FACT_LIMIT_REACHED",
+          "This support ticket already has the maximum number of order facts",
+          HttpStatus.CONFLICT,
+          { limit: MAX_ORDER_FACTS_PER_TICKET }
+        );
+      }
+      const created = await db.orderSupportFact.create({
+        data: {
+          supportTicketId: ticket.id,
+          orderId: ticket.orderId,
+          submittedByUserId: user.id,
+          statement
+        }
+      });
+      // Facts do not change case status, refund, or settlement. Touching only
+      // the ticket timestamp keeps the requester's private queue current.
+      await db.supportTicket.update({
+        where: { id: ticket.id },
+        data: { updatedAt: new Date() }
+      });
+      await this.audit.record({
+        actorId: user.id,
+        action: "support.order_fact_added",
+        resourceType: "supportTicket",
+        resourceId: ticket.id,
+        metadata: { orderId: ticket.orderId, submittedByUserId: user.id, orderSupportFactId: created.id }
+      }, db);
+      return created;
+    });
+    return this.toOrderFactDto(fact, false);
   }
 
   async assign(actorId: string, ticketId: string, assignedToUserId: string) {
@@ -252,6 +358,7 @@ export class SupportService {
         scheduledAt: ticket.order.scheduledAt?.toISOString?.() ?? null
       } : null
     } as Record<string, unknown>;
+    dto.orderFacts = (ticket.orderFacts ?? []).map((fact: any) => this.toOrderFactDto(fact, includeOperations));
     if (includeOperations) {
       dto.requester = ticket.requester ? {
         id: ticket.requester.id,
@@ -262,6 +369,16 @@ export class SupportService {
         displayName: ticket.assignedTo.profile?.displayName ?? null
       } : null;
     }
+    return dto;
+  }
+
+  private toOrderFactDto(fact: any, includeOperations: boolean) {
+    const dto = {
+      id: fact.id,
+      statement: fact.statement,
+      createdAt: fact.createdAt.toISOString()
+    } as Record<string, unknown>;
+    if (includeOperations) dto.submittedByUserId = fact.submittedByUserId;
     return dto;
   }
 

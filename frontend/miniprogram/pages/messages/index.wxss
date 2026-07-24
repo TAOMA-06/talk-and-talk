@@ -1,4 +1,9 @@
 .safety { margin-bottom: 20rpx; padding: 16rpx; border-radius: 14rpx; background: #fce8ed; color: #9b3d58; font-size: 25rpx; }
 .row { display: flex; justify-content: space-between; gap: 16rpx; }
+.conversation-name { display: flex; min-width: 0; align-items: center; gap: 10rpx; }
 .name { font-weight: 700; }
+.notification-muted { flex: 0 0 auto; padding: 2rpx 8rpx; border-radius: 8rpx; background: #f2e9eb; color: #856871; font-size: 20rpx; line-height: 1.35; }
+.conversation-blocked, .conversation-unavailable { flex: 0 0 auto; padding: 2rpx 8rpx; border-radius: 8rpx; font-size: 20rpx; line-height: 1.35; }
+.conversation-blocked { background: #f5e7df; color: #8a593d; }
+.conversation-unavailable { background: #f1ece7; color: #806d5f; }
 .preview { margin-top: 14rpx; overflow: hidden; color: #584147; white-space: nowrap; text-overflow: ellipsis; }

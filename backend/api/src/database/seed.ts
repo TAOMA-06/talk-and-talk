@@ -139,12 +139,35 @@ export const seedCompanions: SeedCompanion[] = [
   }
 ];
 
+function seedAvailabilityWindows(index: number) {
+  const firstStart = new Date();
+  firstStart.setUTCDate(firstStart.getUTCDate() + 1);
+  firstStart.setUTCHours(12 + (index % 4), 0, 0, 0);
+  const secondStart = new Date(firstStart.getTime() + 3 * 60 * 60_000);
+  return [
+    {
+      startsAt: firstStart,
+      endsAt: new Date(firstStart.getTime() + 2 * 60 * 60_000),
+      capacity: 1,
+      isActive: true
+    },
+    {
+      startsAt: secondStart,
+      endsAt: new Date(secondStart.getTime() + 90 * 60_000),
+      capacity: 1,
+      isActive: true
+    }
+  ];
+}
+
 type SeedClient = {
   user: Pick<PrismaClient["user"], "upsert">;
   authIdentity: Pick<PrismaClient["authIdentity"], "upsert">;
   companionProfile: Pick<PrismaClient["companionProfile"], "upsert">;
   companionCommercialProfile: Pick<PrismaClient["companionCommercialProfile"], "upsert">;
   companionServiceTag: Pick<PrismaClient["companionServiceTag"], "deleteMany" | "upsert">;
+  companionServiceOffering: Pick<PrismaClient["companionServiceOffering"], "upsert">;
+  companionAvailabilityWindow: Pick<PrismaClient["companionAvailabilityWindow"], "deleteMany" | "createMany">;
   serviceTag: Pick<PrismaClient["serviceTag"], "upsert">;
 };
 
@@ -333,6 +356,49 @@ export async function seedDatabase(client: SeedClient = prisma) {
         verifiedAt: companion.isVerified ? new Date() : null,
         verifiedById: companion.isVerified ? "seed-second-review" : null
       }
+    });
+
+    await client.companionServiceOffering.upsert({
+      where: {
+        companionId_code: {
+          companionId: companion.id,
+          code: "legacy-standard"
+        }
+      },
+      create: {
+        companionId: companion.id,
+        code: "legacy-standard",
+        title: "线上文字陪伴",
+        description: "在平台内进行一对一文字沟通。",
+        deliveryMode: "text",
+        durationMinutes: 30,
+        priceCents: companion.pricePerHalfHour * 100,
+        currency: "CNY",
+        topicIds: deriveTopicIds(companion.specialties, companion.tags),
+        isActive: true,
+        sortOrder: 0
+      },
+      update: {
+        title: "线上文字陪伴",
+        description: "在平台内进行一对一文字沟通。",
+        deliveryMode: "text",
+        durationMinutes: 30,
+        priceCents: companion.pricePerHalfHour * 100,
+        currency: "CNY",
+        topicIds: deriveTopicIds(companion.specialties, companion.tags),
+        isActive: true,
+        sortOrder: 0
+      }
+    });
+
+    await client.companionAvailabilityWindow.deleteMany({
+      where: { companionId: companion.id }
+    });
+    await client.companionAvailabilityWindow.createMany({
+      data: seedAvailabilityWindows(index).map((window) => ({
+        companionId: companion.id,
+        ...window
+      }))
     });
 
     await client.companionServiceTag.deleteMany({

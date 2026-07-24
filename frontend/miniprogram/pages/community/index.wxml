@@ -6,6 +6,17 @@
     <textarea placeholder="请勿留下联系方式、引导私联或线下见面" value="{{content}}" bindinput="setContent" maxlength="2000" auto-height="true" />
     <button class="primary-button" loading="{{submitting}}" bindtap="submit">发布到广场</button>
   </view>
+  <view class="card report-receipts">
+    <view class="section-title">我的社区举报回执</view>
+    <view class="report-receipts-copy">这里只显示最近 50 条提交时间与收讫信息；不会显示帖子、作者、案件、审核结论或处理时限。</view>
+    <view wx:if="{{reportReceiptsError}}" class="report-receipts-empty">{{reportReceiptsError}}</view>
+    <view wx:elif="{{!reportReceipts.length}}" class="report-receipts-empty">还没有社区举报回执。</view>
+    <view wx:else class="report-receipt-list">
+      <view wx:for="{{reportReceipts}}" wx:key="id" class="report-receipt-item">
+        <text class="report-receipt-status">已收讫</text><text class="report-receipt-time">{{item.submittedAtText}}</text>
+      </view>
+    </view>
+  </view>
   <view wx:if="{{recommendations.length}}" class="related-section">
     <view class="section-title">相关陪伴者</view>
     <view id="community-recommendation-{{item.impressionId}}" class="card recommendation-card" wx:for="{{recommendations}}" wx:key="impressionId" bindtap="openRecommendedCompanion" data-id="{{item.id}}" data-impression-id="{{item.impressionId}}" data-theme-id="{{item.topicIds[0]}}">
@@ -20,6 +31,9 @@
     <view class="row"><text class="author">{{item.authorName}}</text><text class="muted">{{item.kind === 'femaleRequest' ? '需求' : '自荐'}}</text></view>
     <view class="topic"># {{item.topic}}</view>
     <view class="content">{{item.content}}</view>
-    <button class="like {{item.isLiked ? 'liked' : ''}}" bindtap="toggleLike" data-id="{{item.id}}">{{item.isLiked ? '已赞' : '点赞'}} {{item.likeCount}}</button>
+    <view class="post-actions">
+      <button class="like {{item.isLiked ? 'liked' : ''}}" bindtap="toggleLike" data-id="{{item.id}}">{{item.isLiked ? '已赞' : '点赞'}} {{item.likeCount}}</button>
+      <button class="report" loading="{{reportingPostId === item.id}}" bindtap="reportPost" data-id="{{item.id}}">举报</button>
+    </view>
   </view>
 </view>

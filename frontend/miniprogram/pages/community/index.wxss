@@ -5,8 +5,16 @@
 .author { font-weight: 700; }
 .topic { margin-top: 18rpx; color: #b94a68; font-weight: 600; }
 .content { margin: 12rpx 0 18rpx; line-height: 1.65; }
-.like { margin: 0; padding: 0; background: transparent; color: #8d6e73; font-size: 25rpx; }
+.post-actions { display: flex; align-items: center; justify-content: space-between; gap: 20rpx; }
+.like, .report { margin: 0; padding: 0; background: transparent; color: #8d6e73; font-size: 25rpx; }
 .liked { color: #b94a68; }
+.report { color: #9a6571; }
+.report-receipts { border-color: #eadfe1; }
+.report-receipts-copy, .report-receipts-empty { margin-top: 12rpx; color: #80686e; font-size: 23rpx; line-height: 1.6; }
+.report-receipt-list { margin-top: 14rpx; border-top: 1rpx solid #f0e6e8; }
+.report-receipt-item { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; padding: 16rpx 0; border-bottom: 1rpx solid #f0e6e8; }
+.report-receipt-status { color: #8e5362; font-size: 24rpx; font-weight: 700; }
+.report-receipt-time { color: #80686e; font-size: 23rpx; }
 .related-section { margin: 28rpx 0; }
 .section-title { margin: 0 4rpx 16rpx; font-size: 34rpx; font-weight: 700; }
 .recommendation-card { margin-bottom: 14rpx; }

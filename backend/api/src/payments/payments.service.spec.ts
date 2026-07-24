@@ -12,6 +12,9 @@ describe("PaymentsService", () => {
     order: {
       findUnique: jest.fn()
     },
+    companionAvailabilityWindow: {
+      findFirst: jest.fn()
+    },
     paymentTransaction: {
       findUnique: jest.fn(),
       findMany: jest.fn(),
@@ -55,7 +58,8 @@ describe("PaymentsService", () => {
       status: order.status,
       amountCents: order.amountCents,
       companionId: order.companionId
-    }))
+    })),
+    cancelPendingRescheduleRequest: jest.fn().mockResolvedValue(undefined)
   } as any;
 
   const notifications = {
@@ -190,6 +194,79 @@ describe("PaymentsService", () => {
     }));
     expect(providerRetry).not.toHaveBeenCalled();
     expect(prisma.refundTransaction.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("cancels a pending reschedule inside the same transaction that creates a customer refund", async () => {
+    const order = {
+      ...baseOrder,
+      status: "paid",
+      companion: { ownerUserId: "u-companion" }
+    };
+    const refund = {
+      id: "r-reschedule-cancel", orderId: order.id, paymentId: "p1", outRefundNo: "R-reschedule-cancel",
+      amountCents: order.amountCents, status: "pending", reason: "改期协商终止后退款", createdAt: new Date(), updatedAt: new Date()
+    };
+    const db = {
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      order: { findUnique: jest.fn().mockResolvedValue(order) },
+      refundTransaction: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue(refund)
+      },
+      paymentTransaction: { findFirst: jest.fn().mockResolvedValue({ id: "p1", transactionId: "wx-txn-1" }) },
+      companionEarning: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) }
+    } as any;
+    prisma.$transaction.mockImplementation(async (fn: any) => fn(db));
+    jest.spyOn(service as any, "submitRefundToWechat").mockResolvedValue({
+      refund: { id: refund.id, status: "processing" },
+      order: ordersService.toDto(order)
+    });
+
+    await expect(service.requestRefund("u1", order.id, "改期协商终止后退款")).resolves.toEqual(expect.objectContaining({
+      created: true,
+      refund: expect.objectContaining({ id: refund.id })
+    }));
+
+    expect(ordersService.cancelPendingRescheduleRequest).toHaveBeenCalledWith(db, {
+      order,
+      actorId: "u1",
+      actorRole: "customer",
+      reason: "refund_requested"
+    });
+    expect(db.refundTransaction.create.mock.invocationCallOrder[0])
+      .toBeLessThan(ordersService.cancelPendingRescheduleRequest.mock.invocationCallOrder[0]);
+  });
+
+  it("uses a system lifecycle cleanup when a refund is already in progress", async () => {
+    const order = {
+      ...baseOrder,
+      status: "paid",
+      companion: { ownerUserId: "u-companion" }
+    };
+    const existingRefund = {
+      id: "r-existing-reschedule", orderId: order.id, paymentId: "p1", outRefundNo: "R-existing-reschedule",
+      amountCents: order.amountCents, status: "processing", reason: "已有退款", createdAt: new Date(), updatedAt: new Date()
+    };
+    const db = {
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      order: { findUnique: jest.fn().mockResolvedValue(order) },
+      refundTransaction: { findFirst: jest.fn().mockResolvedValue(existingRefund) },
+      companionEarning: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) }
+    } as any;
+    prisma.$transaction.mockImplementation(async (fn: any) => fn(db));
+
+    await expect(service.requestRefund("u1", order.id, "重复提交")).resolves.toEqual(expect.objectContaining({
+      created: false,
+      refund: expect.objectContaining({ id: existingRefund.id, status: "processing" })
+    }));
+
+    expect(ordersService.cancelPendingRescheduleRequest).toHaveBeenCalledWith(db, {
+      order,
+      actorId: null,
+      actorRole: "system",
+      reason: "refund_requested"
+    });
+    expect(db.refundTransaction.create).toBeUndefined();
   });
 
   it("rejects a refund query response bound to another provider refund number", async () => {
@@ -972,6 +1049,48 @@ describe("PaymentsService", () => {
     await expect(service.prepay("u1", "o1", "app")).rejects.toMatchObject({
       code: "COMPANION_SLOT_UNAVAILABLE",
       status: HttpStatus.CONFLICT
+    });
+    expect(createSpy).not.toHaveBeenCalled();
+  });
+
+  it("rechecks structured-window capacity before prepay", async () => {
+    const scheduledAt = new Date(Math.ceil((Date.now() + 3 * 60 * 60_000) / (30 * 60_000)) * (30 * 60_000));
+    const structuredOrder = {
+      ...baseOrder,
+      status: "pending",
+      scheduledAt,
+      availabilityWindowId: "window-1",
+      availabilityWindowStartsAtSnapshot: new Date(scheduledAt.getTime() - 30 * 60_000),
+      availabilityWindowEndsAtSnapshot: new Date(scheduledAt.getTime() + 60 * 60_000),
+      availabilityWindowCapacitySnapshot: 1,
+      paymentReservationExpiresAt: new Date(Date.now() + 10 * 60_000)
+    };
+    const createSpy = jest.spyOn(wechat, "createAppPrepay");
+    prisma.$transaction.mockImplementation(async (fn: any) => fn({
+      $queryRaw: jest.fn()
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ id: "o-conflict" }])
+        .mockResolvedValueOnce([]),
+      companionAvailabilityWindow: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: "window-1", companionId: "c1", startsAt: structuredOrder.availabilityWindowStartsAtSnapshot,
+          endsAt: structuredOrder.availabilityWindowEndsAtSnapshot, capacity: 1, isActive: true
+        })
+      },
+      order: {
+        findUnique: jest.fn()
+          .mockResolvedValueOnce(structuredOrder)
+          .mockResolvedValueOnce({ ...baseOrder, id: "o-conflict", status: "paid", scheduledAt, payments: [] })
+      },
+      paymentTransaction: { findFirst: jest.fn(), create: jest.fn() }
+    }));
+
+    await expect(service.prepay("u1", "o1", "app")).rejects.toMatchObject({
+      code: "COMPANION_SLOT_UNAVAILABLE",
+      status: HttpStatus.CONFLICT,
+      details: expect.objectContaining({ availabilityWindowId: "window-1", capacity: 1 })
     });
     expect(createSpy).not.toHaveBeenCalled();
   });

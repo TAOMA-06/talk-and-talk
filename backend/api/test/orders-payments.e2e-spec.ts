@@ -797,6 +797,54 @@ describe("Orders and payments (e2e)", () => {
     expect(payments.filter((payment) => payment.status === "initiated")).toHaveLength(1);
   });
 
+  it("binds a structured window, honors its capacity, and does not require legacy availableTimes", async () => {
+    const scheduledAt = new Date(Math.ceil((Date.now() + 3 * 60 * 60_000) / (30 * 60_000)) * (30 * 60_000));
+    const window = await prisma.companionAvailabilityWindow.create({
+      data: {
+        companionId: "c1",
+        startsAt: new Date(scheduledAt.getTime() - 30 * 60_000),
+        endsAt: new Date(scheduledAt.getTime() + 60 * 60_000),
+        capacity: 2
+      }
+    });
+    await prisma.companionProfile.update({ where: { id: "c1" }, data: { availableTimes: [] } });
+    const customers = await Promise.all([
+      createUser("+8613800138022"),
+      createUser("+8613800138023"),
+      createUser("+8613800138024")
+    ]);
+    const orders = await Promise.all(customers.map((customer, index) =>
+      request(app.getHttpServer())
+        .post("/api/v1/orders")
+        .set("Authorization", `Bearer ${customer.token}`)
+        .send({
+          companionId: "c1",
+          availabilityWindowId: window.id,
+          themeId: index === 0 ? "t1" : "t2",
+          durationMinutes: 30,
+          scheduledAt: scheduledAt.toISOString()
+        })
+        .expect(201)
+    ));
+
+    expect(orders[0].body.data.availabilitySnapshot).toEqual(expect.objectContaining({
+      availabilityWindowId: window.id,
+      startsAt: window.startsAt.toISOString(),
+      endsAt: window.endsAt.toISOString(),
+      capacity: 2
+    }));
+    const ownerToken = await companionOwnerTokenForOrder(orders[0].body.data.id);
+    const confirmations = await Promise.all(orders.map((order) =>
+      request(app.getHttpServer())
+        .post(`/api/v1/orders/service/${order.body.data.id}/confirm`)
+        .set("Authorization", `Bearer ${ownerToken}`)
+    ));
+
+    expect(confirmations.map((result) => result.status).sort()).toEqual([201, 201, 409]);
+    expect(confirmations.find((result) => result.status === 409)?.body.error.code)
+      .toBe("COMPANION_SLOT_UNAVAILABLE");
+  });
+
   it("reclaims an expired abandoned slot before allowing another user to prepay", async () => {
     const firstUser = await createUser("+8613800138003");
     const secondUser = await createUser("+8613800138004");

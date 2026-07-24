@@ -11,7 +11,9 @@ describe("NotificationsService", () => {
       update: jest.fn(),
       updateMany: jest.fn()
     },
-    notificationDelivery: { upsert: jest.fn() }
+    notificationDelivery: { upsert: jest.fn() },
+    conversationNotificationPreference: { findUnique: jest.fn() },
+    conversationBlock: { findFirst: jest.fn() }
   } as any;
 
   let service: NotificationsService;
@@ -66,5 +68,63 @@ describe("NotificationsService", () => {
     expect(prisma.notificationDelivery.upsert).toHaveBeenCalledWith(expect.objectContaining({
       where: { notificationId_templateKey: { notificationId: "n-outbox", templateKey: "orderConfirmed" } }
     }));
+  });
+
+  it("creates a generic new-message delivery only when the recipient has not muted that conversation", async () => {
+    prisma.conversationBlock.findFirst.mockResolvedValue(null);
+    prisma.conversationNotificationPreference.findUnique.mockResolvedValue(null);
+    prisma.notification.upsert.mockResolvedValue({
+      id: "n-message", userId: "u-recipient", type: "messageReceived", title: "收到一条新消息",
+      body: "打开 Talk&Talk 的平台内会话查看。", data: { conversationId: "c1" },
+      eventKey: "conversation:conv-1:message:message-1:recipient:u-recipient", readAt: null, createdAt: new Date()
+    });
+    prisma.notificationDelivery.upsert.mockResolvedValue({ id: "d-message" });
+
+    await expect(service.createConversationMessageReceivedIfUnmuted(prisma, {
+      conversationId: "conv-1",
+      messageId: "message-1",
+      recipientUserId: "u-recipient",
+      recipientConversationId: "c1"
+    })).resolves.toEqual({ queued: true });
+
+    expect(prisma.notification.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      create: expect.objectContaining({
+        type: "messageReceived",
+        title: "收到一条新消息",
+        body: "打开 Talk&Talk 的平台内会话查看。",
+        data: { conversationId: "c1" },
+        eventKey: "conversation:conv-1:message:message-1:recipient:u-recipient"
+      })
+    }));
+  });
+
+  it("does not create an inbox item or delivery intent for a muted conversation", async () => {
+    prisma.conversationBlock.findFirst.mockResolvedValue(null);
+    prisma.conversationNotificationPreference.findUnique.mockResolvedValue({ mutedAt: new Date() });
+
+    await expect(service.createConversationMessageReceivedIfUnmuted(prisma, {
+      conversationId: "conv-1",
+      messageId: "message-1",
+      recipientUserId: "u-recipient",
+      recipientConversationId: "c1"
+    })).resolves.toEqual({ queued: false });
+
+    expect(prisma.notification.upsert).not.toHaveBeenCalled();
+    expect(prisma.notificationDelivery.upsert).not.toHaveBeenCalled();
+  });
+
+  it("does not create an inbox item or delivery intent after either side blocks the conversation", async () => {
+    prisma.conversationBlock.findFirst.mockResolvedValue({ id: "block-1" });
+
+    await expect(service.createConversationMessageReceivedIfUnmuted(prisma, {
+      conversationId: "conv-1",
+      messageId: "message-1",
+      recipientUserId: "u-recipient",
+      recipientConversationId: "c1"
+    })).resolves.toEqual({ queued: false });
+
+    expect(prisma.conversationNotificationPreference.findUnique).not.toHaveBeenCalled();
+    expect(prisma.notification.upsert).not.toHaveBeenCalled();
+    expect(prisma.notificationDelivery.upsert).not.toHaveBeenCalled();
   });
 });

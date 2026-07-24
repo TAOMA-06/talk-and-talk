@@ -12,6 +12,9 @@ export type MetricsSnapshot = {
   notificationDeliveryFailures: number;
   notificationDeliverySuccess: number;
   notificationDeliverySkipped: number;
+  availabilityReminderDeliveryFailures: number;
+  availabilityReminderDeliverySuccess: number;
+  availabilityReminderDeliverySkipped: number;
 };
 
 type DurationSample = {
@@ -29,6 +32,9 @@ export class MetricsService {
   private notificationDeliveryFailures = 0;
   private notificationDeliverySuccess = 0;
   private notificationDeliverySkipped = 0;
+  private availabilityReminderDeliveryFailures = 0;
+  private availabilityReminderDeliverySuccess = 0;
+  private availabilityReminderDeliverySkipped = 0;
   private latencySumMs = 0;
   private readonly durations: DurationSample[] = [];
   private readonly windowMs = 15 * 60 * 1000;
@@ -67,6 +73,18 @@ export class MetricsService {
     this.notificationDeliverySkipped += 1;
   }
 
+  recordAvailabilityReminderDeliveryFailure() {
+    this.availabilityReminderDeliveryFailures += 1;
+  }
+
+  recordAvailabilityReminderDeliverySuccess() {
+    this.availabilityReminderDeliverySuccess += 1;
+  }
+
+  recordAvailabilityReminderDeliverySkipped() {
+    this.availabilityReminderDeliverySkipped += 1;
+  }
+
   snapshot(): MetricsSnapshot {
     this.pruneDurations();
     const samples = this.durations.map((item) => item.durationMs);
@@ -84,7 +102,10 @@ export class MetricsService {
       wechatNotifySuccess: this.wechatNotifySuccess,
       notificationDeliveryFailures: this.notificationDeliveryFailures,
       notificationDeliverySuccess: this.notificationDeliverySuccess,
-      notificationDeliverySkipped: this.notificationDeliverySkipped
+      notificationDeliverySkipped: this.notificationDeliverySkipped,
+      availabilityReminderDeliveryFailures: this.availabilityReminderDeliveryFailures,
+      availabilityReminderDeliverySuccess: this.availabilityReminderDeliverySuccess,
+      availabilityReminderDeliverySkipped: this.availabilityReminderDeliverySkipped
     };
   }
 
@@ -123,7 +144,16 @@ export class MetricsService {
       `talk_notification_delivery_success_total{app_version="${appVersion}",app_env="${appEnv}"} ${metrics.notificationDeliverySuccess}`,
       "# HELP talk_notification_delivery_skipped_total Transactional notification deliveries skipped without user authorization",
       "# TYPE talk_notification_delivery_skipped_total counter",
-      `talk_notification_delivery_skipped_total{app_version="${appVersion}",app_env="${appEnv}"} ${metrics.notificationDeliverySkipped}`
+      `talk_notification_delivery_skipped_total{app_version="${appVersion}",app_env="${appEnv}"} ${metrics.notificationDeliverySkipped}`,
+      "# HELP talk_availability_reminder_delivery_failures_total Failed or indeterminate availability-reminder delivery attempts",
+      "# TYPE talk_availability_reminder_delivery_failures_total counter",
+      `talk_availability_reminder_delivery_failures_total{app_version="${appVersion}",app_env="${appEnv}"} ${metrics.availabilityReminderDeliveryFailures}`,
+      "# HELP talk_availability_reminder_delivery_success_total Successful availability-reminder delivery attempts",
+      "# TYPE talk_availability_reminder_delivery_success_total counter",
+      `talk_availability_reminder_delivery_success_total{app_version="${appVersion}",app_env="${appEnv}"} ${metrics.availabilityReminderDeliverySuccess}`,
+      "# HELP talk_availability_reminder_delivery_skipped_total Availability-reminder delivery attempts skipped before a remote send",
+      "# TYPE talk_availability_reminder_delivery_skipped_total counter",
+      `talk_availability_reminder_delivery_skipped_total{app_version="${appVersion}",app_env="${appEnv}"} ${metrics.availabilityReminderDeliverySkipped}`
     ];
     return `${lines.join("\n")}\n`;
   }

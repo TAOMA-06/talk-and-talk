@@ -5,6 +5,18 @@ export class CreateOrderDto {
   @MinLength(1)
   companionId!: string;
 
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(160)
+  serviceOfferingId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(160)
+  availabilityWindowId?: string;
+
   @IsString()
   @MinLength(1)
   themeId!: string;

@@ -92,6 +92,7 @@ Prisma **不提供**生产 `migrate down`。步骤：
 
 - 保留 `.env.staging` / `.env.production` 历史副本（如 `.env.production.20260709`）。
 - `APP_VERSION` 与发布 tag 对齐，便于 health/metrics 对照。
+- 若可约提醒投递出现异常，先将 `AVAILABILITY_REMINDER_DELIVERY_ENABLED=false` 并滚动重启 API，停止新的内部扫描；保全 `talk_availability_reminder_delivery_*` 聚合指标和集中日志。不得手工删除、释放或重写 `AvailabilityReminderAttempt` / 订阅授权，也不得通过再次打开开关重发 `uncertain`、`rejected`、`failedBeforeSend` 或旧租约。
 
 ## 回滚后验收
 

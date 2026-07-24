@@ -1,6 +1,60 @@
 .profile { text-align: center; }
 .avatar { display: flex; width: 120rpx; height: 120rpx; margin: 0 auto 18rpx; align-items: center; justify-content: center; border-radius: 50%; background: #f5dce2; color: #a43f5c; font-size: 38rpx; font-weight: 700; }
 .bio { margin: 20rpx 0; text-align: left; line-height: 1.7; }
+.trust-section { margin-top: 24rpx; padding: 18rpx 0 2rpx; border-top: 1rpx solid #eadce0; text-align: left; }
+.trust-heading { display: flex; justify-content: space-between; gap: 16rpx; color: #704a58; font-size: 24rpx; font-weight: 700; letter-spacing: 2rpx; }
+.trust-heading text:last-child { color: #ab8c96; font-size: 21rpx; letter-spacing: 1rpx; }
+.trust-fact { display: flex; gap: 14rpx; margin-top: 16rpx; padding: 0 4rpx 15rpx; border-bottom: 1rpx dashed #eee1e5; }
+.trust-fact:last-child { border-bottom: 0; padding-bottom: 0; }
+.trust-marker { width: 8rpx; flex: 0 0 8rpx; align-self: stretch; min-height: 56rpx; background: #b94a68; }
+.trust-fact-boundary .trust-marker { background: #b07b49; }
+.trust-fact-order .trust-marker { background: #55748f; }
+.trust-copy { min-width: 0; flex: 1; }
+.trust-title { color: #543943; font-size: 26rpx; font-weight: 700; }
+.trust-description { margin-top: 6rpx; color: #755f67; font-size: 23rpx; line-height: 1.6; }
+.favorite-control { margin-top: 22rpx; padding: 15rpx 18rpx 14rpx; border: 1rpx solid #c8d8e5; border-left: 7rpx solid #55748f; background: #f6f9fc; text-align: left; }
+.favorite-toggle { width: 100%; margin: 0; padding: 0; min-height: auto; background: transparent; color: #42627b; font-size: 27rpx; font-weight: 700; line-height: 1.55; text-align: left; }
+.favorite-toggle::after { border: 0; }
+.favorite-toggle-saved { color: #315d7c; }
+.favorite-privacy { margin-top: 7rpx; color: #668096; font-size: 22rpx; line-height: 1.55; }
+.rebooking-notice { margin-top: 22rpx; padding: 16rpx 18rpx; border-left: 6rpx solid #55748f; background: #f3f7fa; text-align: left; }
+.rebooking-notice-heading { display: flex; justify-content: space-between; gap: 16rpx; color: #405e78; font-size: 24rpx; font-weight: 700; letter-spacing: 2rpx; }
+.rebooking-notice-heading text:last-child { color: #738da3; font-size: 21rpx; letter-spacing: 1rpx; }
+.rebooking-notice-copy { margin-top: 9rpx; color: #526b80; font-size: 24rpx; line-height: 1.6; }
+.service-section { margin-top: 28rpx; padding: 24rpx; border-radius: 18rpx; background: #fff8f7; text-align: left; }
+.service-heading { display: flex; align-items: baseline; justify-content: space-between; color: #4d2e37; font-size: 30rpx; font-weight: 700; }
+.service-lock { color: #a98790; font-size: 22rpx; font-weight: 400; }
+.service-list { margin-top: 18rpx; }
+.service-offering { display: flex; align-items: flex-start; gap: 16rpx; margin-top: 12rpx; padding: 20rpx 16rpx; border: 2rpx solid transparent; border-radius: 14rpx; background: #ffffff; }
+.service-offering.is-selected { border-color: #b94a68; background: #fff0f2; box-shadow: 0 8rpx 20rpx rgba(185, 74, 104, 0.09); }
+.service-choice { flex: 0 0 auto; width: 24rpx; height: 24rpx; margin-top: 8rpx; border: 2rpx solid #d8b9c2; border-radius: 50%; background: #ffffff; }
+.service-choice.is-selected { border-color: #b94a68; box-shadow: inset 0 0 0 5rpx #ffffff; background: #b94a68; }
+.service-copy { min-width: 0; flex: 1; }
+.service-title-row { display: flex; justify-content: space-between; gap: 16rpx; }
+.service-title { color: #4d2e37; font-size: 28rpx; font-weight: 700; }
+.service-price { flex: 0 0 auto; color: #b94a68; font-size: 30rpx; font-weight: 700; }
+.service-meta { margin-top: 8rpx; color: #92707a; font-size: 24rpx; }
+.service-description { margin-top: 10rpx; color: #654b52; font-size: 24rpx; line-height: 1.55; }
+.service-state { margin-top: 18rpx; color: #8d7078; font-size: 25rpx; line-height: 1.5; }
+.service-legacy { padding-left: 16rpx; border-left: 4rpx solid #d8a6b3; color: #7a4857; }
+.booking-summary { margin-top: 18rpx; color: #7a4857; font-size: 25rpx; }
+.availability-section { margin-top: 22rpx; padding: 24rpx; border: 1rpx solid #f1dfe3; border-radius: 18rpx; background: #fffdfb; text-align: left; }
+.availability-heading { display: flex; align-items: baseline; justify-content: space-between; color: #4d2e37; font-size: 30rpx; font-weight: 700; }
+.availability-timezone { color: #a98790; font-size: 22rpx; font-weight: 400; }
+.availability-note { margin-top: 14rpx; color: #92707a; font-size: 24rpx; line-height: 1.5; }
+.availability-list { margin-top: 6rpx; }
+.availability-date-group { position: relative; margin-top: 20rpx; padding-left: 18rpx; border-left: 3rpx solid #efd3da; }
+.availability-date-group:first-child { margin-top: 16rpx; }
+.availability-date { color: #654b52; font-size: 25rpx; font-weight: 700; }
+.availability-slot-grid { display: flex; flex-wrap: wrap; gap: 12rpx; margin-top: 12rpx; }
+.availability-slot { flex: 1 1 176rpx; min-width: 176rpx; padding: 16rpx; border: 2rpx solid #ead4da; border-radius: 12rpx; background: #ffffff; }
+.availability-slot.is-selected { border-color: #b94a68; background: #fff0f2; box-shadow: 0 8rpx 18rpx rgba(185, 74, 104, 0.1); }
+.availability-slot-time { color: #4d2e37; font-size: 28rpx; font-weight: 700; }
+.availability-slot-capacity { margin-top: 6rpx; color: #92707a; font-size: 21rpx; }
+.availability-state { margin-top: 18rpx; color: #8d7078; font-size: 25rpx; line-height: 1.55; }
+.availability-legacy { padding-left: 16rpx; border-left: 4rpx solid #d8a6b3; color: #7a4857; }
+.availability-unavailable { color: #98616d; }
+.booking-slot-summary { padding-left: 16rpx; border-left: 4rpx solid #b94a68; font-weight: 700; }
 .booking-row { display: flex; justify-content: center; gap: 18rpx; margin-top: 22rpx; }
 .booking-picker { padding: 14rpx 22rpx; border-radius: 12rpx; background: #fff5f6; color: #7a4857; }
 button { margin-top: 28rpx; }

@@ -47,6 +47,9 @@ interface Environment {
   PAYMENT_RECONCILIATION_ENABLED: boolean;
   PAYMENT_RECONCILIATION_INTERVAL_SECONDS: number;
   PAYMENT_RECONCILIATION_BATCH_SIZE: number;
+  ORDER_RESCHEDULE_EXPIRY_ENABLED: boolean;
+  ORDER_RESCHEDULE_EXPIRY_INTERVAL_SECONDS: number;
+  ORDER_RESCHEDULE_EXPIRY_BATCH_SIZE: number;
   METRICS_TOKEN: string;
   LEGAL_CONSENT_VERSION: string;
   LEGAL_CONSENT_EFFECTIVE_DATE: string;
@@ -63,6 +66,7 @@ interface Environment {
   COMPANION_SETTLEMENT_HOLD_HOURS: number;
   REFUND_REQUEST_WINDOW_HOURS: number;
   ORDER_RESPONSE_WINDOW_MINUTES: number;
+  ORDER_RESCHEDULE_RESPONSE_WINDOW_MINUTES: number;
   ORDER_MAX_SCHEDULE_DAYS: number;
   ORDER_INTAKE_ENABLED: boolean;
   ORDER_MAX_OPEN_TOTAL: number;
@@ -74,6 +78,12 @@ interface Environment {
   NOTIFICATION_DELIVERY_ENABLED: boolean;
   NOTIFICATION_DELIVERY_INTERVAL_SECONDS: number;
   NOTIFICATION_DELIVERY_BATCH_SIZE: number;
+  AVAILABILITY_REMINDER_PREPARATION_ENABLED: boolean;
+  AVAILABILITY_REMINDER_PREPARATION_INTERVAL_SECONDS: number;
+  AVAILABILITY_REMINDER_PREPARATION_BATCH_SIZE: number;
+  AVAILABILITY_REMINDER_DELIVERY_ENABLED: boolean;
+  AVAILABILITY_REMINDER_DELIVERY_INTERVAL_SECONDS: number;
+  AVAILABILITY_REMINDER_DELIVERY_BATCH_SIZE: number;
   WECHAT_SUBSCRIBE_MESSAGES_ENABLED: boolean;
   WECHAT_SUBSCRIBE_TEMPLATES: WeChatSubscribeTemplate[];
 }
@@ -101,7 +111,13 @@ const REQUIRED_TRANSACTIONAL_TEMPLATE_KEYS = [
   "serviceCompleted",
   "orderCancelled",
   "reservationExpired",
-  "supportUpdate"
+  "rescheduleRequested",
+  "rescheduleAccepted",
+  "rescheduleRejected",
+  "rescheduleExpired",
+  "rescheduleCancelled",
+  "supportUpdate",
+  "messageReceived"
 ] as const;
 const DEFAULT_DEVELOPMENT_CORS_ORIGINS = [
   "http://localhost:3000",
@@ -427,6 +443,23 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     positiveInteger("PAYMENT_RECONCILIATION_BATCH_SIZE", env.PAYMENT_RECONCILIATION_BATCH_SIZE, 50),
     200
   );
+  // This is deliberately independent from payment reconciliation: operations
+  // can pause automatic reschedule expiry during an incident without delaying
+  // payment/refund reconciliation. It remains off in test processes so unit
+  // and e2e runs cannot retain timers.
+  const orderRescheduleExpiryEnabled = parseBoolean(
+    env.ORDER_RESCHEDULE_EXPIRY_ENABLED,
+    nodeEnv !== "test"
+  );
+  const orderRescheduleExpiryIntervalSeconds = positiveInteger(
+    "ORDER_RESCHEDULE_EXPIRY_INTERVAL_SECONDS",
+    env.ORDER_RESCHEDULE_EXPIRY_INTERVAL_SECONDS,
+    60
+  );
+  const orderRescheduleExpiryBatchSize = Math.min(
+    positiveInteger("ORDER_RESCHEDULE_EXPIRY_BATCH_SIZE", env.ORDER_RESCHEDULE_EXPIRY_BATCH_SIZE, 50),
+    200
+  );
   const commercialReleaseMode = parseCommercialReleaseMode(env.COMMERCIAL_RELEASE_MODE);
   const platformFeeBps = boundedInteger("PLATFORM_FEE_BPS", env.PLATFORM_FEE_BPS, 0, 0, 10_000);
   const companionSettlementHoldHours = boundedInteger(
@@ -449,6 +482,13 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     10,
     1,
     24 * 60
+  );
+  const orderRescheduleResponseWindowMinutes = boundedInteger(
+    "ORDER_RESCHEDULE_RESPONSE_WINDOW_MINUTES",
+    env.ORDER_RESCHEDULE_RESPONSE_WINDOW_MINUTES,
+    12 * 60,
+    5,
+    7 * 24 * 60
   );
   const orderMaxScheduleDays = boundedInteger(
     "ORDER_MAX_SCHEDULE_DAYS",
@@ -500,11 +540,60 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     1,
     200
   );
+  // This preparation runner only turns existing availability candidates into
+  // private preflight/handoff state; it has no provider or delivery dependency.
+  // Keep it explicitly off in every environment until operations opts in.
+  const availabilityReminderPreparationEnabled = parseBoolean(
+    env.AVAILABILITY_REMINDER_PREPARATION_ENABLED,
+    false
+  );
+  const availabilityReminderPreparationIntervalSeconds = boundedInteger(
+    "AVAILABILITY_REMINDER_PREPARATION_INTERVAL_SECONDS",
+    env.AVAILABILITY_REMINDER_PREPARATION_INTERVAL_SECONDS,
+    60,
+    15,
+    60 * 60
+  );
+  const availabilityReminderPreparationBatchSize = boundedInteger(
+    "AVAILABILITY_REMINDER_PREPARATION_BATCH_SIZE",
+    env.AVAILABILITY_REMINDER_PREPARATION_BATCH_SIZE,
+    20,
+    1,
+    100
+  );
+  // Unlike preparation, this runner crosses the one-time authorization and
+  // provider boundary. It remains separately and explicitly off until an
+  // operator has configured the live subscribe channel and template below.
+  const availabilityReminderDeliveryEnabled = parseBoolean(
+    env.AVAILABILITY_REMINDER_DELIVERY_ENABLED,
+    false
+  );
+  const availabilityReminderDeliveryIntervalSeconds = boundedInteger(
+    "AVAILABILITY_REMINDER_DELIVERY_INTERVAL_SECONDS",
+    env.AVAILABILITY_REMINDER_DELIVERY_INTERVAL_SECONDS,
+    60,
+    15,
+    60 * 60
+  );
+  const availabilityReminderDeliveryBatchSize = boundedInteger(
+    "AVAILABILITY_REMINDER_DELIVERY_BATCH_SIZE",
+    env.AVAILABILITY_REMINDER_DELIVERY_BATCH_SIZE,
+    20,
+    1,
+    100
+  );
   const wechatSubscribeMessagesEnabled = parseBoolean(env.WECHAT_SUBSCRIBE_MESSAGES_ENABLED, false);
   const wechatSubscribeTemplates = parseWeChatSubscribeTemplates(
     env.WECHAT_SUBSCRIBE_TEMPLATES_JSON,
     wechatSubscribeMessagesEnabled
   );
+  if (availabilityReminderDeliveryEnabled && !wechatSubscribeMessagesEnabled) {
+    throw new Error("AVAILABILITY_REMINDER_DELIVERY_ENABLED requires WECHAT_SUBSCRIBE_MESSAGES_ENABLED=true");
+  }
+  if (availabilityReminderDeliveryEnabled
+    && !wechatSubscribeTemplates.some((template) => template.key === "availabilityReminder")) {
+    throw new Error("AVAILABILITY_REMINDER_DELIVERY_ENABLED requires an availabilityReminder subscribe template");
+  }
 
   const miniProgramAppId = optionalString(env.WECHAT_MINIPROGRAM_APP_ID);
   const miniProgramAppSecret = optionalString(env.WECHAT_MINIPROGRAM_APP_SECRET);
@@ -650,6 +739,10 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
       "COMPANION_SETTLEMENT_HOLD_HOURS",
       "REFUND_REQUEST_WINDOW_HOURS",
       "ORDER_RESPONSE_WINDOW_MINUTES",
+      "ORDER_RESCHEDULE_RESPONSE_WINDOW_MINUTES",
+      "ORDER_RESCHEDULE_EXPIRY_ENABLED",
+      "ORDER_RESCHEDULE_EXPIRY_INTERVAL_SECONDS",
+      "ORDER_RESCHEDULE_EXPIRY_BATCH_SIZE",
       "ORDER_MAX_SCHEDULE_DAYS",
       "ORDER_INTAKE_ENABLED",
       "ORDER_MAX_OPEN_TOTAL",
@@ -721,6 +814,9 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     PAYMENT_RECONCILIATION_ENABLED: paymentReconciliationEnabled,
     PAYMENT_RECONCILIATION_INTERVAL_SECONDS: paymentReconciliationIntervalSeconds,
     PAYMENT_RECONCILIATION_BATCH_SIZE: paymentReconciliationBatchSize,
+    ORDER_RESCHEDULE_EXPIRY_ENABLED: orderRescheduleExpiryEnabled,
+    ORDER_RESCHEDULE_EXPIRY_INTERVAL_SECONDS: orderRescheduleExpiryIntervalSeconds,
+    ORDER_RESCHEDULE_EXPIRY_BATCH_SIZE: orderRescheduleExpiryBatchSize,
     METRICS_TOKEN: metricsToken,
     LEGAL_CONSENT_VERSION: legalConsentVersion,
     LEGAL_CONSENT_EFFECTIVE_DATE: legalConsentEffectiveDate,
@@ -737,6 +833,7 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     COMPANION_SETTLEMENT_HOLD_HOURS: companionSettlementHoldHours,
     REFUND_REQUEST_WINDOW_HOURS: refundRequestWindowHours,
     ORDER_RESPONSE_WINDOW_MINUTES: orderResponseWindowMinutes,
+    ORDER_RESCHEDULE_RESPONSE_WINDOW_MINUTES: orderRescheduleResponseWindowMinutes,
     ORDER_MAX_SCHEDULE_DAYS: orderMaxScheduleDays,
     ORDER_INTAKE_ENABLED: orderIntakeEnabled,
     ORDER_MAX_OPEN_TOTAL: orderMaxOpenTotal,
@@ -748,6 +845,12 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     NOTIFICATION_DELIVERY_ENABLED: notificationDeliveryEnabled,
     NOTIFICATION_DELIVERY_INTERVAL_SECONDS: notificationDeliveryIntervalSeconds,
     NOTIFICATION_DELIVERY_BATCH_SIZE: notificationDeliveryBatchSize,
+    AVAILABILITY_REMINDER_PREPARATION_ENABLED: availabilityReminderPreparationEnabled,
+    AVAILABILITY_REMINDER_PREPARATION_INTERVAL_SECONDS: availabilityReminderPreparationIntervalSeconds,
+    AVAILABILITY_REMINDER_PREPARATION_BATCH_SIZE: availabilityReminderPreparationBatchSize,
+    AVAILABILITY_REMINDER_DELIVERY_ENABLED: availabilityReminderDeliveryEnabled,
+    AVAILABILITY_REMINDER_DELIVERY_INTERVAL_SECONDS: availabilityReminderDeliveryIntervalSeconds,
+    AVAILABILITY_REMINDER_DELIVERY_BATCH_SIZE: availabilityReminderDeliveryBatchSize,
     WECHAT_SUBSCRIBE_MESSAGES_ENABLED: wechatSubscribeMessagesEnabled,
     WECHAT_SUBSCRIBE_TEMPLATES: wechatSubscribeTemplates
   };

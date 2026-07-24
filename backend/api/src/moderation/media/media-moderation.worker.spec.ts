@@ -17,6 +17,7 @@ describe("MediaModerationWorker", () => {
   const moderation = { moderateAsync: jest.fn() } as any;
   const cases = { createFromResult: jest.fn() } as any;
   const restrictions = { recordAutomaticHighRiskBlock: jest.fn() } as any;
+  const notifications = { createConversationMessageReceivedIfUnmuted: jest.fn() } as any;
   const rules = new RuleEngine();
   let worker: MediaModerationWorker;
 
@@ -31,7 +32,8 @@ describe("MediaModerationWorker", () => {
       moderation,
       rules,
       cases,
-      restrictions
+      restrictions,
+      notifications
     );
   });
 
@@ -95,6 +97,12 @@ describe("MediaModerationWorker", () => {
       senderId: "user-1",
       content: "正常的图片消息",
       moderationStatus: "queued",
+      conversation: {
+        id: "conversation-1",
+        externalId: "companion-1",
+        userId: "user-1",
+        companion: { ownerUserId: "companion-owner" }
+      },
       attachments: [{ id: "image-1", kind: "image", retryCount: 0, nextAttemptAt: null }]
     };
     prisma.message.findUnique.mockResolvedValue(message);
@@ -114,6 +122,7 @@ describe("MediaModerationWorker", () => {
     });
     moderation.moderateAsync.mockImplementation(async (text: string) => rules.moderate(text, "chat"));
     const db = {
+      conversationBlock: { findFirst: jest.fn().mockResolvedValue(null) },
       message: { updateMany: jest.fn().mockResolvedValue({ count: 1 }), create: jest.fn() },
       mediaAsset: { update: jest.fn().mockResolvedValue({}) },
       conversation: { update: jest.fn().mockResolvedValue({}) }
@@ -125,6 +134,53 @@ describe("MediaModerationWorker", () => {
     expect(analysisProvider.analyzeImage).toHaveBeenCalledTimes(1);
     expect(db.message.updateMany).toHaveBeenCalledTimes(1);
     expect(cases.createFromResult).not.toHaveBeenCalled();
+    expect(notifications.createConversationMessageReceivedIfUnmuted).toHaveBeenCalledWith(db, {
+      conversationId: "conversation-1",
+      messageId: "message-concurrent",
+      recipientUserId: "companion-owner",
+      recipientConversationId: "conversation-1"
+    });
+  });
+
+  it("keeps an already-queued media message sender-only when either participant blocks before review finishes", async () => {
+    const message = {
+      id: "message-after-block",
+      conversationId: "conversation-1",
+      senderId: "user-1",
+      content: "正常图片",
+      moderationStatus: "queued",
+      conversation: {
+        id: "conversation-1",
+        externalId: "companion-1",
+        userId: "user-1",
+        companion: { ownerUserId: "companion-owner" }
+      },
+      attachments: [{ id: "image-1", kind: "image", retryCount: 0, nextAttemptAt: null }]
+    };
+    prisma.message.findUnique.mockResolvedValue(message);
+    prisma.message.updateMany.mockResolvedValue({ count: 1 });
+    analysisProvider.analyzeImage = jest.fn().mockResolvedValue({
+      available: true,
+      score: 0.05,
+      reasons: ["内容正常"],
+      categories: ["normal"]
+    });
+    moderation.moderateAsync.mockImplementation(async (text: string) => rules.moderate(text, "chat"));
+    const db = {
+      conversationBlock: { findFirst: jest.fn().mockResolvedValue({ id: "block-1" }) },
+      message: { updateMany: jest.fn().mockResolvedValue({ count: 1 }), create: jest.fn() },
+      mediaAsset: { update: jest.fn().mockResolvedValue({}) },
+      conversation: { update: jest.fn().mockResolvedValue({}) }
+    };
+    prisma.$transaction.mockImplementation(async (callback: any) => callback(db));
+
+    await worker.processMessage(message.id);
+
+    expect(db.message.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ moderationStatus: "blocked", visibility: "senderOnly" })
+    }));
+    expect(cases.createFromResult).not.toHaveBeenCalled();
+    expect(notifications.createConversationMessageReceivedIfUnmuted).not.toHaveBeenCalled();
   });
 
   it("commits a blocked-message case and rolling restriction in the same transition transaction", async () => {
@@ -134,6 +190,12 @@ describe("MediaModerationWorker", () => {
       senderId: "user-1",
       content: "",
       moderationStatus: "queued",
+      conversation: {
+        id: "conversation-1",
+        externalId: "companion-1",
+        userId: "user-1",
+        companion: { ownerUserId: "companion-owner" }
+      },
       attachments: [{ id: "image-1", kind: "image", retryCount: 0, nextAttemptAt: null }]
     };
     prisma.message.findUnique.mockResolvedValue(message);
@@ -158,6 +220,7 @@ describe("MediaModerationWorker", () => {
     });
     cases.createFromResult.mockResolvedValue({ id: "case-blocked" });
     const db = {
+      conversationBlock: { findFirst: jest.fn().mockResolvedValue(null) },
       message: { updateMany: jest.fn().mockResolvedValue({ count: 1 }), create: jest.fn() },
       mediaAsset: { update: jest.fn().mockResolvedValue({}) },
       conversation: { update: jest.fn().mockResolvedValue({}) }
@@ -172,5 +235,6 @@ describe("MediaModerationWorker", () => {
       "case-blocked",
       db
     );
+    expect(notifications.createConversationMessageReceivedIfUnmuted).not.toHaveBeenCalled();
   });
 });

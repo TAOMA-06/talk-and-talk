@@ -28,6 +28,10 @@ describe("validateEnvironment", () => {
     COMPANION_SETTLEMENT_HOLD_HOURS: "96",
     REFUND_REQUEST_WINDOW_HOURS: "72",
     ORDER_RESPONSE_WINDOW_MINUTES: "10",
+    ORDER_RESCHEDULE_RESPONSE_WINDOW_MINUTES: "720",
+    ORDER_RESCHEDULE_EXPIRY_ENABLED: "true",
+    ORDER_RESCHEDULE_EXPIRY_INTERVAL_SECONDS: "60",
+    ORDER_RESCHEDULE_EXPIRY_BATCH_SIZE: "50",
     ORDER_MAX_SCHEDULE_DAYS: "30",
     ORDER_INTAKE_ENABLED: "true",
     ORDER_MAX_OPEN_TOTAL: "500",
@@ -40,7 +44,7 @@ describe("validateEnvironment", () => {
     WECHAT_SUBSCRIBE_MESSAGES_ENABLED: "true",
     WECHAT_SUBSCRIBE_TEMPLATES_JSON: JSON.stringify([
       "newOrder", "orderConfirmed", "orderRejected", "orderResponseExpired", "paymentSuccess",
-      "serviceStarted", "serviceCompleted", "orderCancelled", "reservationExpired", "supportUpdate"
+      "serviceStarted", "serviceCompleted", "orderCancelled", "reservationExpired", "rescheduleRequested", "rescheduleAccepted", "rescheduleRejected", "rescheduleExpired", "rescheduleCancelled", "supportUpdate", "messageReceived"
     ].map((key) => ({ key, templateId: `TEMPLATE_${key}_123456`, page: "pages/orders/index", data: { thing1: "{{title}}" } }))),
     LEGAL_CONSENT_VERSION: "2.0-2026-07-20",
     LEGAL_OPERATOR_NAME: "上海示例网络科技有限公司",
@@ -72,6 +76,9 @@ describe("validateEnvironment", () => {
     expect(env.PAYMENT_RECONCILIATION_ENABLED).toBe(true);
     expect(env.PAYMENT_RECONCILIATION_INTERVAL_SECONDS).toBe(60);
     expect(env.PAYMENT_RECONCILIATION_BATCH_SIZE).toBe(50);
+    expect(env.ORDER_RESCHEDULE_EXPIRY_ENABLED).toBe(true);
+    expect(env.ORDER_RESCHEDULE_EXPIRY_INTERVAL_SECONDS).toBe(60);
+    expect(env.ORDER_RESCHEDULE_EXPIRY_BATCH_SIZE).toBe(50);
     expect(env.METRICS_TOKEN).toBe("");
     expect(env.LEGAL_CONSENT_VERSION).toBe("2.0-2026-07-20");
     expect(env.LEGAL_CONSENT_EFFECTIVE_DATE).toBe("2026-07-20");
@@ -80,6 +87,7 @@ describe("validateEnvironment", () => {
     expect(env.COMMERCIAL_RELEASE_MODE).toBe("internal");
     expect(env.PLATFORM_FEE_BPS).toBe(0);
     expect(env.ORDER_RESPONSE_WINDOW_MINUTES).toBe(10);
+    expect(env.ORDER_RESCHEDULE_RESPONSE_WINDOW_MINUTES).toBe(720);
     expect(env.ORDER_MAX_SCHEDULE_DAYS).toBe(30);
     expect(env.SUPPORT_MAX_OPEN_PER_USER).toBe(5);
     expect(env.ORDER_INTAKE_ENABLED).toBe(true);
@@ -88,6 +96,63 @@ describe("validateEnvironment", () => {
     expect(env.PAYOUT_CLAIMS_ENABLED).toBe(true);
     expect(env.REFUND_REQUEST_WINDOW_HOURS).toBe(72);
     expect(env.WECHAT_SUBSCRIBE_MESSAGES_ENABLED).toBe(false);
+    expect(env.AVAILABILITY_REMINDER_PREPARATION_ENABLED).toBe(false);
+    expect(env.AVAILABILITY_REMINDER_PREPARATION_INTERVAL_SECONDS).toBe(60);
+    expect(env.AVAILABILITY_REMINDER_PREPARATION_BATCH_SIZE).toBe(20);
+    expect(env.AVAILABILITY_REMINDER_DELIVERY_ENABLED).toBe(false);
+    expect(env.AVAILABILITY_REMINDER_DELIVERY_INTERVAL_SECONDS).toBe(60);
+    expect(env.AVAILABILITY_REMINDER_DELIVERY_BATCH_SIZE).toBe(20);
+  });
+
+  it("keeps availability-reminder preparation explicitly opt-in and bounds its internal work", () => {
+    const enabled = validateEnvironment({
+      AVAILABILITY_REMINDER_PREPARATION_ENABLED: "true",
+      AVAILABILITY_REMINDER_PREPARATION_INTERVAL_SECONDS: "15",
+      AVAILABILITY_REMINDER_PREPARATION_BATCH_SIZE: "100"
+    });
+
+    expect(enabled.AVAILABILITY_REMINDER_PREPARATION_ENABLED).toBe(true);
+    expect(enabled.AVAILABILITY_REMINDER_PREPARATION_INTERVAL_SECONDS).toBe(15);
+    expect(enabled.AVAILABILITY_REMINDER_PREPARATION_BATCH_SIZE).toBe(100);
+    expect(() => validateEnvironment({ AVAILABILITY_REMINDER_PREPARATION_INTERVAL_SECONDS: "14" }))
+      .toThrow("AVAILABILITY_REMINDER_PREPARATION_INTERVAL_SECONDS");
+    expect(() => validateEnvironment({ AVAILABILITY_REMINDER_PREPARATION_BATCH_SIZE: "101" }))
+      .toThrow("AVAILABILITY_REMINDER_PREPARATION_BATCH_SIZE");
+  });
+
+  it("keeps availability-reminder delivery explicitly opt-in and requires its live subscribe template", () => {
+    const templates = JSON.stringify([
+      {
+        key: "availabilityReminder",
+        templateId: "TEMPLATE_availabilityReminder_123456",
+        page: "pages/companions/index",
+        data: { thing1: "{{title}}" }
+      }
+    ]);
+    const enabled = validateEnvironment({
+      AVAILABILITY_REMINDER_DELIVERY_ENABLED: "true",
+      AVAILABILITY_REMINDER_DELIVERY_INTERVAL_SECONDS: "15",
+      AVAILABILITY_REMINDER_DELIVERY_BATCH_SIZE: "100",
+      WECHAT_SUBSCRIBE_MESSAGES_ENABLED: "true",
+      WECHAT_SUBSCRIBE_TEMPLATES_JSON: templates
+    });
+
+    expect(enabled.AVAILABILITY_REMINDER_DELIVERY_ENABLED).toBe(true);
+    expect(enabled.AVAILABILITY_REMINDER_DELIVERY_INTERVAL_SECONDS).toBe(15);
+    expect(enabled.AVAILABILITY_REMINDER_DELIVERY_BATCH_SIZE).toBe(100);
+    expect(() => validateEnvironment({ AVAILABILITY_REMINDER_DELIVERY_INTERVAL_SECONDS: "14" }))
+      .toThrow("AVAILABILITY_REMINDER_DELIVERY_INTERVAL_SECONDS");
+    expect(() => validateEnvironment({ AVAILABILITY_REMINDER_DELIVERY_BATCH_SIZE: "101" }))
+      .toThrow("AVAILABILITY_REMINDER_DELIVERY_BATCH_SIZE");
+    expect(() => validateEnvironment({ AVAILABILITY_REMINDER_DELIVERY_ENABLED: "true" }))
+      .toThrow("WECHAT_SUBSCRIBE_MESSAGES_ENABLED=true");
+    expect(() => validateEnvironment({
+      AVAILABILITY_REMINDER_DELIVERY_ENABLED: "true",
+      WECHAT_SUBSCRIBE_MESSAGES_ENABLED: "true",
+      WECHAT_SUBSCRIBE_TEMPLATES_JSON: JSON.stringify([
+        { key: "newOrder", templateId: "TEMPLATE_newOrder_123456", data: { thing1: "{{title}}" } }
+      ])
+    })).toThrow("availabilityReminder subscribe template");
   });
 
   it("defaults staging app env and seed flag", () => {
@@ -312,6 +377,8 @@ describe("validateEnvironment", () => {
       .toThrow("ORDER_MAX_OPEN_PER_USER");
     expect(() => validateEnvironment({ ...productionEnv, PAYOUT_CLAIMS_ENABLED: "" }))
       .toThrow("PAYOUT_CLAIMS_ENABLED");
+    expect(() => validateEnvironment({ ...productionEnv, ORDER_RESCHEDULE_EXPIRY_ENABLED: "" }))
+      .toThrow("ORDER_RESCHEDULE_EXPIRY_ENABLED");
   });
 
   it("rejects invalid dependency protocols and numeric limits", () => {
@@ -320,6 +387,7 @@ describe("validateEnvironment", () => {
     expect(() => validateEnvironment({ RATE_LIMIT_PER_MINUTE: "-1" })).toThrow("positive integer");
     expect(() => validateEnvironment({ SMS_CODE_TTL_SECONDS: "not-a-number" })).toThrow("positive integer");
     expect(() => validateEnvironment({ PAYMENT_RECONCILIATION_INTERVAL_SECONDS: "0" })).toThrow("positive integer");
+    expect(() => validateEnvironment({ ORDER_RESCHEDULE_EXPIRY_INTERVAL_SECONDS: "0" })).toThrow("positive integer");
   });
 
   it("requires WeChat Mini Program credentials to be configured together", () => {

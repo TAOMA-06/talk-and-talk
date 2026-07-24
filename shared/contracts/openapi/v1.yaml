@@ -29,6 +29,8 @@ tags:
   - name: commercial
   - name: community
   - name: reviews
+  - name: favorites
+  - name: recently-viewed
   - name: admin
   - name: admin-moderation
 paths:
@@ -395,6 +397,7 @@ paths:
     get:
       tags: [companions]
       summary: List companions
+      description: The default public catalog keeps its existing order. keyword is an explicitly submitted, short public-catalog query matched only against a companion's public name, role, service tags, and titles of current active service offerings; it is not persisted or used as a recommendation, marketing, companion-visible, or availability signal. sortBy is an explicit customer choice that switches the client to this public catalog rather than a personalized recommendation. soonestAvailable only considers current public profiles with a current structured candidate that has remaining capacity, then orders by the earliest candidate for the same matching active service in the next seven days, or inside availableWithinDays when that shorter window is selected. It does not reserve a time, expose a promise of availability, or use legacy free-text availability; detail and order creation recheck capacity. When keyword is matched through a service title together with topicId, deliveryMode, maxServicePriceCents, or availableWithinDays, those conditions must match the same current active service offering. availableWithinDays additionally requires a current structured availability candidate with remaining capacity for that same matching service; legacy free-text availability never qualifies. maxServicePriceCents is the total price for that one current service, not a historical order price or a duration-normalized estimate. Private preferences, chat, order body, bookmarks, recent views, companion-visible relationships, and marketing data are never inputs to this endpoint.
       operationId: listCompanions
       parameters:
         - in: query
@@ -407,11 +410,35 @@ paths:
           name: tag
           schema: { type: string }
         - in: query
+          name: keyword
+          description: Explicit public-catalog keyword, normalized to a nonblank 1–40-character string. Matches public name, role, service tag, or a current active service title only.
+          schema: { type: string, minLength: 1, maxLength: 40 }
+        - in: query
+          name: sortBy
+          description: Explicit public ordering — online first, higher rating, more public reviews, lower public per-30-minute profile price, or earliest current structured capacity. soonestAvailable considers the next seven days unless availableWithinDays selects a shorter window; it does not reserve a time and capacity is rechecked later.
+          schema: { type: string, enum: [online, rating, reviewCount, priceAsc, soonestAvailable] }
+        - in: query
           name: availability
           schema: { type: string }
         - in: query
           name: isOnline
           schema: { type: boolean }
+        - in: query
+          name: topicId
+          description: Match an active public service offering tagged with this stable platform topic id.
+          schema: { type: string, enum: [t1, t2, t3, t4, t5, t6] }
+        - in: query
+          name: deliveryMode
+          description: Match an active public service offering by delivery method.
+          schema: { type: string, enum: [text, voice] }
+        - in: query
+          name: maxServicePriceCents
+          description: Match an active public service offering whose current one-time total price is at or below this CNY-cent amount.
+          schema: { type: integer, minimum: 100, maximum: 2000000 }
+        - in: query
+          name: availableWithinDays
+          description: Limit results to matching active services with a currently free structured candidate starting in the next 1–7 days. Capacity is recomputed on this request; the detail page and order creation recheck it again.
+          schema: { type: integer, minimum: 1, maximum: 7 }
       responses:
         "200":
           description: Companion list
@@ -419,6 +446,227 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuccessEnvelope"
+  /favorites/companions:
+    get:
+      tags: [favorites]
+      summary: List the current customer's private companion bookmarks
+      description: Customer-only private bookmarks. The response reapplies the current public-profile eligibility gate, so unpublished, unverified, suspended, or otherwise ineligible profiles are omitted. Each item contains only the caller's private availability-reminder preference and a fixed minimum interval; it never exposes a subscription grant. This endpoint never creates a follower graph, a companion-visible count, or notifications.
+      operationId: listFavoriteCompanions
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current public companions saved by this customer, newest first
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [items]
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              $ref: "#/components/schemas/FavoriteCompanion"
+        "403":
+          $ref: "#/components/responses/Error"
+  /favorites/companions/{id}/availability-reminder:
+    put:
+      tags: [favorites]
+      summary: Arm or disarm the current customer's private availability-reminder preference
+      description: >-
+        Customer-only. The target must still be this caller's currently public bookmark on every write.
+        Enabling requires an unconsumed, caller-owned one-time `availabilityReminder` subscription grant
+        obtained after an explicit Mini Program prompt; disabling requires no grant. A grant already held by a
+        private availability-reminder reservation cannot be rebound here. This endpoint only records the private
+        preference and its one-time grant binding: it does not scan availability, create a schedule, queue a
+        notification, send a message, or notify the companion. Internal candidate preflight, its later handoff,
+        any explicitly enabled bounded preparation or delivery run, any ephemeral post-handoff recheck, private
+        authorization reservation, private consumed-grant send lease, aggregate-only operational metric, or private
+        provider outcome are invisible to this endpoint and return neither a decision, handoff, aggregate, readiness
+        result, reservation, lease, delivery result, nor recipient. Any later delivery must separately recheck current
+        public eligibility, real availability, the exact bound unconsumed grant, and the returned minimum interval
+        before it can atomically consume that grant; only a separately confirmed provider acceptance counts as sent.
+      operationId: setFavoriteAvailabilityReminder
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              properties:
+                enabled: { type: boolean }
+                subscriptionGrantId:
+                  type: string
+                  format: uuid
+                  description: Required when `enabled` is true; it must be a current caller-owned `availabilityReminder` grant. Never returned by this endpoint.
+      responses:
+        "200":
+          description: Private preference saved; no notification was queued or sent
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/FavoriteAvailabilityReminderPreference"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /favorites/companions/{id}:
+    put:
+      tags: [favorites]
+      summary: Save one currently public companion as a private bookmark
+      description: Customer-only and idempotent. A profile that is no longer publicly eligible is returned as not found rather than revealing its private status.
+      operationId: saveFavoriteCompanion
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Private bookmark saved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [favorited, companion]
+                        properties:
+                          favorited: { type: boolean, enum: [true] }
+                          companion:
+                            $ref: "#/components/schemas/PublicCompanion"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    delete:
+      tags: [favorites]
+      summary: Remove one private companion bookmark
+      description: Customer-only and idempotent. Removing a bookmark never affects a companion profile, ranking, orders, settlement, or notifications.
+      operationId: removeFavoriteCompanion
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Private bookmark removal result
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [favorited, removed]
+                        properties:
+                          favorited: { type: boolean, enum: [false] }
+                          removed: { type: boolean }
+        "403":
+          $ref: "#/components/responses/Error"
+  /recently-viewed/companions:
+    get:
+      tags: [recently-viewed]
+      summary: List the current customer's private companion recall list
+      description: Customer-only recent views, newest first, capped at twenty retained records. The response reapplies the current public-profile eligibility gate, so unpublished, unverified, suspended, or otherwise ineligible profiles are omitted. It never feeds recommendations, notifications, a companion-visible profile, orders, refunds, settlement, or marketing, and an old view is never a promise that a current service slot is available.
+      operationId: listRecentlyViewedCompanions
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current public companions recently opened by this customer
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [items]
+                        properties:
+                          items:
+                            type: array
+                            maxItems: 20
+                            items:
+                              $ref: "#/components/schemas/PublicCompanion"
+        "403":
+          $ref: "#/components/responses/Error"
+    delete:
+      tags: [recently-viewed]
+      summary: Clear the current customer's private companion recall list
+      description: Customer-only. Deletes only the caller's recent-view records and does not affect bookmarks, profiles, recommendations, orders, refunds, settlement, or notifications.
+      operationId: clearRecentlyViewedCompanions
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Private recent-view records cleared
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [cleared]
+                        properties:
+                          cleared: { type: integer, minimum: 0 }
+        "403":
+          $ref: "#/components/responses/Error"
+  /recently-viewed/companions/{id}:
+    put:
+      tags: [recently-viewed]
+      summary: Record the current customer's opening of one public companion profile
+      description: Customer-only and idempotent. Reopening refreshes the private recency timestamp and the server removes older records beyond twenty. A profile that is no longer publicly eligible is returned as not found rather than revealing its private status.
+      operationId: recordRecentlyViewedCompanion
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Private recall record refreshed
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [recorded]
+                        properties:
+                          recorded: { type: boolean, enum: [true] }
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
   /companions/me/profile:
     get:
       tags: [companions]
@@ -534,6 +782,522 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
+  /companions/me/service-offerings:
+    get:
+      tags: [companions]
+      summary: List the current verified companion owner's full service catalog
+      description: Includes active and inactive entries. This owner-only view does not require the companion to be publicly published yet.
+      operationId: listOwnCompanionServiceOfferings
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current owner's service catalog in display order
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [items]
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              $ref: "#/components/schemas/OwnCompanionServiceOffering"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    post:
+      tags: [companions]
+      summary: Create a service offering for the current verified companion owner
+      description: Public title and description are moderated before being saved. The stable code is assigned by the server; historic orders retain their own snapshots.
+      operationId: createOwnCompanionServiceOffering
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, deliveryMode, durationMinutes, priceCents]
+              properties:
+                title: { type: string, minLength: 1, maxLength: 80 }
+                description: { type: string, maxLength: 500 }
+                deliveryMode: { type: string, enum: [text, voice] }
+                durationMinutes: { type: integer, minimum: 30, maximum: 240, multipleOf: 30 }
+                priceCents: { type: integer, minimum: 100, maximum: 2000000 }
+                topicIds:
+                  type: array
+                  maxItems: 6
+                  items: { type: string, maxLength: 80 }
+                isActive: { type: boolean, default: true }
+                sortOrder: { type: integer, minimum: 0, maximum: 9999, default: 0 }
+      responses:
+        "201":
+          description: Created service offering
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/OwnCompanionServiceOffering"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "422":
+          description: Public service offering content failed moderation and was not saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "503":
+          description: Production content moderation provider is temporarily unavailable; the service offering was not saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /companions/me/service-offerings/{id}:
+    patch:
+      tags: [companions]
+      summary: Edit, reorder, activate, or retire the current owner's service offering
+      description: An inactive entry is hidden from the public catalog. Reactivating an entry screens its existing public content again; changes never rewrite snapshots on existing orders.
+      operationId: updateOwnCompanionServiceOffering
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                title: { type: string, minLength: 1, maxLength: 80 }
+                description: { type: string, maxLength: 500, nullable: true }
+                deliveryMode: { type: string, enum: [text, voice] }
+                durationMinutes: { type: integer, minimum: 30, maximum: 240, multipleOf: 30 }
+                priceCents: { type: integer, minimum: 100, maximum: 2000000 }
+                topicIds:
+                  type: array
+                  maxItems: 6
+                  items: { type: string, maxLength: 80 }
+                isActive: { type: boolean }
+                sortOrder: { type: integer, minimum: 0, maximum: 9999 }
+      responses:
+        "200":
+          description: Updated service offering
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/OwnCompanionServiceOffering"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "422":
+          description: Public service offering content failed moderation and was not changed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "503":
+          description: Production content moderation provider is temporarily unavailable; the service offering was not changed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /companions/me/availability-schedule/rules:
+    get:
+      tags: [companions]
+      summary: List the current verified companion owner's private weekly scheduling rules
+      description: >-
+        Includes active and retired planning rules, capped at 200 entries. This is not a public availability
+        endpoint: it never returns a customer-facing candidate, companion identifier, materialized draft,
+        order, reminder candidate, or notification result.
+      operationId: listOwnCompanionRecurringAvailabilityRules
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current owner's recurring scheduling rules
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [items]
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              $ref: "#/components/schemas/OwnCompanionRecurringAvailabilityRule"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    post:
+      tags: [companions]
+      summary: Create a private weekly scheduling rule for the current owner
+      description: >-
+        The server fixes the timezone to Asia/Shanghai and creates an active planning rule only. It does not
+        materialize, activate, edit, or retire any concrete availability window; does not invoke a draft
+        generator; and does not create a reminder candidate, notification, order, or external calendar event.
+      operationId: createOwnCompanionRecurringAvailabilityRule
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [weekday, startsAtMinute, endsAtMinute]
+              properties:
+                weekday:
+                  type: integer
+                  minimum: 0
+                  maximum: 6
+                  description: Local Asia/Shanghai weekday, where 0 is Sunday and 6 is Saturday.
+                startsAtMinute:
+                  type: integer
+                  minimum: 0
+                  maximum: 1410
+                  multipleOf: 30
+                  description: Minutes after local midnight on the same weekday.
+                endsAtMinute:
+                  type: integer
+                  minimum: 30
+                  maximum: 1440
+                  multipleOf: 30
+                  description: Must be later than startsAtMinute on the same local weekday.
+                capacity:
+                  type: integer
+                  minimum: 1
+                  maximum: 10
+                  default: 1
+      responses:
+        "201":
+          description: Created private scheduling rule
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/OwnCompanionRecurringAvailabilityRule"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          description: The new rule overlaps an active rule owned by the same companion
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /companions/me/availability-schedule/rules/{id}/deactivate:
+    patch:
+      tags: [companions]
+      summary: Retire one of the current owner's private weekly scheduling rules
+      description: >-
+        The operation is idempotent and only changes this owned rule to inactive. It never deletes history,
+        auto-enables or removes existing drafts, changes an availability window, alters an order, produces a
+        reminder candidate, or calls an external calendar.
+      operationId: deactivateOwnCompanionRecurringAvailabilityRule
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Retired private scheduling rule
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/OwnCompanionRecurringAvailabilityRule"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /companions/me/availability-schedule/blackouts:
+    get:
+      tags: [companions]
+      summary: List the current verified companion owner's private scheduling exceptions
+      description: >-
+        Includes active and retired exceptions, capped at 200 entries. This owner-only result omits the
+        companion identifier and never exposes drafts, public availability, orders, reminder candidates,
+        recipients, or notification delivery information.
+      operationId: listOwnCompanionAvailabilityBlackouts
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current owner's private scheduling exceptions
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [items]
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              $ref: "#/components/schemas/OwnCompanionAvailabilityBlackout"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    post:
+      tags: [companions]
+      summary: Create a private one-off scheduling exception for the current owner
+      description: >-
+        Timestamps must carry an explicit timezone and align to 30-minute boundaries. The server stores an
+        active Asia/Shanghai planning exception only; it does not modify existing drafts or concrete windows,
+        change bookings, create reminder candidates, or call an external calendar.
+      operationId: createOwnCompanionAvailabilityBlackout
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [startsAt, endsAt]
+              properties:
+                startsAt:
+                  type: string
+                  format: date-time
+                  description: ISO-8601 timestamp with an explicit timezone offset or Z suffix.
+                endsAt:
+                  type: string
+                  format: date-time
+                  description: Must be later than startsAt, with an explicit timezone offset or Z suffix.
+      responses:
+        "201":
+          description: Created private scheduling exception
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/OwnCompanionAvailabilityBlackout"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          description: The exception is too soon or overlaps an active exception owned by the same companion
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /companions/me/availability-schedule/blackouts/{id}/deactivate:
+    patch:
+      tags: [companions]
+      summary: Retire one of the current owner's private scheduling exceptions
+      description: >-
+        The operation is idempotent and only changes this owned exception to inactive. It does not delete the
+        exception, update a materialized draft or concrete availability window, alter an order, create a
+        reminder candidate, or invoke an external calendar.
+      operationId: deactivateOwnCompanionAvailabilityBlackout
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Retired private scheduling exception
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/OwnCompanionAvailabilityBlackout"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /companions/me/availability-windows:
+    get:
+      tags: [companions]
+      summary: List the current verified companion owner's structured availability windows
+      description: Includes active and retired windows so the owner can operate their own calendar. The result is capped at 200 entries in chronological order.
+      operationId: listOwnCompanionAvailabilityWindows
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current owner's availability windows
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [items]
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              $ref: "#/components/schemas/OwnCompanionAvailabilityWindow"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    post:
+      tags: [companions]
+      summary: Create a single structured availability window for the current owner
+      description: >-
+        Active windows require explicit-timezone ISO timestamps on 30-minute boundaries, a future start,
+        capacity 1-10, at most 24 hours duration, and no overlap with another active window for the same
+        companion. This endpoint creates one explicit window only: private weekly planning rules and one-off
+        blackout inputs are not exposed here. A separate internal process may create inactive, owner-reviewable
+        drafts from them, but those drafts remain outside customer availability and never imply a promise.
+        When this creates a future active window, the server may atomically create private,
+        deduplicated availability-reminder candidates only for still-public, armed bookmarks. Candidates may
+        later receive an internal, invisible preflight decision, handoff, explicitly enabled bounded
+        preparation or delivery run, ephemeral recheck, private authorization reservation, private consumed-grant
+        send lease, aggregate-only operational metric, and private provider outcome, but the response never exposes
+        a candidate, preflight result, handoff, aggregate, readiness result, reservation, lease, delivery result,
+        recipient, reminder count, or authorization token; it does not itself queue or send a notification.
+      operationId: createOwnCompanionAvailabilityWindow
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [startsAt, endsAt]
+              properties:
+                startsAt: { type: string, format: date-time }
+                endsAt: { type: string, format: date-time }
+                capacity: { type: integer, minimum: 1, maximum: 10, default: 1 }
+                isActive: { type: boolean, default: true }
+      responses:
+        "201":
+          description: Created availability window
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/OwnCompanionAvailabilityWindow"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          description: Active window is too soon or overlaps another active window
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /companions/me/availability-windows/{id}:
+    patch:
+      tags: [companions]
+      summary: Change or retire one of the current owner's availability windows
+      description: >-
+        A window with a pending, paying, paid, or in-service order cannot be changed or retired. Existing
+        order snapshots are never rewritten. Reactivating a future window can atomically create the same
+        private, deduplicated candidate records as creation; ordinary active-window edits and retirement do
+        not. Candidates and any later internal preflight result, handoff, explicitly enabled bounded preparation
+        run, ephemeral recheck, private authorization reservation, private consumed-grant send lease, or private
+        provider outcome are not returned, scheduled, queued, or delivered by this endpoint.
+      operationId: updateOwnCompanionAvailabilityWindow
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                startsAt: { type: string, format: date-time }
+                endsAt: { type: string, format: date-time }
+                capacity: { type: integer, minimum: 1, maximum: 10 }
+                isActive: { type: boolean }
+      responses:
+        "200":
+          description: Updated availability window
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/OwnCompanionAvailabilityWindow"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          description: The window is too soon, overlaps another active window, or has an active order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
   /companions/{id}:
     get:
       tags: [companions]
@@ -549,6 +1313,83 @@ paths:
               schema:
                 $ref: "#/components/schemas/SuccessEnvelope"
         "404":
+          $ref: "#/components/responses/Error"
+  /companions/{id}/service-offerings:
+    get:
+      tags: [companions]
+      summary: List active public service offerings for a published companion
+      description: Service configurations are hidden when the companion is unpublished, unverified, or commercially ineligible.
+      operationId: listCompanionServiceOfferings
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Active service catalog in display order
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [items]
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              $ref: "#/components/schemas/CompanionServiceOffering"
+        "404":
+          $ref: "#/components/responses/Error"
+  /companions/{id}/availability:
+    get:
+      tags: [companions]
+      summary: List bookable structured availability candidates for a published companion
+      description: The selected active service offering determines duration. Profiles that have not adopted structured availability return source=legacy and their existing availableTimes values instead of invented candidates.
+      operationId: listCompanionAvailability
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - in: query
+          name: serviceOfferingId
+          schema: { type: string, maxLength: 160 }
+        - in: query
+          name: durationMinutes
+          schema: { type: integer, minimum: 30, maximum: 240 }
+        - in: query
+          name: from
+          schema: { type: string, format: date-time }
+        - in: query
+          name: days
+          schema: { type: integer, minimum: 1, maximum: 14, default: 7 }
+      responses:
+        "200":
+          description: Structured candidates with live remaining capacity, or a legacy availability fallback
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [source, timezone, serviceOfferingId, durationMinutes, legacyAvailableTimes, items]
+                        properties:
+                          source: { type: string, enum: [structured, legacy] }
+                          timezone: { type: string, example: Asia/Shanghai }
+                          serviceOfferingId: { type: string, nullable: true }
+                          durationMinutes: { type: integer }
+                          legacyAvailableTimes:
+                            type: array
+                            items: { type: string }
+                          items:
+                            type: array
+                            items:
+                              $ref: "#/components/schemas/CompanionAvailabilityCandidate"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
           $ref: "#/components/responses/Error"
   /recommendations/topics:
     get:
@@ -722,9 +1563,23 @@ paths:
               required: [companionId, themeId, durationMinutes, scheduledAt]
               properties:
                 companionId: { type: string }
+                serviceOfferingId:
+                  type: string
+                  minLength: 1
+                  maxLength: 160
+                  description: Optional active offering belonging to companionId. When present, its server-side price and duration are authoritative and frozen on the order.
+                availabilityWindowId:
+                  type: string
+                  minLength: 1
+                  maxLength: 160
+                  description: Optional structured availability window returned by listCompanionAvailability. When supplied, scheduledAt must be a 30-minute candidate fully contained by this active window; the server records a capacity snapshot and rechecks it at confirmation and prepay.
                 themeId: { type: string }
-                durationMinutes: { type: integer, minimum: 30, maximum: 240 }
-                scheduledAt: { type: string, format: date-time, description: Must fall within the server-configured commercial booking horizon. }
+                durationMinutes:
+                  type: integer
+                  minimum: 30
+                  maximum: 240
+                  description: Must exactly match the selected service offering's duration when serviceOfferingId is supplied.
+                scheduledAt: { type: string, format: date-time, description: Must fall within the server-configured commercial booking horizon. With availabilityWindowId it is the selected candidate start time and must use a 30-minute boundary. }
                 clientRequestId:
                   type: string
                   minLength: 16
@@ -746,7 +1601,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/SuccessEnvelope"
         "409":
-          description: Per-user or companion intake limit reached, or an idempotency key was reused with different data
+          description: Per-user or companion intake limit reached, an availability candidate/window is no longer valid or full, or an idempotency key was reused with different data
           content:
             application/json:
               schema:
@@ -759,6 +1614,45 @@ paths:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "503":
           description: Order intake is paused or the controlled global open-order capacity is reached
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /orders/service/today:
+    get:
+      tags: [orders, companions]
+      summary: List the eligible companion owner's Beijing-today service checklist
+      description: >-
+        Returns only the caller's service entries whose appointment start falls in
+        [00:00, 24:00) for Asia/Shanghai. It is a read-only workbench feed: no
+        customer identity, conversation, refund, settlement, payment, or internal
+        order fields are returned, and it never creates a schedule, reminder, or
+        fulfillment action. pendingConfirmationCount is a separate count of the
+        caller's still-unconfirmed pending requests; handling remains in the
+        existing order flow.
+      operationId: listMyCompanionTodayServiceChecklist
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Today checklist ordered by scheduled appointment start
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/CompanionTodayServiceSchedule"
+        "403":
+          description: The authenticated account is not an active identity-verified companion owner
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: No companion profile belongs to the authenticated account
           content:
             application/json:
               schema:
@@ -779,6 +1673,192 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuccessEnvelope"
+  /orders/{id}/timeline:
+    get:
+      tags: [orders]
+      summary: List participant-safe order timeline events, including reschedule request facts when present
+      operationId: listOrderTimeline
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Chronological order activity visible to the customer and the companion owner only
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [orderId, items]
+                        properties:
+                          orderId: { type: string }
+                          items:
+                            type: array
+                            items:
+                              $ref: "#/components/schemas/OrderTimelineEvent"
+        "404":
+          description: Order not found or caller is not an order participant
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /orders/{id}/reschedule-requests:
+    post:
+      tags: [orders]
+      summary: Submit a participant reschedule proposal without changing the current appointment
+      description: The customer or companion owner may propose one future time. A structured order must supply an active structured availability window containing that candidate; the original order time, payment, refund and fulfillment state remain unchanged until a separate response accepts the proposal.
+      operationId: createOrderRescheduleRequest
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestedScheduledAt]
+              properties:
+                requestedScheduledAt:
+                  type: string
+                  format: date-time
+                  description: Must be future, within the commercial booking horizon, and leave at least 15 minutes before a service can start.
+                availabilityWindowId:
+                  type: string
+                  minLength: 1
+                  maxLength: 160
+                  description: Required when the original order uses structured availability. It must be an active companion window that contains the candidate and has current capacity.
+      responses:
+        "201":
+          description: Pending proposal recorded and the other participant notified
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/OrderRescheduleRequest"
+        "400":
+          description: Requested time is invalid or outside the commercial booking horizon
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "409":
+          description: Order state, current capacity, refund state, existing proposal, or response window prevents a new proposal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "422":
+          description: A structured appointment did not include a new availability window
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /orders/{id}/reschedule-requests/{requestId}/accept:
+    post:
+      tags: [orders]
+      summary: Accept the other participant's reschedule proposal and atomically replace the booking slot
+      description: The requester cannot accept their own proposal. The server locks the order, request and current candidate availability, then rechecks request expiry, refund state, appointment state and capacity before replacing the order's scheduled time and availability snapshot.
+      operationId: acceptOrderRescheduleRequest
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - name: requestId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Proposal accepted and order appointment snapshot atomically updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [rescheduleRequest, order]
+                        properties:
+                          rescheduleRequest:
+                            $ref: "#/components/schemas/OrderRescheduleRequest"
+                          order:
+                            type: object
+                            description: Updated order DTO, including its new scheduledAt and availabilitySnapshot.
+        "403":
+          description: The request creator attempted to accept their own proposal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: Order or reschedule request not found, or caller is not an order participant
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "409":
+          description: Proposal expired, order changed state, a refund began, or the candidate is no longer available/capable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+  /orders/{id}/reschedule-requests/{requestId}/reject:
+    post:
+      tags: [orders]
+      summary: Reject the other participant's reschedule proposal without changing the booking
+      description: The requester cannot reject their own proposal. The server locks the order and request, confirms the caller is the other order participant, and records a rejection only while the proposal remains pending and valid. The order appointment, payment, refund and fulfillment state remain unchanged.
+      operationId: rejectOrderRescheduleRequest
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - name: requestId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Proposal rejected and its requester notified; the existing booking is unchanged
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/OrderRescheduleRequest"
+        "403":
+          description: The request creator attempted to reject their own proposal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "404":
+          description: Order or reschedule request not found, or caller is not an order participant
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "409":
+          description: Proposal has expired or is no longer pending
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
   /orders/{id}/cancel:
     post:
       tags: [orders]
@@ -813,6 +1893,68 @@ paths:
                 $ref: "#/components/schemas/SuccessEnvelope"
         "409":
           $ref: "#/components/responses/Error"
+  /orders/{id}/service-guidelines-confirmations:
+    post:
+      tags: [orders]
+      summary: Record one participant's pre-service acknowledgement of platform communication, service scope, and safety boundaries
+      operationId: confirmOrderServiceGuidelines
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Role-specific service-guidelines acknowledgement recorded; it does not change payment, refund, or service-start eligibility
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /orders/{id}/experience-feedback:
+    post:
+      tags: [orders]
+      summary: Record one private customer experience-feedback submission for a completed order
+      description: This is not a public companion review and cannot change order, refund, or settlement state. Free-text notes are moderated before storage; customers who need help use the existing order support-ticket flow.
+      operationId: submitOrderExperienceFeedback
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rating]
+              properties:
+                rating: { type: integer, minimum: 1, maximum: 5 }
+                tags:
+                  type: array
+                  maxItems: 3
+                  uniqueItems: true
+                  items:
+                    type: string
+                    enum: [communicationClear, boundaryRespected, onTime, asExpected, needsImprovement]
+                note: { type: string, maxLength: 200 }
+      responses:
+        "200":
+          description: Private feedback recorded, or the original private feedback returned for a retry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
   /orders/{id}/prepay:
     post:
       tags: [orders]
@@ -835,6 +1977,24 @@ paths:
       responses:
         "200":
           description: Prepay params (mock=true on staging when using mock provider)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /community/reports/mine:
+    get:
+      tags: [community]
+      summary: List the authenticated reporter's minimal community-report receipts
+      description: >-
+        Returns at most fifty of the caller's receipt ids, submission times, and the fixed intake state `received`.
+        It never returns a post, author, reporter reason, moderation case, staff member, decision, SLA, or a claim
+        that a risk has been resolved.
+      operationId: listMyCommunityReportReceipts
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Private minimal report receipts for the authenticated reporter only
           content:
             application/json:
               schema:
@@ -883,6 +2043,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
+        "429":
+          description: Generic temporary community-write throttle; no quota, reset time, or activity data is exposed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
   /community/posts/{id}/like:
     post:
       tags: [community]
@@ -908,6 +2074,53 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuccessEnvelope"
+  /community/posts/{id}/report:
+    post:
+      tags: [community]
+      summary: Submit one private report receipt for the current user's visible community post
+      description: >-
+        Accepts only a short reporter reason and the post already visible to that reporter. It creates an
+        auditable intake signal, not an automatic penalty, staff decision, customer-service conclusion, or
+        emergency-response promise. Repeating the same reporter/post pair returns the existing receipt. Different
+        reporters may be internally grouped under one still-open staff case, but the response never exposes another
+        reporter, a report count, or an internal moderation case.
+      operationId: reportCommunityPost
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason:
+                  type: string
+                  minLength: 2
+                  maxLength: 500
+                  description: Brief reason only; do not paste phone, email, identity-document, chat, or order data.
+      responses:
+        "200":
+          description: Private report receipt; duplicate indicates a previous submission by this same user for this post
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "429":
+          description: Generic temporary community-write throttle; repeated reports for the same post remain idempotent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
   /reviews/companion/{id}:
     get:
       tags: [reviews]
@@ -1166,7 +2379,7 @@ paths:
         - $ref: "#/components/parameters/IdPath"
       responses:
         "200":
-          description: Media availability and active chat-only restriction, if any
+          description: Viewer-owned media/reminder status, a generic interaction-availability flag, and any active chat-only restriction
           content:
             application/json:
               schema:
@@ -1178,9 +2391,101 @@ paths:
                         type: object
                         properties:
                           mediaEnabled: { type: boolean }
+                          messageNotificationsMuted:
+                            type: boolean
+                            description: True only when the authenticated participant muted future message reminders for this conversation. It never reflects the other participant's preference.
+                          conversationBlockedByYou:
+                            type: boolean
+                            description: True only when the authenticated participant set an active block for this conversation. It never identifies another participant's choice.
+                          messageInteractionAvailable:
+                            type: boolean
+                            description: False when either participant ended ordinary message interaction. It never identifies which participant set the boundary.
                           chatRestriction:
                             nullable: true
                             $ref: "#/components/schemas/ChatRestriction"
+  /conversations/{id}/notification-preference:
+    put:
+      tags: [conversations]
+      summary: Set the authenticated participant's future message-reminder mute for one conversation
+      operationId: setConversationNotificationPreference
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [muted]
+              properties:
+                muted:
+                  type: boolean
+                  description: When true, suppress only this participant's future ordinary message notifications. It does not block messages or alter orders, reports, moderation, support, or safety notifications.
+      responses:
+        "200":
+          description: The authenticated participant's updated preference
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [messageNotificationsMuted]
+                        properties:
+                          messageNotificationsMuted: { type: boolean }
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+  /conversations/{id}/block:
+    put:
+      tags: [conversations]
+      summary: Set or remove the authenticated participant's active-only message boundary for one conversation
+      description: >-
+        Blocking stops ordinary message sending and display for both participants and removes the blocker's pending
+        message reminders. It does not cancel an order, decide a refund or settlement, create a report, or close
+        support or safety work. The response never identifies whether another participant also set a boundary.
+      operationId: setConversationBlock
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [blocked]
+              properties:
+                blocked:
+                  type: boolean
+                  description: True creates or preserves the caller's active boundary; false removes only the caller's boundary.
+      responses:
+        "200":
+          description: The caller's block state and generic message availability
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [conversationBlockedByYou, messageInteractionAvailable]
+                        properties:
+                          conversationBlockedByYou: { type: boolean }
+                          messageInteractionAvailable: { type: boolean }
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
   /conversations:
     get:
       tags: [conversations]
@@ -1194,7 +2499,18 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SuccessEnvelope"
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [conversations]
+                        properties:
+                          conversations:
+                            type: array
+                            items:
+                              $ref: "#/components/schemas/ConversationSummary"
   /conversations/{id}/messages:
     get:
       tags: [conversations]
@@ -1503,7 +2819,21 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SuccessEnvelope"
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [recorded]
+                        properties:
+                          recorded: { type: boolean }
+                          reason: { type: string, enum: [not_granted] }
+                          grantId:
+                            type: string
+                            format: uuid
+                            description: Present only when recorded is true. It is an opaque one-time grant and must not be displayed.
+                          grantedAt: { type: string, format: date-time }
   /notifications/{id}/read:
     post:
       tags: [notifications]
@@ -1549,7 +2879,7 @@ paths:
   /support/tickets/me:
     get:
       tags: [support]
-      summary: List the current user's support tickets
+      summary: List the current user's support tickets and only their own private order facts
       operationId: listMySupportTickets
       security:
         - bearerAuth: []
@@ -1560,6 +2890,46 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuccessEnvelope"
+  /support/tickets/{id}/order-facts:
+    post:
+      tags: [support]
+      summary: Add one short private fact to the current requester's open order issue or refund ticket
+      description: >-
+        The ticket must belong to the current user and the user must still be a participant in its linked order.
+        Facts are text only, are not shared with the other order participant, do not copy chat content, and do not
+        automatically alter refunds, settlement, or order status. Attachments are unavailable and obvious identity,
+        contact, document, and health material is rejected before storage. A ticket accepts at most 10 facts.
+      operationId: addOrderSupportFact
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [statement]
+              properties:
+                statement:
+                  type: string
+                  minLength: 5
+                  maxLength: 1200
+                  description: A voluntary first-hand time, fulfillment, or payment fact; no attachment is accepted.
+      responses:
+        "201":
+          description: Fact added to the private support record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
   /commercial/earnings/me:
     get:
       tags: [commercial]
@@ -2524,6 +3894,199 @@ components:
             details: {}
         meta:
           $ref: "#/components/schemas/Meta"
+    PublicCompanion:
+      type: object
+      required: [id, name, role, initials, tags, rating, reviewCount, pricePerHalfHour, isOnline, isVerified, bio, availableTimes, languages, specialties, topicIds, completedOrders, responseTime, distanceKm, availability, cityDistrict, isPublished, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        role: { type: string }
+        initials: { type: string }
+        tags:
+          type: array
+          items: { type: string }
+        rating: { type: number }
+        reviewCount: { type: integer, minimum: 0 }
+        pricePerHalfHour: { type: integer, minimum: 0 }
+        isOnline: { type: boolean }
+        isVerified: { type: boolean }
+        bio: { type: string }
+        availableTimes:
+          type: array
+          items: { type: string }
+        languages:
+          type: array
+          items: { type: string }
+        specialties:
+          type: array
+          items: { type: string }
+        topicIds:
+          type: array
+          items: { type: string }
+        completedOrders: { type: integer, minimum: 0 }
+        responseTime: { type: string }
+        distanceKm: { type: number, minimum: 0 }
+        availability: { type: string }
+        cityDistrict: { type: string }
+        isPublished: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    FavoriteCompanion:
+      allOf:
+        - $ref: "#/components/schemas/PublicCompanion"
+        - type: object
+          required: [availabilityReminderEnabled, availabilityReminderUpdatedAt, availabilityReminderMinimumIntervalHours]
+          properties:
+            availabilityReminderEnabled:
+              type: boolean
+              description: Customer-only armed preference, not a delivery result or a promise that a notification has been sent.
+            availabilityReminderUpdatedAt:
+              type: string
+              format: date-time
+              nullable: true
+            availabilityReminderMinimumIntervalHours:
+              type: integer
+              minimum: 24
+              description: A future delivery must not contact this customer about this same companion more often than this interval.
+    FavoriteAvailabilityReminderPreference:
+      type: object
+      required: [companionId, enabled, updatedAt, minimumIntervalHours]
+      properties:
+        companionId: { type: string }
+        enabled: { type: boolean }
+        updatedAt: { type: string, format: date-time }
+        minimumIntervalHours: { type: integer, minimum: 24 }
+    CompanionServiceOffering:
+      type: object
+      required: [id, code, title, deliveryMode, durationMinutes, priceCents, currency, topicIds]
+      properties:
+        id: { type: string }
+        code: { type: string }
+        title: { type: string }
+        description: { type: string, nullable: true }
+        deliveryMode: { type: string, enum: [text, voice] }
+        durationMinutes: { type: integer, minimum: 1 }
+        priceCents: { type: integer, minimum: 0 }
+        currency: { type: string, enum: [CNY] }
+        topicIds:
+          type: array
+          items: { type: string }
+    OwnCompanionServiceOffering:
+      allOf:
+        - $ref: "#/components/schemas/CompanionServiceOffering"
+        - type: object
+          required: [isActive, sortOrder, createdAt, updatedAt]
+          properties:
+            isActive: { type: boolean }
+            sortOrder: { type: integer, minimum: 0 }
+            createdAt: { type: string, format: date-time }
+            updatedAt: { type: string, format: date-time }
+    OwnCompanionAvailabilityWindow:
+      type: object
+      required: [id, startsAt, endsAt, capacity, isActive, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+        capacity: { type: integer, minimum: 1, maximum: 10 }
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    OwnCompanionRecurringAvailabilityRule:
+      type: object
+      required: [id, weekday, startsAtMinute, endsAtMinute, capacity, timezone, isActive, createdAt, updatedAt]
+      description: Private owner scheduling template. It is not a public availability window or a promise of bookable capacity.
+      properties:
+        id: { type: string }
+        weekday: { type: integer, minimum: 0, maximum: 6 }
+        startsAtMinute: { type: integer, minimum: 0, maximum: 1410, multipleOf: 30 }
+        endsAtMinute: { type: integer, minimum: 30, maximum: 1440, multipleOf: 30 }
+        capacity: { type: integer, minimum: 1, maximum: 10 }
+        timezone: { type: string, enum: [Asia/Shanghai] }
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    OwnCompanionAvailabilityBlackout:
+      type: object
+      required: [id, startsAt, endsAt, timezone, isActive, createdAt, updatedAt]
+      description: Private owner scheduling exception. It is not a public cancellation, notification, or change to an existing booking.
+      properties:
+        id: { type: string }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+        timezone: { type: string, enum: [Asia/Shanghai] }
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    CompanionTodayServiceEntry:
+      type: object
+      required: [id, scheduledAt, durationMinutes, status, serviceTitle]
+      description: Minimal owner-only workbench item; it intentionally contains no customer, conversation, refund, settlement, payment, or internal order fields.
+      properties:
+        id: { type: string }
+        scheduledAt: { type: string, format: date-time }
+        durationMinutes: { type: integer, minimum: 1 }
+        status: { type: string, enum: [pending, paying, paid, inService, completed] }
+        serviceTitle: { type: string }
+    CompanionTodayServiceSchedule:
+      type: object
+      required: [date, timezone, pendingConfirmationCount, items]
+      description: Read-only list for one Asia/Shanghai calendar day. The date boundary is computed by the server from appointment start times.
+      properties:
+        date: { type: string, format: date, example: "2026-07-21" }
+        timezone: { type: string, enum: [Asia/Shanghai] }
+        pendingConfirmationCount:
+          type: integer
+          minimum: 0
+          description: Caller-owned pending orders that still await companion confirmation; the count does not create a reminder or change an order.
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/CompanionTodayServiceEntry"
+    OrderRescheduleRequest:
+      type: object
+      required: [id, requestedByRole, originalScheduledAt, requestedScheduledAt, requestedAvailabilitySnapshot, status, expiresAt, respondedAt]
+      properties:
+        id: { type: string }
+        requestedByRole: { type: string, enum: [customer, companion] }
+        originalScheduledAt: { type: string, format: date-time }
+        requestedScheduledAt: { type: string, format: date-time }
+        requestedAvailabilitySnapshot:
+          type: object
+          nullable: true
+          required: [availabilityWindowId, startsAt, endsAt, capacity]
+          properties:
+            availabilityWindowId: { type: string }
+            startsAt: { type: string, format: date-time, nullable: true }
+            endsAt: { type: string, format: date-time, nullable: true }
+            capacity: { type: integer, nullable: true, minimum: 1 }
+        status: { type: string, enum: [pending, accepted, rejected, expired, cancelled] }
+        expiresAt: { type: string, format: date-time }
+        respondedAt: { type: string, format: date-time, nullable: true }
+    OrderTimelineEvent:
+      type: object
+      required: [id, type, actorRole, occurredAt, rescheduleRequest]
+      properties:
+        id: { type: string }
+        type: { type: string, enum: [orderCreated, rescheduleRequested, rescheduleAccepted, rescheduleRejected, rescheduleExpired, rescheduleCancelled] }
+        actorRole: { type: string, enum: [customer, companion, system] }
+        occurredAt: { type: string, format: date-time }
+        rescheduleRequest:
+          type: object
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/OrderRescheduleRequest"
+    CompanionAvailabilityCandidate:
+      type: object
+      required: [id, availabilityWindowId, startsAt, endsAt, capacity, reservedCount, availableCapacity]
+      properties:
+        id: { type: string, description: Candidate identifier derived from its availability window and start time. }
+        availabilityWindowId: { type: string }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+        capacity: { type: integer, minimum: 1 }
+        reservedCount: { type: integer, minimum: 0 }
+        availableCapacity: { type: integer, minimum: 0 }
     AuthSession:
       type: object
       properties:
@@ -2573,6 +4136,43 @@ components:
           type: array
           items: { $ref: "#/components/schemas/MediaAttachment" }
         timestamp: { type: string, format: date-time }
+    ConversationSummary:
+      type: object
+      required: [id, companionId, viewerRole, participant, lastMessage, unreadCount, messageNotificationsMuted, conversationBlockedByYou, messageInteractionAvailable, updatedAt]
+      properties:
+        id:
+          type: string
+          description: The caller's authorized chat route identifier; it is a public companion id for a customer and an internal conversation id for the companion owner.
+        companionId: { type: string }
+        viewerRole: { type: string, enum: [customer, companion] }
+        participant:
+          type: object
+          required: [id, name, role, initials, isOnline, isVerified]
+          properties:
+            id: { type: string }
+            kind: { type: string, enum: [customer, companion] }
+            name: { type: string }
+            role: { type: string }
+            initials: { type: string }
+            isOnline: { type: boolean }
+            isVerified: { type: boolean }
+            availability: { type: string }
+            responseTime: { type: string }
+        lastMessage:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/ChatMessage"
+        unreadCount: { type: integer, minimum: 0 }
+        messageNotificationsMuted:
+          type: boolean
+          description: The authenticated viewer's own mute state only; another participant's state is never returned.
+        conversationBlockedByYou:
+          type: boolean
+          description: The authenticated viewer's own active block state only; it is never a signal about the other participant.
+        messageInteractionAvailable:
+          type: boolean
+          description: Generic message availability only; false does not identify which participant set a boundary.
+        updatedAt: { type: string, format: date-time }
     ChatRestriction:
       type: object
       required: [id, reason, endsAt]

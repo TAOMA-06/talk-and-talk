@@ -16,6 +16,12 @@ export type SubscribeMessageInput = {
 export type SubscribeMessageResult = {
   outcome: "sent" | "retryable" | "failed" | "skipped";
   attempted: boolean;
+  /**
+   * Whether the remote boundary was crossed, and if so whether WeChat accepted,
+   * explicitly rejected, or may have accepted the message. Callers must never
+   * retry `unknown` outcomes for a one-time subscription authorization.
+   */
+  remoteState: "accepted" | "notAttempted" | "rejected" | "unknown";
   providerMessageId?: string;
   errorCode?: string;
   message?: string;
@@ -26,7 +32,7 @@ const WECHAT_HTTP_TIMEOUT_MS = 15_000;
 
 /**
  * Thin official-API adapter. It deliberately has no marketing fallback and
- * requires a per-template grant before the worker invokes it.
+ * requires a per-template grant before any internal caller invokes it.
  */
 @Injectable()
 export class WeChatSubscribeMessageProvider {
@@ -40,11 +46,11 @@ export class WeChatSubscribeMessageProvider {
 
   async send(input: SubscribeMessageInput): Promise<SubscribeMessageResult> {
     if (this.config.get<boolean>("WECHAT_SUBSCRIBE_MESSAGES_ENABLED") !== true) {
-      return { outcome: "skipped", attempted: false, errorCode: "CHANNEL_DISABLED" };
+      return { outcome: "skipped", attempted: false, remoteState: "notAttempted", errorCode: "CHANNEL_DISABLED" };
     }
     const template = this.findTemplate(input.templateKey, input.templateId);
     if (!template) {
-      return { outcome: "failed", attempted: false, errorCode: "UNKNOWN_TEMPLATE" };
+      return { outcome: "failed", attempted: false, remoteState: "notAttempted", errorCode: "UNKNOWN_TEMPLATE" };
     }
     const identity = await this.prisma.authIdentity.findFirst({
       where: { userId: input.userId, provider: "wechatMiniProgram" },
@@ -52,7 +58,7 @@ export class WeChatSubscribeMessageProvider {
       orderBy: { id: "asc" }
     } as any);
     if (!identity?.providerId) {
-      return { outcome: "skipped", attempted: false, errorCode: "WECHAT_IDENTITY_MISSING" };
+      return { outcome: "skipped", attempted: false, remoteState: "notAttempted", errorCode: "WECHAT_IDENTITY_MISSING" };
     }
 
     let accessToken: string;
@@ -62,6 +68,7 @@ export class WeChatSubscribeMessageProvider {
       return {
         outcome: "retryable",
         attempted: false,
+        remoteState: "notAttempted",
         errorCode: "ACCESS_TOKEN_UNAVAILABLE",
         message: this.safeError(error)
       };
@@ -89,6 +96,7 @@ export class WeChatSubscribeMessageProvider {
         return {
           outcome: "sent",
           attempted: true,
+          remoteState: "accepted",
           providerMessageId: typeof payload.msgid === "string" || typeof payload.msgid === "number"
             ? String(payload.msgid)
             : undefined
@@ -98,17 +106,18 @@ export class WeChatSubscribeMessageProvider {
       const message = typeof payload.errmsg === "string" ? payload.errmsg.slice(0, 180) : "WeChat rejected the message";
       if (["40001", "40014", "42001"].includes(errorCode)) {
         // These are token rejection/expiry responses: WeChat did not accept
-        // the message, so it is safe to refresh the token and retry without
-        // consuming the user's one-time authorization.
+        // the message. A caller that has not crossed its own authorization
+        // boundary may retry; a caller that already consumed a one-time grant
+        // must retain this as a definite pre-send failure instead of guessing.
         this.cachedToken = null;
-        return { outcome: "retryable", attempted: false, errorCode, message };
+        return { outcome: "retryable", attempted: false, remoteState: "notAttempted", errorCode, message };
       }
       if (response.status >= 500 || errorCode === "-1") {
         // WeChat may or may not have accepted an HTTP 5xx request. Conservatively
         // mark it failed rather than blindly re-sending a one-time subscription.
-        return { outcome: "failed", attempted: true, errorCode, message };
+        return { outcome: "failed", attempted: true, remoteState: "unknown", errorCode, message };
       }
-      return { outcome: "failed", attempted: true, errorCode, message };
+      return { outcome: "failed", attempted: true, remoteState: "rejected", errorCode, message };
     } catch (error) {
       // A network failure after POST is an unknown remote state. Never retry it
       // automatically, because duplicate transactional messages are worse than
@@ -116,6 +125,7 @@ export class WeChatSubscribeMessageProvider {
       return {
         outcome: "failed",
         attempted: true,
+        remoteState: "unknown",
         errorCode: "DELIVERY_UNKNOWN",
         message: this.safeError(error)
       };

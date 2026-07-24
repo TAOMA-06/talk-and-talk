@@ -3,15 +3,30 @@ import { ConversationsService } from "./conversations.service";
 describe("ConversationsService.ensureConversation", () => {
   const prisma = {
     conversation: {
-      findFirst: jest.fn()
+      findFirst: jest.fn(),
+      findMany: jest.fn()
     },
     companionProfile: {
       findFirst: jest.fn()
     },
     message: {
       findFirst: jest.fn(),
-      findMany: jest.fn()
+      findMany: jest.fn(),
+      count: jest.fn()
     },
+    conversationNotificationPreference: {
+      findUnique: jest.fn(),
+      upsert: jest.fn(),
+      deleteMany: jest.fn()
+    },
+    conversationBlock: {
+      findUnique: jest.fn(),
+      findFirst: jest.fn(),
+      upsert: jest.fn(),
+      deleteMany: jest.fn()
+    },
+    notification: { deleteMany: jest.fn() },
+    $transaction: jest.fn(),
     $executeRaw: jest.fn()
   } as any;
 
@@ -23,9 +38,11 @@ describe("ConversationsService.ensureConversation", () => {
   const moderationCases = {
     createFromResult: jest.fn()
   } as any;
-  const chatRestrictions = { assertCanSend: jest.fn() } as any;
+  const chatRestrictions = { assertCanSend: jest.fn(), activeForUser: jest.fn() } as any;
   const mediaAssets = { isFeatureEnabled: jest.fn(() => false) } as any;
   const mediaWorker = { enqueue: jest.fn() } as any;
+  const notifications = { createConversationMessageReceivedIfUnmuted: jest.fn() } as any;
+  const audit = { record: jest.fn().mockResolvedValue(undefined) } as any;
 
   let service: ConversationsService;
 
@@ -37,7 +54,9 @@ describe("ConversationsService.ensureConversation", () => {
       moderationCases,
       chatRestrictions,
       mediaAssets,
-      mediaWorker
+      mediaWorker,
+      notifications,
+      audit
     );
   });
 
@@ -135,6 +154,126 @@ describe("ConversationsService.ensureConversation", () => {
             ]
           }
         ]
+      })
+    }));
+  });
+
+  it("returns and changes only the current participant's persisted mute preference", async () => {
+    prisma.conversation.findFirst.mockResolvedValue({
+      id: "conv-1",
+      externalId: "c1",
+      userId: "u1",
+      companion: { ownerUserId: "companion-owner" },
+      user: { profile: null }
+    });
+    prisma.conversationNotificationPreference.findUnique.mockResolvedValue({ mutedAt: new Date("2026-07-20T00:00:00.000Z") });
+    chatRestrictions.activeForUser.mockResolvedValue(null);
+
+    await expect(service.conversationStatus("u1", "c1")).resolves.toEqual(expect.objectContaining({
+      messageNotificationsMuted: true
+    }));
+    expect(prisma.conversationNotificationPreference.findUnique).toHaveBeenCalledWith({
+      where: { conversationId_userId: { conversationId: "conv-1", userId: "u1" } },
+      select: { mutedAt: true }
+    });
+
+    await service.setMessageNotificationsMuted("u1", "c1", { muted: true });
+    expect(prisma.conversationNotificationPreference.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: { conversationId_userId: { conversationId: "conv-1", userId: "u1" } },
+      create: expect.objectContaining({ conversationId: "conv-1", userId: "u1", mutedAt: expect.any(Date) })
+    }));
+
+    await service.setMessageNotificationsMuted("u1", "c1", { muted: false });
+    expect(prisma.conversationNotificationPreference.deleteMany).toHaveBeenCalledWith({
+      where: { conversationId: "conv-1", userId: "u1" }
+    });
+  });
+
+  it("creates an active-only block under the conversation lock without touching orders or non-message notices", async () => {
+    prisma.conversation.findFirst.mockResolvedValue({
+      id: "conv-1",
+      externalId: "c1",
+      userId: "u1",
+      companion: { ownerUserId: "companion-owner" },
+      user: { profile: null }
+    });
+    const db = {
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      conversationBlock: {
+        upsert: jest.fn().mockResolvedValue({ id: "block-1" }),
+        deleteMany: jest.fn(),
+        findFirst: jest.fn().mockResolvedValue({ id: "block-1" })
+      },
+      notification: { deleteMany: jest.fn().mockResolvedValue({ count: 1 }) }
+    };
+    prisma.$transaction.mockImplementation(async (callback: (database: any) => Promise<unknown>) => callback(db));
+
+    await expect(service.setConversationBlocked("u1", "c1", { blocked: true })).resolves.toEqual({
+      conversationBlockedByYou: true,
+      messageInteractionAvailable: false
+    });
+
+    expect(db.$queryRaw).toHaveBeenCalled();
+    expect(db.conversationBlock.upsert).toHaveBeenCalledWith({
+      where: { conversationId_blockedByUserId: { conversationId: "conv-1", blockedByUserId: "u1" } },
+      create: { conversationId: "conv-1", blockedByUserId: "u1" },
+      update: {}
+    });
+    expect(db.notification.deleteMany).toHaveBeenCalledWith({
+      where: {
+        userId: "u1",
+        type: "messageReceived",
+        eventKey: { startsWith: "conversation:conv-1:" }
+      }
+    });
+    expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({
+      action: "conversation.blocked",
+      resourceId: "conv-1",
+      metadata: { scope: "message_interaction_only" }
+    }), db);
+  });
+
+  it("hides message history for both sides after a block without deleting it or allowing a cursor probe", async () => {
+    prisma.conversation.findFirst.mockResolvedValue({
+      id: "conv-1",
+      externalId: "c1",
+      userId: "u1",
+      companion: { ownerUserId: "companion-owner" }
+    });
+    prisma.conversationBlock.findFirst.mockResolvedValue({ id: "block-1" });
+
+    await expect(service.messages("u1", "c1", { cursor: "old-message" })).resolves.toEqual({
+      messages: [],
+      pagination: { limit: 50, nextCursor: null, hasMore: false }
+    });
+    expect(prisma.message.findFirst).not.toHaveBeenCalled();
+    expect(prisma.message.findMany).not.toHaveBeenCalled();
+    expect(prisma.$executeRaw).not.toHaveBeenCalled();
+  });
+
+  it("includes only the viewer's mute flag in their conversation list", async () => {
+    prisma.conversation.findMany.mockResolvedValue([{
+      id: "conv-1",
+      externalId: "c1",
+      userId: "u1",
+      companionId: "c1",
+      companion: { id: "c1", name: "林屿", role: "倾听者", initials: "林屿", isOnline: false, isVerified: true, availability: "available", responseTime: "" },
+      user: { profile: null },
+      messages: [],
+      readStates: [],
+      notificationPreferences: [{ mutedAt: new Date("2026-07-20T00:00:00.000Z") }],
+      blocks: [],
+      updatedAt: new Date("2026-07-20T00:00:00.000Z")
+    }]);
+    prisma.message.count.mockResolvedValue(0);
+
+    const result = await service.list("u1");
+
+    expect(result.conversations[0]).toEqual(expect.objectContaining({ messageNotificationsMuted: true }));
+    expect(prisma.conversation.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      include: expect.objectContaining({
+        notificationPreferences: { where: { userId: "u1" }, select: { mutedAt: true }, take: 1 },
+        blocks: { select: { blockedByUserId: true }, take: 2 }
       })
     }));
   });

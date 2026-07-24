@@ -1,0 +1,106 @@
+<view class="page">
+  <view wx:if="{{loading}}" class="empty">正在加载可约时段…</view>
+
+  <view wx:elif="{{accessState === 'ineligible'}}" class="empty access-empty">
+    <view class="access-title">暂不能查看可约时段</view>
+    <view>{{loadError}}</view>
+    <view class="muted">为保护预约和履约安排，日程只对已完成身份与资料审核的陪伴者本人开放。</view>
+    <button class="plain-button retry-button" bindtap="retry">重新检查</button>
+  </view>
+
+  <view wx:elif="{{accessState === 'error'}}" class="empty access-empty">
+    <view class="access-title">加载失败</view>
+    <view>{{loadError}}</view>
+    <button class="primary-button retry-button" bindtap="retry">重新加载</button>
+  </view>
+
+  <view wx:else>
+    <view class="intro-card">
+      <view class="title">可约时段</view>
+      <view class="muted">全部按中国标准时间（Asia/Shanghai）显示。这里展示的是你配置的原始时段；客户侧会按服务时长拆分为可选预约。</view>
+      <view class="summary">已记录 {{totalWindows}} 个时段 · 每次预约仍以订单确认和容量校验为准</view>
+      <button class="primary-button create-button" bindtap="openCreateWindow">新增可约时段</button>
+    </view>
+    <view wx:if="{{actionError}}" class="action-error">{{actionError}}</view>
+
+    <view wx:if="{{!totalWindows}}" class="empty calendar-empty">
+      <view class="access-title">还没有可约时段</view>
+      <view>配置完成后，客户才能根据服务时长选择具体预约时间。</view>
+    </view>
+
+    <view wx:if="{{activeWindows.length}}" class="section-title">当前可用</view>
+    <view wx:for="{{activeWindows}}" wx:key="id" class="card window-card">
+      <view class="window-head">
+        <view><view class="date-label">{{item.dateLabel}}</view><view class="time-label">{{item.rangeText}}</view></view>
+        <view class="status-chip {{item.statusClass}}">{{item.statusText}}</view>
+      </view>
+      <view class="window-meta">{{item.durationText}} · {{item.capacityText}}</view>
+      <view wx:if="{{item.statusClass === 'active'}}" class="window-actions">
+        <button class="plain-button edit-button" bindtap="openEditWindow" data-id="{{item.id}}">编辑</button>
+        <button class="plain-button retire-button" loading="{{retiringWindowId === item.id}}" bindtap="retireWindow" data-id="{{item.id}}">暂停可约</button>
+      </view>
+    </view>
+
+    <view wx:if="{{expiredWindows.length}}" class="section-title">已过期</view>
+    <view wx:for="{{expiredWindows}}" wx:key="id" class="card window-card subdued">
+      <view class="window-head">
+        <view><view class="date-label">{{item.dateLabel}}</view><view class="time-label">{{item.rangeText}}</view></view>
+        <view class="status-chip expired">{{item.statusText}}</view>
+      </view>
+      <view class="window-meta">{{item.durationText}} · {{item.capacityText}}</view>
+    </view>
+
+    <view wx:if="{{retiredWindows.length}}" class="section-title">已停用</view>
+    <view wx:for="{{retiredWindows}}" wx:key="id" class="card window-card subdued">
+      <view class="window-head">
+        <view><view class="date-label">{{item.dateLabel}}</view><view class="time-label">{{item.rangeText}}</view></view>
+        <view class="status-chip retired">{{item.statusText}}</view>
+      </view>
+      <view class="window-meta">{{item.durationText}} · {{item.capacityText}}</view>
+    </view>
+  </view>
+
+  <view wx:if="{{editorVisible}}" class="editor-mask">
+    <scroll-view scroll-y="true" class="editor-sheet">
+      <view class="editor-header">
+        <view class="title small">{{editingWindowId ? '编辑可约时段' : '新增可约时段'}}</view>
+        <button class="close-button" disabled="{{saving}}" bindtap="closeEditor">关闭</button>
+      </view>
+      <view class="editor-tip">所有输入按中国标准时间（Asia/Shanghai）保存。开放时段必须至少在 15 分钟后开始，且不能与已有开放时段重叠。</view>
+
+      <view class="field-label">日期</view>
+      <picker mode="date" value="{{formDate}}" start="{{minDate}}" bindchange="setFormDate">
+        <view class="picker">{{formDate}}</view>
+      </picker>
+
+      <view class="field-label">开始时间</view>
+      <picker mode="selector" range="{{timeOptions}}" value="{{formStartTimeIndex}}" bindchange="setFormStartTime">
+        <view class="picker">{{timeOptions[formStartTimeIndex]}}</view>
+      </picker>
+
+      <view class="field-label">结束时间</view>
+      <picker mode="selector" range="{{timeOptions}}" value="{{formEndTimeIndex}}" bindchange="setFormEndTime">
+        <view class="picker">{{timeOptions[formEndTimeIndex]}}</view>
+      </picker>
+      <view class="field-hint">{{formEndDayHint}}。开始与结束都只能选择整点或半点，单次最长 24 小时。</view>
+
+      <view class="field-label">单个预约时段容量</view>
+      <input value="{{formCapacity}}" type="number" placeholder="1 至 10" bindinput="setFormCapacity" />
+      <view class="field-hint">容量表示同一候选预约时间最多可被多少位客户占用，实际可约性仍以订单容量锁定为准。</view>
+
+      <view wx:if="{{!editingWindowId}}" class="publish-row">
+        <view><view class="field-label compact-label">立即开放给客户</view><view class="field-hint">关闭则保存为草稿，不会生成客户可选时段。</view></view>
+        <switch checked="{{formActive}}" color="#B94A68" bindchange="setFormActive" />
+      </view>
+      <view wx:else class="publish-row">
+        <view><view class="field-label compact-label">保持当前开放状态</view><view class="field-hint">编辑仅修改时间和容量。若要暂停，请关闭此表单后使用时段卡片上的“暂停可约”。</view></view>
+      </view>
+
+      <view wx:if="{{formError}}" class="form-error">{{formError}}</view>
+      <view class="editor-actions">
+        <button class="plain-button cancel-button" disabled="{{saving}}" bindtap="closeEditor">取消</button>
+        <button class="primary-button save-button" loading="{{saving}}" bindtap="saveWindow">{{editingWindowId ? '保存修改' : formActive ? '保存并开放' : '保存草稿'}}</button>
+      </view>
+    </scroll-view>
+  </view>
+</view>

@@ -1,17 +1,30 @@
 import { BackendConfig, backendConfig } from "./config";
 import {
-  AuthSession, AuthUser, ChatMessage, CommunityPost, Companion, Conversation, MediaAttachment, MiniProgramPayParams,
-  Notification, Order, RecommendationPlacement, RecommendationPreference, RecommendationTopic, RecommendedCompanion, Review
+  AuthSession, AuthUser, ChatMessage, CommunityPost, CommunityPostReportReceipt, CommunityReportReceipt, Companion, Conversation, FavoriteAvailabilityReminderPreference, FavoriteCompanion, MediaAttachment, MiniProgramPayParams,
+  Notification, Order, OrderExperienceFeedbackTag, OrderRescheduleRequest, OrderTimeline, RecommendationPlacement, RecommendationPreference, RecommendationTopic, RecommendedCompanion, RefundRequestResult, Review,
+  CompanionTodayServiceSchedule,
+  CompanionAvailabilityResponse, CreateOwnAvailabilityWindowInput, CreateOwnServiceOfferingInput, OwnAvailabilityWindow, OwnServiceOffering, ServiceOffering,
+  UpdateOwnAvailabilityWindowInput, UpdateOwnServiceOfferingInput
 } from "./models";
 import {
   bindLegalConsentToUser, currentLegalConsent, requireLegalConsent, withdrawLegalConsent
 } from "./privacy";
 
 export type RequestOptions = {
-  method?: "GET" | "POST" | "PATCH" | "DELETE";
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   data?: Record<string, unknown>;
   authenticated?: boolean;
   retry?: boolean;
+};
+export type CreateOrderRequest = {
+  companionId: string;
+  themeId: string;
+  durationMinutes: number;
+  scheduledAt: string;
+  clientRequestId?: string;
+  recommendationImpressionId?: string;
+  serviceOfferingId?: string;
+  availabilityWindowId?: string;
 };
 export type ApiError = Error & { statusCode?: number; code?: string; details?: Record<string, unknown> };
 type TransportResponse = { statusCode: number; data?: any };
@@ -332,7 +345,36 @@ export const api = {
   updateMe: (data: Record<string, unknown>) => request<AuthUser>("/me", { method: "PATCH", data }),
   requestDeletion: () => request<{ id: string; status: string; message: string }>("/me/deletion-request", { method: "POST" }),
   withdrawLegalConsent: () => rawRequest<{ withdrawn: boolean; withdrawnAt: string | null }>("/users/me/legal-consents/current", { method: "DELETE" }),
-  companions: () => request<{ items: Companion[] }>("/companions"),
+  companions: (options: {
+    page?: number;
+    pageSize?: number;
+    tag?: string;
+    keyword?: string;
+    sortBy?: "online" | "rating" | "reviewCount" | "priceAsc" | "soonestAvailable";
+    availability?: "online" | "available" | "busy";
+    isOnline?: boolean;
+    topicId?: string;
+    deliveryMode?: "text" | "voice";
+    maxServicePriceCents?: number;
+    availableWithinDays?: number;
+  } = {}) => {
+    const query = [
+      options.page ? `page=${encodeURIComponent(String(options.page))}` : "",
+      options.pageSize ? `pageSize=${encodeURIComponent(String(options.pageSize))}` : "",
+      options.tag ? `tag=${encodeURIComponent(options.tag)}` : "",
+      options.keyword ? `keyword=${encodeURIComponent(options.keyword)}` : "",
+      options.sortBy ? `sortBy=${encodeURIComponent(options.sortBy)}` : "",
+      options.availability ? `availability=${encodeURIComponent(options.availability)}` : "",
+      options.isOnline === undefined ? "" : `isOnline=${options.isOnline ? "true" : "false"}`,
+      options.topicId ? `topicId=${encodeURIComponent(options.topicId)}` : "",
+      options.deliveryMode ? `deliveryMode=${encodeURIComponent(options.deliveryMode)}` : "",
+      options.maxServicePriceCents ? `maxServicePriceCents=${encodeURIComponent(String(options.maxServicePriceCents))}` : "",
+      options.availableWithinDays ? `availableWithinDays=${encodeURIComponent(String(options.availableWithinDays))}` : ""
+    ].filter(Boolean).join("&");
+    return request<{ items: Companion[]; pagination: { total: number } }>(
+      `/companions${query ? `?${query}` : ""}`
+    );
+  },
   recommendationTopics: () => request<{ algorithmVersion: string; items: RecommendationTopic[] }>("/recommendations/topics"),
   recommendationPreferences: () => request<RecommendationPreference>("/recommendations/me/preferences"),
   updateRecommendationPreferences: (data: Partial<Pick<RecommendationPreference,
@@ -363,18 +405,102 @@ export const api = {
   recordRecommendationEvents: (events: Array<{ impressionId: string; type: "view" | "click" }>) =>
     request<{ updated: number }>("/recommendations/events", { method: "POST", data: { events } }),
   companion: (id: string) => request<Companion>(`/companions/${encodeURIComponent(id)}`, { authenticated: false }),
+  serviceOfferings: (id: string) => request<{ items: ServiceOffering[] }>(
+    `/companions/${encodeURIComponent(id)}/service-offerings`,
+    { authenticated: false }
+  ),
+  companionAvailability: (
+    id: string,
+    options: { serviceOfferingId?: string; durationMinutes?: number; from?: string; days?: number } = {}
+  ) => {
+    const query = [
+      options.serviceOfferingId ? `serviceOfferingId=${encodeURIComponent(options.serviceOfferingId)}` : "",
+      options.durationMinutes ? `durationMinutes=${encodeURIComponent(String(options.durationMinutes))}` : "",
+      options.from ? `from=${encodeURIComponent(options.from)}` : "",
+      options.days ? `days=${encodeURIComponent(String(options.days))}` : ""
+    ].filter(Boolean).join("&");
+    return request<CompanionAvailabilityResponse>(
+      `/companions/${encodeURIComponent(id)}/availability${query ? `?${query}` : ""}`,
+      { authenticated: false }
+    );
+  },
+  favoriteCompanions: () => request<{ items: FavoriteCompanion[] }>("/favorites/companions"),
+  saveFavoriteCompanion: (id: string) => request<{ favorited: true; companion: Companion }>(
+    `/favorites/companions/${encodeURIComponent(id)}`,
+    { method: "PUT" }
+  ),
+  setFavoriteAvailabilityReminder: (
+    id: string,
+    data: { enabled: boolean; subscriptionGrantId?: string }
+  ) => request<FavoriteAvailabilityReminderPreference>(
+    `/favorites/companions/${encodeURIComponent(id)}/availability-reminder`,
+    { method: "PUT", data }
+  ),
+  removeFavoriteCompanion: (id: string) => request<{ favorited: false; removed: boolean }>(
+    `/favorites/companions/${encodeURIComponent(id)}`,
+    { method: "DELETE" }
+  ),
+  recentlyViewedCompanions: () => request<{ items: Companion[] }>("/recently-viewed/companions"),
+  recordRecentlyViewedCompanion: (id: string) => request<{ recorded: true }>(
+    `/recently-viewed/companions/${encodeURIComponent(id)}`,
+    { method: "PUT" }
+  ),
+  clearRecentlyViewedCompanions: () => request<{ cleared: number }>("/recently-viewed/companions", { method: "DELETE" }),
   ownCompanion: () => request<Companion>("/companions/me/profile"),
+  ownServiceOfferings: () => request<{ items: OwnServiceOffering[] }>("/companions/me/service-offerings"),
+  createOwnServiceOffering: (data: CreateOwnServiceOfferingInput) => request<OwnServiceOffering>(
+    "/companions/me/service-offerings",
+    { method: "POST", data }
+  ),
+  updateOwnServiceOffering: (id: string, data: UpdateOwnServiceOfferingInput) => request<OwnServiceOffering>(
+    `/companions/me/service-offerings/${encodeURIComponent(id)}`,
+    { method: "PATCH", data }
+  ),
+  ownAvailabilityWindows: () => request<{ items: OwnAvailabilityWindow[] }>("/companions/me/availability-windows"),
+  createOwnAvailabilityWindow: (data: CreateOwnAvailabilityWindowInput) => request<OwnAvailabilityWindow>(
+    "/companions/me/availability-windows",
+    { method: "POST", data }
+  ),
+  updateOwnAvailabilityWindow: (id: string, data: UpdateOwnAvailabilityWindowInput) => request<OwnAvailabilityWindow>(
+    `/companions/me/availability-windows/${encodeURIComponent(id)}`,
+    { method: "PATCH", data }
+  ),
   applyCompanion: (data: Record<string, unknown>) => request<Companion>("/companions/me/application", { method: "POST", data }),
   community: () => request<{ items: CommunityPost[] }>("/community/posts"),
   createPost: (data: Record<string, unknown>) => request<CommunityPost>("/community/posts", { method: "POST", data }),
   setPostLike: (id: string, liked: boolean) => request<CommunityPost>(`/community/posts/${encodeURIComponent(id)}/like`, { method: "POST", data: { liked } }),
+  reportCommunityPost: (id: string, reason: string) => request<{ report: CommunityPostReportReceipt }>(
+    `/community/posts/${encodeURIComponent(id)}/report`,
+    { method: "POST", data: { reason } }
+  ),
+  communityReportReceipts: () => request<{ items: CommunityReportReceipt[] }>("/community/reports/mine"),
   reviews: (companionId: string) => request<{ items: Review[] }>(`/reviews/companion/${encodeURIComponent(companionId)}`, { authenticated: false }),
   createReview: (data: Record<string, unknown>) => request<Review>("/reviews", { method: "POST", data }),
   orders: () => request<{ items: Order[] }>("/orders"),
   serviceOrders: () => request<{ items: Order[] }>("/orders/service"),
-  createOrder: (data: Record<string, unknown>) => request<Order>("/orders", { method: "POST", data }),
+  companionTodayServiceSchedule: () => request<CompanionTodayServiceSchedule>("/orders/service/today"),
+  orderTimeline: (id: string) => request<OrderTimeline>(`/orders/${encodeURIComponent(id)}/timeline`),
+  createOrderRescheduleRequest: (id: string, data: { requestedScheduledAt: string; availabilityWindowId?: string }) =>
+    request<OrderRescheduleRequest>(`/orders/${encodeURIComponent(id)}/reschedule-requests`, { method: "POST", data }),
+  acceptOrderRescheduleRequest: (orderId: string, requestId: string) => request<{ rescheduleRequest: OrderRescheduleRequest; order: Order }>(
+    `/orders/${encodeURIComponent(orderId)}/reschedule-requests/${encodeURIComponent(requestId)}/accept`,
+    { method: "POST" }
+  ),
+  rejectOrderRescheduleRequest: (orderId: string, requestId: string) => request<OrderRescheduleRequest>(
+    `/orders/${encodeURIComponent(orderId)}/reschedule-requests/${encodeURIComponent(requestId)}/reject`,
+    { method: "POST" }
+  ),
+  createOrder: (data: CreateOrderRequest) => request<Order>("/orders", { method: "POST", data }),
   cancelOrder: (id: string) => request<Order>(`/orders/${encodeURIComponent(id)}/cancel`, { method: "POST" }),
   confirmOrderCompletion: (id: string) => request<Order>(`/orders/${encodeURIComponent(id)}/completion-confirmations`, { method: "POST" }),
+  confirmOrderServiceGuidelines: (id: string) => request<Order>(
+    `/orders/${encodeURIComponent(id)}/service-guidelines-confirmations`, { method: "POST" }
+  ),
+  submitOrderExperienceFeedback: (id: string, data: {
+    rating: number;
+    tags?: OrderExperienceFeedbackTag[];
+    note?: string;
+  }) => request<Order>(`/orders/${encodeURIComponent(id)}/experience-feedback`, { method: "POST", data }),
   startService: (id: string) => request<Order>(`/orders/service/${encodeURIComponent(id)}/start`, { method: "POST" }),
   completeService: (id: string) => request<Order>(`/orders/service/${encodeURIComponent(id)}/complete`, { method: "POST" }),
   confirmServiceOrder: (id: string) => request<Order>(`/orders/service/${encodeURIComponent(id)}/confirm`, { method: "POST" }),
@@ -386,12 +512,24 @@ export const api = {
     data: { alreadyProcessed: boolean; orderId: string; orderStatus: string };
   }>(`/orders/${encodeURIComponent(id)}/payment/sync`, { method: "POST" }),
   mockNotify: (outTradeNo: string) => request("/payments/wechat/mock-notify", { method: "POST", data: { outTradeNo } }),
-  refund: (id: string, reason: string) => request(`/orders/${encodeURIComponent(id)}/refund`, { method: "POST", data: { reason } }),
+  refund: (id: string, reason: string) => request<RefundRequestResult>(
+    `/orders/${encodeURIComponent(id)}/refund`, { method: "POST", data: { reason } }
+  ),
   conversations: () => request<{ conversations: Conversation[] }>("/conversations"),
   conversationStatus: (id: string) => request<{
     mediaEnabled: boolean;
+    messageNotificationsMuted: boolean;
+    conversationBlockedByYou: boolean;
+    messageInteractionAvailable: boolean;
     chatRestriction: { id: string; reason: string; endsAt: string } | null;
   }>(`/conversations/${encodeURIComponent(id)}/status`),
+  setConversationMessageNotificationsMuted: (id: string, muted: boolean) => request<{
+    messageNotificationsMuted: boolean;
+  }>(`/conversations/${encodeURIComponent(id)}/notification-preference`, { method: "PUT", data: { muted } }),
+  setConversationBlocked: (id: string, blocked: boolean) => request<{
+    conversationBlockedByYou: boolean;
+    messageInteractionAvailable: boolean;
+  }>(`/conversations/${encodeURIComponent(id)}/block`, { method: "PUT", data: { blocked } }),
   messages: (id: string, options: { cursor?: string; limit?: number } = {}) => {
     const query = [
       options.cursor ? `cursor=${encodeURIComponent(options.cursor)}` : "",
@@ -441,14 +579,22 @@ export const api = {
   recordSubscriptionGrant: (templateKey: string, granted: boolean) => request<{
     recorded: boolean;
     reason?: "not_granted";
+    grantId?: string;
+    grantedAt?: string;
   }>("/notifications/subscription-grants", { method: "POST", data: { templateKey, granted } }),
   markNotificationRead: (id: string) => request<Notification>(`/notifications/${encodeURIComponent(id)}/read`, { method: "POST" }),
   markAllNotificationsRead: () => request<{ updated: number }>("/notifications/read-all", { method: "POST" }),
   createSupportTicket: (data: { orderId?: string; category: "orderIssue" | "refund" | "safety" | "privacy" | "general"; subject: string; body: string }) =>
     request<{ id: string; status: string }>("/support/tickets", { method: "POST", data }),
+  addOrderSupportFact: (ticketId: string, statement: string) => request<{
+    id: string;
+    statement: string;
+    createdAt: string;
+  }>(`/support/tickets/${encodeURIComponent(ticketId)}/order-facts`, { method: "POST", data: { statement } }),
   supportTickets: () => request<{ items: Array<{
     id: string;
     orderId: string | null;
+    category: "orderIssue" | "refund" | "safety" | "privacy" | "general";
     status: string;
     subject: string;
     body: string;
@@ -456,6 +602,11 @@ export const api = {
     resolutionCode: string | null;
     dueAt: string | null;
     updatedAt: string;
+    orderFacts: Array<{
+      id: string;
+      statement: string;
+      createdAt: string;
+    }>;
   }> }>("/support/tickets/me"),
   companionEarnings: () => request<{ items: Array<{ id: string; payableCents: number; status: string; availableAt: string }> }>("/commercial/earnings/me")
 };

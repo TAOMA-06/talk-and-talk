@@ -1,8 +1,9 @@
 import { api, ensureSession, logout } from "../../utils/api";
 import {
-  AuthUser, Notification, RecommendationPreference, RecommendationTopic, USER_GENDERS, UserGender
+  AuthUser, Companion, FavoriteCompanion, Notification, RecommendationPreference, RecommendationTopic, USER_GENDERS, UserGender
 } from "../../utils/models";
 import { openLegalDocument, withdrawLegalConsent } from "../../utils/privacy";
+import { requestTransactionalSubscriptions } from "../../utils/subscription";
 
 const GENDER_LABELS: Record<UserGender, string> = { female: "女", male: "男" };
 const PREFERRED_TIME_SLOTS = ["08:00", "12:00", "18:00", "21:00", "23:00"];
@@ -28,19 +29,39 @@ Page({
     recommendationPreferences: null as RecommendationPreference | null,
     recommendationTopics: [] as DisplayTopic[], recommendationTopicIds: [] as string[],
     recommendationCity: "", recommendationMaxPrice: "", recommendationTimeSlots: [] as string[],
-    recommendationTimeOptions: displayTimeSlots([]), recommendationSaving: false
+    recommendationTimeOptions: displayTimeSlots([]), recommendationSaving: false,
+    hasCompanionProfile: false,
+    favoriteCompanions: [] as FavoriteCompanion[],
+    favoriteReminderSavingId: "",
+    recentlyViewedCompanions: [] as Companion[],
+    clearingRecentViews: false
   },
   onShow() { void this.load(); },
   async load() {
-    this.setData({ profileLoading: true });
+    this.setData({
+      profileLoading: true,
+      favoriteCompanions: [],
+      favoriteReminderSavingId: "",
+      recentlyViewedCompanions: [],
+      clearingRecentViews: false
+    });
     try {
       await ensureSession();
-      const [user, notifications, unread, preference, topics] = await Promise.all([
-        api.fetchMe(),
+      const user = await api.fetchMe();
+      const [notifications, unread, preference, topics, ownCompanion, favorites, recentViews] = await Promise.all([
         api.notifications().catch(() => ({ items: [] as Notification[] })),
         api.notificationUnreadCount().catch(() => ({ count: 0 })),
         api.recommendationPreferences().catch(() => null),
-        api.recommendationTopics().catch(() => ({ items: [] as RecommendationTopic[] }))
+        api.recommendationTopics().catch(() => ({ items: [] as RecommendationTopic[] })),
+        user.role === "companion"
+          ? api.ownCompanion().then(() => true).catch(() => false)
+          : Promise.resolve(false),
+        user.role === "user"
+          ? api.favoriteCompanions().catch(() => ({ items: [] as FavoriteCompanion[] }))
+          : Promise.resolve({ items: [] as FavoriteCompanion[] }),
+        user.role === "user"
+          ? api.recentlyViewedCompanions().catch(() => ({ items: [] as Companion[] }))
+          : Promise.resolve({ items: [] as Companion[] })
       ]);
       this.setData({
         user,
@@ -56,6 +77,9 @@ Page({
         recommendationMaxPrice: preference?.maxPricePerHalfHour ? String(preference.maxPricePerHalfHour) : "",
         recommendationTimeSlots: preference?.preferredTimeSlots || [],
         recommendationTimeOptions: displayTimeSlots(preference?.preferredTimeSlots || []),
+        hasCompanionProfile: ownCompanion,
+        favoriteCompanions: favorites.items || [],
+        recentlyViewedCompanions: recentViews.items || [],
         profileLoading: false
       });
     } catch (error) { this.setData({ profileLoading: false }); wx.showToast({ title: (error as Error).message || "加载失败", icon: "none" }); }
@@ -164,6 +188,88 @@ Page({
       this.setData({ applicationVisible: false });
       await this.load();
     } catch (error) { wx.showToast({ title: (error as Error).message || "申请失败", icon: "none" }); }
+  },
+  openCompanionWorkbench() { wx.navigateTo({ url: "/pages/companion/workbench/index" }); },
+  openSafetyCenter() { wx.navigateTo({ url: "/pages/safety/index" }); },
+  openFavoriteCompanion(event: any) {
+    const id = String(event.currentTarget.dataset.id || "");
+    if (!id) return;
+    wx.navigateTo({ url: `/pages/companion/detail?id=${encodeURIComponent(id)}` });
+  },
+  stopFavoriteReminderTap() {},
+  async setFavoriteAvailabilityReminder(event: any) {
+    const id = String(event.currentTarget.dataset.id || "");
+    const enabled = Boolean(event.detail.value);
+    const favorite = this.data.favoriteCompanions.find((item) => item.id === id);
+    if (!id || !favorite || this.data.favoriteReminderSavingId) return;
+
+    let subscriptionGrantId: string | undefined;
+    if (enabled) {
+      const authorization = await requestTransactionalSubscriptions(["availabilityReminder"]);
+      subscriptionGrantId = authorization.grants.find((grant) => grant.templateKey === "availabilityReminder")?.grantId;
+      if (!subscriptionGrantId) {
+        // Re-render the controlled switch rather than leaving a visual state
+        // that would imply a reminder can be sent without a real grant.
+        this.setData({ favoriteCompanions: [...this.data.favoriteCompanions] });
+        wx.showToast({ title: "未获得微信提醒授权，未开启", icon: "none" });
+        return;
+      }
+    }
+
+    this.setData({ favoriteReminderSavingId: id });
+    try {
+      const preference = await api.setFavoriteAvailabilityReminder(id, {
+        enabled,
+        ...(subscriptionGrantId ? { subscriptionGrantId } : {})
+      });
+      this.setData({
+        favoriteCompanions: this.data.favoriteCompanions.map((item) => item.id === id ? {
+          ...item,
+          availabilityReminderEnabled: preference.enabled,
+          availabilityReminderUpdatedAt: preference.updatedAt,
+          availabilityReminderMinimumIntervalHours: preference.minimumIntervalHours
+        } : item)
+      });
+      wx.showToast({ title: preference.enabled ? "可约提醒已开启" : "可约提醒已关闭", icon: "success" });
+    } catch (error) {
+      const code = (error as { code?: string }).code;
+      if (code === "FAVORITE_REMINDER_NOT_FOUND") {
+        wx.showToast({ title: "该资料已不可用，书签已刷新", icon: "none" });
+        await this.load();
+      } else if (code === "FAVORITE_REMINDER_AUTHORIZATION_REQUIRED" || code === "FAVORITE_REMINDER_AUTHORIZATION_UNAVAILABLE") {
+        wx.showToast({ title: "提醒授权已失效，请重新开启", icon: "none" });
+      } else {
+        wx.showToast({ title: (error as Error).message || "提醒设置失败", icon: "none" });
+      }
+    } finally {
+      if (this.data.favoriteReminderSavingId === id) this.setData({ favoriteReminderSavingId: "" });
+    }
+  },
+  openRecentlyViewedCompanion(event: any) {
+    const id = String(event.currentTarget.dataset.id || "");
+    if (!id) return;
+    wx.navigateTo({ url: `/pages/companion/detail?id=${encodeURIComponent(id)}` });
+  },
+  async clearRecentlyViewedCompanions() {
+    if (!this.data.recentlyViewedCompanions.length || this.data.clearingRecentViews) return;
+    const confirmation = await new Promise<any>((resolve) => wx.showModal({
+      title: "清空最近浏览",
+      content: "只会清除你的回看列表，不影响书签、订单或任何服务记录。",
+      confirmText: "清空",
+      confirmColor: "#55748F",
+      success: resolve
+    }));
+    if (!confirmation.confirm) return;
+    this.setData({ clearingRecentViews: true });
+    try {
+      await api.clearRecentlyViewedCompanions();
+      this.setData({ recentlyViewedCompanions: [] });
+      wx.showToast({ title: "最近浏览已清空", icon: "success" });
+    } catch (error) {
+      wx.showToast({ title: (error as Error).message || "暂时无法清空记录", icon: "none" });
+    } finally {
+      this.setData({ clearingRecentViews: false });
+    }
   },
   async markAllNotificationsRead() {
     if (!this.data.unreadNotificationCount) return;

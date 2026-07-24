@@ -5,6 +5,8 @@ describe("ModerationCaseService", () => {
   const create = jest.fn();
   const prisma = {
     moderationCase: { create, findUnique: jest.fn() },
+    moderationEvidence: { create: jest.fn() },
+    moderationActionLog: { create: jest.fn() },
     $transaction: jest.fn()
   } as any;
   const audit = { record: jest.fn().mockResolvedValue({}) } as any;
@@ -210,6 +212,77 @@ describe("ModerationCaseService", () => {
       }),
       prisma
     );
+    expect(notifications.create).not.toHaveBeenCalled();
+  });
+
+  it("uses a caller-owned transaction and redacted intake audit metadata for a report", async () => {
+    const created = { id: "report-tx", status: "pending", source: "report" };
+    const tx = { moderationCase: { create: jest.fn().mockResolvedValue(created) } } as any;
+
+    await expect(service.createReportCase({
+      result: {
+        decision: "allow", riskLevel: "low", priority: "normal", score: 0.05,
+        reasons: ["内容正常"], matchedRules: [], categories: ["normal"], policyVersion: "chat-v2", usedAI: false
+      },
+      reason: "疑似广告",
+      content: "公开内容",
+      targetId: "post-1",
+      subjectUserId: "author-1",
+      actorId: "reporter-1",
+      auditMetadata: { source: "community_post_report", postId: "post-1" },
+      db: tx
+    })).resolves.toBe(created);
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(notifications.create).not.toHaveBeenCalled();
+    expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({
+      resourceId: "report-tx",
+      metadata: { source: "community_post_report", postId: "post-1" }
+    }), tx);
+  });
+
+  it("adds later community-report evidence to an existing case without a notification or disposition", async () => {
+    const tx = {
+      moderationEvidence: { create: jest.fn().mockResolvedValue({ id: "evidence-2" }) },
+      moderationActionLog: { create: jest.fn().mockResolvedValue({ id: "log-2" }) }
+    } as any;
+    const result: ModerationResult = {
+      decision: "review", riskLevel: "low", priority: "normal", score: 0.42,
+      reasons: ["疑似广告"], matchedRules: ["ads.promo"], categories: ["fraudOrSpam"], policyVersion: "chat-v2", usedAI: false
+    };
+
+    await service.appendCommunityReportToCase({
+      caseId: "case-1",
+      reportId: "receipt-2",
+      postId: "post-1",
+      reporterUserId: "reporter-2",
+      reason: "疑似重复引流",
+      result,
+      db: tx
+    });
+
+    expect(tx.moderationEvidence.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        caseId: "case-1",
+        type: "community_report_attachment",
+        payload: expect.objectContaining({ reportId: "receipt-2", reason: "疑似重复引流" })
+      })
+    }));
+    expect(tx.moderationActionLog.create).toHaveBeenCalledWith({
+      data: {
+        caseId: "case-1",
+        actorId: "reporter-2",
+        action: "community_report.attached",
+        note: "An additional independent community report was attached."
+      }
+    });
+    expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({
+      actorId: "reporter-2",
+      action: "community.report_attached",
+      resourceId: "case-1",
+      metadata: expect.objectContaining({ postId: "post-1", reportId: "receipt-2" })
+    }), tx);
+    expect(notifications.create).not.toHaveBeenCalled();
   });
 
   it("allows one appeal after an auditor confirms a violation", async () => {

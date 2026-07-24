@@ -1,6 +1,29 @@
 .hero { margin: 8rpx 0 28rpx; padding: 34rpx; border-radius: 28rpx; background: linear-gradient(135deg, #fce8ed, #fff7f0); }
 .hero-title { font-size: 44rpx; font-weight: 700; }
 .hero-copy { margin-top: 12rpx; color: #765b60; font-size: 27rpx; }
+.filter-panel { margin: 0 2rpx 24rpx; padding: 24rpx; border: 1rpx solid #eadfe1; border-radius: 22rpx; background: #fffdfc; }
+.search-heading { color: #3e2b30; font-size: 30rpx; font-weight: 700; }
+.search-row { display: flex; margin-top: 14rpx; align-items: center; gap: 12rpx; }
+.search-input { min-width: 0; flex: 1; height: 64rpx; padding: 0 18rpx; border: 1rpx solid #e5d8da; border-radius: 14rpx; background: #fff; color: #3e2b30; font-size: 25rpx; }
+.search-submit { flex: 0 0 auto; min-width: 108rpx; height: 64rpx; margin: 0; padding: 0 20rpx; border-radius: 14rpx; background: #b94a68; color: #fff; font-size: 25rpx; line-height: 64rpx; }
+.search-submit::after { border: 0; }
+.search-copy { margin-top: 10rpx; color: #816d71; font-size: 22rpx; line-height: 1.5; }
+.filter-heading { margin-top: 26rpx; color: #3e2b30; font-size: 30rpx; font-weight: 700; }
+.filter-copy { margin-top: 8rpx; color: #816d71; font-size: 22rpx; line-height: 1.5; }
+.filter-group { margin-top: 20rpx; }
+.filter-group-last { margin-bottom: 2rpx; }
+.filter-label { margin-bottom: 12rpx; color: #72575d; font-size: 23rpx; font-weight: 600; }
+.sort-copy { margin-top: 12rpx; color: #8a7679; font-size: 21rpx; line-height: 1.5; }
+.filter-scroll { width: 100%; white-space: nowrap; }
+.filter-options { display: flex; gap: 12rpx; width: max-content; }
+.filter-chip { display: inline-flex; min-height: 56rpx; margin: 0; padding: 0 20rpx; align-items: center; justify-content: center; border: 1rpx solid #e5d8da; border-radius: 999rpx; background: #fff; color: #6f565c; font-size: 23rpx; line-height: 54rpx; }
+.filter-chip::after, .filter-clear::after, .empty-clear::after { border: 0; }
+.filter-chip-selected { border-color: #b94a68; background: #fbe9ee; color: #9f3655; font-weight: 600; }
+.filter-summary { display: flex; margin-top: 20rpx; padding-top: 16rpx; align-items: center; justify-content: space-between; gap: 16rpx; border-top: 1rpx solid #f0e6e8; color: #87515f; font-size: 23rpx; }
+.filter-clear, .empty-clear { flex: 0 0 auto; margin: 0; padding: 0; border: 0; background: transparent; color: #a33e5b; font-size: 23rpx; line-height: 1.4; }
+.filter-result-note { margin: 0 4rpx 16rpx; color: #8f5967; font-size: 23rpx; }
+.filter-empty { line-height: 1.6; }
+.empty-clear { display: block; margin: 14rpx auto 0; }
 .recommendation-note { margin: 0 4rpx 16rpx; color: #8d6e73; font-size: 23rpx; }
 .companion { display: flex; gap: 22rpx; }
 .avatar { display: flex; width: 88rpx; height: 88rpx; align-items: center; justify-content: center; border-radius: 50%; background: #f5dce2; color: #a43f5c; font-weight: 700; }

@@ -1,5 +1,24 @@
 <view class="page chat-page">
   <view class="notice">请在平台内完成沟通，勿交换私人联系方式、线下见面或私下转账。</view>
+  <view wx:if="{{hasConversation && messageInteractionAvailable}}" class="message-notification-setting">
+    <view class="message-notification-copy">
+      <view class="message-notification-title">本会话消息提醒</view>
+      <view wx:if="{{messageNotificationsMuted}}" class="message-notification-description">仅你已静音。新消息仍会显示在会话和未读列表，对方不会收到提示。</view>
+      <view wx:else class="message-notification-description">当前未静音。微信订阅是否送达取决于你的主动授权。</view>
+    </view>
+    <button class="message-notification-action" loading="{{messageNotificationUpdating}}" bindtap="toggleMessageNotifications">{{messageNotificationsMuted ? '恢复提醒' : '静音本会话'}}</button>
+  </view>
+  <view class="safety-exit">
+    <view class="safety-exit-title">感到不适或不安全？</view>
+    <view class="safety-exit-copy">可以先停止回复、离开会话或查看安全说明。出现即时危险时，请联系当地紧急服务或身边可信的人；Talk&amp;Talk 不提供报警或紧急救援。</view>
+    <view class="safety-exit-copy">需要举报具体内容可长按消息；举报会话仍需你自己填写原因后提交。</view>
+    <view class="safety-exit-actions">
+      <button class="safety-exit-action" bindtap="openSafetyCenter">安全与支持</button>
+      <button class="safety-exit-action" bindtap="leaveConversation">离开会话</button>
+      <button wx:if="{{hasConversation}}" class="safety-exit-action safety-exit-report" bindtap="report">举报会话</button>
+      <button wx:if="{{hasConversation}}" class="safety-exit-action safety-exit-block" loading="{{conversationBlockUpdating}}" bindtap="toggleConversationBlock">{{conversationBlockedByYou ? '解除拉黑' : '为自己拉黑'}}</button>
+    </view>
+  </view>
   <view wx:if="{{restrictionNotice}}" class="restriction-notice">{{restrictionNotice}}。到期后可恢复发送。</view>
   <view wx:if="{{appealCaseId}}" class="appeal-notice">
     <text>严重处置可申请一次人工复核。</text>
@@ -7,6 +26,14 @@
   </view>
   <view wx:if="{{loading}}" class="empty">正在加载…</view>
   <view wx:elif="{{error}}" class="empty">{{error}}</view>
+  <view wx:elif="{{conversationBlockedByYou}}" class="conversation-boundary">
+    <view class="conversation-boundary-title">你已为自己拉黑本会话</view>
+    <view class="conversation-boundary-copy">消息记录暂不展示，双方不能继续在这里收发消息。拉黑不取消订单，也不代表举报、客服、退款或安全处置已经完成；需要时仍可使用上方入口。</view>
+  </view>
+  <view wx:elif="{{!messageInteractionAvailable}}" class="conversation-boundary">
+    <view class="conversation-boundary-title">当前会话暂不能继续收发消息</view>
+    <view class="conversation-boundary-copy">订单、退款、举报、客服和安全入口不受影响。页面不会说明是哪一方设置了关系边界。</view>
+  </view>
   <view wx:else class="messages">
     <view wx:if="{{loadingOlder}}" class="history-status">正在加载更早消息…</view>
     <view wx:elif="{{hasMore}}" class="history-status">上拉加载更早消息</view>
@@ -27,11 +54,10 @@
     </view>
     <view wx:if="{{syncing}}" class="sync-status">正在同步新消息…</view>
   </view>
-  <view class="composer">
+  <view wx:if="{{messageInteractionAvailable}}" class="composer">
     <input value="{{draft}}" bindinput="setDraft" maxlength="2000" placeholder="输入消息…" confirm-type="send" bindconfirm="send" disabled="{{restrictionEndsAt !== ''}}" />
     <button wx:if="{{mediaEnabled}}" class="media" disabled="{{sending || mediaUploading || restrictionEndsAt}}" bindtap="chooseImage">图片</button>
     <button wx:if="{{mediaEnabled}}" class="media {{recording ? 'recording' : ''}}" disabled="{{sending || mediaUploading || restrictionEndsAt}}" bindtap="toggleRecord">{{recording ? '结束' : '语音'}}</button>
     <button class="send" loading="{{sending || mediaUploading}}" disabled="{{restrictionEndsAt !== ''}}" bindtap="send">发送</button>
   </view>
-  <button class="report" bindtap="report">举报此会话</button>
 </view>

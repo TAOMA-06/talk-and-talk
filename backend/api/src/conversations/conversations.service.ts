@@ -2,15 +2,19 @@ import { HttpStatus, Injectable } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 
 import { AppException } from "../common/errors/app.exception";
+import { AuditService } from "../common/audit/audit.service";
 import { PrismaService } from "../database/prisma.service";
 import { ChatRestrictionService } from "../moderation/chat-restriction.service";
 import { MediaAssetService } from "../moderation/media/media-asset.service";
 import { MediaModerationWorker } from "../moderation/media/media-moderation.worker";
 import { ModerationCaseService } from "../moderation/moderation-case.service";
 import { ModerationService, ModerationResult } from "../moderation/moderation.service";
+import { NotificationsService } from "../notifications/notifications.service";
 import { ListMessagesQueryDto } from "./dto/list-messages.dto";
 import { ReserveMediaUploadDto } from "./dto/reserve-media-upload.dto";
 import { SendMessageDto } from "./dto/send-message.dto";
+import { SetConversationBlockDto } from "./dto/set-conversation-block.dto";
+import { SetConversationNotificationPreferenceDto } from "./dto/set-conversation-notification-preference.dto";
 
 type Db = any;
 const CHAT_ENABLED_ORDER_STATUSES = ["paid", "inService", "completed"] as const;
@@ -23,7 +27,9 @@ export class ConversationsService {
     private readonly moderationCases: ModerationCaseService,
     private readonly chatRestrictions: ChatRestrictionService,
     private readonly mediaAssets: MediaAssetService,
-    private readonly mediaWorker: MediaModerationWorker
+    private readonly mediaWorker: MediaModerationWorker,
+    private readonly notifications: NotificationsService,
+    private readonly audit: AuditService
   ) {}
 
   status() {
@@ -35,10 +41,27 @@ export class ConversationsService {
   }
 
   async conversationStatus(userId: string, externalId: string) {
-    await this.ensureConversation(userId, externalId);
-    const restriction: any = await this.chatRestrictions.activeForUser(userId);
+    const conversation = await this.ensureConversation(userId, externalId);
+    const [restriction, preference, ownBlock, anyBlock] = await Promise.all([
+      this.chatRestrictions.activeForUser(userId),
+      this.prisma.conversationNotificationPreference.findUnique({
+        where: { conversationId_userId: { conversationId: conversation.id, userId } },
+        select: { mutedAt: true }
+      } as any),
+      this.prisma.conversationBlock.findUnique({
+        where: { conversationId_blockedByUserId: { conversationId: conversation.id, blockedByUserId: userId } },
+        select: { id: true }
+      } as any),
+      this.prisma.conversationBlock.findFirst({
+        where: { conversationId: conversation.id },
+        select: { id: true }
+      } as any)
+    ]);
     return {
       mediaEnabled: this.mediaAssets.isFeatureEnabled(),
+      messageNotificationsMuted: Boolean(preference?.mutedAt),
+      conversationBlockedByYou: Boolean(ownBlock),
+      messageInteractionAvailable: !anyBlock,
       chatRestriction: restriction
         ? {
             id: restriction.id,
@@ -66,6 +89,18 @@ export class ConversationsService {
         readStates: {
           where: { userId },
           take: 1
+        },
+        notificationPreferences: {
+          where: { userId },
+          select: { mutedAt: true },
+          take: 1
+        },
+        // The response never exposes a block actor. It only receives a
+        // boolean describing whether message interaction is available and,
+        // for the current user, whether an unblock control is needed.
+        blocks: {
+          select: { blockedByUserId: true },
+          take: 2
         }
       },
       orderBy: { updatedAt: "desc" }
@@ -74,6 +109,8 @@ export class ConversationsService {
     const items = await Promise.all(
       conversations.map(async (conversation: any) => {
         const isCustomer = conversation.userId === userId;
+        const conversationBlockedByYou = conversation.blocks.some((block: any) => block.blockedByUserId === userId);
+        const messageInteractionAvailable = conversation.blocks.length === 0;
         const readState = conversation.readStates[0];
         const unreadPosition = readState
           ? {
@@ -90,15 +127,17 @@ export class ConversationsService {
               ]
             }
           : {};
-        const unreadCount = await this.prisma.message.count({
-          where: {
-            conversationId: conversation.id,
-            senderId: { not: userId },
-            moderationStatus: "published",
-            visibility: "participants",
-            ...unreadPosition
-          }
-        } as any);
+        const unreadCount = !messageInteractionAvailable
+          ? 0
+          : await this.prisma.message.count({
+              where: {
+                conversationId: conversation.id,
+                senderId: { not: userId },
+                moderationStatus: "published",
+                visibility: "participants",
+                ...unreadPosition
+              }
+            } as any);
 
         return {
           // Customer routes stay compatible with the public companion id. An
@@ -110,13 +149,18 @@ export class ConversationsService {
           participant: isCustomer
             ? this.companionParticipantDto(conversation.companion)
             : this.customerParticipantDto(conversation.user),
-          lastMessage: conversation.messages[0]
+          lastMessage: messageInteractionAvailable && conversation.messages[0]
             ? await this.toMessageDto(
                 conversation.messages[0],
                 isCustomer ? conversation.externalId : conversation.id
               )
             : null,
           unreadCount,
+          // This field is selected with the viewer's user id, so neither
+          // participant can learn the other participant's private preference.
+          messageNotificationsMuted: Boolean(conversation.notificationPreferences[0]?.mutedAt),
+          conversationBlockedByYou,
+          messageInteractionAvailable,
           updatedAt: conversation.updatedAt.toISOString()
         };
       })
@@ -125,9 +169,89 @@ export class ConversationsService {
     return { conversations: items };
   }
 
+  async setMessageNotificationsMuted(
+    userId: string,
+    externalId: string,
+    dto: SetConversationNotificationPreferenceDto
+  ) {
+    const conversation = await this.ensureConversation(userId, externalId);
+    if (dto.muted) {
+      await this.prisma.conversationNotificationPreference.upsert({
+        where: { conversationId_userId: { conversationId: conversation.id, userId } },
+        create: { conversationId: conversation.id, userId, mutedAt: new Date() },
+        update: { mutedAt: new Date() }
+      } as any);
+    } else {
+      // The default is enabled. Removing the row restores it and avoids
+      // retaining an unnecessary unmuted-conversation behavior record.
+      await this.prisma.conversationNotificationPreference.deleteMany({
+        where: { conversationId: conversation.id, userId }
+      } as any);
+    }
+    return { messageNotificationsMuted: dto.muted };
+  }
+
+  async setConversationBlocked(userId: string, externalId: string, dto: SetConversationBlockDto) {
+    const conversation = await this.ensureConversation(userId, externalId);
+    return this.prisma.$transaction(async (tx) => {
+      const db = tx as Db;
+      await this.lockConversationBoundary(db, conversation.id);
+      if (dto.blocked) {
+        await db.conversationBlock.upsert({
+          where: { conversationId_blockedByUserId: { conversationId: conversation.id, blockedByUserId: userId } },
+          create: { conversationId: conversation.id, blockedByUserId: userId },
+          update: {}
+        });
+        // Remove only the blocker's outstanding, content-free message notices.
+        // Orders, support, moderation, and safety notifications remain intact.
+        await db.notification.deleteMany({
+          where: {
+            userId,
+            type: "messageReceived",
+            eventKey: { startsWith: `conversation:${conversation.id}:` }
+          }
+        });
+        await this.audit.record({
+          actorId: userId,
+          action: "conversation.blocked",
+          resourceType: "conversation",
+          resourceId: conversation.id,
+          metadata: { scope: "message_interaction_only" }
+        }, db);
+      } else {
+        const removed = await db.conversationBlock.deleteMany({
+          where: { conversationId: conversation.id, blockedByUserId: userId }
+        });
+        if (removed.count) {
+          await this.audit.record({
+            actorId: userId,
+            action: "conversation.unblocked",
+            resourceType: "conversation",
+            resourceId: conversation.id,
+            metadata: { scope: "message_interaction_only" }
+          }, db);
+        }
+      }
+      const anyBlock = await this.findAnyConversationBlock(conversation.id, db);
+      return {
+        conversationBlockedByYou: dto.blocked,
+        messageInteractionAvailable: !anyBlock
+      };
+    });
+  }
+
   async messages(userId: string, externalId: string, query: ListMessagesQueryDto) {
     const conversation = await this.ensureConversation(userId, externalId);
     const limit = Math.min(query.limit ?? 50, 100);
+    if (await this.findAnyConversationBlock(conversation.id)) {
+      // Blocking does not delete records needed for audit, reporting, or an
+      // eventual explicit unblock. It stops both sides from receiving or
+      // displaying the conversation through ordinary message routes.
+      return {
+        messages: [],
+        pagination: { limit, nextCursor: null, hasMore: false }
+      };
+    }
     const visibleToViewer = {
       OR: [
         { moderationStatus: "published", visibility: "participants" },
@@ -207,6 +331,7 @@ export class ConversationsService {
     await this.chatRestrictions.assertCanSend(userId);
 
     const conversation: any = await this.ensureConversation(userId, externalId);
+    await this.assertConversationInteractionAvailable(conversation.id);
     const user: any = await this.prisma.user.findUnique({
       where: { id: userId },
       include: { profile: true }
@@ -252,6 +377,8 @@ export class ConversationsService {
 
     const result = await this.prisma.$transaction(async (tx) => {
       const db = tx as Db;
+      await this.lockConversationBoundary(db, conversation.id);
+      await this.assertConversationInteractionAvailable(conversation.id, db);
       const now = Date.now();
       let message: any;
       let safetyMessage: any | null = null;
@@ -332,6 +459,23 @@ export class ConversationsService {
         data: { updatedAt: new Date(now + 3) }
       });
 
+      if (moderationStatus === "published") {
+        const recipientUserId = isCompanion ? conversation.userId : conversation.companion.ownerUserId;
+        if (recipientUserId && recipientUserId !== userId) {
+          // The notification helper receives only stable ids. It never reads
+          // or renders this message's content, and persists no relation beyond
+          // the existing paid conversation.
+          await this.notifications.createConversationMessageReceivedIfUnmuted(db, {
+            conversationId: conversation.id,
+            messageId: message.id,
+            recipientUserId,
+            recipientConversationId: recipientUserId === conversation.userId
+              ? conversation.externalId
+              : conversation.id
+          });
+        }
+      }
+
       return { message, safetyMessage, moderationCase };
     });
 
@@ -353,6 +497,7 @@ export class ConversationsService {
   async reserveMediaUpload(userId: string, externalId: string, dto: ReserveMediaUploadDto) {
     await this.chatRestrictions.assertCanSend(userId);
     const conversation = await this.ensureConversation(userId, externalId);
+    await this.assertConversationInteractionAvailable(conversation.id);
     return this.mediaAssets.reserve({
       uploaderId: userId,
       conversationId: conversation.id,
@@ -367,6 +512,7 @@ export class ConversationsService {
   async completeMediaUpload(userId: string, externalId: string, assetId: string) {
     await this.chatRestrictions.assertCanSend(userId);
     const conversation = await this.ensureConversation(userId, externalId);
+    await this.assertConversationInteractionAvailable(conversation.id);
     return this.mediaAssets.complete(assetId, userId, conversation.id);
   }
 
@@ -404,6 +550,29 @@ export class ConversationsService {
     }
 
     throw new AppException("CONVERSATION_NOT_FOUND", "Conversation not found", HttpStatus.NOT_FOUND);
+  }
+
+  private async lockConversationBoundary(db: Db, conversationId: string) {
+    if (typeof db.$queryRaw === "function") {
+      await db.$queryRaw`SELECT "id" FROM "Conversation" WHERE "id" = ${conversationId} FOR UPDATE`;
+    }
+  }
+
+  private async findAnyConversationBlock(conversationId: string, db: Db = this.prisma as any) {
+    return db.conversationBlock.findFirst({
+      where: { conversationId },
+      select: { id: true }
+    } as any);
+  }
+
+  private async assertConversationInteractionAvailable(conversationId: string, db: Db = this.prisma as any) {
+    if (await this.findAnyConversationBlock(conversationId, db)) {
+      throw new AppException(
+        "CONVERSATION_INTERACTION_UNAVAILABLE",
+        "This conversation cannot receive new messages",
+        HttpStatus.FORBIDDEN
+      );
+    }
   }
 
   private companionParticipantDto(companion: any) {

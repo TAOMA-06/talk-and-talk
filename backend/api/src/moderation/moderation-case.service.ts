@@ -23,6 +23,8 @@ export interface CreateModerationCaseInput {
   assignedToUserId?: string | null;
   /** When true, create even if decision is allow (used for user reports). */
   forceCreate?: boolean;
+  /** A user report is intake only and must not notify the reported subject. */
+  notifySubject?: boolean;
   /** When provided, all case, evidence, notification, and audit writes use it. */
   db?: any;
 }
@@ -36,6 +38,21 @@ export interface CreateReportCaseInput {
   conversationId?: string | null;
   subjectUserId?: string | null;
   actorId?: string | null;
+  /** Use an existing outer transaction when report receipt and case must commit together. */
+  db?: any;
+  /** Allows intake callers to omit reporter prose from audit metadata. */
+  auditMetadata?: Record<string, unknown>;
+}
+
+export interface AppendCommunityReportToCaseInput {
+  caseId: string;
+  reportId: string;
+  postId: string;
+  reporterUserId: string;
+  reason: string;
+  result: ModerationResult;
+  /** Must share the caller's post/case-lock transaction. */
+  db: any;
 }
 
 @Injectable()
@@ -63,6 +80,7 @@ export class ModerationCaseService {
       dueAt,
       assignedToUserId,
       forceCreate,
+      notifySubject,
       db
     } = input;
     if (result.decision === "allow" && !forceCreate) {
@@ -132,16 +150,34 @@ export class ModerationCaseService {
       );
     }
 
-    await this.afterCaseCreated(created, result, subjectUserId ?? actorId, conversationId, client);
+    await this.afterCaseCreated(
+      created,
+      result,
+      subjectUserId,
+      actorId,
+      conversationId,
+      client,
+      notifySubject !== false
+    );
 
     return created;
   }
 
   async createReportCase(input: CreateReportCaseInput) {
-    const { result, reason, content, targetId, messageId, conversationId, subjectUserId, actorId } = input;
+    const {
+      result,
+      reason,
+      content,
+      targetId,
+      messageId,
+      conversationId,
+      subjectUserId,
+      actorId,
+      db: providedDatabase,
+      auditMetadata
+    } = input;
     const status = result.score >= 0.55 ? "humanReview" : "pending";
-    return this.prisma.$transaction(async (tx) => {
-      const db = tx as any;
+    const create = async (db: any) => {
       const created = await this.createFromResult({
         result,
         source: "report",
@@ -155,6 +191,7 @@ export class ModerationCaseService {
         title: `举报：${reason.slice(0, 40)}`,
         status,
         forceCreate: true,
+        notifySubject: false,
         db
       });
 
@@ -168,7 +205,7 @@ export class ModerationCaseService {
           action: "create_report",
           resourceType: "moderation_case",
           resourceId: created.id,
-          metadata: {
+          metadata: auditMetadata ?? {
             reason: reason.slice(0, 200),
             source: "report",
             decision: result.decision
@@ -177,7 +214,59 @@ export class ModerationCaseService {
       }
 
       return created;
+    };
+    return providedDatabase ? create(providedDatabase) : this.prisma.$transaction(create);
+  }
+
+  /**
+   * Adds a later independent community-report signal to an already open case.
+   * It intentionally does not alter case status, decision, priority, the post,
+   * or any user notification: joining staff evidence is not a disposition.
+   */
+  async appendCommunityReportToCase(input: AppendCommunityReportToCaseInput) {
+    const { caseId, reportId, postId, reporterUserId, reason, result, db } = input;
+    await db.moderationEvidence.create({
+      data: {
+        caseId,
+        type: "community_report_attachment",
+        payload: {
+          reportId,
+          reason: reason.slice(0, 500),
+          moderation: {
+            decision: result.decision,
+            riskLevel: result.riskLevel,
+            priority: result.priority,
+            score: result.score,
+            reasons: result.reasons,
+            matchedRules: result.matchedRules,
+            categories: result.categories,
+            policyVersion: result.policyVersion
+          }
+        }
+      }
     });
+    await db.moderationActionLog.create({
+      data: {
+        caseId,
+        actorId: reporterUserId,
+        action: "community_report.attached",
+        // Keep reporter prose in the evidence record only, not duplicated in
+        // action-log summaries that are routinely scanned by operations.
+        note: "An additional independent community report was attached."
+      }
+    });
+    await this.audit.record({
+      actorId: reporterUserId,
+      action: "community.report_attached",
+      resourceType: "moderation_case",
+      resourceId: caseId,
+      metadata: {
+        source: "community_post_report",
+        postId,
+        reportId,
+        attachedToExistingCase: true
+      }
+    }, db);
   }
 
   async createAppeal(input: { caseId: string; subjectUserId: string; reason: string }) {
@@ -245,13 +334,15 @@ export class ModerationCaseService {
   private async afterCaseCreated(
     created: { id: string },
     result: ModerationResult,
+    subjectUserId?: string | null,
     actorId?: string | null,
     conversationId?: string | null,
-    database: any = this.prisma
+    database: any = this.prisma,
+    notifySubject = true
   ) {
-    if (actorId) {
+    if (notifySubject && (subjectUserId ?? actorId)) {
       await this.notifications.create(
-        actorId,
+        subjectUserId ?? actorId!,
         "moderationAlert",
         "内容安全提醒",
         "你的内容已触发平台安全机制，请继续在平台内合规沟通。",
@@ -264,7 +355,7 @@ export class ModerationCaseService {
       );
     }
     await this.audit.record({
-      actorId: actorId ?? "system",
+      actorId: actorId ?? subjectUserId ?? "system",
       action: "moderation.case_created",
       resourceType: "moderation_case",
       resourceId: created.id,

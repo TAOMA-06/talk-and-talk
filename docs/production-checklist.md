@@ -7,6 +7,7 @@
 
 - [ ] `COMMERCIAL_RELEASE_MODE=commercial`；`REFUND_REQUEST_WINDOW_HOURS`、`COMPANION_SETTLEMENT_HOLD_HOURS` 与经批准规则一致，且结算至少晚于退款窗口 24 小时
 - [ ] `ORDER_INTAKE_ENABLED`、总量/单用户/单陪伴者容量与 `ORDER_MAX_SCHEDULE_DAYS` 已按排班和值班能力设置；事故演练能暂停新单但仍允许同幂等键找回原订单
+- [ ] `ORDER_RESCHEDULE_RESPONSE_WINDOW_MINUTES`、`ORDER_RESCHEDULE_EXPIRY_*`、`rescheduleRequested`、`rescheduleAccepted`、`rescheduleRejected`、`rescheduleExpired` 与 `rescheduleCancelled` 订阅消息模板已按值班能力配置；小程序真机已验证用户主动开启提醒时会按单次最多 3 项分批请求并记录授权；改期请求只在双方确认后、并通过第二次容量校验时才可替换原预约，拒绝、超时、订单取消、退款或履约开始/完成都不会改写原预约
 - [ ] `/admin/commercial/readiness` 返回 `clear`，并由值班人员核对失败/超时退款、超时工单、失败推送、过期推送租约、待复核商业档案、未结追偿、超时结算、审核服务故障、严重/超时审核、媒体删除失败、过期支付、预约响应/支付保留超时、已过履约窗口待退款和超时服务订单均为 0
 - [ ] `SUPPORT_MAX_OPEN_PER_USER` 与实际客服容量一致；普通工单达到上限会被拒绝，但紧急安全工单仍可进入队列
 - [ ] 每位上架陪伴者均具备已复核的实名状态与商业档案；收款对象、税务档案、身份和协议只保存受控外部证据引用
@@ -62,9 +63,11 @@
 
 ## 微信订阅通知
 
-- [ ] 生产配置的十个逻辑模板键均映射到实际审批通过的模板 ID，字段与小程序授权场景一致
+- [ ] 生产配置的全部必需逻辑模板键（含 `messageReceived`）均映射到实际审批通过的模板 ID，字段与小程序授权场景一致；真机验证会话静音后不会消耗授权或投递新消息提醒
 - [ ] 真机逐个验证授权、发送、拒绝授权、模板更换和授权耗尽；旧模板授权不得用于新模板
 - [ ] 失败投递进入后台商用门禁并配置跨副本告警；不得对结果未知的一次性消息自动重发
+- [ ] 收藏对象可约提醒保持 `AVAILABILITY_REMINDER_DELIVERY_ENABLED=false`，除非 staging 已完成一次明确授权、私人书签、真实可约与 provider 接受的受控演练；若开启，预检必须识别已审批的 `availabilityReminder` 模板
+- [ ] 内网 metrics 已采集 `talk_availability_reminder_delivery_success_total`、`talk_availability_reminder_delivery_failures_total`、`talk_availability_reminder_delivery_skipped_total`；初期任何 failure 或私有 `uncertain` 增量均由工程值班人工核查，绝不通过改状态、释放授权或重启 runner 补发
 
 ## 退款、结算与财务对账
 

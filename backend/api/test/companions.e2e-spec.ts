@@ -139,6 +139,238 @@ describe("Companions and me (e2e)", () => {
     expect(response.body.error.code).toBe("COMPANION_NOT_FOUND");
   });
 
+  it("returns service-duration availability candidates and a legacy fallback", async () => {
+    const offering = await prisma.companionServiceOffering.findFirst({
+      where: { companionId: "c1", isActive: true }
+    });
+    expect(offering).not.toBeNull();
+
+    const structured = await request(app.getHttpServer())
+      .get("/api/v1/companions/c1/availability")
+      .query({ serviceOfferingId: offering!.id, days: 2 })
+      .expect(200);
+
+    expect(structured.body.data).toEqual(expect.objectContaining({
+      source: "structured",
+      serviceOfferingId: offering!.id,
+      durationMinutes: offering!.durationMinutes,
+      timezone: "Asia/Shanghai"
+    }));
+    expect(structured.body.data.items[0]).toEqual(expect.objectContaining({
+      availabilityWindowId: expect.any(String),
+      startsAt: expect.any(String),
+      endsAt: expect.any(String),
+      availableCapacity: 1
+    }));
+
+    await prisma.companionAvailabilityWindow.deleteMany({ where: { companionId: "c1" } });
+    const legacy = await request(app.getHttpServer())
+      .get("/api/v1/companions/c1/availability")
+      .query({ durationMinutes: 30 })
+      .expect(200);
+
+    expect(legacy.body.data).toEqual(expect.objectContaining({
+      source: "legacy",
+      serviceOfferingId: null,
+      legacyAvailableTimes: expect.arrayContaining(["20:00"]),
+      items: []
+    }));
+  });
+
+  it("returns active service offerings without exposing inactive catalog entries", async () => {
+    await prisma.companionServiceOffering.create({
+      data: {
+        companionId: "c1",
+        code: "inactive-test-offering",
+        title: "未上架服务",
+        deliveryMode: "text",
+        durationMinutes: 30,
+        priceCents: 9900,
+        currency: "CNY",
+        topicIds: ["t1"],
+        isActive: false,
+        sortOrder: 99
+      }
+    });
+
+    const response = await request(app.getHttpServer())
+      .get("/api/v1/companions/c1/service-offerings")
+      .expect(200);
+
+    expect(response.body.data.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: "legacy-standard",
+        deliveryMode: "text",
+        durationMinutes: 30,
+        priceCents: 3900,
+        currency: "CNY"
+      })
+    ]));
+    expect(response.body.data.items.map((item: { code: string }) => item.code)).not.toContain("inactive-test-offering");
+
+    await prisma.companionProfile.update({ where: { id: "c1" }, data: { isPublished: false } });
+    const hiddenResponse = await request(app.getHttpServer())
+      .get("/api/v1/companions/c1/service-offerings")
+      .expect(404);
+
+    expect(hiddenResponse.body.error.code).toBe("COMPANION_NOT_FOUND");
+  });
+
+  it("lets a verified companion owner manage only their own service catalog", async () => {
+    const companion = await prisma.companionProfile.findUnique({
+      where: { id: "c1" },
+      select: { ownerUserId: true }
+    });
+    expect(companion?.ownerUserId).toBeTruthy();
+    const owner = await prisma.user.findUnique({ where: { id: companion!.ownerUserId! } });
+    expect(owner).not.toBeNull();
+    await grantCurrentLegalConsent(prisma, owner!.id);
+    const token = jwt.sign(
+      { sub: owner!.id, role: owner!.role },
+      { secret: "e2e-access-secret", expiresIn: "15m" }
+    );
+
+    await request(app.getHttpServer())
+      .get("/api/v1/companions/me/service-offerings")
+      .set("Authorization", `Bearer ${token}`)
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body.data.items).toEqual(expect.arrayContaining([
+          expect.objectContaining({ code: "legacy-standard", isActive: true })
+        ]));
+      });
+
+    const created = await request(app.getHttpServer())
+      .post("/api/v1/companions/me/service-offerings")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        title: "周末语音陪伴",
+        description: "在平台内聊天，不交换联系方式。",
+        deliveryMode: "voice",
+        durationMinutes: 60,
+        priceCents: 8800,
+        topicIds: ["t1", "t3"],
+        sortOrder: 12
+      })
+      .expect(201);
+
+    expect(created.body.data).toEqual(expect.objectContaining({
+      id: expect.any(String),
+      code: expect.stringMatching(/^service-/),
+      title: "周末语音陪伴",
+      deliveryMode: "voice",
+      durationMinutes: 60,
+      priceCents: 8800,
+      isActive: true,
+      sortOrder: 12
+    }));
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/companions/me/service-offerings/${created.body.data.id}`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ isActive: false, sortOrder: 14 })
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body.data).toEqual(expect.objectContaining({
+          id: created.body.data.id,
+          isActive: false,
+          sortOrder: 14
+        }));
+      });
+
+    const publicCatalog = await request(app.getHttpServer())
+      .get("/api/v1/companions/c1/service-offerings")
+      .expect(200);
+    expect(publicCatalog.body.data.items.map((item: { id: string }) => item.id)).not.toContain(created.body.data.id);
+
+    const otherOffering = await prisma.companionServiceOffering.findFirst({
+      where: { companionId: "c2", isActive: true }
+    });
+    expect(otherOffering).not.toBeNull();
+    const foreignResponse = await request(app.getHttpServer())
+      .patch(`/api/v1/companions/me/service-offerings/${otherOffering!.id}`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ isActive: false })
+      .expect(404);
+    expect(foreignResponse.body.error.code).toBe("SERVICE_OFFERING_NOT_FOUND");
+  });
+
+  it("lets a verified companion owner manage only their own structured availability windows", async () => {
+    const companion = await prisma.companionProfile.findUnique({
+      where: { id: "c1" },
+      select: { ownerUserId: true }
+    });
+    expect(companion?.ownerUserId).toBeTruthy();
+    const owner = await prisma.user.findUnique({ where: { id: companion!.ownerUserId! } });
+    expect(owner).not.toBeNull();
+    await grantCurrentLegalConsent(prisma, owner!.id);
+    const token = jwt.sign(
+      { sub: owner!.id, role: owner!.role },
+      { secret: "e2e-access-secret", expiresIn: "15m" }
+    );
+
+    await request(app.getHttpServer())
+      .get("/api/v1/companions/me/availability-windows")
+      .set("Authorization", `Bearer ${token}`)
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body.data.items).toEqual(expect.arrayContaining([
+          expect.objectContaining({ id: expect.any(String), isActive: true })
+        ]));
+      });
+
+    const created = await request(app.getHttpServer())
+      .post("/api/v1/companions/me/availability-windows")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        startsAt: "2030-01-02T10:00:00.000Z",
+        endsAt: "2030-01-02T12:00:00.000Z",
+        capacity: 2
+      })
+      .expect(201);
+
+    expect(created.body.data).toEqual(expect.objectContaining({
+      id: expect.any(String),
+      startsAt: "2030-01-02T10:00:00.000Z",
+      endsAt: "2030-01-02T12:00:00.000Z",
+      capacity: 2,
+      isActive: true
+    }));
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/companions/me/availability-windows/${created.body.data.id}`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ isActive: false })
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body.data).toEqual(expect.objectContaining({
+          id: created.body.data.id,
+          isActive: false
+        }));
+      });
+
+    const invalidAlignment = await request(app.getHttpServer())
+      .post("/api/v1/companions/me/availability-windows")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        startsAt: "2030-01-03T10:15:00.000Z",
+        endsAt: "2030-01-03T12:00:00.000Z"
+      })
+      .expect(400);
+    expect(invalidAlignment.body.error.code).toBe("INVALID_AVAILABILITY_WINDOW_ALIGNMENT");
+
+    const otherWindow = await prisma.companionAvailabilityWindow.findFirst({
+      where: { companionId: "c2", isActive: true }
+    });
+    expect(otherWindow).not.toBeNull();
+    const foreignResponse = await request(app.getHttpServer())
+      .patch(`/api/v1/companions/me/availability-windows/${otherWindow!.id}`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ isActive: false })
+      .expect(404);
+    expect(foreignResponse.body.error.code).toBe("AVAILABILITY_WINDOW_NOT_FOUND");
+  });
+
   it("allows admins to create, edit, publish and unpublish companions", async () => {
     const { token } = await createUser("admin");
     const { token: reviewerToken } = await createUser("admin");

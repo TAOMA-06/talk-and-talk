@@ -6,7 +6,11 @@
     "pages/orders/index",
     "pages/messages/index",
     "pages/profile/index",
+    "pages/safety/index",
     "pages/companion/detail",
+    "pages/companion/workbench/index",
+    "pages/companion/services/index",
+    "pages/companion/availability/index",
     "pages/chat/index",
     "pages/legal/index"
   ],

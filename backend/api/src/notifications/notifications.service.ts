@@ -9,7 +9,8 @@ export type NotificationTypeName =
   | "orderStatus"
   | "moderationAlert"
   | "safetyAlert"
-  | "supportUpdate";
+  | "supportUpdate"
+  | "messageReceived";
 
 export type TransactionalNotificationInput = {
   userId: string;
@@ -22,6 +23,40 @@ export type TransactionalNotificationInput = {
   /** A key configured server-side for a WeChat subscription template. */
   templateKey: string;
 };
+
+export type ConversationMessageNotificationInput = {
+  /** Internal conversation id, used only for server-side mute enforcement. */
+  conversationId: string;
+  messageId: string;
+  recipientUserId: string;
+  /** The recipient's authorized route id (public companion id or internal id). */
+  recipientConversationId: string;
+};
+
+export const CONVERSATION_MESSAGE_NOTIFICATION_TEMPLATE_KEY = "messageReceived";
+
+/**
+ * Event keys are intentionally server-only: the public notification payload
+ * contains just the recipient's existing chat route, never a chat body or a
+ * hidden internal conversation identifier.
+ */
+export function conversationMessageNotificationEventKey(input: Pick<
+  ConversationMessageNotificationInput,
+  "conversationId" | "messageId" | "recipientUserId"
+>) {
+  return `conversation:${input.conversationId}:message:${input.messageId}:recipient:${input.recipientUserId}`;
+}
+
+/** Returns the internal conversation id only for a valid, recipient-owned event. */
+export function conversationIdFromMessageNotificationEventKey(
+  eventKey: string | null | undefined,
+  recipientUserId: string
+): string | null {
+  if (!eventKey) return null;
+  const matched = /^conversation:([^:]+):message:([^:]+):recipient:([^:]+)$/.exec(eventKey);
+  if (!matched || matched[3] !== recipientUserId) return null;
+  return matched[1];
+}
 
 @Injectable()
 export class NotificationsService {
@@ -83,6 +118,48 @@ export class NotificationsService {
       update: {}
     });
     return this.toDto(item);
+  }
+
+  /**
+   * Stores a durable new-message notification only when the recipient has not
+   * muted this exact conversation. It never receives or renders message body
+   * text. The delivery worker rechecks the same preference immediately before
+   * consuming a one-time WeChat grant, so a queued delivery cannot bypass a
+   * mute chosen after the message transaction committed.
+   */
+  async createConversationMessageReceivedIfUnmuted(
+    db: any,
+    input: ConversationMessageNotificationInput
+  ) {
+    // Sending paths recheck this boundary before publishing. Keep a second
+    // check here so a future caller cannot turn a blocked conversation into an
+    // inbox or external reminder by mistake.
+    const block = await db.conversationBlock.findFirst({
+      where: { conversationId: input.conversationId },
+      select: { id: true }
+    });
+    if (block) return { queued: false };
+    const preference = await db.conversationNotificationPreference.findUnique({
+      where: {
+        conversationId_userId: {
+          conversationId: input.conversationId,
+          userId: input.recipientUserId
+        }
+      },
+      select: { mutedAt: true }
+    });
+    if (preference?.mutedAt) return { queued: false };
+
+    await this.createTransactional(db, {
+      userId: input.recipientUserId,
+      type: "messageReceived",
+      title: "收到一条新消息",
+      body: "打开 Talk&Talk 的平台内会话查看。",
+      data: { conversationId: input.recipientConversationId },
+      eventKey: conversationMessageNotificationEventKey(input),
+      templateKey: CONVERSATION_MESSAGE_NOTIFICATION_TEMPLATE_KEY
+    });
+    return { queued: true };
   }
 
   async list(userId: string, query: ListNotificationsQueryDto) {

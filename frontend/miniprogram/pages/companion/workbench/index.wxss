@@ -1,0 +1,39 @@
+.hero-card { padding: 34rpx 30rpx; border-radius: 28rpx; background: linear-gradient(135deg, #fff, #ffe9ef); box-shadow: 0 10rpx 28rpx rgba(96, 50, 60, 0.08); }
+.eyebrow { color: #b94a68; font-size: 24rpx; font-weight: 700; letter-spacing: 1rpx; }
+.hero-title { margin-top: 10rpx; color: #2d2023; font-size: 39rpx; font-weight: 700; }
+.hero-copy { margin-top: 14rpx; color: #765b60; font-size: 26rpx; line-height: 1.65; }
+.updated-at { margin-top: 22rpx; color: #a9878e; font-size: 22rpx; }
+.access-empty { line-height: 1.7; }
+.access-title { color: #4b353a; font-size: 34rpx; font-weight: 700; }
+.retry-button { margin-top: 28rpx; }
+.attention-card { display: flex; align-items: center; gap: 18rpx; margin-top: 20rpx; padding: 24rpx; border-radius: 22rpx; background: #fff0d6; color: #704c1b; }
+.attention-icon { display: flex; flex: none; align-items: center; justify-content: center; width: 42rpx; height: 42rpx; border-radius: 50%; background: #efad39; color: #fff; font-size: 29rpx; font-weight: 700; }
+.attention-body { flex: 1; min-width: 0; }
+.attention-title { font-size: 28rpx; font-weight: 700; }
+.attention-copy { margin-top: 6rpx; font-size: 23rpx; line-height: 1.45; }
+.attention-link { flex: none; color: #9d671d; font-size: 24rpx; font-weight: 700; }
+.section-heading { margin: 32rpx 4rpx 16rpx; color: #4b353a; font-size: 30rpx; font-weight: 700; }
+.overview-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16rpx; }
+.overview-card { box-sizing: border-box; min-height: 188rpx; padding: 24rpx 22rpx; border-radius: 22rpx; background: #fff; box-shadow: 0 6rpx 20rpx rgba(96, 50, 60, 0.06); }
+.overview-card.earnings-card { grid-column: 1 / -1; min-height: 150rpx; background: linear-gradient(135deg, #fff, #f8f0f2); }
+.overview-label { color: #8d6e73; font-size: 24rpx; }
+.overview-value { margin-top: 13rpx; color: #2d2023; font-size: 39rpx; font-weight: 700; line-height: 1.15; }
+.overview-unit { margin-left: 5rpx; color: #765b60; font-size: 23rpx; font-weight: 400; }
+.earnings-value { color: #a43f5c; }
+.overview-unavailable { margin-top: 13rpx; color: #765b60; font-size: 32rpx; font-weight: 700; line-height: 1.35; }
+.overview-note { margin-top: 14rpx; overflow: hidden; color: #a9878e; font-size: 22rpx; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
+.schedule-card { padding: 28rpx; }
+.today-service-card + .today-service-card { margin-top: 16rpx; }
+.schedule-head { display: flex; align-items: flex-start; gap: 16rpx; }
+.schedule-title { flex: 1; color: #2d2023; font-size: 30rpx; font-weight: 700; }
+.status-chip { flex: none; padding: 7rpx 12rpx; border-radius: 999rpx; background: #fce8ed; color: #a43f5c; font-size: 22rpx; }
+.schedule-time { margin-top: 22rpx; color: #4b353a; font-size: 29rpx; font-weight: 600; }
+.schedule-meta, .schedule-link { margin-top: 10rpx; color: #8d6e73; font-size: 25rpx; }
+.schedule-link { color: #a43f5c; font-weight: 700; }
+.empty-schedule { line-height: 1.6; }
+.empty-actions { display: flex; gap: 14rpx; margin-top: 22rpx; }
+.plain-button { margin: 0; padding: 0 20rpx; background: #f9edef; color: #a43f5c; font-size: 26rpx; line-height: 68rpx; }
+.schedule-action { margin-top: 22rpx; }
+.empty-actions .schedule-action { flex: 1; margin-top: 0; }
+.workbench-tip { margin: 24rpx 8rpx 10rpx; color: #a9878e; font-size: 22rpx; line-height: 1.55; }
+.card-hover { opacity: 0.8; }

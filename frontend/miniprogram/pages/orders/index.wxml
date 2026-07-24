@@ -4,22 +4,172 @@
   <view wx:else>
     <view class="section-title">我的预约</view>
     <button wx:if="{{orders.length}}" class="plain action" bindtap="enableCustomerNotifications">开启订单提醒</button>
+    <view wx:if="{{orders.length}}" class="notification-note">可选择服务状态、售后处理、改期请求/处理、改期超时或自动关闭提醒；微信会按每次最多 3 项分批询问。</view>
     <view wx:if="{{!orders.length}}" class="empty">还没有订单，去发现页找一位陪伴者吧。</view>
     <view class="card" wx:for="{{orders}}" wx:key="id">
       <view class="row"><text class="name">{{item.displayName}}</text><text class="status">{{item.statusText}}</text></view>
       <view class="schedule">预约：{{item.scheduledAtText}}</view>
       <view class="muted">{{item.durationMinutes}} 分钟 · {{item.amountText}}</view>
-      <view wx:if="{{item.status === 'pending' && !item.companionConfirmedAt}}" class="muted">等待陪伴者确认预约，确认前不会扣款。响应截止：{{item.responseDeadlineText}}</view>
-      <view wx:if="{{item.status === 'pending' && item.companionConfirmedAt}}" class="muted">已为你保留时段，请在 {{item.paymentDeadlineText}} 前支付；超时后需要重新确认。</view>
+      <view class="status-explanation">{{item.statusExplanation}}</view>
+      <view wx:if="{{item.hasFulfillmentGuidance}}" class="fulfillment-panel fulfillment-panel-{{item.fulfillmentTone}}">
+        <view class="fulfillment-heading-row">
+          <view class="fulfillment-kicker">本次服务</view>
+          <view class="fulfillment-heading">{{item.fulfillmentTitle}}</view>
+        </view>
+        <view class="fulfillment-detail">{{item.fulfillmentDetail}}</view>
+        <view wx:if="{{item.fulfillmentCountdownText}}" class="fulfillment-countdown">
+          <view class="fulfillment-countdown-label">{{item.fulfillmentCountdownLabel}}</view>
+          <view class="fulfillment-countdown-value">{{item.fulfillmentCountdownText}}</view>
+        </view>
+        <button wx:if="{{item.canOpenOrderConversation}}" class="fulfillment-chat" bindtap="openOrderConversation" data-id="{{item.id}}">{{item.orderConversationActionText}}</button>
+      </view>
+      <view wx:if="{{item.hasExperienceFeedback}}" class="experience-feedback-record">
+        <view class="experience-feedback-heading-row">
+          <view class="experience-feedback-kicker">服务后的回声</view>
+          <view class="experience-feedback-private">非公开</view>
+        </view>
+        <view class="experience-feedback-record-copy">{{item.experienceFeedbackStatusText}}。这不会改变退款、结算或订单状态。</view>
+        <button class="experience-feedback-support" bindtap="openSupport" data-id="{{item.id}}" data-category="orderIssue">仍需要平台协助</button>
+      </view>
+      <view wx:elif="{{item.canSubmitExperienceFeedback}}" class="experience-feedback-panel">
+        <view class="experience-feedback-heading-row">
+          <view class="experience-feedback-kicker">服务后的回声</view>
+          <view class="experience-feedback-private">非公开 · 仅平台可见</view>
+        </view>
+        <view class="experience-feedback-intro">用一小段反馈帮助我们核对履约体验；它不是公开评价，也不会改变退款、结算或订单状态。</view>
+        <button class="experience-feedback-toggle" bindtap="toggleExperienceFeedback" data-id="{{item.id}}">{{item.experienceFeedbackToggleText}}</button>
+        <view wx:if="{{item.experienceFeedbackOpen}}" class="experience-feedback-form">
+          <view class="experience-feedback-prompt">这次体验更接近哪一格？</view>
+          <view class="experience-feedback-rating-scale">
+            <button wx:for="{{item.experienceFeedbackRatingOptions}}" wx:for-item="ratingOption" wx:key="value" class="experience-feedback-rating {{ratingOption.className}}" bindtap="setExperienceFeedbackRating" data-id="{{item.id}}" data-rating="{{ratingOption.value}}">
+              <view class="experience-feedback-rating-value">{{ratingOption.label}}</view>
+              <view class="experience-feedback-rating-label">{{ratingOption.description}}</view>
+            </button>
+          </view>
+          <view class="experience-feedback-prompt">可补充至多 3 个标签</view>
+          <view class="experience-feedback-tags">
+            <button wx:for="{{item.experienceFeedbackTagOptions}}" wx:for-item="feedbackTag" wx:key="value" class="experience-feedback-tag {{feedbackTag.className}}" bindtap="toggleExperienceFeedbackTag" data-id="{{item.id}}" data-tag="{{feedbackTag.value}}">{{feedbackTag.label}}</button>
+          </view>
+          <textarea class="experience-feedback-note" value="{{item.experienceFeedbackNote}}" maxlength="200" placeholder="可选：用不超过 200 字说明体验（会先经过内容审核）" bindinput="setExperienceFeedbackNote" data-id="{{item.id}}"></textarea>
+          <button class="primary-button experience-feedback-submit" disabled="{{!item.experienceFeedbackSubmitEnabled}}" loading="{{item.experienceFeedbackSubmitting}}" bindtap="submitExperienceFeedback" data-id="{{item.id}}">记录体验反馈</button>
+        </view>
+        <button class="experience-feedback-support" bindtap="openSupport" data-id="{{item.id}}" data-category="orderIssue">需要平台协助，提交订单工单</button>
+      </view>
+      <view wx:if="{{item.canRebook}}" class="rebook-panel">
+        <view class="rebook-heading-row">
+          <view>
+            <view class="rebook-kicker">继续下一次</view>
+            <view class="rebook-heading">回到实时可约日历</view>
+          </view>
+          <view class="rebook-live">重新核对</view>
+        </view>
+        <view class="rebook-copy">{{item.rebookDescription}}</view>
+        <button class="rebook-action" bindtap="rebook" data-id="{{item.id}}">{{item.rebookActionText}}</button>
+      </view>
+      <view wx:if="{{item.hasServiceGuidelines}}" class="service-guidelines-panel">
+        <view class="service-guidelines-heading-row">
+          <view class="service-guidelines-kicker">服务前约定</view>
+          <view class="service-guidelines-progress">{{item.serviceGuidelinesProgress}}</view>
+        </view>
+        <view class="service-guidelines-summary">{{item.serviceGuidelinesSummary}}</view>
+        <view class="service-guidelines-status-list">
+          <view class="service-guidelines-status"><text>客户</text><text>{{item.customerServiceGuidelinesStatus}}</text></view>
+          <view class="service-guidelines-status"><text>陪伴者</text><text>{{item.companionServiceGuidelinesStatus}}</text></view>
+        </view>
+        <button wx:if="{{item.canConfirmServiceGuidelines}}" class="service-guidelines-action" disabled="{{confirmingGuidelinesId === item.id}}" loading="{{confirmingGuidelinesId === item.id}}" bindtap="confirmServiceGuidelines" data-id="{{item.id}}">{{item.serviceGuidelinesActionText}}</button>
+      </view>
+      <view wx:if="{{item.refund}}" class="refund-panel refund-panel-{{item.refundTone}}">
+        <view class="refund-heading-row">
+          <view>
+            <view class="refund-kicker">退款处理单</view>
+            <view class="refund-heading">{{item.refundStatusText}}</view>
+          </view>
+          <view class="refund-amount">{{item.refundAmountText}}</view>
+        </view>
+        <view class="refund-explanation">{{item.refundStatusExplanation}}</view>
+        <view class="refund-detail">
+          <view class="refund-detail-label">申请原因</view>
+          <view class="refund-detail-content">{{item.refundReasonText}}</view>
+        </view>
+        <view wx:if="{{item.refundReviewText}}" class="refund-detail">
+          <view class="refund-detail-label">{{item.refundReviewLabel}}</view>
+          <view class="refund-detail-content">{{item.refundReviewText}}</view>
+        </view>
+        <view wx:if="{{item.refundFailureText}}" class="refund-detail refund-failure-detail">
+          <view class="refund-detail-label">未完成原因</view>
+          <view class="refund-detail-content">{{item.refundFailureText}}</view>
+        </view>
+        <button wx:if="{{item.refundCanContactSupport}}" class="refund-support" bindtap="openSupport" data-id="{{item.id}}" data-category="refund">{{item.refundSupportActionText}}</button>
+      </view>
+      <button class="timeline-toggle" bindtap="toggleTimeline" data-id="{{item.id}}">{{item.timelineToggleText}}</button>
+      <view wx:if="{{item.timelineOpen}}" class="order-timeline">
+        <view wx:if="{{item.timelineState === 'loading'}}" class="timeline-loading">正在读取订单进度…</view>
+        <view wx:elif="{{item.timelineState === 'unavailable'}}" class="timeline-loading">{{item.timelineError}}</view>
+        <view wx:elif="{{item.timelineItems.length}}">
+          <view class="timeline-event" wx:for="{{item.timelineItems}}" wx:for-item="timelineItem" wx:key="id">
+            <view class="timeline-rail"><view class="timeline-dot timeline-dot-{{timelineItem.tone}}"></view></view>
+            <view class="timeline-content">
+              <view class="timeline-heading"><text class="timeline-title">{{timelineItem.title}}</text><text class="timeline-time">{{timelineItem.occurredAtText}}</text></view>
+              <view class="timeline-description">{{timelineItem.description}}</view>
+            </view>
+          </view>
+        </view>
+        <view wx:else class="timeline-loading">暂未记录更多节点，当前订单状态仍以卡片说明为准。</view>
+      </view>
+      <view wx:if="{{item.pendingReschedule}}" class="reschedule-pending">{{item.pendingRescheduleText}}</view>
+      <view wx:if="{{item.canRespondToReschedule && item.pendingReschedule}}" class="reschedule-response">
+        <view class="reschedule-heading">请处理对方的改期提议</view>
+        <view class="reschedule-response-row"><text class="reschedule-response-label">原预约</text><text>{{item.pendingRescheduleOriginalText}}</text></view>
+        <view class="reschedule-response-row"><text class="reschedule-response-label">新提议</text><text>{{item.pendingRescheduleRequestedText}}</text></view>
+        <view class="reschedule-response-row"><text class="reschedule-response-label">响应截止</text><text>{{item.pendingRescheduleDeadlineText}}</text></view>
+        <view class="reschedule-response-note">接受后会再次核对时段和订单状态；拒绝则保留原预约。</view>
+        <view class="reschedule-response-actions">
+          <button class="primary-button reschedule-response-button" disabled="{{item.rescheduleResponseAction !== ''}}" loading="{{item.rescheduleResponseAction === 'accept'}}" bindtap="respondReschedule" data-id="{{item.id}}" data-action="accept">接受改期</button>
+          <button class="plain reschedule-response-button" disabled="{{item.rescheduleResponseAction !== ''}}" loading="{{item.rescheduleResponseAction === 'reject'}}" bindtap="respondReschedule" data-id="{{item.id}}" data-action="reject">保持原预约</button>
+        </view>
+        <view wx:if="{{item.rescheduleResponseError}}" class="reschedule-response-error">{{item.rescheduleResponseError}}</view>
+      </view>
+      <view wx:if="{{item.rescheduleOpen}}" class="reschedule-panel">
+        <view class="reschedule-heading">改期协商</view>
+        <view wx:if="{{item.rescheduleState === 'loading'}}" class="reschedule-state">正在核对协商与可约时段…</view>
+        <view wx:elif="{{item.rescheduleState === 'pending'}}" class="reschedule-state">{{item.pendingRescheduleText || item.rescheduleMessage}}</view>
+        <view wx:elif="{{item.rescheduleState === 'structured'}}">
+          <view class="reschedule-state">{{item.rescheduleMessage}}</view>
+          <view wx:for="{{item.rescheduleDateGroups}}" wx:for-item="group" wx:key="key" class="reschedule-date-group">
+            <view class="reschedule-date">{{group.label}}（北京时间）</view>
+            <view class="reschedule-slot-grid">
+              <view wx:for="{{group.items}}" wx:for-item="slot" wx:key="id" class="reschedule-slot {{item.selectedRescheduleCandidateId === slot.id ? 'is-selected' : ''}}" data-id="{{slot.id}}" data-order-id="{{item.id}}" bindtap="selectRescheduleCandidate">
+                <view class="reschedule-slot-time">{{slot.timeLabel}}–{{slot.endTimeLabel}}</view>
+                <view class="reschedule-slot-capacity">余 {{slot.availableCapacity}} 位</view>
+              </view>
+            </view>
+          </view>
+          <view wx:if="{{item.selectedRescheduleCandidate}}" class="reschedule-summary">拟议时间：{{item.selectedRescheduleCandidate.dateLabel}} {{item.selectedRescheduleCandidate.timeLabel}}–{{item.selectedRescheduleCandidate.endTimeLabel}}</view>
+        </view>
+        <view wx:elif="{{item.rescheduleState === 'legacy'}}">
+          <view class="reschedule-state">{{item.rescheduleMessage}}</view>
+          <view class="reschedule-picker-row">
+            <picker mode="date" value="{{item.rescheduleDate}}" data-id="{{item.id}}" bindchange="setRescheduleDate"><view class="reschedule-picker">{{item.rescheduleDate}}</view></picker>
+            <picker mode="time" value="{{item.rescheduleTime}}" data-id="{{item.id}}" bindchange="setRescheduleTime"><view class="reschedule-picker">{{item.rescheduleTime}}</view></picker>
+          </view>
+          <view class="reschedule-summary">拟议时间：{{item.rescheduleDate}} {{item.rescheduleTime}}（北京时间）</view>
+        </view>
+        <view wx:else class="reschedule-state">{{item.rescheduleMessage}}</view>
+        <view wx:if="{{item.rescheduleState === 'structured' || item.rescheduleState === 'legacy'}}" class="reschedule-submit-row">
+          <button class="primary-button reschedule-submit" disabled="{{!item.rescheduleSubmitEnabled}}" loading="{{item.rescheduleSubmitting}}" bindtap="submitReschedule" data-id="{{item.id}}">{{item.rescheduleSubmitText}}</button>
+        </view>
+        <button wx:if="{{item.rescheduleState === 'empty' || item.rescheduleState === 'unavailable'}}" class="reschedule-refresh" bindtap="reloadReschedule" data-id="{{item.id}}">重新读取可约时段</button>
+      </view>
       <view class="actions">
         <button wx:if="{{(item.status === 'pending' || item.status === 'paying') && item.companionConfirmedAt}}" class="primary-button action" loading="{{payingId === item.id}}" bindtap="pay" data-id="{{item.id}}">去支付</button>
         <button wx:if="{{item.status === 'pending' || item.status === 'paying'}}" class="plain action" bindtap="cancel" data-id="{{item.id}}">取消订单</button>
-        <button wx:if="{{item.canRequestRefund}}" class="plain action" bindtap="refund" data-id="{{item.id}}">申请退款</button>
+        <button wx:if="{{item.canInitiateReschedule && !item.pendingReschedule}}" class="plain action" bindtap="toggleReschedule" data-id="{{item.id}}">{{item.rescheduleToggleText}}</button>
+        <button wx:if="{{item.canRequestRefund}}" class="plain action" bindtap="refund" data-id="{{item.id}}">{{item.refundActionText}}</button>
         <view wx:if="{{item.status === 'completed' && item.refundRequestDeadlineAt}}" class="muted">自助售后截止：{{item.refundDeadlineText}}；截止后仍可提交客服争议。</view>
         <button wx:if="{{item.status === 'completed'}}" class="primary-button action" bindtap="review" data-id="{{item.id}}">提交评价</button>
         <button wx:if="{{item.status === 'completed' && !item.customerConfirmedAt}}" class="plain action" bindtap="confirmCompletion" data-id="{{item.id}}">确认服务完成</button>
         <view wx:if="{{item.customerConfirmedAt}}" class="muted">你已确认本次服务完成；售后期限不受影响。</view>
-        <button wx:if="{{item.status === 'paid' || item.status === 'inService' || item.status === 'completed'}}" class="plain action" bindtap="openSupport" data-id="{{item.id}}">订单遇到问题</button>
+        <button wx:if="{{(item.status === 'paid' || item.status === 'inService' || item.status === 'completed') && !item.refundCanContactSupport}}" class="plain action" bindtap="openSupport" data-id="{{item.id}}">订单遇到问题</button>
       </view>
     </view>
     <view wx:if="{{supportTickets.length}}" class="section-title">客服处理进度</view>
@@ -27,6 +177,17 @@
       <view class="row"><text class="name">{{item.subject}}</text><text class="status">{{item.statusText}}</text></view>
       <view class="muted">更新：{{item.updatedAtText}} · 订单：{{item.orderId || '未关联订单'}}</view>
       <view>{{item.body}}</view>
+      <view wx:if="{{item.orderFacts.length}}" class="support-facts">
+        <view class="support-facts-heading">你补充的订单事实</view>
+        <view wx:for="{{item.orderFacts}}" wx:for-item="fact" wx:key="id" class="support-fact">
+          <view class="support-fact-statement">{{fact.statement}}</view>
+          <view class="support-fact-meta">提交于 {{fact.createdAtText}} · 仅平台客服可见</view>
+        </view>
+      </view>
+      <view wx:if="{{item.canAddOrderFact}}" class="support-fact-boundary">
+        <view>最多补充 10 条你亲历的时间、履约或支付事实；不会自动改变退款、结算或订单状态，也不会向订单另一方展示。</view>
+        <button class="support-fact-action" loading="{{submittingSupportFactId === item.id}}" disabled="{{submittingSupportFactId === item.id}}" bindtap="addOrderSupportFact" data-id="{{item.id}}">补充订单事实</button>
+      </view>
       <view wx:if="{{item.resolution}}" class="muted">平台结论：{{item.resolution}}</view>
     </view>
     <view wx:if="{{followupRecommendations.length}}" class="followup-section">
@@ -38,19 +199,128 @@
     </view>
     <view wx:if="{{serviceOrders.length}}" class="section-title">作为陪伴者</view>
     <button wx:if="{{serviceOrders.length}}" class="plain action" bindtap="enableCompanionNotifications">开启接单提醒</button>
+    <view wx:if="{{serviceOrders.length}}" class="notification-note">可选择新订单、取消/客服更新、改期请求/处理、改期超时或自动关闭提醒；授权不影响正常接单。</view>
     <view class="card" wx:for="{{serviceOrders}}" wx:key="id">
       <view class="row"><text class="name">{{item.displayName}}</text><text class="status">{{item.statusText}}</text></view>
       <view class="schedule">预约：{{item.scheduledAtText}}</view>
       <view class="muted">{{item.durationMinutes}} 分钟服务 · {{item.amountText}}</view>
-      <view wx:if="{{item.status === 'pending' && !item.companionConfirmedAt}}" class="muted">请在 {{item.responseDeadlineText}} 前响应，超时将自动取消。</view>
+      <view class="status-explanation">{{item.statusExplanation}}</view>
+      <view wx:if="{{item.hasFulfillmentGuidance}}" class="fulfillment-panel fulfillment-panel-{{item.fulfillmentTone}}">
+        <view class="fulfillment-heading-row">
+          <view class="fulfillment-kicker">本次服务</view>
+          <view class="fulfillment-heading">{{item.fulfillmentTitle}}</view>
+        </view>
+        <view class="fulfillment-detail">{{item.fulfillmentDetail}}</view>
+        <view wx:if="{{item.fulfillmentCountdownText}}" class="fulfillment-countdown">
+          <view class="fulfillment-countdown-label">{{item.fulfillmentCountdownLabel}}</view>
+          <view class="fulfillment-countdown-value">{{item.fulfillmentCountdownText}}</view>
+        </view>
+        <button wx:if="{{item.canOpenOrderConversation}}" class="fulfillment-chat" bindtap="openOrderConversation" data-id="{{item.id}}">{{item.orderConversationActionText}}</button>
+      </view>
+      <view wx:if="{{item.hasServiceGuidelines}}" class="service-guidelines-panel">
+        <view class="service-guidelines-heading-row">
+          <view class="service-guidelines-kicker">服务前约定</view>
+          <view class="service-guidelines-progress">{{item.serviceGuidelinesProgress}}</view>
+        </view>
+        <view class="service-guidelines-summary">{{item.serviceGuidelinesSummary}}</view>
+        <view class="service-guidelines-status-list">
+          <view class="service-guidelines-status"><text>客户</text><text>{{item.customerServiceGuidelinesStatus}}</text></view>
+          <view class="service-guidelines-status"><text>陪伴者</text><text>{{item.companionServiceGuidelinesStatus}}</text></view>
+        </view>
+        <button wx:if="{{item.canConfirmServiceGuidelines}}" class="service-guidelines-action" disabled="{{confirmingGuidelinesId === item.id}}" loading="{{confirmingGuidelinesId === item.id}}" bindtap="confirmServiceGuidelines" data-id="{{item.id}}">{{item.serviceGuidelinesActionText}}</button>
+      </view>
+      <view wx:if="{{item.refund}}" class="refund-panel refund-panel-{{item.refundTone}}">
+        <view class="refund-heading-row">
+          <view>
+            <view class="refund-kicker">退款处理单</view>
+            <view class="refund-heading">{{item.refundStatusText}}</view>
+          </view>
+          <view class="refund-amount">{{item.refundAmountText}}</view>
+        </view>
+        <view class="refund-explanation">{{item.refundStatusExplanation}}</view>
+        <view class="refund-detail">
+          <view class="refund-detail-label">申请原因</view>
+          <view class="refund-detail-content">{{item.refundReasonText}}</view>
+        </view>
+        <view wx:if="{{item.refundReviewText}}" class="refund-detail">
+          <view class="refund-detail-label">{{item.refundReviewLabel}}</view>
+          <view class="refund-detail-content">{{item.refundReviewText}}</view>
+        </view>
+        <view wx:if="{{item.refundFailureText}}" class="refund-detail refund-failure-detail">
+          <view class="refund-detail-label">未完成原因</view>
+          <view class="refund-detail-content">{{item.refundFailureText}}</view>
+        </view>
+        <button wx:if="{{item.refundCanContactSupport}}" class="refund-support" bindtap="openSupport" data-id="{{item.id}}" data-category="refund">{{item.refundSupportActionText}}</button>
+      </view>
+      <button class="timeline-toggle" bindtap="toggleTimeline" data-id="{{item.id}}">{{item.timelineToggleText}}</button>
+      <view wx:if="{{item.timelineOpen}}" class="order-timeline">
+        <view wx:if="{{item.timelineState === 'loading'}}" class="timeline-loading">正在读取订单进度…</view>
+        <view wx:elif="{{item.timelineState === 'unavailable'}}" class="timeline-loading">{{item.timelineError}}</view>
+        <view wx:elif="{{item.timelineItems.length}}">
+          <view class="timeline-event" wx:for="{{item.timelineItems}}" wx:for-item="timelineItem" wx:key="id">
+            <view class="timeline-rail"><view class="timeline-dot timeline-dot-{{timelineItem.tone}}"></view></view>
+            <view class="timeline-content">
+              <view class="timeline-heading"><text class="timeline-title">{{timelineItem.title}}</text><text class="timeline-time">{{timelineItem.occurredAtText}}</text></view>
+              <view class="timeline-description">{{timelineItem.description}}</view>
+            </view>
+          </view>
+        </view>
+        <view wx:else class="timeline-loading">暂未记录更多节点，当前订单状态仍以卡片说明为准。</view>
+      </view>
+      <view wx:if="{{item.pendingReschedule}}" class="reschedule-pending">{{item.pendingRescheduleText}}</view>
+      <view wx:if="{{item.canRespondToReschedule && item.pendingReschedule}}" class="reschedule-response">
+        <view class="reschedule-heading">请处理对方的改期提议</view>
+        <view class="reschedule-response-row"><text class="reschedule-response-label">原预约</text><text>{{item.pendingRescheduleOriginalText}}</text></view>
+        <view class="reschedule-response-row"><text class="reschedule-response-label">新提议</text><text>{{item.pendingRescheduleRequestedText}}</text></view>
+        <view class="reschedule-response-row"><text class="reschedule-response-label">响应截止</text><text>{{item.pendingRescheduleDeadlineText}}</text></view>
+        <view class="reschedule-response-note">接受后会再次核对时段和订单状态；拒绝则保留原预约。</view>
+        <view class="reschedule-response-actions">
+          <button class="primary-button reschedule-response-button" disabled="{{item.rescheduleResponseAction !== ''}}" loading="{{item.rescheduleResponseAction === 'accept'}}" bindtap="respondReschedule" data-id="{{item.id}}" data-action="accept">接受改期</button>
+          <button class="plain reschedule-response-button" disabled="{{item.rescheduleResponseAction !== ''}}" loading="{{item.rescheduleResponseAction === 'reject'}}" bindtap="respondReschedule" data-id="{{item.id}}" data-action="reject">保持原预约</button>
+        </view>
+        <view wx:if="{{item.rescheduleResponseError}}" class="reschedule-response-error">{{item.rescheduleResponseError}}</view>
+      </view>
+      <view wx:if="{{item.rescheduleOpen}}" class="reschedule-panel">
+        <view class="reschedule-heading">改期协商</view>
+        <view wx:if="{{item.rescheduleState === 'loading'}}" class="reschedule-state">正在核对协商与可约时段…</view>
+        <view wx:elif="{{item.rescheduleState === 'pending'}}" class="reschedule-state">{{item.pendingRescheduleText || item.rescheduleMessage}}</view>
+        <view wx:elif="{{item.rescheduleState === 'structured'}}">
+          <view class="reschedule-state">{{item.rescheduleMessage}}</view>
+          <view wx:for="{{item.rescheduleDateGroups}}" wx:for-item="group" wx:key="key" class="reschedule-date-group">
+            <view class="reschedule-date">{{group.label}}（北京时间）</view>
+            <view class="reschedule-slot-grid">
+              <view wx:for="{{group.items}}" wx:for-item="slot" wx:key="id" class="reschedule-slot {{item.selectedRescheduleCandidateId === slot.id ? 'is-selected' : ''}}" data-id="{{slot.id}}" data-order-id="{{item.id}}" bindtap="selectRescheduleCandidate">
+                <view class="reschedule-slot-time">{{slot.timeLabel}}–{{slot.endTimeLabel}}</view>
+                <view class="reschedule-slot-capacity">余 {{slot.availableCapacity}} 位</view>
+              </view>
+            </view>
+          </view>
+          <view wx:if="{{item.selectedRescheduleCandidate}}" class="reschedule-summary">拟议时间：{{item.selectedRescheduleCandidate.dateLabel}} {{item.selectedRescheduleCandidate.timeLabel}}–{{item.selectedRescheduleCandidate.endTimeLabel}}</view>
+        </view>
+        <view wx:elif="{{item.rescheduleState === 'legacy'}}">
+          <view class="reschedule-state">{{item.rescheduleMessage}}</view>
+          <view class="reschedule-picker-row">
+            <picker mode="date" value="{{item.rescheduleDate}}" data-id="{{item.id}}" bindchange="setRescheduleDate"><view class="reschedule-picker">{{item.rescheduleDate}}</view></picker>
+            <picker mode="time" value="{{item.rescheduleTime}}" data-id="{{item.id}}" bindchange="setRescheduleTime"><view class="reschedule-picker">{{item.rescheduleTime}}</view></picker>
+          </view>
+          <view class="reschedule-summary">拟议时间：{{item.rescheduleDate}} {{item.rescheduleTime}}（北京时间）</view>
+        </view>
+        <view wx:else class="reschedule-state">{{item.rescheduleMessage}}</view>
+        <view wx:if="{{item.rescheduleState === 'structured' || item.rescheduleState === 'legacy'}}" class="reschedule-submit-row">
+          <button class="primary-button reschedule-submit" disabled="{{!item.rescheduleSubmitEnabled}}" loading="{{item.rescheduleSubmitting}}" bindtap="submitReschedule" data-id="{{item.id}}">{{item.rescheduleSubmitText}}</button>
+        </view>
+        <button wx:if="{{item.rescheduleState === 'empty' || item.rescheduleState === 'unavailable'}}" class="reschedule-refresh" bindtap="reloadReschedule" data-id="{{item.id}}">重新读取可约时段</button>
+      </view>
       <view class="actions">
         <button wx:if="{{item.status === 'pending' && !item.companionConfirmedAt}}" class="primary-button action" bindtap="confirmServiceOrder" data-id="{{item.id}}">确认预约</button>
         <button wx:if="{{item.status === 'pending' && !item.companionConfirmedAt}}" class="plain action" bindtap="rejectServiceOrder" data-id="{{item.id}}">无法接单</button>
+        <button wx:if="{{item.canInitiateReschedule && !item.pendingReschedule}}" class="plain action" bindtap="toggleReschedule" data-id="{{item.id}}">{{item.rescheduleToggleText}}</button>
         <view wx:if="{{item.status === 'pending' && item.companionConfirmedAt}}" class="muted">已确认，客户需在 {{item.paymentDeadlineText}} 前支付，超时自动释放时段</view>
-        <button wx:if="{{item.status === 'paid'}}" class="primary-button action" bindtap="startService" data-id="{{item.id}}">开始服务</button>
+        <button wx:if="{{item.status === 'paid' && item.canStartService}}" class="primary-button action" bindtap="startService" data-id="{{item.id}}">开始服务</button>
+        <view wx:if="{{item.status === 'paid' && !item.canStartService && item.startServiceNotice}}" class="muted">{{item.startServiceNotice}}</view>
         <button wx:if="{{item.status === 'inService' && item.canCompleteService}}" class="primary-button action" bindtap="completeService" data-id="{{item.id}}">完成服务</button>
         <view wx:if="{{item.status === 'inService' && !item.canCompleteService}}" class="muted">服务时长未结束，{{item.completionEligibleAtText}} 后可标记完成</view>
-        <button wx:if="{{item.status === 'paid' || item.status === 'inService' || item.status === 'completed'}}" class="plain action" bindtap="openSupport" data-id="{{item.id}}">订单遇到问题</button>
+        <button wx:if="{{(item.status === 'paid' || item.status === 'inService' || item.status === 'completed') && !item.refundCanContactSupport}}" class="plain action" bindtap="openSupport" data-id="{{item.id}}">订单遇到问题</button>
       </view>
     </view>
   </view>

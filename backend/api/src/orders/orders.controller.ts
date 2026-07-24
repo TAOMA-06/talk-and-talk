@@ -5,6 +5,8 @@ import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { PaymentsService } from "../payments/payments.service";
 import { CreateOrderDto } from "./dto/create-order.dto";
+import { CreateOrderExperienceFeedbackDto } from "./dto/create-order-experience-feedback.dto";
+import { CreateOrderRescheduleRequestDto } from "./dto/create-order-reschedule-request.dto";
 import { CreateRefundDto } from "./dto/create-refund.dto";
 import { PrepayDto } from "./dto/prepay.dto";
 import { OrdersService } from "./orders.service";
@@ -37,6 +39,48 @@ export class OrdersController {
   @UseGuards(JwtAuthGuard)
   listService(@CurrentUser() user: AuthenticatedUser) {
     return this.ordersService.listForCompanion(user.id);
+  }
+
+  @Get("service/today")
+  @UseGuards(JwtAuthGuard)
+  listTodayService(@CurrentUser() user: AuthenticatedUser) {
+    return this.ordersService.listTodayForCompanion(user.id);
+  }
+
+  @Get(":id/timeline")
+  @UseGuards(JwtAuthGuard)
+  timeline(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
+    return this.ordersService.timeline(user.id, id);
+  }
+
+  @Post(":id/reschedule-requests")
+  @UseGuards(JwtAuthGuard)
+  requestReschedule(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id") id: string,
+    @Body() dto: CreateOrderRescheduleRequestDto
+  ) {
+    return this.ordersService.requestReschedule(user.id, id, dto);
+  }
+
+  @Post(":id/reschedule-requests/:requestId/accept")
+  @UseGuards(JwtAuthGuard)
+  acceptReschedule(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id") id: string,
+    @Param("requestId") requestId: string
+  ) {
+    return this.ordersService.acceptReschedule(user.id, id, requestId);
+  }
+
+  @Post(":id/reschedule-requests/:requestId/reject")
+  @UseGuards(JwtAuthGuard)
+  rejectReschedule(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id") id: string,
+    @Param("requestId") requestId: string
+  ) {
+    return this.ordersService.rejectReschedule(user.id, id, requestId);
   }
 
   @Post("service/:id/start")
@@ -79,6 +123,22 @@ export class OrdersController {
   @UseGuards(JwtAuthGuard)
   confirmCompletion(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
     return this.ordersService.confirmCompletion(user.id, id);
+  }
+
+  @Post(":id/service-guidelines-confirmations")
+  @UseGuards(JwtAuthGuard)
+  confirmServiceGuidelines(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
+    return this.ordersService.confirmServiceGuidelines(user.id, id);
+  }
+
+  @Post(":id/experience-feedback")
+  @UseGuards(JwtAuthGuard)
+  submitExperienceFeedback(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id") id: string,
+    @Body() dto: CreateOrderExperienceFeedbackDto
+  ) {
+    return this.ordersService.submitExperienceFeedback(user.id, id, dto);
   }
 
   @Post(":id/prepay")

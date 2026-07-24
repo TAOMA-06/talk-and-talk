@@ -4,12 +4,88 @@
     <view class="title">{{companion.name}}</view>
     <view class="muted">{{companion.role}} · {{companion.availability}} · ★ {{companion.rating}}</view>
     <view class="bio">{{companion.bio}}</view>
-    <view class="muted">¥{{companion.pricePerHalfHour}} / 30 分钟</view>
-    <view class="booking-row">
+    <view wx:if="{{trustFacts.length}}" class="trust-section">
+      <view class="trust-heading"><text>下单前确认</text><text>当前规则</text></view>
+      <view wx:for="{{trustFacts}}" wx:key="tone" class="trust-fact trust-fact-{{item.tone}}">
+        <view class="trust-marker"></view>
+        <view class="trust-copy">
+          <view class="trust-title">{{item.title}}</view>
+          <view class="trust-description">{{item.description}}</view>
+        </view>
+      </view>
+    </view>
+    <view wx:if="{{canManageFavorites}}" class="favorite-control">
+      <button class="favorite-toggle {{isFavorite ? 'favorite-toggle-saved' : ''}}" loading="{{favoriteSaving}}" disabled="{{favoriteSaving}}" bindtap="toggleFavorite">{{isFavorite ? '已保存到我的书签' : '保存到我的书签'}}</button>
+      <view class="favorite-privacy">仅你可见；不会通知陪伴者，也不会改变订单或推荐排序。</view>
+    </view>
+    <view wx:if="{{rebookingNotice}}" class="rebooking-notice">
+      <view class="rebooking-notice-heading"><text>再次预约</text><text>重新核对</text></view>
+      <view class="rebooking-notice-copy">{{rebookingNotice}}</view>
+    </view>
+    <view class="service-section">
+      <view class="service-heading">
+        <view>选择服务</view>
+        <view class="service-lock">下单时锁定价格、时长与时段</view>
+      </view>
+      <view wx:if="{{serviceCatalogStatus === 'loading'}}" class="service-state">正在加载可预约服务…</view>
+      <view wx:elif="{{serviceCatalogStatus === 'available'}}" class="service-list">
+        <view
+          wx:for="{{serviceOfferings}}"
+          wx:key="id"
+          class="service-offering {{selectedServiceOfferingId === item.id ? 'is-selected' : ''}}"
+          data-id="{{item.id}}"
+          bindtap="selectServiceOffering"
+        >
+          <view class="service-choice {{selectedServiceOfferingId === item.id ? 'is-selected' : ''}}"></view>
+          <view class="service-copy">
+            <view class="service-title-row">
+              <view class="service-title">{{item.title}}</view>
+              <view class="service-price">¥{{item.priceCents / 100}}</view>
+            </view>
+            <view class="service-meta">{{item.deliveryMode === 'voice' ? '语音陪伴' : '文字陪伴'}} · {{item.durationMinutes}} 分钟</view>
+            <view wx:if="{{item.description}}" class="service-description">{{item.description}}</view>
+          </view>
+        </view>
+      </view>
+      <view wx:else class="service-state {{serviceCatalogStatus === 'legacy' ? 'service-legacy' : ''}}">{{serviceCatalogMessage}}</view>
+    </view>
+    <view wx:if="{{selectedServiceOffering}}" class="booking-summary">已选：{{selectedServiceOffering.title}} · ¥{{selectedServiceOffering.priceCents / 100}} / {{selectedServiceOffering.durationMinutes}} 分钟</view>
+    <view wx:elif="{{serviceCatalogStatus === 'legacy'}}" class="booking-summary">旧版服务：¥{{companion.pricePerHalfHour}} / 30 分钟</view>
+    <view wx:if="{{serviceCatalogStatus === 'available' || serviceCatalogStatus === 'legacy'}}" class="availability-section">
+      <view class="availability-heading">
+        <view>选择时段</view>
+        <view class="availability-timezone">北京时间</view>
+      </view>
+      <view wx:if="{{availabilityStatus === 'loading'}}" class="availability-state">正在读取可预约时段…</view>
+      <view wx:elif="{{availabilityStatus === 'structured'}}" class="availability-list">
+        <view class="availability-note">{{availabilityMessage}}</view>
+        <view wx:for="{{availabilityDateGroups}}" wx:for-item="group" wx:key="key" class="availability-date-group">
+          <view class="availability-date">{{group.label}}</view>
+          <view class="availability-slot-grid">
+            <view
+              wx:for="{{group.items}}"
+              wx:for-item="slot"
+              wx:key="id"
+              class="availability-slot {{selectedAvailabilityCandidateId === slot.id ? 'is-selected' : ''}}"
+              data-id="{{slot.id}}"
+              bindtap="selectAvailabilityCandidate"
+            >
+              <view class="availability-slot-time">{{slot.timeLabel}}–{{slot.endTimeLabel}}</view>
+              <view wx:if="{{slot.availableCapacity > 1}}" class="availability-slot-capacity">还可约 {{slot.availableCapacity}} 位</view>
+              <view wx:else class="availability-slot-capacity">可预约</view>
+            </view>
+          </view>
+        </view>
+      </view>
+      <view wx:elif="{{availabilityStatus === 'legacy'}}" class="availability-state availability-legacy">{{availabilityMessage}}</view>
+      <view wx:else class="availability-state availability-unavailable">{{availabilityMessage}}</view>
+    </view>
+    <view wx:if="{{selectedAvailabilityCandidate}}" class="booking-summary booking-slot-summary">已选时段：{{selectedAvailabilityCandidate.dateLabel}} {{selectedAvailabilityCandidate.timeLabel}}–{{selectedAvailabilityCandidate.endTimeLabel}}（北京时间）</view>
+    <view wx:if="{{availabilityStatus === 'legacy'}}" class="booking-row">
       <picker mode="date" value="{{bookingDate}}" bindchange="setBookingDate"><view class="booking-picker">{{bookingDate}}</view></picker>
       <picker mode="time" value="{{bookingTime}}" bindchange="setBookingTime"><view class="booking-picker">{{bookingTime}}</view></picker>
     </view>
-    <button class="primary-button" loading="{{booking}}" bindtap="book">预约 30 分钟</button>
+    <button class="primary-button" disabled="{{!canBook || booking}}" loading="{{booking}}" bindtap="book">{{bookingButtonText}}</button>
   </view>
   <view class="title section-title">用户评价</view>
   <view wx:if="{{!reviews.length}}" class="empty">暂时还没有评价</view>

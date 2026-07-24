@@ -29,6 +29,7 @@ const REQUIRED_TRANSACTIONAL_TEMPLATE_KEYS = [
   "newOrder", "orderConfirmed", "orderRejected", "orderResponseExpired", "paymentSuccess",
   "serviceStarted", "serviceCompleted", "orderCancelled", "reservationExpired", "supportUpdate"
 ];
+const AVAILABILITY_REMINDER_TEMPLATE_KEY = "availabilityReminder";
 
 export function parseEnv(text) {
   const env = {};
@@ -57,6 +58,7 @@ function validUrl(value, protocols) {
 export function validateDeploymentConfig(env) {
   const errors = [];
   const production = env.APP_ENV === "production";
+  const availabilityReminderDeliveryEnabled = env.AVAILABILITY_REMINDER_DELIVERY_ENABLED === "true";
   const required = [
     "NODE_ENV", "APP_ENV", "API_PREFIX", "DATABASE_URL", "REDIS_URL", "CORS_ORIGINS",
     "JWT_ACCESS_SECRET", "JWT_REFRESH_SECRET", "WECHAT_MINIPROGRAM_APP_ID",
@@ -223,6 +225,23 @@ export function validateDeploymentConfig(env) {
   if (production && env.PAYMENT_RECONCILIATION_ENABLED !== "true") {
     errors.push("PAYMENT_RECONCILIATION_ENABLED must be true in production");
   }
+  if (
+    env.AVAILABILITY_REMINDER_DELIVERY_ENABLED
+    && !["true", "false"].includes(env.AVAILABILITY_REMINDER_DELIVERY_ENABLED)
+  ) {
+    errors.push("AVAILABILITY_REMINDER_DELIVERY_ENABLED must be true or false when configured");
+  }
+  for (const [key, minimum, maximum] of [
+    ["AVAILABILITY_REMINDER_DELIVERY_INTERVAL_SECONDS", 15, 60 * 60],
+    ["AVAILABILITY_REMINDER_DELIVERY_BATCH_SIZE", 1, 100]
+  ]) {
+    const value = env[key]?.trim();
+    if (!value) continue;
+    if (!/^\d+$/.test(value) || Number(value) < minimum || Number(value) > maximum) {
+      errors.push(`${key} must be an integer between ${minimum} and ${maximum}`);
+    }
+  }
+  const configuredSubscribeTemplateKeys = new Set();
   if (env.WECHAT_SUBSCRIBE_TEMPLATES_JSON) {
     try {
       const templates = JSON.parse(env.WECHAT_SUBSCRIBE_TEMPLATES_JSON);
@@ -231,21 +250,28 @@ export function validateDeploymentConfig(env) {
       } else {
         const keys = new Set();
         const templateIds = new Set();
+        let validTemplateMap = true;
         for (const template of templates) {
           if (!template || typeof template !== "object" || !template.key || !template.templateId || !template.data || typeof template.data !== "object") {
             errors.push("WECHAT_SUBSCRIBE_TEMPLATES_JSON contains an invalid template");
+            validTemplateMap = false;
             break;
           }
           if (keys.has(template.key)) {
             errors.push("WECHAT_SUBSCRIBE_TEMPLATES_JSON template keys must be unique");
+            validTemplateMap = false;
             break;
           }
           if (templateIds.has(template.templateId)) {
             errors.push("WECHAT_SUBSCRIBE_TEMPLATES_JSON template IDs must be unique");
+            validTemplateMap = false;
             break;
           }
           keys.add(template.key);
           templateIds.add(template.templateId);
+        }
+        if (validTemplateMap) {
+          for (const key of keys) configuredSubscribeTemplateKeys.add(key);
         }
         if (production) {
           const missing = REQUIRED_TRANSACTIONAL_TEMPLATE_KEYS.filter((key) => !keys.has(key));
@@ -254,6 +280,14 @@ export function validateDeploymentConfig(env) {
       }
     } catch {
       errors.push("WECHAT_SUBSCRIBE_TEMPLATES_JSON must be valid JSON");
+    }
+  }
+  if (availabilityReminderDeliveryEnabled) {
+    if (env.WECHAT_SUBSCRIBE_MESSAGES_ENABLED !== "true") {
+      errors.push("AVAILABILITY_REMINDER_DELIVERY_ENABLED requires WECHAT_SUBSCRIBE_MESSAGES_ENABLED=true");
+    }
+    if (!configuredSubscribeTemplateKeys.has(AVAILABILITY_REMINDER_TEMPLATE_KEY)) {
+      errors.push("AVAILABILITY_REMINDER_DELIVERY_ENABLED requires an availabilityReminder subscribe template");
     }
   }
 

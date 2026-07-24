@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 
 import { PrismaService } from "../database/prisma.service";
 import { MetricsService } from "../metrics/metrics.service";
+import { conversationIdFromMessageNotificationEventKey } from "./notifications.service";
 import { WeChatSubscribeMessageProvider } from "./wechat/wechat-subscribe-message.provider";
 
 const LEASE_MS = 2 * 60_000;
@@ -175,6 +176,73 @@ export class NotificationDeliveryWorker implements OnModuleInit, OnModuleDestroy
         return { kind: "lost" as const };
       }
 
+      // A mute is a private, conversation-scoped preference. Check it while
+      // the delivery lease is held and before a one-time WeChat grant is
+      // consumed, so a queued external reminder never bypasses a later mute.
+      if (delivery.notification.type === "messageReceived") {
+        const conversationId = conversationIdFromMessageNotificationEventKey(
+          delivery.notification.eventKey,
+          delivery.userId
+        );
+        if (!conversationId) {
+          await db.notificationDelivery.updateMany({
+            where: { id: deliveryId, status: "processing", leaseToken },
+            data: {
+              status: "skipped",
+              errorCode: "MESSAGE_NOTIFICATION_INVALID",
+              lastError: "Message notification is missing a valid recipient-owned conversation key",
+              leaseToken: null,
+              leaseExpiresAt: null
+            }
+          });
+          return { kind: "skipped" as const };
+        }
+        // Share the Conversation row lock with block/unblock writes. If the
+        // boundary commits first, this delivery observes it before consuming a
+        // one-time grant; if delivery has already crossed this point, it has
+        // already become an external-send attempt and cannot be unsent.
+        if (typeof db.$queryRaw === "function") {
+          await db.$queryRaw`SELECT "id" FROM "Conversation" WHERE "id" = ${conversationId} FOR UPDATE`;
+        }
+        const preference = await db.conversationNotificationPreference.findUnique({
+          where: { conversationId_userId: { conversationId, userId: delivery.userId } },
+          select: { mutedAt: true }
+        });
+        if (preference?.mutedAt) {
+          await db.notificationDelivery.updateMany({
+            where: { id: deliveryId, status: "processing", leaseToken },
+            data: {
+              status: "skipped",
+              errorCode: "CONVERSATION_MUTED",
+              lastError: "Recipient muted this conversation before message delivery",
+              leaseToken: null,
+              leaseExpiresAt: null
+            }
+          });
+          return { kind: "skipped" as const };
+        }
+        // A relationship boundary is more restrictive than a reminder
+        // preference. Recheck it while holding the delivery lease so neither
+        // the inbox nor a one-time WeChat grant can deliver after a block.
+        const block = await db.conversationBlock.findFirst({
+          where: { conversationId },
+          select: { id: true }
+        });
+        if (block) {
+          await db.notificationDelivery.updateMany({
+            where: { id: deliveryId, status: "processing", leaseToken },
+            data: {
+              status: "skipped",
+              errorCode: "CONVERSATION_BLOCKED",
+              lastError: "Conversation interaction ended before message delivery",
+              leaseToken: null,
+              leaseExpiresAt: null
+            }
+          });
+          return { kind: "skipped" as const };
+        }
+      }
+
       const configuredTemplate = (this.config.get<Array<{ key: string; templateId: string }>>("WECHAT_SUBSCRIBE_TEMPLATES") ?? [])
         .find((template) => template.key === delivery.templateKey);
       if (!configuredTemplate) {
@@ -192,13 +260,26 @@ export class NotificationDeliveryWorker implements OnModuleInit, OnModuleDestroy
       }
 
       const grants: Array<{ id: string; templateId: string }> = await db.$queryRaw`
-        SELECT "id", "templateId"
-        FROM "WeChatSubscriptionGrant"
-        WHERE "userId" = ${delivery.userId}
-          AND "templateKey" = ${delivery.templateKey}
-          AND "templateId" = ${configuredTemplate.templateId}
-          AND "consumedAt" IS NULL
-        ORDER BY "grantedAt" ASC, "id" ASC
+        SELECT grant."id", grant."templateId"
+        FROM "WeChatSubscriptionGrant" AS grant
+        WHERE grant."userId" = ${delivery.userId}
+          AND grant."templateKey" = ${delivery.templateKey}
+          AND grant."templateId" = ${configuredTemplate.templateId}
+          AND grant."consumedAt" IS NULL
+          -- A private availability-reminder preference or reservation owns its
+          -- exact grant. This generic delivery pool must not steal it between
+          -- preference binding, reservation, and final consumption.
+          AND NOT EXISTS (
+            SELECT 1
+            FROM "CompanionFavorite" AS reminder_favorite
+            WHERE reminder_favorite."availabilityReminderGrantId" = grant."id"
+          )
+          AND NOT EXISTS (
+            SELECT 1
+            FROM "AvailabilityReminderAttempt" AS reminder_attempt
+            WHERE reminder_attempt."subscriptionGrantId" = grant."id"
+          )
+        ORDER BY grant."grantedAt" ASC, grant."id" ASC
         FOR UPDATE SKIP LOCKED
         LIMIT 1
       `;

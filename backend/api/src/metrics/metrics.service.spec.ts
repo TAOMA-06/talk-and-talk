@@ -10,6 +10,9 @@ describe("MetricsService", () => {
     metrics.recordAiFailure();
     metrics.recordWechatNotifyFailure();
     metrics.recordWechatNotifySuccess();
+    metrics.recordAvailabilityReminderDeliveryFailure();
+    metrics.recordAvailabilityReminderDeliverySuccess();
+    metrics.recordAvailabilityReminderDeliverySkipped();
 
     const snapshot = metrics.snapshot();
 
@@ -21,6 +24,9 @@ describe("MetricsService", () => {
     expect(snapshot.aiFailures).toBe(1);
     expect(snapshot.wechatNotifyFailures).toBe(1);
     expect(snapshot.wechatNotifySuccess).toBe(1);
+    expect(snapshot.availabilityReminderDeliveryFailures).toBe(1);
+    expect(snapshot.availabilityReminderDeliverySuccess).toBe(1);
+    expect(snapshot.availabilityReminderDeliverySkipped).toBe(1);
   });
 
   it("renders prometheus text", () => {
@@ -32,5 +38,6 @@ describe("MetricsService", () => {
     expect(text).toContain("talk_http_requests_total");
     expect(text).toContain('app_version="1.2.3"');
     expect(text).toContain('app_env="staging"');
+    expect(text).toContain("talk_availability_reminder_delivery_success_total");
   });
 });

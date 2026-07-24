@@ -12,6 +12,7 @@ import { AuditModule } from "./common/audit/audit.module";
 import { RequestIdMiddleware } from "./common/middleware/request-id.middleware";
 import { IpRateLimitMiddleware } from "./common/rate-limit/ip-rate-limit.middleware";
 import { DatabaseModule } from "./database/database.module";
+import { FavoritesModule } from "./favorites/favorites.module";
 import { HealthModule } from "./health/health.module";
 import { LegalModule } from "./legal/legal.module";
 import { MetricsModule } from "./metrics/metrics.module";
@@ -37,6 +38,7 @@ import { UsersModule } from "./users/users.module";
     AuthModule,
     UsersModule,
     CompanionsModule,
+    FavoritesModule,
     CommunityModule,
     ConversationsModule,
     ModerationModule,

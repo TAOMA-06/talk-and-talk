@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nest
 import { randomUUID } from "node:crypto";
 
 import { PrismaService } from "../../database/prisma.service";
+import { NotificationsService } from "../../notifications/notifications.service";
 import { ChatRestrictionService } from "../chat-restriction.service";
 import {
   ModerationCategory,
@@ -30,7 +31,8 @@ export class MediaModerationWorker implements OnModuleInit, OnModuleDestroy {
     private readonly moderation: ModerationService,
     private readonly ruleEngine: RuleEngine,
     private readonly cases: ModerationCaseService,
-    private readonly restrictions: ChatRestrictionService
+    private readonly restrictions: ChatRestrictionService,
+    private readonly notifications: NotificationsService
   ) {}
 
   onModuleInit() {
@@ -90,7 +92,17 @@ export class MediaModerationWorker implements OnModuleInit, OnModuleDestroy {
   async processMessage(messageId: string): Promise<void> {
     const message: any = await this.prisma.message.findUnique({
       where: { id: messageId },
-      include: { attachments: true }
+      include: {
+        attachments: true,
+        conversation: {
+          select: {
+            id: true,
+            externalId: true,
+            userId: true,
+            companion: { select: { ownerUserId: true } }
+          }
+        }
+      }
     } as any);
     if (!message || message.moderationStatus !== "queued" || !message.attachments.length) return;
     if (message.attachments.some((asset: any) => asset.nextAttemptAt && asset.nextAttemptAt > new Date())) return;
@@ -117,16 +129,27 @@ export class MediaModerationWorker implements OnModuleInit, OnModuleDestroy {
       }
 
       const moderation = await this.moderateMessage(message, analysis);
-      const nextStatus = moderation.decision === "allow"
+      const moderatedStatus = moderation.decision === "allow"
         ? "published"
         : moderation.decision === "block"
           ? "blocked"
           : "pendingReview";
-      const nextVisibility = nextStatus === "published" ? "participants" : "senderOnly";
       const now = new Date();
 
       const transitioned = await this.prisma.$transaction(async (tx) => {
         const db = tx as any;
+        // Block/unblock operations take the same conversation row lock. This
+        // stops a queued media item from becoming visible after either side has
+        // chosen to end message interaction.
+        if (typeof db.$queryRaw === "function") {
+          await db.$queryRaw`SELECT "id" FROM "Conversation" WHERE "id" = ${message.conversationId} FOR UPDATE`;
+        }
+        const interactionBlocked = await db.conversationBlock.findFirst({
+          where: { conversationId: message.conversationId },
+          select: { id: true }
+        });
+        const nextStatus = interactionBlocked ? "blocked" : moderatedStatus;
+        const nextVisibility = nextStatus === "published" ? "participants" : "senderOnly";
         const transition = await db.message.updateMany({
           where: {
             id: message.id,
@@ -183,6 +206,23 @@ export class MediaModerationWorker implements OnModuleInit, OnModuleDestroy {
           await this.createCriticalSafetyMessage(db, message);
         }
         await db.conversation.update({ where: { id: message.conversationId }, data: { updatedAt: now } });
+        if (nextStatus === "published") {
+          const recipientUserId = message.conversation.userId === message.senderId
+            ? message.conversation.companion.ownerUserId
+            : message.conversation.userId;
+          if (recipientUserId && recipientUserId !== message.senderId) {
+            // Media-derived text and attachments stay in the moderation path.
+            // This helper receives only ids and never reads their contents.
+            await this.notifications.createConversationMessageReceivedIfUnmuted(db, {
+              conversationId: message.conversationId,
+              messageId: message.id,
+              recipientUserId,
+              recipientConversationId: recipientUserId === message.conversation.userId
+                ? message.conversation.externalId
+                : message.conversation.id
+            });
+          }
+        }
         return true;
       });
       if (!transitioned) return;

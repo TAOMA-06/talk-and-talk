@@ -14,6 +14,6 @@ import { WeChatSubscriptionService } from "./wechat/wechat-subscription.service"
     WeChatSubscribeMessageProvider,
     NotificationDeliveryWorker
   ],
-  exports: [NotificationsService]
+  exports: [NotificationsService, WeChatSubscribeMessageProvider]
 })
 export class NotificationsModule {}

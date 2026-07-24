@@ -32,6 +32,11 @@ enum Availability {
   busy
 }
 
+enum CompanionServiceOfferingMode {
+  text
+  voice
+}
+
 enum MessageType {
   text
   image
@@ -125,6 +130,40 @@ enum OrderStatus {
   refunded
 }
 
+// A reschedule is intentionally a separate negotiation record instead of an
+// OrderStatus. That keeps the paid/refund lifecycle intact and leaves a durable
+// account of both appointment times even after the request is resolved.
+enum OrderRescheduleRequestStatus {
+  pending
+  accepted
+  rejected
+  expired
+  cancelled
+}
+
+enum OrderRescheduleRequesterRole {
+  customer
+  companion
+}
+
+// Timeline events are customer/companion-facing operational facts, not an
+// alias for the internal AuditLog. They deliberately exclude private evidence
+// and staff-only moderation or settlement metadata.
+enum OrderTimelineEventType {
+  orderCreated
+  rescheduleRequested
+  rescheduleAccepted
+  rescheduleRejected
+  rescheduleExpired
+  rescheduleCancelled
+}
+
+enum OrderTimelineActorRole {
+  customer
+  companion
+  system
+}
+
 enum PaymentTxnStatus {
   initiated
   success
@@ -158,6 +197,7 @@ enum NotificationType {
   moderationAlert
   safetyAlert
   supportUpdate
+  messageReceived
 }
 
 enum NotificationDeliveryStatus {
@@ -214,6 +254,57 @@ enum SupportTicketPriority {
   urgent
 }
 
+// A reminder candidate is evaluated once before any future delivery stage.
+// The decision stays private operational state: it is neither a notification
+// nor evidence that an external provider has been called.
+enum AvailabilityReminderCandidateDecision {
+  pending
+  eligible
+  skipped
+}
+
+// Keep persisted skip outcomes deliberately generic. They are useful for
+// internal audit and retry analysis without exposing a customer's private
+// preference, order, authorization, or profile details.
+enum AvailabilityReminderCandidateSkipReason {
+  favoriteUnavailable
+  authorizationUnavailable
+  availabilityUnavailable
+  rateLimited
+}
+
+// A private authorization binding is deliberately separate from both a
+// candidate and a provider delivery. Reservation, consumption, and lease
+// states alone never claim that a remote message was attempted or delivered;
+// only a later explicit provider outcome may do so.
+enum AvailabilityReminderAttemptStatus {
+  reserved
+  readyToSend
+  sending
+  sent
+  skipped
+  failedBeforeSend
+  rejected
+  uncertain
+}
+
+// These are private state-machine outcomes, not recipient-visible delivery
+// results. `uncertain` records a lost lease or unknown remote outcome without
+// ever claiming that a provider call succeeded.
+enum AvailabilityReminderAttemptOutcomeReason {
+  favoriteUnavailable
+  authorizationUnavailable
+  availabilityUnavailable
+  rateLimited
+  handoffUnavailable
+  preflightUnavailable
+  sendLeaseExpired
+  providerSkipped
+  providerPreSendFailed
+  providerRejected
+  providerUnknown
+}
+
 enum LegalDocumentKind {
   terms
   privacy
@@ -247,37 +338,43 @@ enum RecommendationTagSource {
 }
 
 model User {
-  id                       String                        @id @default(uuid())
-  role                     UserRole                      @default(user)
-  accountStatus            AccountStatus                 @default(active)
-  createdAt                DateTime                      @default(now())
-  updatedAt                DateTime                      @updatedAt
-  identities               AuthIdentity[]
-  staffCredential          StaffCredential?
-  profile                  UserProfile?
-  refreshTokens            RefreshToken[]
-  conversations            Conversation[]
-  readStates               MessageReadState[]
-  orders                   Order[]
-  notifications            Notification[]
-  notificationDeliveries   NotificationDelivery[]
-  subscriptionGrants       WeChatSubscriptionGrant[]
-  supportTickets           SupportTicket[]               @relation("SupportRequester")
-  assignedSupportTickets   SupportTicket[]               @relation("SupportAssignee")
-  deletionRequests         AccountDeletionRequest[]
-  legalConsentReceipts     LegalConsentReceipt[]
-  companionProfile         CompanionProfile?             @relation("CompanionOwner")
-  communityPosts           CommunityPost[]
-  communityLikes           CommunityLike[]
-  reviews                  Review[]
-  mediaAssets              MediaAsset[]                  @relation("MediaAssetUploader")
-  chatRestrictions         ChatRestriction[]
-  moderationSubjectCases   ModerationCase[]              @relation("ModerationSubject")
-  moderationReporterCases  ModerationCase[]              @relation("ModerationReporter")
-  moderationAppeals        ModerationAppeal[]            @relation("ModerationAppealer")
-  recommendationPreference UserRecommendationPreference?
-  recommendationTags       UserRecommendationTag[]
-  recommendationRequests   RecommendationRequest[]
+  id                                  String                               @id @default(uuid())
+  role                                UserRole                             @default(user)
+  accountStatus                       AccountStatus                        @default(active)
+  createdAt                           DateTime                             @default(now())
+  updatedAt                           DateTime                             @updatedAt
+  identities                          AuthIdentity[]
+  staffCredential                     StaffCredential?
+  profile                             UserProfile?
+  refreshTokens                       RefreshToken[]
+  conversations                       Conversation[]
+  readStates                          MessageReadState[]
+  conversationNotificationPreferences ConversationNotificationPreference[]
+  conversationBlocks                  ConversationBlock[]                  @relation("ConversationBlocker")
+  orders                              Order[]
+  notifications                       Notification[]
+  notificationDeliveries              NotificationDelivery[]
+  subscriptionGrants                  WeChatSubscriptionGrant[]
+  supportTickets                      SupportTicket[]                      @relation("SupportRequester")
+  assignedSupportTickets              SupportTicket[]                      @relation("SupportAssignee")
+  orderSupportFacts                   OrderSupportFact[]
+  deletionRequests                    AccountDeletionRequest[]
+  legalConsentReceipts                LegalConsentReceipt[]
+  companionProfile                    CompanionProfile?                    @relation("CompanionOwner")
+  communityPosts                      CommunityPost[]
+  communityLikes                      CommunityLike[]
+  communityPostReports                CommunityPostReport[]                @relation("CommunityPostReporter")
+  reviews                             Review[]
+  mediaAssets                         MediaAsset[]                         @relation("MediaAssetUploader")
+  chatRestrictions                    ChatRestriction[]
+  moderationSubjectCases              ModerationCase[]                     @relation("ModerationSubject")
+  moderationReporterCases             ModerationCase[]                     @relation("ModerationReporter")
+  moderationAppeals                   ModerationAppeal[]                   @relation("ModerationAppealer")
+  recommendationPreference            UserRecommendationPreference?
+  recommendationTags                  UserRecommendationTag[]
+  recommendationRequests              RecommendationRequest[]
+  companionFavorites                  CompanionFavorite[]
+  companionRecentViews                CompanionRecentView[]
 }
 
 model AuthIdentity {
@@ -346,6 +443,10 @@ model CompanionProfile {
   createdAt                 DateTime                        @default(now())
   updatedAt                 DateTime                        @updatedAt
   serviceTags               CompanionServiceTag[]
+  serviceOfferings          CompanionServiceOffering[]
+  availabilityWindows       CompanionAvailabilityWindow[]
+  recurringAvailabilityRules CompanionRecurringAvailabilityRule[]
+  availabilityBlackouts     CompanionAvailabilityBlackout[]
   conversations             Conversation[]
   orders                    Order[]
   owner                     User?                           @relation("CompanionOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
@@ -355,10 +456,53 @@ model CompanionProfile {
   earnings                  CompanionEarning[]
   recoveries                CompanionRecovery[]
   commercialProfile         CompanionCommercialProfile?
+  favorites                 CompanionFavorite[]
+  recentViews               CompanionRecentView[]
+  availabilityReminderCandidates AvailabilityReminderCandidate[]
 
   @@index([isPublished, availability])
   @@index([isOnline])
   @@index([ownerUserId])
+}
+
+// A customer-owned bookmark. This is intentionally not a social graph: it is
+// never returned through a companion profile, never notifies the companion,
+// and current public-visibility checks are reapplied whenever it is listed.
+model CompanionFavorite {
+  id                               String   @id @default(uuid())
+  userId                           String
+  companionId                      String
+  availabilityReminderEnabled      Boolean  @default(false)
+  availabilityReminderGrantId      String?  @unique
+  availabilityReminderUpdatedAt    DateTime?
+  availabilityReminderLastDeliveredAt DateTime?
+  createdAt                        DateTime @default(now())
+
+  user                          User                           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companion                     CompanionProfile               @relation(fields: [companionId], references: [id], onDelete: Cascade)
+  availabilityReminderCandidates AvailabilityReminderCandidate[]
+
+  @@unique([userId, companionId])
+  @@index([userId, createdAt])
+  @@index([companionId])
+  @@index([companionId, availabilityReminderEnabled])
+}
+
+// A bounded, customer-owned recall list. It is intentionally separate from
+// recommendations and bookmarks: a view is neither a relationship nor a
+// preference signal, and it is never returned through a companion profile.
+model CompanionRecentView {
+  id          String   @id @default(uuid())
+  userId      String
+  companionId String
+  viewedAt    DateTime @default(now())
+
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companion CompanionProfile @relation(fields: [companionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, companionId])
+  @@index([userId, viewedAt])
+  @@index([companionId])
 }
 
 model Conversation {
@@ -369,12 +513,14 @@ model Conversation {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  companion   CompanionProfile   @relation(fields: [companionId], references: [id], onDelete: Cascade)
-  messages    Message[]
-  mediaAssets MediaAsset[]
-  readStates  MessageReadState[]
-  orders      Order[]
+  user                    User                                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companion               CompanionProfile                     @relation(fields: [companionId], references: [id], onDelete: Cascade)
+  messages                Message[]
+  mediaAssets             MediaAsset[]
+  readStates              MessageReadState[]
+  notificationPreferences ConversationNotificationPreference[]
+  blocks                  ConversationBlock[]
+  orders                  Order[]
 
   @@unique([userId, externalId])
   @@unique([userId, companionId])
@@ -383,61 +529,124 @@ model Conversation {
 }
 
 model Order {
-  id                                  String      @id @default(uuid())
-  userId                              String
-  companionId                         String
-  themeId                             String
-  durationMinutes                     Int
-  amountCents                         Int
-  currency                            String      @default("CNY")
-  status                              OrderStatus @default(pending)
-  scheduledAt                         DateTime
-  companionNameSnapshot               String
-  companionRoleSnapshot               String
-  companionInitialsSnapshot           String
-  themeNameSnapshot                   String
-  conversationId                      String?
-  recommendationImpressionId          String?     @unique
-  clientRequestId                     String?
-  companionConfirmedAt                DateTime?
-  companionResponseDeadlineAt         DateTime?
-  paymentReservationExpiresAt         DateTime?
-  serviceStartedAt                    DateTime?
-  platformFeeBps                      Int         @default(0)
-  platformFeeCents                    Int         @default(0)
-  companionPayableCents               Int         @default(0)
-  paidAt                              DateTime?
-  cancelledAt                         DateTime?
-  completedAt                         DateTime?
-  customerConfirmedAt                 DateTime?
-  refundRequestDeadlineAt             DateTime?
-  settlementRecipientRefSnapshot      String?
-  settlementRecipientMaskedSnapshot   String?
-  taxProfileRefSnapshot               String?
-  identityEvidenceRefSnapshot         String?
-  serviceAgreementVersionSnapshot     String?
-  serviceAgreementEvidenceRefSnapshot String?
-  createdAt                           DateTime    @default(now())
-  updatedAt                           DateTime    @updatedAt
+  id                                    String                        @id @default(uuid())
+  userId                                String
+  companionId                           String
+  serviceOfferingId                     String?
+  serviceOfferingCodeSnapshot           String?
+  serviceOfferingTitleSnapshot          String?
+  serviceOfferingDeliveryModeSnapshot   CompanionServiceOfferingMode?
+  serviceOfferingDurationSnapshot       Int?
+  serviceOfferingPriceCentsSnapshot     Int?
+  serviceOfferingCurrencySnapshot       String?
+  availabilityWindowId                  String?
+  availabilityWindowStartsAtSnapshot    DateTime?
+  availabilityWindowEndsAtSnapshot      DateTime?
+  availabilityWindowCapacitySnapshot    Int?
+  themeId                               String
+  durationMinutes                       Int
+  amountCents                           Int
+  currency                              String                        @default("CNY")
+  status                                OrderStatus                   @default(pending)
+  scheduledAt                           DateTime
+  companionNameSnapshot                 String
+  companionRoleSnapshot                 String
+  companionInitialsSnapshot             String
+  themeNameSnapshot                     String
+  conversationId                        String?
+  recommendationImpressionId            String?                       @unique
+  clientRequestId                       String?
+  companionConfirmedAt                  DateTime?
+  companionResponseDeadlineAt           DateTime?
+  paymentReservationExpiresAt           DateTime?
+  serviceStartedAt                      DateTime?
+  platformFeeBps                        Int                           @default(0)
+  platformFeeCents                      Int                           @default(0)
+  companionPayableCents                 Int                           @default(0)
+  paidAt                                DateTime?
+  cancelledAt                           DateTime?
+  completedAt                           DateTime?
+  customerConfirmedAt                   DateTime?
+  customerServiceGuidelinesConfirmedAt  DateTime?
+  companionServiceGuidelinesConfirmedAt DateTime?
+  refundRequestDeadlineAt               DateTime?
+  settlementRecipientRefSnapshot        String?
+  settlementRecipientMaskedSnapshot     String?
+  taxProfileRefSnapshot                 String?
+  identityEvidenceRefSnapshot           String?
+  serviceAgreementVersionSnapshot       String?
+  serviceAgreementEvidenceRefSnapshot   String?
+  createdAt                             DateTime                      @default(now())
+  updatedAt                             DateTime                      @updatedAt
 
-  user                     User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  companion                CompanionProfile          @relation(fields: [companionId], references: [id], onDelete: Restrict)
-  conversation             Conversation?             @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  user                     User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companion                CompanionProfile             @relation(fields: [companionId], references: [id], onDelete: Restrict)
+  serviceOffering          CompanionServiceOffering?    @relation(fields: [serviceOfferingId], references: [id], onDelete: SetNull)
+  availabilityWindow       CompanionAvailabilityWindow? @relation(fields: [availabilityWindowId], references: [id], onDelete: Restrict)
+  conversation             Conversation?                @relation(fields: [conversationId], references: [id], onDelete: SetNull)
   payments                 PaymentTransaction[]
   refunds                  RefundTransaction[]
   reviews                  Review[]
   earning                  CompanionEarning?
   supportTickets           SupportTicket[]
-  recommendationImpression RecommendationImpression? @relation("RecommendationAttributedOrder", fields: [recommendationImpressionId], references: [id], onDelete: SetNull)
+  supportFacts             OrderSupportFact[]
+  experienceFeedback       OrderExperienceFeedback?
+  rescheduleRequests       OrderRescheduleRequest[]
+  timelineEvents           OrderTimelineEvent[]
+  recommendationImpression RecommendationImpression?    @relation("RecommendationAttributedOrder", fields: [recommendationImpressionId], references: [id], onDelete: SetNull)
 
   @@unique([userId, clientRequestId])
   @@index([userId, createdAt])
   @@index([companionId, status])
+  @@index([serviceOfferingId])
+  @@index([availabilityWindowId])
   @@index([companionId, paymentReservationExpiresAt])
   @@index([status, companionResponseDeadlineAt])
   @@index([status, refundRequestDeadlineAt])
   @@index([status, createdAt])
   @@index([conversationId])
+}
+
+model OrderRescheduleRequest {
+  id                                          String                       @id @default(uuid())
+  orderId                                     String
+  requestedByUserId                           String
+  requestedByRole                             OrderRescheduleRequesterRole
+  originalScheduledAt                         DateTime
+  requestedScheduledAt                        DateTime
+  requestedAvailabilityWindowId               String?
+  requestedAvailabilityWindowStartsAtSnapshot DateTime?
+  requestedAvailabilityWindowEndsAtSnapshot   DateTime?
+  requestedAvailabilityWindowCapacitySnapshot Int?
+  status                                      OrderRescheduleRequestStatus @default(pending)
+  expiresAt                                   DateTime
+  respondedAt                                 DateTime?
+  respondedByUserId                           String?
+  createdAt                                   DateTime                     @default(now())
+  updatedAt                                   DateTime                     @updatedAt
+
+  order          Order                @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  timelineEvents OrderTimelineEvent[]
+
+  @@index([orderId, status, expiresAt])
+  @@index([requestedByUserId, createdAt])
+}
+
+model OrderTimelineEvent {
+  id                  String                 @id @default(uuid())
+  orderId             String
+  type                OrderTimelineEventType
+  actorId             String?
+  actorRole           OrderTimelineActorRole
+  rescheduleRequestId String?
+  payload             Json?
+  createdAt           DateTime               @default(now())
+
+  order             Order                   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  rescheduleRequest OrderRescheduleRequest? @relation(fields: [rescheduleRequestId], references: [id], onDelete: SetNull)
+
+  @@index([orderId, createdAt, id])
+  @@index([rescheduleRequestId])
 }
 
 model PaymentTransaction {
@@ -509,8 +718,9 @@ model CommunityPost {
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
 
-  author User            @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  likes  CommunityLike[]
+  author  User                  @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  likes   CommunityLike[]
+  reports CommunityPostReport[]
 
   @@index([status, createdAt])
   @@index([authorId, createdAt])
@@ -528,6 +738,26 @@ model CommunityLike {
   @@index([userId])
 }
 
+// A reporter-owned receipt for one currently public post. The full reason and
+// staff evidence live only in the linked moderation case; this row exists to
+// make duplicate submission atomic without turning reports into social data.
+model CommunityPostReport {
+  id               String   @id @default(uuid())
+  postId           String
+  reporterUserId   String
+  moderationCaseId String?
+  createdAt        DateTime @default(now())
+
+  post           CommunityPost   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  reporter       User            @relation("CommunityPostReporter", fields: [reporterUserId], references: [id], onDelete: Cascade)
+  moderationCase ModerationCase? @relation(fields: [moderationCaseId], references: [id], onDelete: SetNull)
+
+  @@unique([postId, reporterUserId])
+  @@index([reporterUserId, createdAt])
+  @@index([postId, createdAt])
+  @@index([moderationCaseId, createdAt])
+}
+
 model Review {
   id          String   @id @default(uuid())
   orderId     String   @unique
@@ -543,6 +773,23 @@ model Review {
 
   @@index([companionId, createdAt])
   @@index([userId, createdAt])
+}
+
+// Private, post-service feedback belongs to the order rather than the public
+// review surface. It deliberately has no relation to a companion profile and
+// therefore cannot change public ratings or be read through companion lists.
+model OrderExperienceFeedback {
+  id        String   @id @default(uuid())
+  orderId   String   @unique
+  rating    Int
+  tags      String[] @default([])
+  note      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
 }
 
 model UserRecommendationPreference {
@@ -702,39 +949,75 @@ model MessageReadState {
   @@index([userId])
 }
 
+// A participant-owned notification preference. It intentionally records only
+// an active mute; removing the row restores the default and avoids retaining a
+// history of unmuted conversation behavior.
+model ConversationNotificationPreference {
+  id             String   @id @default(uuid())
+  conversationId String
+  userId         String
+  mutedAt        DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+}
+
+// A participant-owned boundary for one conversation. The row exists only while
+// active, so unblocking restores the default without retaining a relationship
+// history. It intentionally does not cancel or mutate any order.
+model ConversationBlock {
+  id              String   @id @default(uuid())
+  conversationId  String
+  blockedByUserId String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  blockedBy    User         @relation("ConversationBlocker", fields: [blockedByUserId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, blockedByUserId])
+  @@index([blockedByUserId, createdAt])
+}
+
 model ModerationCase {
-  id               String                @id @default(uuid())
-  title            String
-  category         String
-  riskLevel        RiskLevel
-  status           ModerationCaseStatus  @default(pending)
-  source           ModerationSource
-  content          String
-  targetId         String?
-  messageId        String?
-  automaticCaseKey String?               @unique
-  conversationId   String?
-  subjectUserId    String?
-  reporterUserId   String?
-  priority         ModerationPriority    @default(normal)
-  dueAt            DateTime?
-  assignedToUserId String?
-  policyVersion    String                @default("chat-v2")
-  provider         String?
-  providerVersion  String?
-  aiScore          Float
-  aiReason         String
-  decision         ModerationDecision
-  matchedRules     String[]
-  usedAI           Boolean               @default(false)
-  resolvedAt       DateTime?
-  createdAt        DateTime              @default(now())
-  evidences        ModerationEvidence[]
-  actionLogs       ModerationActionLog[]
-  appeals          ModerationAppeal[]
-  restrictions     ChatRestriction[]
-  subject          User?                 @relation("ModerationSubject", fields: [subjectUserId], references: [id], onDelete: SetNull)
-  reporter         User?                 @relation("ModerationReporter", fields: [reporterUserId], references: [id], onDelete: SetNull)
+  id                   String                @id @default(uuid())
+  title                String
+  category             String
+  riskLevel            RiskLevel
+  status               ModerationCaseStatus  @default(pending)
+  source               ModerationSource
+  content              String
+  targetId             String?
+  messageId            String?
+  automaticCaseKey     String?               @unique
+  conversationId       String?
+  subjectUserId        String?
+  reporterUserId       String?
+  priority             ModerationPriority    @default(normal)
+  dueAt                DateTime?
+  assignedToUserId     String?
+  policyVersion        String                @default("chat-v2")
+  provider             String?
+  providerVersion      String?
+  aiScore              Float
+  aiReason             String
+  decision             ModerationDecision
+  matchedRules         String[]
+  usedAI               Boolean               @default(false)
+  resolvedAt           DateTime?
+  createdAt            DateTime              @default(now())
+  evidences            ModerationEvidence[]
+  actionLogs           ModerationActionLog[]
+  appeals              ModerationAppeal[]
+  restrictions         ChatRestriction[]
+  communityPostReports CommunityPostReport[]
+  subject              User?                 @relation("ModerationSubject", fields: [subjectUserId], references: [id], onDelete: SetNull)
+  reporter             User?                 @relation("ModerationReporter", fields: [reporterUserId], references: [id], onDelete: SetNull)
 
   @@index([source, status])
   @@index([targetId])
@@ -880,6 +1163,7 @@ model WeChatSubscriptionGrant {
   createdAt            DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  availabilityReminderAttempt AvailabilityReminderAttempt?
 
   @@index([userId, templateKey, templateId, consumedAt, grantedAt])
 }
@@ -988,11 +1272,32 @@ model SupportTicket {
   order      Order?              @relation(fields: [orderId], references: [id], onDelete: SetNull)
   assignedTo User?               @relation("SupportAssignee", fields: [assignedToUserId], references: [id], onDelete: SetNull)
   refunds    RefundTransaction[]
+  orderFacts OrderSupportFact[]
 
   @@index([userId, createdAt])
   @@index([orderId, status])
   @@index([status, priority, dueAt])
   @@index([assignedToUserId, status])
+}
+
+// A short, immutable statement a requester voluntarily adds to an active
+// order-related support ticket. It intentionally has no attachment, message,
+// moderation, or settlement relation: it is private support context only.
+model OrderSupportFact {
+  id                String   @id @default(uuid())
+  supportTicketId   String
+  orderId           String
+  submittedByUserId String
+  statement         String
+  createdAt         DateTime @default(now())
+
+  supportTicket SupportTicket @relation(fields: [supportTicketId], references: [id], onDelete: Cascade)
+  order         Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  submittedBy   User          @relation(fields: [submittedByUserId], references: [id], onDelete: Cascade)
+
+  @@index([supportTicketId, createdAt])
+  @@index([orderId, createdAt])
+  @@index([submittedByUserId, createdAt])
 }
 
 model AccountDeletionRequest {
@@ -1075,6 +1380,160 @@ model CompanionServiceTag {
 
   @@id([companionId, tagId])
   @@index([tagId])
+}
+
+model CompanionServiceOffering {
+  id              String                       @id @default(uuid())
+  companionId     String
+  code            String
+  title           String
+  description     String?
+  deliveryMode    CompanionServiceOfferingMode
+  durationMinutes Int
+  priceCents      Int
+  currency        String                       @default("CNY")
+  topicIds        String[]                     @default([])
+  isActive        Boolean                      @default(true)
+  sortOrder       Int                          @default(0)
+  createdAt       DateTime                     @default(now())
+  updatedAt       DateTime                     @updatedAt
+
+  companion CompanionProfile @relation(fields: [companionId], references: [id], onDelete: Cascade)
+  orders    Order[]
+
+  @@unique([companionId, code])
+  @@index([companionId, isActive, sortOrder])
+}
+
+model CompanionAvailabilityWindow {
+  id                            String   @id @default(uuid())
+  companionId                   String
+  startsAt                      DateTime
+  endsAt                        DateTime
+  capacity                      Int      @default(1)
+  isActive                      Boolean  @default(true)
+  recurringAvailabilityRuleId   String?
+  recurringOccurrenceStartsAt   DateTime?
+  createdAt                     DateTime @default(now())
+  updatedAt                     DateTime @updatedAt
+
+  companion                     CompanionProfile               @relation(fields: [companionId], references: [id], onDelete: Cascade)
+  recurringAvailabilityRule     CompanionRecurringAvailabilityRule? @relation("RecurringAvailabilityGeneratedWindows", fields: [recurringAvailabilityRuleId], references: [id], onDelete: SetNull)
+  orders                        Order[]
+  availabilityReminderCandidates AvailabilityReminderCandidate[]
+
+  @@index([companionId, isActive, startsAt])
+  @@index([companionId, isActive, endsAt])
+  @@index([companionId, recurringAvailabilityRuleId, recurringOccurrenceStartsAt])
+  @@unique([recurringAvailabilityRuleId, recurringOccurrenceStartsAt])
+}
+
+// A weekly template is intentionally not itself a bookable window. It stores
+// only a Shanghai-local day/time range for a future, separately controlled
+// materializer; no order, public availability, or notification reads it yet.
+model CompanionRecurringAvailabilityRule {
+  id                String   @id @default(uuid())
+  companionId       String
+  weekday           Int
+  startsAtMinute    Int
+  endsAtMinute      Int
+  capacity          Int      @default(1)
+  timezone          String   @default("Asia/Shanghai")
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  companion                   CompanionProfile             @relation(fields: [companionId], references: [id], onDelete: Cascade)
+  generatedAvailabilityWindows CompanionAvailabilityWindow[] @relation("RecurringAvailabilityGeneratedWindows")
+
+  @@index([companionId, isActive, weekday, startsAtMinute])
+}
+
+// A blackout is a one-off, private schedule exception. It deliberately has no
+// free-text reason or user-facing state: it will only guide a future window
+// materializer and cannot alter existing windows or bookings on its own.
+model CompanionAvailabilityBlackout {
+  id          String   @id @default(uuid())
+  companionId String
+  startsAt    DateTime
+  endsAt      DateTime
+  timezone    String   @default("Asia/Shanghai")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  companion CompanionProfile @relation(fields: [companionId], references: [id], onDelete: Cascade)
+
+  @@index([companionId, isActive, startsAt])
+  @@index([companionId, isActive, endsAt])
+}
+
+// A private, deduplicated hint that one structured availability window was
+// created or reactivated. It is not a notification intent or delivery record;
+// the future delivery path must recheck every current condition before use.
+model AvailabilityReminderCandidate {
+  id                            String   @id @default(uuid())
+  favoriteId                    String
+  companionId                   String
+  availabilityWindowId          String
+  availabilityWindowUpdatedAt DateTime
+  preflightDecision             AvailabilityReminderCandidateDecision @default(pending)
+  preflightReason               AvailabilityReminderCandidateSkipReason?
+  preflightedAt                 DateTime?
+  createdAt                     DateTime @default(now())
+
+  favorite           CompanionFavorite           @relation(fields: [favoriteId], references: [id], onDelete: Cascade)
+  companion          CompanionProfile            @relation(fields: [companionId], references: [id], onDelete: Cascade)
+  availabilityWindow CompanionAvailabilityWindow @relation(fields: [availabilityWindowId], references: [id], onDelete: Cascade)
+  handoff            AvailabilityReminderHandoff?
+
+  @@unique([favoriteId, availabilityWindowId, availabilityWindowUpdatedAt])
+  @@index([favoriteId, createdAt])
+  @@index([companionId, createdAt])
+  @@index([availabilityWindowId, createdAt])
+  @@index([preflightDecision, createdAt])
+}
+
+// A one-to-one, server-only handoff for an already eligible candidate. It is
+// intentionally not a notification, delivery, schedule, recipient record, or
+// provider attempt. The later delivery stage must recheck live state again.
+model AvailabilityReminderHandoff {
+  id          String   @id @default(uuid())
+  candidateId String   @unique
+  createdAt   DateTime @default(now())
+
+  candidate AvailabilityReminderCandidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  attempt   AvailabilityReminderAttempt?
+
+  @@index([createdAt])
+}
+
+// A durable, one-to-one authorization state record for a private handoff. It
+// has no recipient payload, in-app notification, or message body. Its final
+// stages may consume only this exact bound grant, issue a short private lease,
+// and retain a minimal provider acknowledgement or error classification.
+model AvailabilityReminderAttempt {
+  id                       String                                  @id @default(uuid())
+  handoffId                String                                  @unique
+  subscriptionGrantId      String                                  @unique
+  status                   AvailabilityReminderAttemptStatus       @default(reserved)
+  outcomeReason            AvailabilityReminderAttemptOutcomeReason?
+  authorizationConsumedAt  DateTime?
+  sendLeaseToken           String?                                 @unique
+  sendLeaseExpiresAt       DateTime?
+  providerAttemptStartedAt DateTime?
+  providerResolvedAt       DateTime?
+  providerMessageId        String?
+  providerErrorCode        String?
+  createdAt                DateTime                                @default(now())
+  updatedAt                DateTime                                @updatedAt
+
+  handoff           AvailabilityReminderHandoff @relation(fields: [handoffId], references: [id], onDelete: Cascade)
+  subscriptionGrant WeChatSubscriptionGrant      @relation(fields: [subscriptionGrantId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([status, sendLeaseExpiresAt])
+  @@index([status, providerAttemptStartedAt])
 }
 
 model VerificationCode {

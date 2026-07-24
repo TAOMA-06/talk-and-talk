@@ -2,6 +2,7 @@ import { api, ApiError, ensureSession, readLocalFile, uploadAuthorizedMedia } fr
 import { ChatMessage } from "../../utils/models";
 import { ensurePrivacyAuthorization } from "../../utils/privacy";
 import { sha256Hex } from "../../utils/sha256";
+import { requestTransactionalSubscriptions } from "../../utils/subscription";
 
 const CHAT_SYNC_INTERVAL_MS = 15_000;
 const RESTRICTION_REFRESH_INTERVAL_MS = 30_000;
@@ -68,7 +69,13 @@ Page({
     sending: false,
     mediaUploading: false,
     mediaEnabled: false,
+    messageNotificationsMuted: false,
+    messageNotificationUpdating: false,
+    conversationBlockedByYou: false,
+    messageInteractionAvailable: true,
+    conversationBlockUpdating: false,
     recording: false,
+    hasConversation: false,
     restrictionEndsAt: "",
     restrictionNotice: "",
     appealCaseId: "",
@@ -89,9 +96,10 @@ Page({
   onLoad(query: any) {
     this.conversationId = typeof query.id === "string" ? query.id : "";
     if (!this.conversationId) {
-      this.setData({ loading: false, error: "会话不存在，请返回会话列表重试" });
+      this.setData({ loading: false, hasConversation: false, error: "会话不存在，请返回会话列表重试" });
       return;
     }
+    this.setData({ hasConversation: true });
     this.ensureRecorder();
     void this.load();
   },
@@ -118,9 +126,11 @@ Page({
   async onReachBottom() { await this.loadOlder(); },
   async load(stopRefresh = false) {
     if (!this.conversationId) {
+      this.setData({ hasConversation: false });
       if (stopRefresh) wx.stopPullDownRefresh();
       return;
     }
+    this.setData({ hasConversation: true });
     try {
       if (this.hasLoadedInitial) await this.refreshLatest(true);
       else await this.loadInitial();
@@ -170,7 +180,12 @@ Page({
     if (!this.conversationId) return;
     try {
       const status = await api.conversationStatus(this.conversationId);
-      this.setData({ mediaEnabled: status.mediaEnabled });
+      this.setData({
+        mediaEnabled: status.mediaEnabled,
+        messageNotificationsMuted: status.messageNotificationsMuted,
+        conversationBlockedByYou: status.conversationBlockedByYou,
+        messageInteractionAvailable: status.messageInteractionAvailable
+      });
       this.applyRestriction(status.chatRestriction);
     } catch {
       // Sending still receives authoritative restriction errors. Do not replace
@@ -195,6 +210,9 @@ Page({
           loading: false,
           hasMore: this.hasMore,
           mediaEnabled: status.mediaEnabled,
+          messageNotificationsMuted: status.messageNotificationsMuted,
+          conversationBlockedByYou: status.conversationBlockedByYou,
+          messageInteractionAvailable: status.messageInteractionAvailable,
           error: ""
         });
         this.applyRestriction(status.chatRestriction);
@@ -314,11 +332,16 @@ Page({
       wx.showToast({ title: "当前处于聊天限言", icon: "none" });
       return;
     }
+    if ((error as ApiError)?.code === "CONVERSATION_INTERACTION_UNAVAILABLE") {
+      this.setData({ messageInteractionAvailable: false });
+      wx.showToast({ title: "当前会话无法继续收发消息", icon: "none" });
+      return;
+    }
     wx.showToast({ title: (error as Error).message || fallback, icon: "none" });
   },
   async send() {
     const content = this.data.draft.trim();
-    if (!content || this.data.sending || this.data.mediaUploading || this.data.restrictionEndsAt) return;
+    if (!content || this.data.sending || this.data.mediaUploading || this.data.restrictionEndsAt || !this.data.messageInteractionAvailable) return;
     this.setData({ sending: true });
     try {
       await ensurePrivacyAuthorization();
@@ -327,6 +350,7 @@ Page({
     finally { this.setData({ sending: false }); }
   },
   chooseImage() {
+    if (!this.data.messageInteractionAvailable) return;
     if (!this.data.mediaEnabled) {
       wx.showToast({ title: "当前环境未启用媒体消息", icon: "none" });
       return;
@@ -367,11 +391,12 @@ Page({
     return recorder;
   },
   async toggleRecord() {
+    if (!this.data.messageInteractionAvailable) return;
     if (!this.data.mediaEnabled) {
       wx.showToast({ title: "当前环境未启用媒体消息", icon: "none" });
       return;
     }
-    if (this.data.mediaUploading || this.data.sending || this.data.restrictionEndsAt) return;
+    if (this.data.mediaUploading || this.data.sending || this.data.restrictionEndsAt || !this.data.messageInteractionAvailable) return;
     const recorder = this.ensureRecorder();
     if (!recorder) {
       wx.showToast({ title: "当前微信版本不支持语音录制", icon: "none" });
@@ -390,7 +415,7 @@ Page({
     }
   },
   async sendMedia(input: MediaInput) {
-    if (this.data.mediaUploading || this.data.sending || this.data.restrictionEndsAt) return;
+    if (this.data.mediaUploading || this.data.sending || this.data.restrictionEndsAt || !this.data.messageInteractionAvailable) return;
     this.setData({ mediaUploading: true });
     try {
       await ensurePrivacyAuthorization();
@@ -424,6 +449,93 @@ Page({
     player.onError(() => wx.showToast({ title: "语音暂时无法播放", icon: "none" }));
     player.play();
     this.audioPlayer = player;
+  },
+  async toggleMessageNotifications() {
+    if (!this.conversationId || this.data.messageNotificationUpdating) return;
+    const muted = !this.data.messageNotificationsMuted;
+    const confirmation = await new Promise<any>((resolve) => wx.showModal({
+      title: muted ? "静音本会话" : "恢复本会话提醒",
+      content: muted
+        ? "只会暂停你在这个会话的后续新消息提醒。消息仍会正常收发、显示在会话和未读列表，对方不会收到提示；订单、举报、审核、客服和安全通知不受影响。"
+        : "恢复后，后续已发布消息会进入平台提醒。可在下一步主动授权微信订阅；未授权不影响聊天和未读列表。",
+      confirmText: muted ? "静音" : "恢复提醒",
+      confirmColor: muted ? "#8D5565" : "#55748F",
+      success: resolve,
+      fail: () => resolve({ confirm: false })
+    }));
+    if (!confirmation?.confirm) return;
+
+    this.setData({ messageNotificationUpdating: true });
+    try {
+      const result = await api.setConversationMessageNotificationsMuted(this.conversationId, muted);
+      this.setData({ messageNotificationsMuted: result.messageNotificationsMuted });
+      if (muted) {
+        wx.showToast({ title: "已仅为你静音本会话", icon: "success" });
+        return;
+      }
+
+      // Subscription permission is requested only after the user explicitly
+      // chose to restore this conversation's reminders. A declined platform
+      // prompt never changes message delivery or hides its unread state.
+      const subscription = await requestTransactionalSubscriptions(["messageReceived"]);
+      wx.showToast({
+        title: subscription.recorded > 0
+          ? "已恢复提醒并记录微信授权"
+          : "已恢复提醒；未授权仍可查看未读",
+        icon: "none"
+      });
+    } catch (error) {
+      wx.showToast({ title: (error as Error).message || "暂时无法更新提醒", icon: "none" });
+    } finally {
+      this.setData({ messageNotificationUpdating: false });
+    }
+  },
+  async toggleConversationBlock() {
+    if (!this.conversationId || this.data.conversationBlockUpdating) return;
+    const blocked = !this.data.conversationBlockedByYou;
+    const confirmation = await new Promise<any>((resolve) => wx.showModal({
+      title: blocked ? "为自己拉黑本会话" : "解除本会话拉黑",
+      content: blocked
+        ? "这会停止双方在该会话继续收发和展示消息，并清除你尚未查看的消息提醒。不会取消订单、退款、结算、举报或客服处理；需要时仍可从订单和安全入口获得帮助。"
+        : "解除后，只有在对方没有设置同样边界时，本会话才会恢复收发。订单、退款、举报和客服处理始终独立。",
+      confirmText: blocked ? "拉黑" : "解除拉黑",
+      confirmColor: blocked ? "#8D5565" : "#55748F",
+      success: resolve,
+      fail: () => resolve({ confirm: false })
+    }));
+    if (!confirmation?.confirm) return;
+    this.setData({ conversationBlockUpdating: true });
+    try {
+      const result = await api.setConversationBlocked(this.conversationId, blocked);
+      this.setData({
+        conversationBlockedByYou: result.conversationBlockedByYou,
+        messageInteractionAvailable: result.messageInteractionAvailable,
+        ...(blocked ? { messages: [], draft: "", hasMore: false } : {})
+      });
+      if (blocked) {
+        this.nextCursor = null;
+        this.hasMore = false;
+        wx.showToast({ title: "已为自己拉黑本会话", icon: "success" });
+        return;
+      }
+      wx.showToast({
+        title: result.messageInteractionAvailable ? "已解除拉黑" : "已解除；当前会话仍不可收发",
+        icon: "none"
+      });
+      if (result.messageInteractionAvailable) await this.load();
+    } catch (error) {
+      wx.showToast({ title: (error as Error).message || "暂时无法更新拉黑状态", icon: "none" });
+    } finally {
+      this.setData({ conversationBlockUpdating: false });
+    }
+  },
+  openSafetyCenter() {
+    wx.navigateTo({ url: "/pages/safety/index" });
+  },
+  leaveConversation() {
+    // Leaving only changes the visible page. It never cancels an order,
+    // submits a report, uploads conversation content, or writes a safety flag.
+    wx.switchTab({ url: "/pages/messages/index" });
   },
   report() { this.openReport(); },
   reportMessage(event: any) {

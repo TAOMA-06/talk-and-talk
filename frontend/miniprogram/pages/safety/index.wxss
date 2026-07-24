@@ -1,0 +1,19 @@
+.safety-page { padding-bottom: 56rpx; }
+.safety-hero { margin: 8rpx 0 28rpx; padding: 34rpx; border-radius: 28rpx; background: linear-gradient(135deg, #fcebed, #fff8f3); }
+.safety-eyebrow { color: #a43f5c; font-size: 23rpx; font-weight: 700; letter-spacing: 2rpx; }
+.safety-title { margin-top: 10rpx; color: #3e2b30; font-size: 42rpx; font-weight: 700; }
+.safety-copy { margin-top: 14rpx; color: #765b60; font-size: 26rpx; line-height: 1.65; }
+.section-title { color: #443037; font-size: 31rpx; font-weight: 700; }
+.section-copy { margin-top: 14rpx; color: #654f55; font-size: 26rpx; line-height: 1.7; }
+.section-note { margin-top: 14rpx; color: #8b7077; font-size: 23rpx; line-height: 1.6; }
+.urgent-card { border: 1rpx solid #e2bcc5; background: #fffafa; }
+.leave-button, .secondary-button { width: 100%; margin-top: 22rpx; border-radius: 12rpx; font-size: 26rpx; }
+.leave-button { background: #b94a68; color: #fff; }
+.secondary-button { border: 1rpx solid #dbbdc4; background: transparent; color: #a43f5c; }
+.action-note { margin-top: 12rpx; color: #90787d; font-size: 22rpx; line-height: 1.5; text-align: center; }
+.action-card { border-color: #eadfe1; }
+.rules-card { background: #fffdfc; }
+.rule-actions { display: flex; flex-wrap: wrap; gap: 16rpx 28rpx; margin-top: 22rpx; }
+.text-button { margin: 0; padding: 0; background: transparent; color: #a43f5c; font-size: 25rpx; line-height: 1.5; }
+.leave-button::after, .secondary-button::after, .text-button::after { border: 0; }
+.safety-footer { padding: 8rpx 16rpx; color: #90787d; font-size: 22rpx; line-height: 1.65; text-align: center; }

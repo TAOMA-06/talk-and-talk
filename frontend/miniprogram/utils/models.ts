@@ -16,6 +16,96 @@ export type Companion = {
   topicIds?: string[]; specialties?: string[]; cityDistrict?: string;
 };
 
+/** Customer-only bookmark fields. The opaque subscription grant is never
+ * returned to the Mini Program, a companion profile, recommendations, or an
+ * order. A stored preference is not a promise that a notification was sent. */
+export type FavoriteCompanion = Companion & {
+  availabilityReminderEnabled: boolean;
+  availabilityReminderUpdatedAt: string | null;
+  availabilityReminderMinimumIntervalHours: number;
+};
+
+export type FavoriteAvailabilityReminderPreference = {
+  companionId: string;
+  enabled: boolean;
+  updatedAt: string;
+  minimumIntervalHours: number;
+};
+
+export type ServiceOffering = {
+  id: string;
+  code: string;
+  title: string;
+  description?: string | null;
+  deliveryMode: "text" | "voice";
+  durationMinutes: number;
+  priceCents: number;
+  currency: "CNY" | string;
+  topicIds: string[];
+};
+
+/** Owner-only catalog fields. Public catalog responses deliberately omit these
+ * so customers cannot infer a companion's drafts or operating order. */
+export type OwnServiceOffering = ServiceOffering & {
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateOwnServiceOfferingInput = {
+  title: string;
+  description?: string | null;
+  deliveryMode: "text" | "voice";
+  durationMinutes: number;
+  priceCents: number;
+  topicIds?: string[];
+  isActive?: boolean;
+  sortOrder?: number;
+};
+
+export type UpdateOwnServiceOfferingInput = Partial<CreateOwnServiceOfferingInput>;
+
+/** Owner-only calendar configuration. Unlike customer-facing candidates, this
+ * records the raw availability range and its configured capacity. */
+export type OwnAvailabilityWindow = {
+  id: string;
+  startsAt: string;
+  endsAt: string;
+  capacity: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateOwnAvailabilityWindowInput = {
+  startsAt: string;
+  endsAt: string;
+  capacity?: number;
+  isActive?: boolean;
+};
+
+export type UpdateOwnAvailabilityWindowInput = Partial<CreateOwnAvailabilityWindowInput>;
+
+export type CompanionAvailabilityCandidate = {
+  id: string;
+  availabilityWindowId: string;
+  startsAt: string;
+  endsAt: string;
+  capacity: number;
+  reservedCount: number;
+  availableCapacity: number;
+};
+
+export type CompanionAvailabilityResponse = {
+  source: "structured" | "legacy";
+  timezone: string;
+  serviceOfferingId: string | null;
+  durationMinutes: number;
+  legacyAvailableTimes: string[];
+  items: CompanionAvailabilityCandidate[];
+};
+
 export type RecommendationPlacement = "discoverHome" | "communityRelated" | "orderFollowup";
 export type RecommendationTopic = { id: string; name: string };
 export type RecommendationBehavioralTag = {
@@ -43,20 +133,135 @@ export type CommunityPost = {
   likeCount: number; isLiked: boolean; moderationStatus: string; createdAt: string;
 };
 
+/** A private submission receipt, not a public case status or a judgment. */
+export type CommunityPostReportReceipt = {
+  id: string;
+  submittedAt: string;
+  duplicate: boolean;
+};
+
+/** The reporter can only recall a receipt, never a target or case outcome. */
+export type CommunityReportReceipt = {
+  id: string;
+  submittedAt: string;
+  status: "received";
+};
+
 export type Review = { id: string; orderId?: string; companionId: string; userName: string; rating: number; content: string; createdAt: string };
+
+export type RefundStatus = "pendingReview" | "pending" | "processing" | "success" | "failed" | "rejected";
+
+export type OrderRefund = {
+  id: string;
+  outRefundNo: string;
+  amountCents: number;
+  status: RefundStatus;
+  reason: string | null;
+  reviewNote: string | null;
+  failureReason: string | null;
+};
+
+export type OrderExperienceFeedbackTag =
+  | "communicationClear"
+  | "boundaryRespected"
+  | "onTime"
+  | "asExpected"
+  | "needsImprovement";
+
+export type OrderExperienceFeedback = {
+  id: string;
+  rating: number;
+  tags: OrderExperienceFeedbackTag[];
+  note: string | null;
+  createdAt: string;
+};
+
+/** Narrow owner-only workbench feed. It intentionally omits customer,
+ * conversation, refund, settlement and other full-order details. */
+export type CompanionTodayServiceEntry = {
+  id: string;
+  scheduledAt: string;
+  durationMinutes: number;
+  status: "pending" | "paying" | "paid" | "inService" | "completed" | string;
+  serviceTitle: string;
+};
+
+export type CompanionTodayServiceSchedule = {
+  date: string;
+  timezone: "Asia/Shanghai" | string;
+  pendingConfirmationCount: number;
+  items: CompanionTodayServiceEntry[];
+};
 
 export type Order = {
   id: string; companionId: string; themeId: string; durationMinutes: number; amountCents: number; status: string;
   scheduledAt?: string; createdAt: string; companion?: Companion; companionSnapshot?: { name: string; role: string; initials: string };
+  conversationId?: string | null;
+  customer?: { id: string; name: string; initials: string } | null;
+  experienceFeedback?: OrderExperienceFeedback | null;
+  serviceOfferingId?: string | null;
+  serviceOfferingSnapshot?: {
+    id: string | null;
+    code: string;
+    title: string;
+    deliveryMode: "text" | "voice" | string | null;
+    durationMinutes: number;
+    priceCents: number;
+    currency: string;
+  } | null;
+  availabilityWindowId?: string | null;
+  availabilitySnapshot?: { availabilityWindowId: string | null; startsAt: string | null; endsAt: string | null; capacity: number | null } | null;
   companionConfirmedAt?: string | null;
   companionResponseDeadlineAt?: string | null;
   paymentReservationExpiresAt?: string | null;
   serviceStartedAt?: string | null;
+  paidAt?: string | null;
+  cancelledAt?: string | null;
+  completedAt?: string | null;
   refundRequestDeadlineAt?: string | null;
   customerConfirmedAt?: string | null;
+  customerServiceGuidelinesConfirmedAt?: string | null;
+  companionServiceGuidelinesConfirmedAt?: string | null;
   platformFeeBps?: number;
   platformFeeCents?: number;
   companionPayableCents?: number;
+  updatedAt?: string;
+  refund?: OrderRefund | null;
+};
+
+export type RefundRequestResult = {
+  refund: OrderRefund;
+  order: Order;
+  created: boolean;
+};
+
+export type OrderRescheduleRequest = {
+  id: string;
+  requestedByRole: "customer" | "companion";
+  originalScheduledAt: string;
+  requestedScheduledAt: string;
+  requestedAvailabilitySnapshot: {
+    availabilityWindowId: string | null;
+    startsAt: string | null;
+    endsAt: string | null;
+    capacity: number | null;
+  } | null;
+  status: "pending" | "accepted" | "rejected" | "expired" | "cancelled";
+  expiresAt: string;
+  respondedAt: string | null;
+};
+
+export type OrderTimelineEvent = {
+  id: string;
+  type: "orderCreated" | "rescheduleRequested" | "rescheduleAccepted" | "rescheduleRejected" | "rescheduleExpired" | "rescheduleCancelled" | string;
+  actorRole: "customer" | "companion" | "system" | string;
+  occurredAt: string;
+  rescheduleRequest: OrderRescheduleRequest | null;
+};
+
+export type OrderTimeline = {
+  orderId: string;
+  items: OrderTimelineEvent[];
 };
 
 export type Conversation = {
@@ -64,6 +269,12 @@ export type Conversation = {
   participant: { id: string; name: string; role: string; initials: string; isOnline: boolean; isVerified: boolean };
   lastMessage?: ChatMessage | null;
   unreadCount: number;
+  /** Viewer-owned only; never reflects the other participant's preference. */
+  messageNotificationsMuted: boolean;
+  /** Viewer-owned only; exposes an unblock control without naming the other participant's choice. */
+  conversationBlockedByYou: boolean;
+  /** Generic availability only; never identifies which participant set a boundary. */
+  messageInteractionAvailable: boolean;
   updatedAt: string;
 };
 

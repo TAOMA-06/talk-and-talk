@@ -24,3 +24,10 @@ export class SetCommunityLikeDto {
   @IsBoolean()
   liked!: boolean;
 }
+
+export class CreateCommunityPostReportDto {
+  @IsString()
+  @MinLength(2)
+  @MaxLength(500)
+  reason!: string;
+}

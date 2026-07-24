@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, Put, Query, UseGuards } from "@nestjs/common";
 
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { AuthenticatedUser } from "../auth/auth.service";
@@ -7,6 +7,8 @@ import { ConversationsService } from "./conversations.service";
 import { ListMessagesQueryDto } from "./dto/list-messages.dto";
 import { ReserveMediaUploadDto } from "./dto/reserve-media-upload.dto";
 import { SendMessageDto } from "./dto/send-message.dto";
+import { SetConversationBlockDto } from "./dto/set-conversation-block.dto";
+import { SetConversationNotificationPreferenceDto } from "./dto/set-conversation-notification-preference.dto";
 
 @Controller("conversations")
 export class ConversationsController {
@@ -27,6 +29,26 @@ export class ConversationsController {
   @UseGuards(JwtAuthGuard)
   list(@CurrentUser() user: AuthenticatedUser) {
     return this.conversationsService.list(user.id);
+  }
+
+  @Put(":id/notification-preference")
+  @UseGuards(JwtAuthGuard)
+  setNotificationPreference(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id") id: string,
+    @Body() dto: SetConversationNotificationPreferenceDto
+  ) {
+    return this.conversationsService.setMessageNotificationsMuted(user.id, id, dto);
+  }
+
+  @Put(":id/block")
+  @UseGuards(JwtAuthGuard)
+  setBlock(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id") id: string,
+    @Body() dto: SetConversationBlockDto
+  ) {
+    return this.conversationsService.setConversationBlocked(user.id, id, dto);
   }
 
   @Get(":id/messages")

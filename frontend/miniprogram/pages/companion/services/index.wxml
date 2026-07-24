@@ -1,0 +1,98 @@
+<view class="page">
+  <view wx:if="{{loading}}" class="empty">正在加载服务商品…</view>
+
+  <view wx:elif="{{accessState === 'ineligible'}}" class="empty access-empty">
+    <view class="access-title">暂不能管理服务商品</view>
+    <view>{{loadError}}</view>
+    <view class="muted">为保护客户和陪伴者，服务商品只能由已完成身份与资料审核的陪伴者本人配置。</view>
+    <button class="plain-button retry-button" bindtap="retry">重新检查</button>
+  </view>
+
+  <view wx:elif="{{accessState === 'error'}}" class="empty access-empty">
+    <view class="access-title">加载失败</view>
+    <view>{{loadError}}</view>
+    <button class="primary-button retry-button" bindtap="retry">重新加载</button>
+  </view>
+
+  <view wx:else>
+    <view class="intro-card">
+      <view class="title">服务商品</view>
+      <view class="muted">客户只会看到“已上架”的服务。暂停服务不会改写已创建订单的价格、时长或服务内容。</view>
+      <view class="workbench-actions">
+        <button class="primary-button create-button" bindtap="openCreate">新建服务</button>
+        <button class="plain-button availability-button" bindtap="openAvailabilityWindows">查看可约时段</button>
+      </view>
+    </view>
+
+    <view wx:if="{{!offerings.length}}" class="empty catalog-empty">
+      <view class="access-title">还没有服务商品</view>
+      <view>先建立一项服务草稿，确认内容、价格和时长后再上架给客户。</view>
+    </view>
+
+    <view wx:for="{{offerings}}" wx:key="id" class="card offering-card">
+      <view class="offering-head">
+        <view class="offering-main">
+          <view class="offering-title">{{item.title}}</view>
+          <view class="muted">{{item.deliveryModeText}} · {{item.durationMinutes}} 分钟 · {{item.priceText}}</view>
+        </view>
+        <view class="status-chip {{item.isActive ? 'active' : 'paused'}}">{{item.statusText}}</view>
+      </view>
+      <view wx:if="{{item.description}}" class="description">{{item.description}}</view>
+      <view class="topic-line">关联主题：{{item.topicText}}</view>
+      <view class="offering-actions">
+        <button class="plain-button action-button" bindtap="editOffering" data-id="{{item.id}}">编辑</button>
+        <button class="plain-button action-button" loading="{{changingOfferingId === item.id}}" bindtap="toggleOfferingActive" data-id="{{item.id}}">{{item.isActive ? '暂停' : '上架'}}</button>
+        <button class="plain-button direction-button" disabled="{{!item.canMoveUp || reorderingId !== ''}}" loading="{{reorderingId === item.id}}" bindtap="moveOffering" data-id="{{item.id}}" data-direction="-1">上移</button>
+        <button class="plain-button direction-button" disabled="{{!item.canMoveDown || reorderingId !== ''}}" loading="{{reorderingId === item.id}}" bindtap="moveOffering" data-id="{{item.id}}" data-direction="1">下移</button>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{editorVisible}}" class="editor-mask">
+    <scroll-view scroll-y="true" class="editor-sheet">
+      <view class="editor-header">
+        <view class="title small">{{editingId ? '编辑服务' : '新建服务'}}</view>
+        <button class="close-button" disabled="{{saving}}" bindtap="closeEditor">关闭</button>
+      </view>
+      <view class="editor-tip">服务文本会经过公开内容审核；请只描述平台内、可履约的服务内容。</view>
+
+      <view class="field-label">服务名称</view>
+      <input value="{{formTitle}}" maxlength="80" placeholder="例如：30 分钟文字倾听" bindinput="setFormTitle" />
+
+      <view class="field-label">服务介绍（可选）</view>
+      <textarea value="{{formDescription}}" maxlength="500" placeholder="说明服务形式、适合的场景和边界" bindinput="setFormDescription" />
+
+      <view class="field-label">服务方式</view>
+      <view class="mode-options">
+        <button class="mode-button {{formDeliveryMode === 'text' ? 'selected' : ''}}" bindtap="setFormDeliveryMode" data-mode="text">文字服务</button>
+        <button class="mode-button {{formDeliveryMode === 'voice' ? 'selected' : ''}}" bindtap="setFormDeliveryMode" data-mode="voice">语音服务</button>
+      </view>
+
+      <view class="field-label">服务时长</view>
+      <picker mode="selector" range="{{durationOptions}}" value="{{formDurationIndex}}" bindchange="setFormDuration">
+        <view class="picker">{{durationOptions[formDurationIndex]}} 分钟</view>
+      </picker>
+
+      <view class="field-label">价格（元）</view>
+      <input value="{{formPriceYuan}}" type="digit" placeholder="例如 39 或 39.90" bindinput="setFormPrice" />
+      <view class="field-hint">最低 ¥1.00，最高 ¥20,000.00；平台会以分为单位准确保存。</view>
+
+      <view class="field-label">关联主题（可选，最多 6 个）</view>
+      <view wx:if="{{topicChoices.length}}" class="topic-choices">
+        <view wx:for="{{topicChoices}}" wx:key="id" class="topic-choice {{item.selected ? 'selected' : ''}}" bindtap="toggleFormTopic" data-id="{{item.id}}">{{item.selected ? '✓ ' : ''}}{{item.name}}</view>
+      </view>
+      <view wx:else class="field-hint">主题暂时无法加载，不影响保存服务。</view>
+
+      <view class="publish-row">
+        <view><view class="field-label compact-label">立即上架</view><view class="field-hint">关闭则保存为草稿，客户不可见。</view></view>
+        <switch checked="{{formActive}}" color="#B94A68" bindchange="setFormActive" />
+      </view>
+
+      <view wx:if="{{formError}}" class="form-error">{{formError}}</view>
+      <view class="editor-actions">
+        <button class="plain-button cancel-button" disabled="{{saving}}" bindtap="closeEditor">取消</button>
+        <button class="primary-button save-button" loading="{{saving}}" bindtap="saveEditor">{{formActive ? '保存并上架' : '保存草稿'}}</button>
+      </view>
+    </scroll-view>
+  </view>
+</view>

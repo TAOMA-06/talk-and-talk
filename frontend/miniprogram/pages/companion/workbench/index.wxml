@@ -1,0 +1,80 @@
+<view class="page">
+  <view wx:if="{{loading}}" class="empty">正在整理你的工作台…</view>
+
+  <view wx:elif="{{accessState === 'ineligible'}}" class="empty access-empty">
+    <view class="access-title">暂不能进入陪伴者工作台</view>
+    <view>{{loadError}}</view>
+    <view class="muted">工作台仅向已完成身份与资料审核的陪伴者本人开放。</view>
+    <button class="plain-button retry-button" bindtap="retry">重新检查</button>
+  </view>
+
+  <view wx:elif="{{accessState === 'error'}}" class="empty access-empty">
+    <view class="access-title">加载失败</view>
+    <view>{{loadError}}</view>
+    <button class="primary-button retry-button" bindtap="retry">重新加载</button>
+  </view>
+
+  <view wx:else>
+    <view class="hero-card">
+      <view class="eyebrow">陪伴者工作台</view>
+      <view class="hero-title">把现在要处理的事放在一起</view>
+      <view class="hero-copy">管理服务、开放时段和履约安排；客户侧只会看到你已经上架和开放的内容。</view>
+      <view class="updated-at">更新于 {{updatedAtText}}（北京时间）</view>
+    </view>
+
+    <view wx:if="{{pendingConfirmationCount}}" class="attention-card" bindtap="openOrders" hover-class="card-hover">
+      <view class="attention-icon">!</view>
+      <view class="attention-body">
+        <view class="attention-title">有 {{pendingConfirmationCount}} 个预约等待你确认</view>
+        <view class="attention-copy">确认后客户才能继续支付；请在订单页查看预约时间与处理时限。</view>
+      </view>
+      <view class="attention-link">去处理 ›</view>
+    </view>
+
+    <view class="section-heading">经营概览</view>
+    <view class="overview-grid">
+      <view class="overview-card" bindtap="openServiceOfferings" hover-class="card-hover">
+        <view class="overview-label">服务商品</view>
+        <view class="overview-value">{{activeOfferingCount}}<text class="overview-unit"> 项已上架</text></view>
+        <view class="overview-note">共 {{totalOfferingCount}} 项 · 管理商品 ›</view>
+      </view>
+      <view class="overview-card" bindtap="openAvailabilityWindows" hover-class="card-hover">
+        <view class="overview-label">可约时段</view>
+        <view class="overview-value">{{futureWindowCount}}<text class="overview-unit"> 个待开放</text></view>
+        <view class="overview-note">{{nextWindowText}} ›</view>
+      </view>
+      <view class="overview-card earnings-card">
+        <view class="overview-label">可结算收入</view>
+        <view wx:if="{{earningsUnavailable}}" class="overview-unavailable">暂无法获取</view>
+        <view wx:else class="overview-value earnings-value">{{availableEarningsText}}</view>
+        <view wx:if="{{!earningsUnavailable}}" class="overview-note">{{availableEarningCount}} 笔已处于可结算状态</view>
+        <view wx:else class="overview-note">不会影响订单和时段管理</view>
+      </view>
+    </view>
+
+    <view class="section-heading">今天的服务 · {{todayServiceDateText}}</view>
+    <view wx:if="{{todayServiceOrdersUnavailable}}" class="card schedule-card">
+      <view class="schedule-title">今日服务暂时无法同步</view>
+      <view class="muted">服务商品和可约时段仍可正常管理。请稍后下拉刷新，或前往订单页查看。</view>
+      <button class="plain-button schedule-action" bindtap="openOrders">打开订单页</button>
+    </view>
+    <block wx:elif="{{todayServiceOrders.length}}">
+      <view wx:for="{{todayServiceOrders}}" wx:key="id" wx:for-item="todayOrder" class="card schedule-card today-service-card" bindtap="openOrders" hover-class="card-hover">
+        <view class="schedule-head"><view class="schedule-title">{{todayOrder.serviceTitle}}</view><view class="status-chip">{{todayOrder.statusText}}</view></view>
+        <view class="schedule-time">{{todayOrder.scheduledAtText}} · {{todayOrder.durationMinutes}} 分钟</view>
+        <view class="schedule-meta">{{todayOrder.statusDescription}}</view>
+        <view class="schedule-link">到订单页处理 ›</view>
+      </view>
+    </block>
+    <view wx:else class="card schedule-card empty-schedule">
+      <view class="schedule-title">今天暂时没有服务安排</view>
+      <view class="muted">可先检查已上架服务和开放时段，让客户能找到并预约你。</view>
+      <view class="empty-actions">
+        <button class="plain-button schedule-action" bindtap="openServiceOfferings">管理服务</button>
+        <button class="plain-button schedule-action" bindtap="openAvailabilityWindows">开放时段</button>
+      </view>
+    </view>
+
+    <view class="workbench-tip">今日清单只按预约开始时间落在北京时间当天排列；订单确认、支付、开始、完成和资金状态仍以订单页实时记录为准，工作台不会在此处变更任何状态。</view>
+  </view>
+</view>

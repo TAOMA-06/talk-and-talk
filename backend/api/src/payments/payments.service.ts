@@ -35,6 +35,7 @@ type RefundExceptionContext = {
 
 const MIN_PREPAY_LEAD_MS = 5 * 60 * 1000;
 const MIN_PREPAY_USABLE_WINDOW_MS = 60 * 1000;
+const STRUCTURED_AVAILABILITY_STEP_MS = 30 * 60 * 1000;
 // Keep a small issuance allowance so the client still receives at least a
 // full minute after the WeChat create-order round trip completes.
 const PREPAY_ISSUANCE_ALLOWANCE_MS = 25 * 1000;
@@ -477,7 +478,10 @@ export class PaymentsService implements OnModuleInit {
     const result = await this.prisma.$transaction(async (tx) => {
       const db = tx as any;
       await db.$queryRaw`SELECT "id" FROM "Order" WHERE "id" = ${orderId} FOR UPDATE`;
-      const order = await db.order.findUnique({ where: { id: orderId } });
+      const order = await db.order.findUnique({
+        where: { id: orderId },
+        include: { companion: { select: { ownerUserId: true } } }
+      });
       if (!order || order.userId !== userId) {
         throw new AppException("ORDER_NOT_FOUND", "Order not found", HttpStatus.NOT_FOUND);
       }
@@ -510,6 +514,15 @@ export class PaymentsService implements OnModuleInit {
         if (["pendingReview", "pending", "processing", "failed"].includes(existing.status)) {
           await this.holdEarningForRefund(db, orderId);
         }
+        // An existing active refund can predate this lifecycle guard. Treat the
+        // cleanup as a system transition so a retry cannot leave a stale
+        // negotiable request beside a refund that is already in progress.
+        await this.ordersService.cancelPendingRescheduleRequest(db, {
+          order,
+          actorId: null,
+          actorRole: "system",
+          reason: "refund_requested"
+        });
         return { order, refund: existing, created: false };
       }
       if (!["paid", "inService", "completed"].includes(order.status)) {
@@ -556,6 +569,12 @@ export class PaymentsService implements OnModuleInit {
         }
       });
       await this.holdEarningForRefund(db, orderId);
+      await this.ordersService.cancelPendingRescheduleRequest(db, {
+        order,
+        actorId: exceptionContext?.actorId ?? userId,
+        actorRole: exceptionContext ? "system" : "customer",
+        reason: "refund_requested"
+      });
       await this.audit.record({
         actorId: exceptionContext?.actorId ?? userId,
         action: "refund.requested",
@@ -1367,6 +1386,11 @@ export class PaymentsService implements OnModuleInit {
   ): Promise<void> {
     const scheduledAt = order.scheduledAt as Date;
     const scheduledEnd = new Date(scheduledAt.getTime() + order.durationMinutes * 60_000);
+    const now = new Date();
+    const availabilityWindow = order.availabilityWindowId
+      ? await this.lockActiveAvailabilityWindow(db, order)
+      : null;
+    const capacity = availabilityWindow?.capacity ?? 1;
     const candidates = await db.$queryRaw`
       SELECT candidate."id"
       FROM "Order" AS candidate
@@ -1379,6 +1403,7 @@ export class PaymentsService implements OnModuleInit {
     `;
     if (!Array.isArray(candidates)) return;
 
+    let reservedCount = 0;
     for (const candidateRef of candidates) {
       const candidateId = String((candidateRef as { id: unknown }).id);
       await db.$queryRaw`SELECT "id" FROM "Order" WHERE "id" = ${candidateId} FOR UPDATE`;
@@ -1394,22 +1419,24 @@ export class PaymentsService implements OnModuleInit {
       if (!candidate || !["pending", "paying", "paid", "inService", "completed"].includes(candidate.status)) {
         continue;
       }
-      if (["paid", "inService"].includes(candidate.status) ||
+      if (["paid", "inService", "completed"].includes(candidate.status) ||
           candidate.payments.some((payment: any) => payment.status === "success")) {
-        this.throwCompanionSlotUnavailable();
+        reservedCount += 1;
+        continue;
       }
 
       if (candidate.companionConfirmedAt) {
         const reservationExpiresAt = candidate.paymentReservationExpiresAt as Date | null;
-        if (!reservationExpiresAt || reservationExpiresAt.getTime() > Date.now()) {
-          this.throwCompanionSlotUnavailable();
+        if (!reservationExpiresAt || reservationExpiresAt.getTime() > now.getTime()) {
+          reservedCount += 1;
+          continue;
         }
         await db.order.updateMany({
           where: {
             id: candidate.id,
             status: "pending",
             companionConfirmedAt: { not: null },
-            paymentReservationExpiresAt: { lte: new Date() }
+            paymentReservationExpiresAt: { lte: now }
           },
           data: { companionConfirmedAt: null, paymentReservationExpiresAt: null }
         });
@@ -1432,8 +1459,9 @@ export class PaymentsService implements OnModuleInit {
       const expiresAt = activePayment.expiresAt instanceof Date
         ? activePayment.expiresAt
         : new Date(activePayment.createdAt.getTime() + WECHAT_PREPAY_TTL_MS);
-      if (expiresAt.getTime() > Date.now()) {
-        this.throwCompanionSlotUnavailable();
+      if (expiresAt.getTime() > now.getTime()) {
+        reservedCount += 1;
+        continue;
       }
 
       // Reclaim an abandoned slot only after WeChat confirms that its expired
@@ -1466,13 +1494,72 @@ export class PaymentsService implements OnModuleInit {
         });
       }
     }
+
+    if (reservedCount >= capacity) {
+      this.throwCompanionSlotUnavailable({
+        availabilityWindowId: availabilityWindow?.id ?? null,
+        capacity,
+        reservedCount
+      });
+    }
   }
 
-  private throwCompanionSlotUnavailable(): never {
+  private async lockActiveAvailabilityWindow(db: any, order: any) {
+    const availabilityWindowId = String(order.availabilityWindowId ?? "").trim();
+    if (!availabilityWindowId) {
+      throw new AppException(
+        "AVAILABILITY_WINDOW_UNAVAILABLE",
+        "The selected availability window is no longer available",
+        HttpStatus.CONFLICT
+      );
+    }
+    await db.$queryRaw`
+      SELECT "id" FROM "CompanionAvailabilityWindow"
+      WHERE "id" = ${availabilityWindowId} AND "companionId" = ${order.companionId}
+      FOR UPDATE
+    `;
+    const window = await db.companionAvailabilityWindow.findFirst({
+      where: {
+        id: availabilityWindowId,
+        companionId: order.companionId,
+        isActive: true
+      }
+    });
+    if (!window) {
+      throw new AppException(
+        "AVAILABILITY_WINDOW_UNAVAILABLE",
+        "The selected availability window is no longer available",
+        HttpStatus.CONFLICT
+      );
+    }
+    const scheduledAt = order.scheduledAt as Date;
+    const scheduledEnd = new Date(scheduledAt.getTime() + order.durationMinutes * 60_000);
+    if (
+      scheduledAt.getTime() % STRUCTURED_AVAILABILITY_STEP_MS !== 0 ||
+      scheduledAt.getTime() < window.startsAt.getTime() ||
+      scheduledEnd.getTime() > window.endsAt.getTime()
+    ) {
+      throw new AppException(
+        "AVAILABILITY_SLOT_INVALID",
+        "The requested time is not a bookable candidate in this availability window",
+        HttpStatus.CONFLICT,
+        {
+          availabilityWindowId,
+          startsAt: window.startsAt.toISOString(),
+          endsAt: window.endsAt.toISOString(),
+          durationMinutes: order.durationMinutes
+        }
+      );
+    }
+    return window;
+  }
+
+  private throwCompanionSlotUnavailable(details?: Record<string, unknown>): never {
     throw new AppException(
       "COMPANION_SLOT_UNAVAILABLE",
       "The companion already has a payment or service for this time slot",
-      HttpStatus.CONFLICT
+      HttpStatus.CONFLICT,
+      details
     );
   }
 

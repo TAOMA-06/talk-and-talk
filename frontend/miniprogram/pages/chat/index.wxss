@@ -1,6 +1,23 @@
 .chat-page { padding-bottom: 164rpx; }
-.notice, .restriction-notice, .appeal-notice { margin-bottom: 20rpx; padding: 16rpx; border-radius: 14rpx; font-size: 24rpx; line-height: 1.5; }
+.notice, .restriction-notice, .appeal-notice, .safety-exit { margin-bottom: 20rpx; padding: 16rpx; border-radius: 14rpx; font-size: 24rpx; line-height: 1.5; }
 .notice { background: #fce8ed; color: #9b3d58; }
+.message-notification-setting { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; margin-bottom: 20rpx; padding: 16rpx; border: 1rpx solid #e7dfe1; border-radius: 14rpx; background: #fff; }
+.message-notification-copy { min-width: 0; flex: 1; }
+.message-notification-title { color: #5f454d; font-size: 25rpx; font-weight: 700; }
+.message-notification-description { margin-top: 5rpx; color: #856871; font-size: 21rpx; line-height: 1.5; }
+.message-notification-action { flex: 0 0 auto; margin: 0; padding: 0 16rpx; border: 1rpx solid #e1c5cc; border-radius: 10rpx; background: #fffafa; color: #914158; font-size: 22rpx; line-height: 56rpx; }
+.message-notification-action::after { border: 0; }
+.safety-exit { border: 1rpx solid #ead8dc; background: #fffafa; color: #765b60; }
+.safety-exit-title { color: #7e334a; font-size: 26rpx; font-weight: 700; }
+.safety-exit-copy { margin-top: 8rpx; color: #795f66; font-size: 22rpx; line-height: 1.55; }
+.safety-exit-actions { display: flex; flex-wrap: wrap; gap: 12rpx; margin-top: 14rpx; }
+.safety-exit-action { flex: 1 1 180rpx; margin: 0; padding: 0 14rpx; border: 1rpx solid #e1c5cc; border-radius: 10rpx; background: #fff; color: #914158; font-size: 22rpx; line-height: 56rpx; }
+.safety-exit-report { border-color: #c8798c; color: #8d344d; }
+.safety-exit-block { border-color: #b9966d; color: #805c32; }
+.safety-exit-action::after { border: 0; }
+.conversation-boundary { margin-bottom: 20rpx; padding: 20rpx; border: 1rpx solid #d9c8b9; border-radius: 14rpx; background: #fffaf4; }
+.conversation-boundary-title { color: #725032; font-size: 27rpx; font-weight: 700; }
+.conversation-boundary-copy { margin-top: 10rpx; color: #765f4c; font-size: 23rpx; line-height: 1.65; }
 .restriction-notice { background: #fff4d8; color: #8a5d08; }
 .appeal-notice { display: flex; align-items: center; justify-content: space-between; gap: 12rpx; background: #eef3ff; color: #3d5a9b; }
 .appeal-notice button { margin: 0; background: #fff; color: #3d5a9b; font-size: 22rpx; }
@@ -24,4 +41,3 @@
 .send { background: #b94a68; color: #fff; }
 .media { padding: 0 14rpx; background: #f7e7ed; color: #93445d; }
 .recording { background: #d9536f; color: #fff; }
-.report { margin: 28rpx auto 0; background: transparent; color: #8d6e73; font-size: 24rpx; }

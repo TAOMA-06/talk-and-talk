@@ -1,0 +1,50 @@
+<view class="page safety-page">
+  <view class="safety-hero">
+    <view class="safety-eyebrow">安全与支持</view>
+    <view class="safety-title">先照顾自己的感受与安全</view>
+    <view class="safety-copy">这里说明平台现在能做什么、不能做什么，以及需要帮助时可以从哪里开始。</view>
+  </view>
+
+  <view class="card urgent-card">
+    <view class="section-title">感到不适或不安全时</view>
+    <view class="section-copy">请先停止回复、离开当前会话，不要继续私下转账、交换联系方式或安排线下见面。出现即时危险时，请联系当地紧急服务或身边可信的人。</view>
+    <view class="section-note">Talk&amp;Talk 不提供报警、紧急救援、医疗或危机干预服务。</view>
+    <button class="leave-button" bindtap="leaveCurrentInteraction">先离开当前互动</button>
+    <view class="action-note">离开不会取消已有订单，也不会代为提交举报。</view>
+  </view>
+
+  <view class="card">
+    <view class="section-title">怎么看“已认证”</view>
+    <view class="section-copy">资料页的“已认证”表示该资料当前通过平台的展示资格检查并处于可公开查看状态。它不等同于医疗、心理治疗、紧急干预资质，也不保证某次服务体验或时段一定可用。</view>
+  </view>
+
+  <view class="card">
+    <view class="section-title">沟通与服务边界</view>
+    <view class="section-copy">服务、沟通和支付应留在平台内完成。请不要交换私人联系方式、私下转账或约线下见面；线上陪伴不替代医疗、心理治疗或紧急帮助。</view>
+  </view>
+
+  <view class="card action-card">
+    <view class="section-title">举报与申请复核</view>
+    <view class="section-copy">在具体聊天中，你可以举报整个会话，或长按一条消息举报该内容。若聊天提示可申请复核，可在同一会话提交说明。</view>
+    <view class="section-note">安全中心不会代你提交举报或读取聊天内容，避免脱离具体会话产生误报。</view>
+    <button class="secondary-button" bindtap="openMessages">前往消息</button>
+  </view>
+
+  <view class="card action-card">
+    <view class="section-title">订单、退款与售后</view>
+    <view class="section-copy">需要处理退款、履约、骚扰或安全问题时，请在订单页选择对应订单后提交售后或安全工单；工单进度会显示在订单中。</view>
+    <view class="section-note">此入口不创建工单。没有关联订单时，请先从具体聊天使用举报入口。</view>
+    <button class="secondary-button" bindtap="openOrders">前往订单</button>
+  </view>
+
+  <view class="card rules-card">
+    <view class="section-title">规则与隐私</view>
+    <view class="section-copy">你可以随时查看平台规则和隐私政策，了解平台内沟通、内容审核及信息处理的边界。</view>
+    <view class="rule-actions">
+      <button class="text-button" bindtap="openTerms">查看用户协议</button>
+      <button class="text-button" bindtap="openPrivacy">查看隐私政策</button>
+    </view>
+  </view>
+
+  <view class="safety-footer">本页只提供说明和跳转：不会读取聊天或订单正文、保存安全标签、发送消息或替你创建举报与工单。</view>
+</view>

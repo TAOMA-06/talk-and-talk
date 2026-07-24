@@ -72,6 +72,52 @@ test("accepts a complete production Mini Program deployment", () => {
   assert.deepEqual(validateDeploymentConfig(validProduction()), []);
 });
 
+test("requires a live availability-reminder template only when the default-off delivery runner is explicitly enabled", () => {
+  const enabled = {
+    ...validProduction(),
+    AVAILABILITY_REMINDER_DELIVERY_ENABLED: "true"
+  };
+  assert.match(
+    validateDeploymentConfig(enabled).join("\n"),
+    /requires an availabilityReminder subscribe template/
+  );
+
+  const templates = JSON.parse(enabled.WECHAT_SUBSCRIBE_TEMPLATES_JSON);
+  templates.push({
+    key: "availabilityReminder",
+    templateId: "TEMPLATE_availabilityReminder_123456",
+    page: "pages/companions/index",
+    data: { thing1: "{{title}}" }
+  });
+  enabled.WECHAT_SUBSCRIBE_TEMPLATES_JSON = JSON.stringify(templates);
+  enabled.AVAILABILITY_REMINDER_DELIVERY_INTERVAL_SECONDS = "15";
+  enabled.AVAILABILITY_REMINDER_DELIVERY_BATCH_SIZE = "100";
+  assert.deepEqual(validateDeploymentConfig(enabled), []);
+
+  assert.match(
+    validateDeploymentConfig({
+      ...enabled,
+      WECHAT_SUBSCRIBE_MESSAGES_ENABLED: "false"
+    }).join("\n"),
+    /AVAILABILITY_REMINDER_DELIVERY_ENABLED requires WECHAT_SUBSCRIBE_MESSAGES_ENABLED=true/
+  );
+  assert.match(
+    validateDeploymentConfig({
+      ...enabled,
+      AVAILABILITY_REMINDER_DELIVERY_INTERVAL_SECONDS: "14",
+      AVAILABILITY_REMINDER_DELIVERY_BATCH_SIZE: "101"
+    }).join("\n"),
+    /AVAILABILITY_REMINDER_DELIVERY_INTERVAL_SECONDS must be an integer between 15 and 3600/
+  );
+  assert.match(
+    validateDeploymentConfig({
+      ...enabled,
+      AVAILABILITY_REMINDER_DELIVERY_ENABLED: "yes"
+    }).join("\n"),
+    /AVAILABILITY_REMINDER_DELIVERY_ENABLED must be true or false when configured/
+  );
+});
+
 test("rejects a production deployment without a real HTTPS moderation provider", () => {
   assert.match(validateDeploymentConfig({ ...validProduction(), DEEPSEEK_API_KEY: "" }).join("\n"), /DEEPSEEK_API_KEY is required/);
   assert.match(validateDeploymentConfig({ ...validProduction(), DEEPSEEK_API_KEY: "short" }).join("\n"), /at least 24 characters/);
