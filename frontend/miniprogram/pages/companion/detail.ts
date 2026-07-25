@@ -4,8 +4,8 @@ import {
 } from "../../utils/models";
 import { requestTransactionalSubscriptions } from "../../utils/subscription";
 
-type ServiceCatalogStatus = "loading" | "available" | "empty" | "legacy";
-type AvailabilityStatus = "loading" | "structured" | "legacy" | "empty" | "unavailable";
+type ServiceCatalogStatus = "loading" | "available" | "empty";
+type AvailabilityStatus = "loading" | "structured" | "empty" | "unavailable";
 type AvailabilitySlot = CompanionAvailabilityCandidate & {
   dateKey: string;
   dateLabel: string;
@@ -24,12 +24,6 @@ const AVAILABILITY_STEP_MS = 30 * 60_000;
 const SHANGHAI_OFFSET_MS = 8 * 60 * 60_000;
 const WEEKDAY_LABELS = ["日", "一", "二", "三", "四", "五", "六"];
 
-function bookingDefaults(): { date: string; time: string } {
-  const date = new Date(Date.now() + 60 * 60 * 1000);
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60 * 1000).toISOString();
-  return { date: local.slice(0, 10), time: local.slice(11, 16) };
-}
-
 function createOrderRequestId(): string {
   return `order_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}_${Math.random().toString(36).slice(2, 12)}`;
 }
@@ -39,12 +33,12 @@ const PENDING_ORDER_PREFIX = "talkandtalk.pendingOrder.";
 function pendingOrderStorageKey(
   companionId: string,
   themeId: string,
-  serviceOfferingId: string | null,
-  availabilityWindowId: string | null,
+  serviceOfferingId: string,
+  availabilityWindowId: string,
   durationMinutes: number,
   scheduledAt: Date
 ): string {
-  return `${PENDING_ORDER_PREFIX}${encodeURIComponent(companionId)}:${encodeURIComponent(themeId)}:${encodeURIComponent(serviceOfferingId || "legacy")}:${encodeURIComponent(availabilityWindowId || "legacy")}:${durationMinutes}:${scheduledAt.toISOString()}`;
+  return `${PENDING_ORDER_PREFIX}${encodeURIComponent(companionId)}:${encodeURIComponent(themeId)}:${encodeURIComponent(serviceOfferingId)}:${encodeURIComponent(availabilityWindowId)}:${durationMinutes}:${scheduledAt.toISOString()}`;
 }
 
 function persistedOrderRequestId(storageKey: string, scheduledAt: Date): string {
@@ -229,19 +223,16 @@ function formatCny(cents: number): string {
 }
 
 function bookingButtonText(
-  companion: Companion,
-  offering: ServiceOffering | null,
+  offering: ServiceOffering,
   candidate: Pick<AvailabilitySlot, "timeLabel"> | null = null
 ): string {
-  if (candidate) return `预约 ${candidate.timeLabel} · ¥${offering ? formatCny(offering.priceCents) : companion.pricePerHalfHour}`;
-  if (offering) return `预约 ${offering.durationMinutes} 分钟 · ¥${formatCny(offering.priceCents)}`;
-  return `预约 30 分钟 · ¥${companion.pricePerHalfHour}`;
+  if (candidate) return `预约 ${candidate.timeLabel} · ¥${formatCny(offering.priceCents)}`;
+  return `预约 ${offering.durationMinutes} 分钟 · ¥${formatCny(offering.priceCents)}`;
 }
 
 Page({
   data: {
     companion: null as Companion | null, reviews: [] as Review[], loading: true, error: "", booking: false,
-    bookingDate: bookingDefaults().date, bookingTime: bookingDefaults().time,
     orderClientRequestId: "",
     serviceOfferings: [] as ServiceOffering[],
     selectedServiceOffering: null as ServiceOffering | null,
@@ -377,35 +368,8 @@ Page({
         });
         await this.loadAvailability(companion, selectedServiceOffering);
       } catch {
-        if (this.rebookingRequested) {
-          this.setData({
-            companion,
-            reviews: reviews.items || [],
-            trustFacts: companionTrustFacts(companion),
-            canManageFavorites,
-            isFavorite,
-            favoriteSaving: false,
-            serviceOfferings: [],
-            selectedServiceOffering: null,
-            selectedServiceOfferingId: "",
-            serviceCatalogStatus: "empty",
-            serviceCatalogMessage: "暂时无法确认上次服务是否仍在开放，请稍后刷新后再约。",
-            availabilityStatus: "unavailable",
-            availabilityMessage: "服务目录恢复后，平台会重新读取价格和可约时段。",
-            availabilityCandidates: [],
-            availabilityDateGroups: [],
-            selectedAvailabilityCandidate: null,
-            selectedAvailabilityCandidateId: "",
-            canBook: false,
-            bookingButtonText: "暂无法再次预约",
-            rebookingNotice: "再次预约不会复用旧订单；请等待当前服务目录恢复后重新确认。",
-            loading: false
-          });
-          return;
-        }
-        // Deployment skew or a transient catalog outage must not strand users
-        // on a profile that the legacy booking endpoint can still serve.
-        this.themeId = this.themeId || "t1";
+        // A catalog outage cannot safely fall back to editable profile pricing:
+        // commercial orders require a current offering and structured capacity.
         this.setData({
           companion,
           reviews: reviews.items || [],
@@ -413,16 +377,24 @@ Page({
           canManageFavorites,
           isFavorite,
           favoriteSaving: false,
-          serviceCatalogStatus: "legacy",
-          serviceCatalogMessage: "服务目录暂时不可用，已按旧版半小时服务预约。",
-          availabilityStatus: "legacy",
-          availabilityMessage: "请填写希望的日期和时间，陪伴者确认后为你保留时段。",
+          serviceOfferings: [],
+          selectedServiceOffering: null,
+          selectedServiceOfferingId: "",
+          serviceCatalogStatus: "empty",
+          serviceCatalogMessage: this.rebookingRequested
+            ? "暂时无法确认上次服务是否仍在开放，请稍后刷新后再约。"
+            : "服务目录暂时不可用，请稍后刷新。",
+          availabilityStatus: "unavailable",
+          availabilityMessage: "服务目录恢复后，平台会重新读取价格和可约时段。",
           availabilityCandidates: [],
           availabilityDateGroups: [],
           selectedAvailabilityCandidate: null,
           selectedAvailabilityCandidateId: "",
-          canBook: true,
-          bookingButtonText: bookingButtonText(companion, null),
+          canBook: false,
+          bookingButtonText: this.rebookingRequested ? "暂无法再次预约" : "暂无法预约",
+          rebookingNotice: this.rebookingRequested
+            ? "再次预约不会复用旧订单；请等待当前服务目录恢复后重新确认。"
+            : "",
           loading: false
         });
       }
@@ -457,18 +429,15 @@ Page({
         return;
       }
       if (response.source === "legacy") {
-        const times = response.legacyAvailableTimes.filter((time) => time.trim());
         this.setData({
-          availabilityStatus: "legacy",
-          availabilityMessage: times.length
-            ? `常见可约时段：${times.join("、")}。请填写希望的日期和时间，等待确认。`
-            : "请填写希望的日期和时间，陪伴者确认后为你保留时段。",
+          availabilityStatus: "empty",
+          availabilityMessage: "这项服务尚未配置可选择的真实时段，请稍后再来。",
           availabilityCandidates: [],
           availabilityDateGroups: [],
           selectedAvailabilityCandidate: null,
           selectedAvailabilityCandidateId: "",
-          canBook: true,
-          bookingButtonText: bookingButtonText(companion, offering)
+          canBook: false,
+          bookingButtonText: "暂时没有可约时段"
         });
         return;
       }
@@ -543,14 +512,6 @@ Page({
       if (this.data.companion?.id === companion.id) this.setData({ favoriteSaving: false });
     }
   },
-  setBookingDate(event: any) {
-    if (this.data.availabilityStatus !== "legacy") return;
-    this.setData({ bookingDate: event.detail.value, orderClientRequestId: "" });
-  },
-  setBookingTime(event: any) {
-    if (this.data.availabilityStatus !== "legacy") return;
-    this.setData({ bookingTime: event.detail.value, orderClientRequestId: "" });
-  },
   selectServiceOffering(event: any) {
     const id = String(event.currentTarget?.dataset?.id || "");
     const selectedServiceOffering = this.data.serviceOfferings.find((offering) => offering.id === id);
@@ -561,7 +522,7 @@ Page({
       selectedServiceOffering,
       selectedServiceOfferingId: selectedServiceOffering.id,
       orderClientRequestId: "",
-      bookingButtonText: companion ? bookingButtonText(companion, selectedServiceOffering) : "预约服务"
+      bookingButtonText: bookingButtonText(selectedServiceOffering)
     });
     if (companion) void this.loadAvailability(companion, selectedServiceOffering);
   },
@@ -577,16 +538,12 @@ Page({
       !isBookableAvailabilityCandidate(selectedAvailabilityCandidate, offering.durationMinutes)
     ) return;
     const slot = selectedAvailabilityCandidate as AvailabilitySlot;
-    const startsAt = new Date(slot.startsAt);
-    const local = shanghaiDateParts(startsAt);
     this.setData({
       selectedAvailabilityCandidate: slot,
       selectedAvailabilityCandidateId: slot.id,
-      bookingDate: `${local.year}-${twoDigits(local.month)}-${twoDigits(local.day)}`,
-      bookingTime: `${twoDigits(local.hour)}:${twoDigits(local.minute)}`,
       orderClientRequestId: "",
       canBook: true,
-      bookingButtonText: companion ? bookingButtonText(companion, offering, slot) : "预约服务"
+      bookingButtonText: companion ? bookingButtonText(offering, slot) : "预约服务"
     });
   },
   async book() {
@@ -595,11 +552,11 @@ Page({
       return;
     }
     const selectedServiceOffering = this.data.selectedServiceOffering;
-    if (selectedServiceOffering && !isBookableOffering(selectedServiceOffering)) {
+    if (!selectedServiceOffering || !isBookableOffering(selectedServiceOffering)) {
       wx.showToast({ title: "所选服务已失效，请重新选择", icon: "none" });
       return;
     }
-    const durationMinutes = selectedServiceOffering?.durationMinutes ?? 30;
+    const durationMinutes = selectedServiceOffering.durationMinutes;
     let scheduledAt: Date;
     let availabilityWindowId: string | null = null;
     if (this.data.availabilityStatus === "structured") {
@@ -610,8 +567,6 @@ Page({
       }
       scheduledAt = new Date(candidate.startsAt);
       availabilityWindowId = candidate.availabilityWindowId;
-    } else if (this.data.availabilityStatus === "legacy") {
-      scheduledAt = new Date(`${this.data.bookingDate}T${this.data.bookingTime}:00`);
     } else {
       wx.showToast({ title: this.data.availabilityMessage || "暂无法确认可约时段", icon: "none" });
       return;
@@ -624,7 +579,7 @@ Page({
     const storageKey = pendingOrderStorageKey(
       this.companionId,
       themeId,
-      selectedServiceOffering?.id ?? null,
+      selectedServiceOffering.id,
       availabilityWindowId,
       durationMinutes,
       scheduledAt
@@ -639,8 +594,8 @@ Page({
         durationMinutes,
         scheduledAt: scheduledAt.toISOString(),
         clientRequestId,
-        ...(selectedServiceOffering ? { serviceOfferingId: selectedServiceOffering.id } : {}),
-        ...(availabilityWindowId ? { availabilityWindowId } : {}),
+        serviceOfferingId: selectedServiceOffering.id,
+        availabilityWindowId,
         ...(this.recommendationImpressionId ? { recommendationImpressionId: this.recommendationImpressionId } : {})
       });
       await requestTransactionalSubscriptions(["orderConfirmed", "orderRejected", "orderResponseExpired"]);

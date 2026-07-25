@@ -1,4 +1,5 @@
 import { api, ApiError, ensureSession } from "../../utils/api";
+import { CatalogDisplay, withCatalogDisplays } from "../../utils/catalog";
 import {
   CompanionAvailabilityCandidate, Order, OrderExperienceFeedbackTag, OrderRescheduleRequest, OrderTimelineEvent, RecommendedCompanion
 } from "../../utils/models";
@@ -116,6 +117,8 @@ type DisplayOrder = Order & {
   rescheduleResponseAction: "" | "accept" | "reject";
   rescheduleResponseError: string;
 };
+
+type DisplayRecommendation = CatalogDisplay<RecommendedCompanion>;
 
 type OrderViewerRole = "customer" | "companion";
 
@@ -1053,7 +1056,7 @@ async function confirmPaymentWithBackend(orderId: string): Promise<boolean> {
 
 Page({
   data: {
-    orders: [] as DisplayOrder[], serviceOrders: [] as DisplayOrder[], supportTickets: [] as DisplaySupportTicket[], followupRecommendations: [] as RecommendedCompanion[],
+    orders: [] as DisplayOrder[], serviceOrders: [] as DisplayOrder[], supportTickets: [] as DisplaySupportTicket[], followupRecommendations: [] as DisplayRecommendation[],
     loading: true, error: "", payingId: "", confirmingGuidelinesId: "", submittingSupportFactId: ""
   },
   stopRecommendationTracking: null as (() => void) | null,
@@ -1107,7 +1110,7 @@ Page({
           statusText: ({ open: "待受理", inProgress: "处理中", resolved: "已处理", closed: "已关闭" } as Record<string, string>)[ticket.status] || ticket.status,
           updatedAtText: formatDateTime(ticket.updatedAt)
         })),
-        followupRecommendations: recommendations.items || [],
+        followupRecommendations: withCatalogDisplays(recommendations.items || []),
         loading: false
       });
       setTimeout(() => this.startTracking(), 0);

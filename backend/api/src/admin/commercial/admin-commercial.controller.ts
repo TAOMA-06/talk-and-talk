@@ -6,6 +6,8 @@ import { Roles } from "../../auth/decorators/roles.decorator";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../../auth/guards/roles.guard";
 import { CommercialService } from "../../commercial/commercial.service";
+import { CommercialFunnelService } from "../../commercial/commercial-funnel.service";
+import { CommercialFunnelQueryDto } from "../../commercial/dto/commercial-funnel-query.dto";
 import { CancelPayoutClaimDto } from "../../commercial/dto/cancel-payout-claim.dto";
 import { SubmitPayoutDto } from "../../commercial/dto/submit-payout.dto";
 import { SubmitRecoveryEvidenceDto } from "../../commercial/dto/submit-recovery-evidence.dto";
@@ -24,6 +26,7 @@ import { PaymentsService } from "../../payments/payments.service";
 export class AdminCommercialController {
   constructor(
     private readonly commercial: CommercialService,
+    private readonly commercialFunnel: CommercialFunnelService,
     private readonly support: SupportService,
     private readonly payments: PaymentsService
   ) {}
@@ -31,6 +34,11 @@ export class AdminCommercialController {
   @Get("readiness")
   readiness() {
     return this.commercial.operationalReadiness();
+  }
+
+  @Get("funnel")
+  funnel(@Query() query: CommercialFunnelQueryDto) {
+    return this.commercialFunnel.get(query);
   }
 
   @Get("earnings")

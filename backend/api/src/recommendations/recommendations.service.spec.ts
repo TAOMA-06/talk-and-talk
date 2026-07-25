@@ -26,6 +26,14 @@ const companion = {
   serviceTags: [{ tag: { name: "心理学背景" } }],
   recommendationPolicies: []
 };
+const sellableMatch = {
+  id: "c1",
+  earliestStartsAt: new Date("2026-07-26T02:00:00.000Z"),
+  startingPriceCents: 3900,
+  startingDurationMinutes: 30,
+  currency: "CNY",
+  deliveryModes: ["text"] as Array<"text" | "voice">
+};
 
 describe("RecommendationsService", () => {
   const prisma = {
@@ -33,16 +41,19 @@ describe("RecommendationsService", () => {
     userRecommendationTag: { findMany: jest.fn(), findUnique: jest.fn(), upsert: jest.fn(), findFirst: jest.fn(), update: jest.fn() },
     companionProfile: { findMany: jest.fn(), findUnique: jest.fn() },
     order: { findMany: jest.fn() },
+    auditLog: { findMany: jest.fn() },
     recommendationRequest: { create: jest.fn(), findFirst: jest.fn() },
     recommendationImpression: { findMany: jest.fn(), createMany: jest.fn(), count: jest.fn(), updateMany: jest.fn(), findFirst: jest.fn() },
     companionRecommendationPolicy: { upsert: jest.fn() }
   } as any;
+  const companions = { findSellableCompanions: jest.fn() } as any;
 
   let service: RecommendationsService;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new RecommendationsService(prisma);
+    companions.findSellableCompanions.mockResolvedValue([sellableMatch]);
+    service = new RecommendationsService(prisma, companions);
   });
 
   it("persists a ranked request snapshot and returns an opaque impression id", async () => {
@@ -83,7 +94,10 @@ describe("RecommendationsService", () => {
     const result = await service.listCompanions("u1", { placement: "discoverHome", themeId: "t1", pageSize: 10 });
 
     expect(prisma.companionProfile.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({ commercialProfile: { status: "verified" } })
+      where: expect.objectContaining({
+        id: { in: ["c1"] },
+        commercialProfile: { status: "verified" }
+      })
     }));
     expect(prisma.recommendationImpression.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({
@@ -100,7 +114,62 @@ describe("RecommendationsService", () => {
     expect(result.items[0]).toEqual(expect.objectContaining({
       id: "c1",
       impressionId: "00000000-0000-4000-8000-000000000001",
-      reasonText: "适合情绪倾听"
+      reasonText: "适合情绪倾听",
+      catalog: expect.objectContaining({
+        startingPriceCents: 3900,
+        nextAvailableAt: "2026-07-26T02:00:00.000Z"
+      })
+    }));
+  });
+
+  it("returns an empty discovery page when no companion has current sellable capacity", async () => {
+    companions.findSellableCompanions.mockResolvedValue([]);
+    prisma.userRecommendationPreference.findUnique.mockResolvedValue(null);
+
+    const result = await service.listCompanions("u1", { placement: "discoverHome", pageSize: 10 });
+
+    expect(result).toEqual(expect.objectContaining({
+      personalized: true,
+      items: [],
+      pagination: expect.objectContaining({ pageSize: 10, total: 0, nextCursor: null })
+    }));
+    expect(prisma.companionProfile.findMany).not.toHaveBeenCalled();
+    expect(prisma.recommendationRequest.create).not.toHaveBeenCalled();
+  });
+
+  it("keeps accepted recommendation attribution after a reservation releases its current confirmation field", async () => {
+    prisma.recommendationImpression.findMany.mockResolvedValue([{
+      companionId: "c1",
+      servedAt: new Date("2026-07-20T00:00:00.000Z"),
+      viewedAt: new Date("2026-07-20T00:01:00.000Z"),
+      clickedAt: new Date("2026-07-20T00:02:00.000Z"),
+      request: { placement: "discoverHome" },
+      companion: { id: "c1", name: "林屿" },
+      order: {
+        id: "o1",
+        amountCents: 3900,
+        companionConfirmedAt: null,
+        paidAt: new Date("2026-07-20T00:05:00.000Z"),
+        serviceStartedAt: null,
+        completedAt: null,
+        reviews: [],
+        refunds: []
+      }
+    }]);
+    prisma.auditLog.findMany.mockResolvedValue([{ resourceId: "o1" }]);
+
+    const result = await service.metrics({
+      from: "2026-07-01T00:00:00.000Z",
+      to: "2026-07-25T00:00:00.000Z"
+    });
+
+    expect(result.items[0]).toEqual(expect.objectContaining({
+      served: 1,
+      clicked: 1,
+      orderCreated: 1,
+      accepted: 1,
+      paid: 1,
+      acceptanceRate: 1
     }));
   });
 

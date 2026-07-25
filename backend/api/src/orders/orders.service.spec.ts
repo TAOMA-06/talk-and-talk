@@ -7,7 +7,8 @@ describe("OrdersService", () => {
   const prisma = {
     companionProfile: {
       findFirst: jest.fn(),
-      findUnique: jest.fn()
+      findUnique: jest.fn(),
+      update: jest.fn()
     },
     companionServiceOffering: {
       findFirst: jest.fn()
@@ -351,6 +352,25 @@ describe("OrdersService", () => {
       scheduledAt: new Date(Date.now() + 3_600_000).toISOString()
     })).rejects.toMatchObject({
       code: "ORDER_CLIENT_REQUEST_ID_REQUIRED",
+      status: HttpStatus.UNPROCESSABLE_ENTITY
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("requires a current service offering and structured availability window for commercial intake", async () => {
+    const config = {
+      get: jest.fn((key: string, fallback?: unknown) => key === "COMMERCIAL_RELEASE_MODE" ? "commercial" : fallback)
+    } as any;
+    service = new OrdersService(prisma, notifications, wechat, undefined, config);
+
+    await expect(service.create("u1", {
+      companionId: "c1",
+      themeId: "t1",
+      durationMinutes: 30,
+      scheduledAt: new Date(Date.now() + 3_600_000).toISOString(),
+      clientRequestId: "order_structured_123456"
+    })).rejects.toMatchObject({
+      code: "ORDER_STRUCTURED_CATALOG_REQUIRED",
       status: HttpStatus.UNPROCESSABLE_ENTITY
     });
     expect(prisma.$transaction).not.toHaveBeenCalled();
@@ -1730,7 +1750,8 @@ describe("OrdersService", () => {
         update: jest.fn().mockResolvedValue({ ...order, status: "completed", completedAt })
       },
       orderRescheduleRequest: { findFirst: jest.fn().mockResolvedValue(null) },
-      companionEarning: { upsert: jest.fn().mockResolvedValue({ id: "earning-1" }) }
+      companionEarning: { upsert: jest.fn().mockResolvedValue({ id: "earning-1" }) },
+      companionProfile: { update: jest.fn().mockResolvedValue({ id: "c1" }) }
     };
     prisma.$transaction.mockImplementation(async (fn: any) => fn(db));
 
@@ -1740,6 +1761,10 @@ describe("OrdersService", () => {
       where: { orderId: "o-complete" },
       create: expect.objectContaining({ payableCents: 9000, platformFeeCents: 1000, status: "pending" })
     }));
+    expect(db.companionProfile.update).toHaveBeenCalledWith({
+      where: { id: "c1" },
+      data: { completedOrders: { increment: 1 } }
+    });
     expect(notifications.create).toHaveBeenCalledWith(
       "u1", "orderStatus", "服务已完成", expect.any(String), expect.objectContaining({ orderId: "o-complete" })
     );
@@ -1778,7 +1803,8 @@ describe("OrdersService", () => {
         update: jest.fn().mockResolvedValue({ ...order, status: "completed", completedAt: new Date() })
       },
       orderRescheduleRequest: { findFirst: jest.fn().mockResolvedValue(null) },
-      companionEarning: { upsert: jest.fn().mockResolvedValue({ id: "earning-historical" }) }
+      companionEarning: { upsert: jest.fn().mockResolvedValue({ id: "earning-historical" }) },
+      companionProfile: { update: jest.fn().mockResolvedValue({ id: "c1" }) }
     };
     prisma.$transaction.mockImplementation(async (fn: any) => fn(db));
 
@@ -1830,7 +1856,8 @@ describe("OrdersService", () => {
         update: jest.fn().mockResolvedValue(resolvedRequest)
       },
       orderTimelineEvent: { create: jest.fn().mockResolvedValue({}) },
-      companionEarning: { upsert: jest.fn().mockResolvedValue({ id: "earning-legacy-complete" }) }
+      companionEarning: { upsert: jest.fn().mockResolvedValue({ id: "earning-legacy-complete" }) },
+      companionProfile: { update: jest.fn().mockResolvedValue({ id: "c1" }) }
     };
     prisma.$transaction.mockImplementation(async (fn: any) => fn(db));
 

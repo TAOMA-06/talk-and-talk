@@ -1567,12 +1567,12 @@ paths:
                   type: string
                   minLength: 1
                   maxLength: 160
-                  description: Optional active offering belonging to companionId. When present, its server-side price and duration are authoritative and frozen on the order.
+                  description: Required in commercial release mode. It must identify a current active offering belonging to companionId; its server-side price and duration are authoritative and frozen on the order. Optional only for controlled internal legacy compatibility.
                 availabilityWindowId:
                   type: string
                   minLength: 1
                   maxLength: 160
-                  description: Optional structured availability window returned by listCompanionAvailability. When supplied, scheduledAt must be a 30-minute candidate fully contained by this active window; the server records a capacity snapshot and rechecks it at confirmation and prepay.
+                  description: Required in commercial release mode. It must be the structured availability window returned by listCompanionAvailability; scheduledAt must be a 30-minute candidate fully contained by this active window. The server records a capacity snapshot and rechecks it at confirmation and prepay. Optional only for controlled internal legacy compatibility.
                 themeId: { type: string }
                 durationMinutes:
                   type: integer
@@ -1607,7 +1607,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
         "422":
-          description: Commercial intake requires a clientRequestId
+          description: Commercial intake requires clientRequestId, serviceOfferingId, and availabilityWindowId
           content:
             application/json:
               schema:
@@ -3016,6 +3016,31 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuccessEnvelope"
+  /admin/commercial/funnel:
+    get:
+      tags: [admin, commercial]
+      summary: Aggregate the order-created cohort through acceptance, payment, fulfillment, review, refund, repeat purchase, and net collection without returning customer identity or chat content
+      operationId: adminCommercialFunnel
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string, format: date-time }
+          description: Inclusive cohort start; defaults to 30 days before the request.
+        - name: to
+          in: query
+          schema: { type: string, format: date-time }
+          description: Inclusive cohort end; cannot be in the future. The range may not exceed 90 days.
+      responses:
+        "200":
+          description: Privacy-safe commercial funnel and financial aggregates
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+        "400":
+          $ref: "#/components/responses/Error"
   /admin/commercial/companions:
     get:
       tags: [admin, commercial]
@@ -3678,8 +3703,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              additionalProperties: true
+              $ref: "#/components/schemas/CreateCompanionAdminInput"
       responses:
         "200":
           description: Created
@@ -3700,8 +3724,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              additionalProperties: true
+              $ref: "#/components/schemas/UpdateCompanionAdminInput"
       responses:
         "200":
           description: Updated
@@ -3972,9 +3995,96 @@ components:
         distanceKm: { type: number, minimum: 0 }
         availability: { type: string }
         cityDistrict: { type: string }
+        catalog:
+          type: object
+          description: Current seven-day sellability summary. Public discovery and recommendation items are returned only when sellable is true; private recall surfaces may omit this field.
+          required: [sellable, startingPriceCents, startingDurationMinutes, currency, deliveryModes, nextAvailableAt]
+          properties:
+            sellable: { type: boolean }
+            startingPriceCents: { type: integer, minimum: 1, nullable: true }
+            startingDurationMinutes: { type: integer, minimum: 30, nullable: true }
+            currency: { type: string, nullable: true }
+            deliveryModes:
+              type: array
+              items: { type: string, enum: [text, voice] }
+            nextAvailableAt: { type: string, format: date-time, nullable: true }
         isPublished: { type: boolean }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+    CreateCompanionAdminInput:
+      type: object
+      additionalProperties: false
+      description: Trust metrics (rating, reviewCount, completedOrders, and responseTime) are server-derived and are intentionally not writable.
+      required: [name, role, initials, tags, pricePerHalfHour, isOnline, isVerified, bio, availableTimes, languages, specialties, distanceKm, availability, cityDistrict]
+      properties:
+        id: { type: string }
+        ownerUserId: { type: string }
+        name: { type: string }
+        role: { type: string }
+        initials: { type: string }
+        tags:
+          type: array
+          minItems: 1
+          items: { type: string }
+        pricePerHalfHour: { type: integer, minimum: 1, description: Legacy compatibility field; new commercial orders use service offering priceCents. }
+        isOnline: { type: boolean }
+        isVerified: { type: boolean }
+        bio: { type: string }
+        availableTimes:
+          type: array
+          minItems: 1
+          items: { type: string }
+        languages:
+          type: array
+          minItems: 1
+          items: { type: string }
+        specialties:
+          type: array
+          minItems: 1
+          items: { type: string }
+        topicIds:
+          type: array
+          items: { type: string }
+        distanceKm: { type: number, minimum: 0 }
+        availability: { type: string, enum: [online, available, busy] }
+        cityDistrict: { type: string }
+        isPublished: { type: boolean, enum: [false], default: false }
+    UpdateCompanionAdminInput:
+      type: object
+      additionalProperties: false
+      description: Public trust metrics are read-only. Publishing remains a separate guarded operation.
+      properties:
+        ownerUserId: { type: string }
+        name: { type: string }
+        role: { type: string }
+        initials: { type: string }
+        tags:
+          type: array
+          minItems: 1
+          items: { type: string }
+        pricePerHalfHour: { type: integer, minimum: 1, description: Legacy compatibility field; it is not a current sellable SKU price. }
+        isOnline: { type: boolean }
+        isVerified: { type: boolean }
+        bio: { type: string }
+        availableTimes:
+          type: array
+          minItems: 1
+          items: { type: string }
+        languages:
+          type: array
+          minItems: 1
+          items: { type: string }
+        specialties:
+          type: array
+          minItems: 1
+          items: { type: string }
+        topicIds:
+          type: array
+          items: { type: string }
+        distanceKm: { type: number, minimum: 0 }
+        availability: { type: string, enum: [online, available, busy] }
+        cityDistrict: { type: string }
+        isPublished: { type: boolean }
     FavoriteCompanion:
       allOf:
         - $ref: "#/components/schemas/PublicCompanion"

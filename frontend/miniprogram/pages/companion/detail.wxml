@@ -47,11 +47,10 @@
           </view>
         </view>
       </view>
-      <view wx:else class="service-state {{serviceCatalogStatus === 'legacy' ? 'service-legacy' : ''}}">{{serviceCatalogMessage}}</view>
+      <view wx:else class="service-state">{{serviceCatalogMessage}}</view>
     </view>
     <view wx:if="{{selectedServiceOffering}}" class="booking-summary">已选：{{selectedServiceOffering.title}} · ¥{{selectedServiceOffering.priceCents / 100}} / {{selectedServiceOffering.durationMinutes}} 分钟</view>
-    <view wx:elif="{{serviceCatalogStatus === 'legacy'}}" class="booking-summary">旧版服务：¥{{companion.pricePerHalfHour}} / 30 分钟</view>
-    <view wx:if="{{serviceCatalogStatus === 'available' || serviceCatalogStatus === 'legacy'}}" class="availability-section">
+    <view wx:if="{{serviceCatalogStatus === 'available'}}" class="availability-section">
       <view class="availability-heading">
         <view>选择时段</view>
         <view class="availability-timezone">北京时间</view>
@@ -77,14 +76,9 @@
           </view>
         </view>
       </view>
-      <view wx:elif="{{availabilityStatus === 'legacy'}}" class="availability-state availability-legacy">{{availabilityMessage}}</view>
       <view wx:else class="availability-state availability-unavailable">{{availabilityMessage}}</view>
     </view>
     <view wx:if="{{selectedAvailabilityCandidate}}" class="booking-summary booking-slot-summary">已选时段：{{selectedAvailabilityCandidate.dateLabel}} {{selectedAvailabilityCandidate.timeLabel}}–{{selectedAvailabilityCandidate.endTimeLabel}}（北京时间）</view>
-    <view wx:if="{{availabilityStatus === 'legacy'}}" class="booking-row">
-      <picker mode="date" value="{{bookingDate}}" bindchange="setBookingDate"><view class="booking-picker">{{bookingDate}}</view></picker>
-      <picker mode="time" value="{{bookingTime}}" bindchange="setBookingTime"><view class="booking-picker">{{bookingTime}}</view></picker>
-    </view>
     <button class="primary-button" disabled="{{!canBook || booking}}" loading="{{booking}}" bindtap="book">{{bookingButtonText}}</button>
   </view>
   <view class="title section-title">用户评价</view>

@@ -33,7 +33,8 @@ AI 内容识别是平台内容安全员，不是陪用户聊天的机器人。
 
 ```text
 talk-and-talk/
-├── frontend/ios/          # iOS SwiftUI App，App Store/TestFlight 分发
+├── frontend/miniprogram/  # 当前发行：原生 TypeScript 微信小程序
+├── frontend/ios/          # 历史/后续 SwiftUI 工程，不参与当前放行
 ├── backend/api/           # NestJS + TypeScript 正式后端
 ├── shared/contracts/      # OpenAPI v1，前后端共同契约
 ├── infra/                 # Docker Compose、nginx、secrets
@@ -46,43 +47,33 @@ talk-and-talk/
 
 | 模块 | 技术 | 当前状态 |
 |------|------|----------|
-| iOS App | SwiftUI, iOS 18+ | UI 与多数业务仍可本地运行 |
-| 正式 API | NestJS, TypeScript | Auth + companions + conversations + moderation |
+| 微信小程序 | 原生 TypeScript | 当前唯一商用客户端；覆盖微信登录、商品/时段、订单、支付、履约、售后和双角色工作台 |
+| iOS App | SwiftUI, iOS 18+ | 历史/后续工程，可本地运行但不属于当前发行或验收范围 |
+| 正式 API | NestJS, TypeScript | Auth、供给、商品、容量、推荐、订单、支付、会话、审核、退款、结算与运营控制 |
 | 数据依赖 | Postgres, Redis | Docker Compose 已配置 |
 | 内容审核 | 服务端 RuleEngine + 生产必配 DeepSeek-compatible provider | 聊天、社区、公开昵称、评价和陪伴者资料均以服务端为准 |
 
 ## 4. App 与后端怎么协作
 
-Phase 1：
+当前发行（微信小程序 + NestJS）：
 
-- iOS Debug 默认运行前端离线演示：不连接后端且不要求登录；使用本地演示身份进入完整 App 壳，**不预填虚假陪伴者/广场用户/订单**（空状态与上架产物一致）；首次启动仍展示身份选择。
-- Debug 需要本地 API 联调时，在 Run Scheme 环境变量中设置 `FRONTEND_DEMO_MODE=NO`，再使用 `http://127.0.0.1:3000`（列表数据来自后端 seed/真实写入）。
-- Staging/Release 维持后端连接；App 启动时调用 `GET /api/v1/health` 检查后端状态。
-- Debug 的本地人物、消息和支付闭环只在 `#if DEBUG` 中编译；Release 后端失败只显示空状态或错误。
-- Release 聊天只写入后端已存在的正式会话，不生成自动陪伴者回复。
-- 订单、社区、评价、陪伴者申请和服务方订单均由后端持久化；订单保存预约时间与人物/主题快照。
-- 退款只有微信回调或主动查询确认成功后才更新订单为“已退款”；服务中/已完成订单先进入人工审核。
-- 通知中心（支付/订单/审核/安全）、账号注销申请、安全加固（helmet、限流、日志脱敏、审计）已具备发行前基础。
-
-Phase 2（Auth）：
-
-- 正式账号体系：手机号验证码登录、Apple 登录、JWT access/refresh、logout、`GET /users/me`。
-- iOS 启动门控：Debug 离线演示直接进入本地演示身份（市场数据为空壳）；Staging/Release 未登录显示 `LoginView`，已登录进入主 App。
-- Token 持久化在 Keychain；401 时自动 refresh 并重试。
-- Release 使用 `Config/Release.xcconfig` 中的生产 `BACKEND_BASE_URL`，CI 会扫描产物并拒绝 Demo/Mock 标记。
-- 详见 [docs/auth-api.md](./auth-api.md)。
-
-Phase 3（聊天/审核 v2，微信小程序 + NestJS）：
-
+- 小程序以 `wx.login` 建立微信身份，服务端签发 JWT access/refresh；法律同意、18+ 门禁、注销与同意撤回均保留服务端证据。
+- 默认发现与推荐只展示未来 7 天内同时具有当前商品和结构化剩余容量的陪伴者；卡片价格来自 SKU，不来自可编辑资料价。
+- 商用创建订单必须携带稳定幂等键、商品 ID 和时段 ID。服务端在创建、接单和预支付阶段重复校验价格、资格和容量。
+- 订单、支付、退款、评价、聊天权益、结算和追偿均以服务端事实为准；小程序不自行推导资金或权限状态。
 - 正式聊天与审核 API 已接入微信小程序：`POST /conversations/:id/messages`、媒体直传预留/完成、`POST /moderation/appeals`、`GET /conversations/:id/status` 与 staff 审核接口。
 - 文本、图片、短语音统一走 `queued → pendingReview/published/blocked → 人工复核 → 处置/申诉`；接收方不会看到待审文本或未获批准媒体。
 - 聊天响应只返回用户可理解的审核决定与风险等级，举报响应只返回回执；规则命中、AI 原因和完整案件仅 staff API 可见。
 - 审核流水线：RuleEngine →（高风险 block 跳过）生产文本审核提供方 → Case/Evidence/ActionLog；提供方故障时不会降级公开。
 - Admin Moderation：概览、筛选队列、详情、会话证据、人工处置、样本标注/导出；动作写 `ModerationActionLog` + `AuditLog`。
-- 用户举报：`POST /moderation/reports`；iOS 举报入口优先提交后端。
-- Web 运营后台与 iOS 完全分离：本地工具入口为 `http://localhost:3000/admin/`，生产部署需独立访问控制。
-- 历史 iOS `c1`–`c3` 不在本次 v2 范围；小程序以服务端投递状态与审核结果为准。
+- 用户举报、广场举报和订单客服均只返回权限内的收讫/状态，不向用户泄漏另一方或内部案件细节。
+- Web 运营后台与普通用户/陪伴者客户端完全分离：本地工具入口为 `http://localhost:3000/admin/`，生产部署需独立访问控制。
 - 会话、消息、审核工单持久化到 Postgres。
+
+历史 iOS：
+
+- 仅用于参考或后续独立立项；它的 Debug 演示、Apple 登录、Keychain、TestFlight 或 App Store 配置都不是当前小程序商用放行条件。
+- 不允许以 iOS 已有页面作为当前能力完成的证据；当前真实行为以小程序、NestJS、冻结契约和生产检查清单为准。
 
 ## 5. 启动方式
 
@@ -131,15 +122,7 @@ DEPLOY_ENV_FILE=../backend/api/.env.staging \
 
 环境变量：`APP_ENV`（development/staging/production）控制 mock 支付与 seed；`GET /api/v1/health` 只返回依赖状态，metrics 需携带 `Authorization: Bearer $METRICS_TOKEN` 请求 `/api/v1/metrics`。
 
-iOS：Debug 默认 `http://127.0.0.1:3000`（[`Config/Debug.xcconfig`](../frontend/ios/Config/Debug.xcconfig)）；Release 默认 `https://api.talkandtalk.app`。TestFlight 前在 `Config/Shared.xcconfig` 填写 `WECHAT_APP_ID` 与 Apple Team。
-
-### iOS
-
-```bash
-open frontend/ios/TalkAndTalk.xcodeproj
-```
-
-模拟器默认后端地址：`http://127.0.0.1:3000`。真机调试时使用 `BACKEND_BASE_URL` 指向 Mac 局域网 IP。
+微信小程序的本地结构、运行冒烟和真机联调见 [miniprogram-verification.md](./miniprogram-verification.md) 与 [staging-acceptance.md](./staging-acceptance.md)。历史 iOS 若需单独维护，再按 `frontend/ios` 内配置运行；它不进入本节首发步骤。
 
 ## 6. 测试
 
@@ -151,7 +134,7 @@ npm run test:e2e         # 同 npm run test:integration；需 Postgres + Redis
 ./scripts/acceptance-smoke.sh http://127.0.0.1:3000
 ```
 
-iOS：
+历史 iOS（可选，不属于当前放行）：
 
 ```bash
 xcodebuild test \
@@ -165,6 +148,7 @@ xcodebuild test \
 
 - [staging-acceptance.md](./staging-acceptance.md)
 - [production-checklist.md](./production-checklist.md)
+- [core-tolerance-and-expansion-matrix.md](./core-tolerance-and-expansion-matrix.md)
 - 契约冻结：[shared/contracts](../shared/contracts)
 - 未交付范围：[NEXT_PHASE.md](../NEXT_PHASE.md)
 
@@ -173,7 +157,9 @@ xcodebuild test \
 | 误区 | 正确理解 |
 |------|----------|
 | “旧 demo 后端还在” | 已从主分支移除；正式后端在 `backend/api`；历史见 git history |
-| “聊天已经完全接正式后端” | `c1`–`c3` 聊天与审核已走正式后端；举报已接 `POST /moderation/reports`；社区仍本地；DEBUG 失败可本地兜底 |
+| “iOS 页面存在，所以它也是本次首发” | 当前唯一发行范围是微信小程序 + NestJS；iOS 为历史/后续工程 |
+| “资料已发布就一定能被首页推荐” | 默认目录与推荐还要求当前有效 SKU、未来 7 天结构化剩余容量和启用的交付方式 |
+| “聊天已经完全接正式后端” | 小程序正式聊天、举报、审核与权益均走后端；生产故障不得用本地假消息或自动回复兜底 |
 | “AI 是陪聊” | AI/审核逻辑只负责内容安全 |
 | “在根目录 npm start” | 后端命令在 `backend/api` 执行 |
 | “审核后台还是旧 demo” | 运维控制台在 `backend/api/public/admin` + `/api/v1/admin/moderation/*` |

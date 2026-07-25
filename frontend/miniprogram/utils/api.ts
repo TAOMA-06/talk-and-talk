@@ -465,7 +465,6 @@ export const api = {
     `/companions/me/availability-windows/${encodeURIComponent(id)}`,
     { method: "PATCH", data }
   ),
-  applyCompanion: (data: Record<string, unknown>) => request<Companion>("/companions/me/application", { method: "POST", data }),
   community: () => request<{ items: CommunityPost[] }>("/community/posts"),
   createPost: (data: Record<string, unknown>) => request<CommunityPost>("/community/posts", { method: "POST", data }),
   setPostLike: (id: string, liked: boolean) => request<CommunityPost>(`/community/posts/${encodeURIComponent(id)}/like`, { method: "POST", data: { liked } }),

@@ -46,9 +46,13 @@ type AvailabilityReservation = {
   paymentReservationExpiresAt: Date | null;
 };
 
-type CompanionCapacityMatch = {
+export type SellableCompanionMatch = {
   id: string;
   earliestStartsAt: Date;
+  startingPriceCents: number;
+  startingDurationMinutes: number;
+  currency: string;
+  deliveryModes: Array<"text" | "voice">;
 };
 
 @Injectable()
@@ -76,26 +80,27 @@ export class CompanionsService {
       };
     }
     const where = this.buildPublicWhere(query);
-    const capacityDays = query.availableWithinDays
-      ?? (query.sortBy === "soonestAvailable" ? DEFAULT_PUBLIC_AVAILABILITY_PRIORITY_DAYS : undefined);
-    const capacityMatches = capacityDays === undefined
-      ? undefined
-      : await this.findCompanionsWithFutureCapacity(query, capacityDays);
-    if (capacityMatches) {
-      // This deliberately happens before pagination/counting. A profile only
-      // survives if at least one *matching current service* has an actual
-      // structured candidate with remaining capacity in the requested window.
-      // Legacy free-text availability is excluded because it cannot honestly
-      // make the same capacity guarantee.
-      where.id = { in: capacityMatches.map((match) => match.id) };
-    }
+    const capacityDays = query.availableWithinDays ?? DEFAULT_PUBLIC_AVAILABILITY_PRIORITY_DAYS;
+    const capacityMatches = await this.findSellableCompanions(query, capacityDays);
+    // Public discovery is a sellable catalog, not a directory of profiles.
+    // Apply the capacity gate before pagination/counting so every returned card
+    // has at least one matching current service and one structured candidate
+    // with remaining capacity. Legacy free-text availability stays readable on
+    // existing profiles, but cannot claim that a paid appointment is available.
+    where.id = { in: capacityMatches.map((match) => match.id) };
+    const catalogByCompanionId = new Map(capacityMatches.map((match) => [match.id, match]));
 
-    if (query.sortBy === "soonestAvailable") {
+    if (query.sortBy === "soonestAvailable" || query.sortBy === "priceAsc") {
       // Availability is volatile, so this is deliberately a current ordering
-      // pass rather than a booking claim. Do not expose its calculated time in
-      // the profile DTO: detail and order creation each recheck capacity.
-      const orderedMatches = [...(capacityMatches ?? [])].sort((left, right) =>
-        left.earliestStartsAt.getTime() - right.earliestStartsAt.getTime() || left.id.localeCompare(right.id)
+      // pass rather than a booking claim. The DTO exposes the calculated time as
+      // a discovery hint; detail and order creation each recheck capacity.
+      const orderedMatches = [...capacityMatches].sort((left, right) =>
+        query.sortBy === "priceAsc"
+          ? left.startingPriceCents - right.startingPriceCents
+            || left.startingDurationMinutes - right.startingDurationMinutes
+            || left.id.localeCompare(right.id)
+          : left.earliestStartsAt.getTime() - right.earliestStartsAt.getTime()
+            || left.id.localeCompare(right.id)
       );
       const total = orderedMatches.length;
       const pageIds = orderedMatches
@@ -124,7 +129,7 @@ export class CompanionsService {
         (pagePosition.get(left.id) ?? Number.MAX_SAFE_INTEGER) - (pagePosition.get(right.id) ?? Number.MAX_SAFE_INTEGER)
       );
       return {
-        items: items.map((item) => this.toDto(item)),
+        items: items.map((item) => this.toDto(item, catalogByCompanionId.get(item.id))),
         pagination: {
           page,
           pageSize,
@@ -146,7 +151,7 @@ export class CompanionsService {
     ]);
 
     return {
-      items: items.map((item) => this.toDto(item)),
+      items: items.map((item) => this.toDto(item, catalogByCompanionId.get(item.id))),
       pagination: {
         page,
         pageSize,
@@ -157,23 +162,45 @@ export class CompanionsService {
   }
 
   async getPublished(id: string) {
-    const item = await this.prisma.companionProfile.findFirst({
-      where: {
-        id,
-        isPublished: true,
-        isVerified: true,
-        ownerUserId: { not: null },
-        owner: { accountStatus: "active", profile: { isVerified: true } },
-        commercialProfile: { status: "verified" }
-      },
-      include: this.includeTags()
-    });
+    const [item, sellableMatches] = await Promise.all([
+      this.prisma.companionProfile.findFirst({
+        where: {
+          id,
+          isPublished: true,
+          isVerified: true,
+          ownerUserId: { not: null },
+          owner: { accountStatus: "active", profile: { isVerified: true } },
+          commercialProfile: { status: "verified" }
+        },
+        include: this.includeTags()
+      }),
+      this.findSellableCompanions({}, DEFAULT_PUBLIC_AVAILABILITY_PRIORITY_DAYS, [id])
+    ]);
 
     if (!item) {
       throw new AppException("COMPANION_NOT_FOUND", "Companion not found", HttpStatus.NOT_FOUND);
     }
 
-    return this.toDto(item as CompanionRecord);
+    return this.toDto(item as CompanionRecord, sellableMatches[0]);
+  }
+
+  /**
+   * Shared public sellability read model. Recommendations and catalog listings
+   * must use this boundary instead of independently guessing from profile flags,
+   * free-text availability, or an active offering alone.
+   */
+  async findSellableCompanions(
+    query: ListCompanionsQueryDto = {},
+    days = DEFAULT_PUBLIC_AVAILABILITY_PRIORITY_DAYS,
+    companionIds?: string[]
+  ): Promise<SellableCompanionMatch[]> {
+    if (query.deliveryMode === "voice" && !this.isVoiceBookingEnabled()) return [];
+    const boundedDays = Math.max(1, Math.min(7, Math.trunc(days)));
+    const normalizedIds = companionIds
+      ? [...new Set(companionIds.map((id) => id.trim()).filter(Boolean))]
+      : undefined;
+    if (normalizedIds && normalizedIds.length === 0) return [];
+    return this.findCompanionsWithFutureCapacity(query, boundedDays, normalizedIds);
   }
 
   /**
@@ -208,8 +235,9 @@ export class CompanionsService {
 
   /**
    * Converts explicit availability windows into booking candidates. Existing
-   * profiles with no structured window intentionally retain the legacy
-   * availableTimes fallback so rolling deployments do not remove booking.
+   * profiles with no structured window retain legacy availableTimes only for
+   * historical/internal compatibility. Commercial discovery and order intake
+   * fail closed unless a structured candidate exists.
    */
   async listPublishedAvailability(id: string, query: ListCompanionAvailabilityQueryDto) {
     const now = new Date();
@@ -846,6 +874,10 @@ export class CompanionsService {
     const data: any = {
       id,
       ...this.profileData(dto),
+      rating: 0,
+      reviewCount: 0,
+      completedOrders: 0,
+      responseTime: "暂无履约数据",
       isPublished: dto.isPublished ?? false
     };
     await this.prisma.companionProfile.create({ data });
@@ -1006,10 +1038,12 @@ export class CompanionsService {
     // currently active service offering. This keeps retired/draft catalog
     // data, historic order pricing, profile-only topic labels,
     // recommendations, and private user behavior out of the result set.
+    const deliveryMode = query.deliveryMode
+      ?? (this.isVoiceBookingEnabled() ? undefined : "text");
     return {
       isActive: true,
       ...(query.topicId ? { topicIds: { has: query.topicId } } : {}),
-      ...(query.deliveryMode ? { deliveryMode: query.deliveryMode } : {}),
+      ...(deliveryMode ? { deliveryMode } : {}),
       ...(query.maxServicePriceCents !== undefined ? { priceCents: { lte: query.maxServicePriceCents } } : {})
     };
   }
@@ -1047,8 +1081,9 @@ export class CompanionsService {
 
   private async findCompanionsWithFutureCapacity(
     query: ListCompanionsQueryDto,
-    days: number
-  ): Promise<CompanionCapacityMatch[]> {
+    days: number,
+    companionIds?: string[]
+  ): Promise<SellableCompanionMatch[]> {
     const now = new Date();
     const earliestStart = new Date(now.getTime() + MIN_PUBLIC_BOOKING_LEAD_TIME_MS);
     const until = new Date(now.getTime() + days * 24 * 60 * 60_000);
@@ -1060,6 +1095,7 @@ export class CompanionsService {
         // scope as the final list, including an explicit keyword. The later
         // list still re-applies every condition before returning a profile.
         ...publicCatalogWhere,
+        ...(companionIds ? { id: { in: companionIds } } : {}),
         serviceOfferings: { some: serviceWhere },
         availabilityWindows: {
           some: {
@@ -1073,7 +1109,13 @@ export class CompanionsService {
         id: true,
         serviceOfferings: {
           where: serviceWhere,
-          select: { id: true, durationMinutes: true }
+          select: {
+            id: true,
+            durationMinutes: true,
+            priceCents: true,
+            currency: true,
+            deliveryMode: true
+          }
         },
         availabilityWindows: {
           where: {
@@ -1103,14 +1145,21 @@ export class CompanionsService {
       }
     } as any) as unknown) as Array<{
       id: string;
-      serviceOfferings: Array<{ id: string; durationMinutes: number }>;
+      serviceOfferings: Array<{
+        id: string;
+        durationMinutes: number;
+        priceCents: number;
+        currency: string;
+        deliveryMode: "text" | "voice";
+      }>;
       availabilityWindows: Array<{ id: string; startsAt: Date; endsAt: Date; capacity: number }>;
       orders: AvailabilityReservation[];
     }>;
 
-    const matches: CompanionCapacityMatch[] = [];
+    const matches: SellableCompanionMatch[] = [];
     for (const companion of candidates) {
       let earliestStartsAt: Date | null = null;
+      const sellableOfferings: typeof companion.serviceOfferings = [];
       for (const offering of companion.serviceOfferings) {
         // All explicitly selected service conditions are already present in
         // serviceWhere. When none is selected, each currently active offering
@@ -1124,13 +1173,26 @@ export class CompanionsService {
           now
         )[0];
         if (!candidate) continue;
+        sellableOfferings.push(offering);
         const startsAt = new Date(candidate.startsAt);
         if (!earliestStartsAt || startsAt.getTime() < earliestStartsAt.getTime()) {
           earliestStartsAt = startsAt;
         }
       }
-      if (earliestStartsAt) {
-        matches.push({ id: companion.id, earliestStartsAt });
+      if (earliestStartsAt && sellableOfferings.length > 0) {
+        const startingOffering = [...sellableOfferings].sort((left, right) =>
+          left.priceCents - right.priceCents
+          || left.durationMinutes - right.durationMinutes
+          || left.id.localeCompare(right.id)
+        )[0];
+        matches.push({
+          id: companion.id,
+          earliestStartsAt,
+          startingPriceCents: startingOffering.priceCents,
+          startingDurationMinutes: startingOffering.durationMinutes,
+          currency: startingOffering.currency,
+          deliveryModes: [...new Set(sellableOfferings.map((offering) => offering.deliveryMode))].sort()
+        });
       }
     }
     return matches;
@@ -1692,8 +1754,6 @@ export class CompanionsService {
       "ownerUserId",
       "role",
       "initials",
-      "rating",
-      "reviewCount",
       "pricePerHalfHour",
       "isOnline",
       "isVerified",
@@ -1702,8 +1762,6 @@ export class CompanionsService {
       "languages",
       "specialties",
       "topicIds",
-      "completedOrders",
-      "responseTime",
       "distanceKm",
       "availability",
       "cityDistrict",
@@ -1814,7 +1872,7 @@ export class CompanionsService {
     }
   }
 
-  private toDto(item: CompanionRecord) {
+  private toDto(item: CompanionRecord, catalog?: SellableCompanionMatch) {
     return {
       id: item.id,
       name: item.name,
@@ -1836,6 +1894,21 @@ export class CompanionsService {
       distanceKm: item.distanceKm,
       availability: item.availability,
       cityDistrict: item.cityDistrict,
+      catalog: catalog ? {
+        sellable: true,
+        startingPriceCents: catalog.startingPriceCents,
+        startingDurationMinutes: catalog.startingDurationMinutes,
+        currency: catalog.currency,
+        deliveryModes: catalog.deliveryModes,
+        nextAvailableAt: catalog.earliestStartsAt.toISOString()
+      } : {
+        sellable: false,
+        startingPriceCents: null,
+        startingDurationMinutes: null,
+        currency: null,
+        deliveryModes: [],
+        nextAvailableAt: null
+      },
       isPublished: item.isPublished,
       createdAt: item.createdAt.toISOString(),
       updatedAt: item.updatedAt.toISOString()

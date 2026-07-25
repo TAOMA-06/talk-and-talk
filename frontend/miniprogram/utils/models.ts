@@ -9,11 +9,21 @@ export type AuthUser = {
 
 export type AuthSession = { accessToken: string; refreshToken: string; expiresIn: number; user: AuthUser };
 
+export type PublicCatalogSummary = {
+  sellable: boolean;
+  startingPriceCents: number | null;
+  startingDurationMinutes: number | null;
+  currency: string | null;
+  deliveryModes: Array<"text" | "voice">;
+  nextAvailableAt: string | null;
+};
+
 export type Companion = {
   id: string; name: string; role: string; initials: string; bio: string;
   rating: number; reviewCount: number; pricePerHalfHour: number; isOnline: boolean;
   isVerified: boolean; availability: string; tags?: string[]; serviceTags?: string[]; availableTimes?: string[];
   topicIds?: string[]; specialties?: string[]; cityDistrict?: string;
+  catalog?: PublicCatalogSummary;
 };
 
 /** Customer-only bookmark fields. The opaque subscription grant is never

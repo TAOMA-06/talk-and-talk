@@ -6,10 +6,13 @@
 ## 商用模式总门禁
 
 - [ ] `COMMERCIAL_RELEASE_MODE=commercial`；`REFUND_REQUEST_WINDOW_HOURS`、`COMPANION_SETTLEMENT_HOLD_HOURS` 与经批准规则一致，且结算至少晚于退款窗口 24 小时
+- [ ] 用正式小程序重放一次创建订单：缺少 `clientRequestId`、`serviceOfferingId` 或 `availabilityWindowId` 均返回 422；相同幂等键和相同业务输入只返回原订单，不产生第二笔支付意图
+- [ ] 默认发现、价格排序和推荐均只返回未来 7 天有当前 SKU 与结构化剩余容量的对象；卡片起价/时长/方式与详情 SKU、订单快照、支付金额一致。商品目录或时段接口故障时小程序失败关闭，不降级到资料价
 - [ ] `ORDER_INTAKE_ENABLED`、总量/单用户/单陪伴者容量与 `ORDER_MAX_SCHEDULE_DAYS` 已按排班和值班能力设置；事故演练能暂停新单但仍允许同幂等键找回原订单
 - [ ] `ORDER_RESCHEDULE_RESPONSE_WINDOW_MINUTES`、`ORDER_RESCHEDULE_EXPIRY_*`、`rescheduleRequested`、`rescheduleAccepted`、`rescheduleRejected`、`rescheduleExpired` 与 `rescheduleCancelled` 订阅消息模板已按值班能力配置；小程序真机已验证用户主动开启提醒时会按单次最多 3 项分批请求并记录授权；改期请求只在双方确认后、并通过第二次容量校验时才可替换原预约，拒绝、超时、订单取消、退款或履约开始/完成都不会改写原预约
 - [ ] `ORDER_CHAT_PRE_SERVICE_WINDOW_MINUTES` 与 `ORDER_CHAT_POST_SERVICE_WINDOW_MINUTES` 已按服务与客服能力明确设置；两名真实测试用户验证服务窗口内可发消息，完成订单仅可查看历史而不能新建文字/媒体，举报、售后和客服仍可用
 - [ ] `/admin/commercial/readiness` 返回 `clear`，并由值班人员核对失败/超时退款、超时工单、失败推送、过期推送租约、待复核商业档案、未结追偿、超时结算、审核服务故障、严重/超时审核、媒体删除失败、过期支付、预约响应/支付保留超时、已过履约窗口待退款、超时服务订单和语音关房积压均为 0；若启用语音，`voiceEmergencyStopActive=0` 且 `voice.roomControlEnabled=true`
+- [ ] `/admin/commercial/funnel` 的请求、接单（含已释放支付保留的不可变审计事实）、支付、应开始、准时开始、应完成、完成、评价、退款、复购和净实收已与抽样订单逐笔核对；经营评审采用 [核心宽容度与拓展度决策](./core-tolerance-and-expansion-matrix.md) 的分母和停止规则
 - [ ] `SUPPORT_MAX_OPEN_PER_USER` 与实际客服容量一致；普通工单达到上限会被拒绝，但紧急安全工单仍可进入队列
 - [ ] 每位上架陪伴者均具备已复核的实名状态与商业档案；收款对象、税务档案、身份和协议只保存受控外部证据引用
 - [ ] 已逐笔处置历史已支付/服务中/已完成订单、失败退款、未结工单及缺少结算快照的应结款；禁止伪造历史核验结果
@@ -38,6 +41,7 @@
 - [ ] Postgres 不直接对公网暴露
 - [ ] `REDIS_URL` 生产建议 `redis://:PASSWORD@host:6379`（requirepass）；至少不公网裸奔
 - [ ] health 中 `dependencies.database` / `dependencies.redis` 为 `ok`
+- [ ] 发布前已备份数据库；在 staging 执行 `20260725100000_derive_companion_trust_metrics` 后，逐位核对评分/评价数、完单数与平均响应文案均来自真实评价和订单。生产迁移后再次抽样，禁止手工“恢复”旧宣传数字
 - [ ] 迁移前确认 `RefundTransaction.providerRefundId` 的非空值无重复；若有差异先逐笔对账，不得删除或随意改写财务记录来强行通过唯一索引
 - [ ] `20260720163000_refund_reconciliation_schedule` 已部署；现存 `processing` 退款已获得 `nextReconcileAt`，worker 扫描后不存在长期逾期租约
 

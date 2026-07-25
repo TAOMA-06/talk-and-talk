@@ -30,6 +30,7 @@ talk-and-talk/
 | [docs/deploy-rollback.md](./docs/deploy-rollback.md) | 部署与回滚 |
 | [docs/production-checklist.md](./docs/production-checklist.md) | 生产检查清单 |
 | [docs/COMMERCIAL_RELEASE.md](./docs/COMMERCIAL_RELEASE.md) | 正式商用交易模型、代码控制、外部 P0 与放行流程 |
+| [docs/core-tolerance-and-expansion-matrix.md](./docs/core-tolerance-and-expansion-matrix.md) | CTO + 商务负责人视角的核心宽容度、硬边界、扩展触发器与放量规则 |
 | [docs/wechat-backend-selection.md](./docs/wechat-backend-selection.md) | 微信后端方案选型、云托管部署与真机验收 |
 | [docs/app-store-metadata.md](./docs/app-store-metadata.md) | App Store Connect 元数据 |
 | [frontend/ios/](./frontend/ios/) | 历史 iOS SwiftUI App（当前不发布） |

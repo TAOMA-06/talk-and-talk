@@ -1,4 +1,5 @@
 import { api, ensureSession } from "../../utils/api";
+import { CatalogDisplay, withCatalogDisplays } from "../../utils/catalog";
 import { Companion, RecommendedCompanion, RecommendationTopic } from "../../utils/models";
 import { flushRecommendationEvents, queueRecommendationEvent, trackRecommendationCardViews } from "../../utils/recommendations";
 
@@ -9,6 +10,7 @@ type PriceFilter = { value: number; label: string; selected: boolean };
 type AvailabilityWithinDaysFilter = { value: number; label: string; selected: boolean };
 type PublicSort = "" | "online" | "rating" | "reviewCount" | "priceAsc" | "soonestAvailable";
 type PublicSortFilter = { value: Exclude<PublicSort, "">; label: string; selected: boolean };
+type DisplayCompanion = CatalogDisplay<Companion | RecommendedCompanion>;
 
 const DELIVERY_MODES: Array<Omit<DeliveryModeFilter, "selected">> = [
   { value: "text", label: "文字服务" },
@@ -27,7 +29,7 @@ const PUBLIC_SORTS: Array<Omit<PublicSortFilter, "selected">> = [
   { value: "online", label: "在线优先" },
   { value: "rating", label: "评分优先" },
   { value: "reviewCount", label: "评价量优先" },
-  { value: "priceAsc", label: "资料标价低优先" }
+  { value: "priceAsc", label: "商品起价低优先" }
 ];
 
 function displayTopics(topics: RecommendationTopic[], selectedTopicId: string): DisplayTopic[] {
@@ -77,9 +79,13 @@ function normalizeKeyword(value: unknown): string {
   return typeof value === "string" ? value.trim().replace(/\s+/g, " ").slice(0, 40) : "";
 }
 
+function displayCompanions(items: Array<Companion | RecommendedCompanion>): DisplayCompanion[] {
+  return withCatalogDisplays(items);
+}
+
 Page({
   data: {
-    companions: [] as Array<Companion | RecommendedCompanion>,
+    companions: [] as DisplayCompanion[],
     topicFilters: [] as DisplayTopic[],
     deliveryModeFilters: displayDeliveryModes(""),
     priceFilters: displayPriceLimits(0),
@@ -136,7 +142,7 @@ Page({
         ]);
         if (sequence !== this.loadSequence) return;
         this.setData({
-          companions: result.items || [],
+          companions: displayCompanions(result.items || []),
           topicFilters: displayTopics(topics.items || [], selectedTopicId),
           deliveryModeFilters: displayDeliveryModes(selectedDeliveryMode),
           priceFilters: displayPriceLimits(selectedMaxServicePriceCents),
@@ -163,7 +169,7 @@ Page({
         ]);
         if (sequence !== this.loadSequence) return;
         this.setData({
-          companions: result.items || [],
+          companions: displayCompanions(result.items || []),
           topicFilters: displayTopics(topics.items || [], ""),
           deliveryModeFilters: displayDeliveryModes(""),
           priceFilters: displayPriceLimits(0),
@@ -178,7 +184,7 @@ Page({
         const [topics, result] = await Promise.all([topicsTask, api.companions()]);
         if (sequence !== this.loadSequence) return;
         this.setData({
-          companions: result.items || [],
+          companions: displayCompanions(result.items || []),
           topicFilters: displayTopics(topics.items || [], ""),
           deliveryModeFilters: displayDeliveryModes(""),
           priceFilters: displayPriceLimits(0),

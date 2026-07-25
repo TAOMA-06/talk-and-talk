@@ -25,7 +25,6 @@ Page({
     user: null as AuthUser | null, displayName: "", gender: "" as UserGender | "", genderLabel: "未选择",
     genderLabels: USER_GENDERS.map((gender) => GENDER_LABELS[gender]), notifications: [] as Notification[],
     unreadNotificationCount: 0, markingNotificationsRead: false, profileLoading: true, saving: false,
-    applicationVisible: false, role: "情绪倾听者", bio: "", price: "39", city: "线上",
     recommendationPreferences: null as RecommendationPreference | null,
     recommendationTopics: [] as DisplayTopic[], recommendationTopicIds: [] as string[],
     recommendationCity: "", recommendationMaxPrice: "", recommendationTimeSlots: [] as string[],
@@ -89,10 +88,6 @@ Page({
     const gender = USER_GENDERS[Number(event.detail.value)] || "";
     this.setData({ gender, genderLabel: gender ? GENDER_LABELS[gender] : "未选择" });
   },
-  setRole(event: any) { this.setData({ role: event.detail.value }); },
-  setBio(event: any) { this.setData({ bio: event.detail.value }); },
-  setPrice(event: any) { this.setData({ price: event.detail.value }); },
-  setCity(event: any) { this.setData({ city: event.detail.value }); },
   async setPersonalization(event: any) {
     const current = this.data.recommendationPreferences;
     if (!current) return;
@@ -175,19 +170,6 @@ Page({
       wx.showToast({ title: "资料已保存", icon: "success" });
     } catch (error) { wx.showToast({ title: (error as Error).message || "保存失败", icon: "none" }); }
     finally { this.setData({ saving: false }); }
-  },
-  toggleApplication() { this.setData({ applicationVisible: !this.data.applicationVisible }); },
-  async applyCompanion() {
-    if (!this.data.bio.trim()) { wx.showToast({ title: "请填写服务介绍", icon: "none" }); return; }
-    try {
-      await api.applyCompanion({
-        role: this.data.role.trim(), bio: this.data.bio.trim(), pricePerHalfHour: Number(this.data.price) || 39,
-        tags: ["平台内沟通"], availableTimes: ["可预约"], languages: ["中文"], specialties: ["情绪倾听"], cityDistrict: this.data.city.trim() || "线上"
-      });
-      wx.showToast({ title: "申请已提交", icon: "success" });
-      this.setData({ applicationVisible: false });
-      await this.load();
-    } catch (error) { wx.showToast({ title: (error as Error).message || "申请失败", icon: "none" }); }
   },
   openCompanionWorkbench() { wx.navigateTo({ url: "/pages/companion/workbench/index" }); },
   openSafetyCenter() { wx.navigateTo({ url: "/pages/safety/index" }); },

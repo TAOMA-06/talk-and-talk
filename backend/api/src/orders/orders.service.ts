@@ -133,10 +133,18 @@ export class OrdersService {
         return this.toDto(existing);
       }
     }
-    if (this.config?.get<string>("COMMERCIAL_RELEASE_MODE", "internal") === "commercial" && !clientRequestId) {
+    const commercialMode = this.config?.get<string>("COMMERCIAL_RELEASE_MODE", "internal") === "commercial";
+    if (commercialMode && !clientRequestId) {
       throw new AppException(
         "ORDER_CLIENT_REQUEST_ID_REQUIRED",
         "clientRequestId is required for commercial order intake",
+        HttpStatus.UNPROCESSABLE_ENTITY
+      );
+    }
+    if (commercialMode && (!serviceOfferingId || !availabilityWindowId)) {
+      throw new AppException(
+        "ORDER_STRUCTURED_CATALOG_REQUIRED",
+        "serviceOfferingId and availabilityWindowId are required for commercial order intake",
         HttpStatus.UNPROCESSABLE_ENTITY
       );
     }
@@ -880,6 +888,22 @@ export class OrdersService {
         },
         include: { conversation: { select: { externalId: true } } }
       });
+      const responseStats: Array<{ averageMinutes: number | string | null }> = await db.$queryRaw`
+        SELECT AVG(EXTRACT(EPOCH FROM ("companionConfirmedAt" - "createdAt")) / 60.0) AS "averageMinutes"
+        FROM "Order"
+        WHERE "companionId" = ${updated.companionId}
+          AND "companionConfirmedAt" IS NOT NULL
+      `;
+      const averageResponseMinutes = Number(responseStats?.[0]?.averageMinutes);
+      if (Number.isFinite(averageResponseMinutes) && averageResponseMinutes >= 0) {
+        const responseTime = averageResponseMinutes < 60
+          ? `约 ${Math.max(1, Math.round(averageResponseMinutes / 5) * 5)} 分钟`
+          : `约 ${Math.max(1, Math.round(averageResponseMinutes / 60))} 小时`;
+        await db.companionProfile.update({
+          where: { id: updated.companionId },
+          data: { responseTime }
+        });
+      }
       await this.enqueueTransactionalNotification(db, {
         userId: updated.userId,
         type: "orderStatus",
@@ -1049,6 +1073,10 @@ export class OrdersService {
           serviceAgreementEvidenceRefSnapshot
         },
         update: {}
+      });
+      await db.companionProfile.update({
+        where: { id: updated.companionId },
+        data: { completedOrders: { increment: 1 } }
       });
       await this.enqueueTransactionalNotification(db, {
         userId: updated.userId,

@@ -48,6 +48,32 @@ const serviceOfferingRecord = {
   updatedAt: new Date("2026-07-09T00:00:00.000Z")
 };
 
+function sellableCapacityRecord(input: {
+  id?: string;
+  deliveryMode?: "text" | "voice";
+  durationMinutes?: number;
+  priceCents?: number;
+} = {}) {
+  const startsAt = new Date(Math.ceil((Date.now() + 60 * 60_000) / (30 * 60_000)) * (30 * 60_000));
+  return {
+    id: input.id ?? "c1",
+    serviceOfferings: [{
+      id: `offer-${input.id ?? "c1"}`,
+      durationMinutes: input.durationMinutes ?? 30,
+      priceCents: input.priceCents ?? 3900,
+      currency: "CNY",
+      deliveryMode: input.deliveryMode ?? "text"
+    }],
+    availabilityWindows: [{
+      id: `window-${input.id ?? "c1"}`,
+      startsAt,
+      endsAt: new Date(startsAt.getTime() + 3 * 60 * 60_000),
+      capacity: 1
+    }],
+    orders: []
+  };
+}
+
 const availabilityWindowRecord = {
   id: "window-1",
   companionId: "c1",
@@ -164,6 +190,9 @@ describe("CompanionsService", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    prisma.companionProfile.findMany.mockResolvedValue([]);
+    prisma.companionProfile.count.mockResolvedValue(0);
+    prisma.companionProfile.findFirst.mockResolvedValue(null);
     prisma.$transaction.mockImplementation(async (callback: (db: typeof prisma) => unknown) => callback(prisma));
     prisma.$queryRaw.mockResolvedValue([]);
     moderation.moderateAsync.mockResolvedValue({ decision: "allow" });
@@ -179,7 +208,9 @@ describe("CompanionsService", () => {
   });
 
   it("lists published companions with filters and pagination", async () => {
-    prisma.companionProfile.findMany.mockResolvedValue([companionRecord] as any);
+    prisma.companionProfile.findMany
+      .mockResolvedValueOnce([sellableCapacityRecord({ deliveryMode: "voice", durationMinutes: 60, priceCents: 8800 })] as any)
+      .mockResolvedValueOnce([companionRecord] as any);
     prisma.companionProfile.count.mockResolvedValue(1 as any);
 
     const result = await service.list({
@@ -234,17 +265,31 @@ describe("CompanionsService", () => {
     );
     expect(result.items[0].id).toBe("c1");
     expect(result.items[0].tags).toEqual(["心理学背景"]);
+    expect(result.items[0].catalog).toEqual(expect.objectContaining({
+      sellable: true,
+      startingPriceCents: 8800,
+      startingDurationMinutes: 60,
+      deliveryModes: ["voice"]
+    }));
     expect(result.pagination.total).toBe(1);
   });
 
-  it("keeps the existing public catalog and default order when no explicit service filter is selected", async () => {
-    prisma.companionProfile.findMany.mockResolvedValue([companionRecord] as any);
+  it("defaults the public catalog to currently sellable companions while preserving a stable public order", async () => {
+    prisma.companionProfile.findMany
+      .mockResolvedValueOnce([sellableCapacityRecord()] as any)
+      .mockResolvedValueOnce([companionRecord] as any);
     prisma.companionProfile.count.mockResolvedValue(1 as any);
 
     await service.list({});
 
-    expect(prisma.companionProfile.findMany).toHaveBeenCalledWith(expect.objectContaining({
+    const capacityQuery = prisma.companionProfile.findMany.mock.calls[0][0];
+    expect(capacityQuery.where).toEqual(expect.objectContaining({
+      serviceOfferings: { some: { isActive: true } },
+      availabilityWindows: expect.objectContaining({ some: expect.any(Object) })
+    }));
+    expect(prisma.companionProfile.findMany.mock.calls[1][0]).toEqual(expect.objectContaining({
       where: expect.objectContaining({
+        id: { in: ["c1"] },
         isPublished: true,
         isVerified: true,
         ownerUserId: { not: null },
@@ -258,33 +303,30 @@ describe("CompanionsService", () => {
         { pricePerHalfHour: "asc" }
       ]
     }));
-    const where = prisma.companionProfile.findMany.mock.calls[0][0].where;
-    expect(where).not.toHaveProperty("serviceOfferings");
   });
 
-  it("orders an explicitly sorted public catalog with only the disclosed public fields", async () => {
-    prisma.companionProfile.findMany.mockResolvedValue([companionRecord] as any);
-    prisma.companionProfile.count.mockResolvedValue(1 as any);
+  it("orders price-selected results by the current sellable offering rather than editable profile price", async () => {
+    prisma.companionProfile.findMany
+      .mockResolvedValueOnce([sellableCapacityRecord({ priceCents: 2900 })] as any)
+      .mockResolvedValueOnce([companionRecord] as any);
 
     await service.list({ keyword: "林", sortBy: "priceAsc" });
 
-    const query = prisma.companionProfile.findMany.mock.calls[0][0];
-    expect(query.orderBy).toEqual([
-      { pricePerHalfHour: "asc" },
-      { isOnline: "desc" },
-      { rating: "desc" },
-      { reviewCount: "desc" }
-    ]);
-    expect(JSON.stringify(query.orderBy)).not.toMatch(/recommendation|favorite|recent|conversation|order/i);
+    const finalQuery = prisma.companionProfile.findMany.mock.calls[1][0];
+    expect(finalQuery.where.id).toEqual({ in: ["c1"] });
+    expect(finalQuery).not.toHaveProperty("orderBy");
+    expect(prisma.companionProfile.count).not.toHaveBeenCalled();
   });
 
   it("searches only public name, role, tags, or the same current active service title", async () => {
-    prisma.companionProfile.findMany.mockResolvedValue([companionRecord] as any);
+    prisma.companionProfile.findMany
+      .mockResolvedValueOnce([sellableCapacityRecord()] as any)
+      .mockResolvedValueOnce([companionRecord] as any);
     prisma.companionProfile.count.mockResolvedValue(1 as any);
 
     await service.list({ keyword: "静文字", topicId: "t1", deliveryMode: "text" });
 
-    const where = prisma.companionProfile.findMany.mock.calls[0][0].where;
+    const where = prisma.companionProfile.findMany.mock.calls[1][0].where;
     expect(where).toEqual(expect.objectContaining({
       isPublished: true,
       isVerified: true,
@@ -322,7 +364,13 @@ describe("CompanionsService", () => {
     prisma.companionProfile.findMany
       .mockResolvedValueOnce([{
         id: "c1",
-        serviceOfferings: [{ id: "offer-voice", durationMinutes: 60 }],
+        serviceOfferings: [{
+          id: "offer-voice",
+          durationMinutes: 60,
+          priceCents: 8800,
+          currency: "CNY",
+          deliveryMode: "voice"
+        }],
         availabilityWindows: [{ id: "window-1", startsAt, endsAt, capacity: 1 }],
         // The first two 30-minute candidate starts overlap this booking, but
         // the 11:00 candidate is still genuinely available.
@@ -391,7 +439,13 @@ describe("CompanionsService", () => {
       .mockResolvedValueOnce([
         {
           id: "c-later",
-          serviceOfferings: [{ id: "offer-later", durationMinutes: 30 }],
+          serviceOfferings: [{
+            id: "offer-later",
+            durationMinutes: 30,
+            priceCents: 4900,
+            currency: "CNY",
+            deliveryMode: "text"
+          }],
           availabilityWindows: [{
             id: "window-later",
             startsAt: laterStartsAt,
@@ -402,7 +456,13 @@ describe("CompanionsService", () => {
         },
         {
           id: "c-sooner",
-          serviceOfferings: [{ id: "offer-sooner", durationMinutes: 30 }],
+          serviceOfferings: [{
+            id: "offer-sooner",
+            durationMinutes: 30,
+            priceCents: 3900,
+            currency: "CNY",
+            deliveryMode: "text"
+          }],
           availabilityWindows: [{
             id: "window-sooner",
             startsAt: soonerStartsAt,
@@ -413,7 +473,13 @@ describe("CompanionsService", () => {
         },
         {
           id: "c-full",
-          serviceOfferings: [{ id: "offer-full", durationMinutes: 60 }],
+          serviceOfferings: [{
+            id: "offer-full",
+            durationMinutes: 60,
+            priceCents: 5000,
+            currency: "CNY",
+            deliveryMode: "text"
+          }],
           availabilityWindows: [{
             id: "window-full",
             startsAt: fullStartsAt,
@@ -431,7 +497,13 @@ describe("CompanionsService", () => {
         {
           id: "c-legacy-only",
           availableTimes: ["今晚 20:00 后"],
-          serviceOfferings: [{ id: "offer-legacy", durationMinutes: 30 }],
+          serviceOfferings: [{
+            id: "offer-legacy",
+            durationMinutes: 30,
+            priceCents: 3900,
+            currency: "CNY",
+            deliveryMode: "text"
+          }],
           availabilityWindows: [],
           orders: []
         }
@@ -512,7 +584,13 @@ describe("CompanionsService", () => {
     prisma.companionProfile.findMany
       .mockResolvedValueOnce([{
         id: "c1",
-        serviceOfferings: [{ id: "offer-text", durationMinutes: 60 }],
+        serviceOfferings: [{
+          id: "offer-text",
+          durationMinutes: 60,
+          priceCents: 5000,
+          currency: "CNY",
+          deliveryMode: "text"
+        }],
         availabilityWindows: [{ id: "window-full", startsAt, endsAt, capacity: 1 }],
         // One booking blocks every possible 60-minute candidate in this
         // two-hour window, so the profile must not masquerade as available.

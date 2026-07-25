@@ -1,9 +1,11 @@
 import { api, ensureSession } from "../../utils/api";
+import { CatalogDisplay, withCatalogDisplays } from "../../utils/catalog";
 import { CommunityPost, CommunityReportReceipt, RecommendedCompanion } from "../../utils/models";
 import { ensurePrivacyAuthorization } from "../../utils/privacy";
 import { flushRecommendationEvents, queueRecommendationEvent, trackRecommendationCardViews } from "../../utils/recommendations";
 
 type CommunityReportReceiptView = CommunityReportReceipt & { submittedAtText: string };
+type DisplayRecommendation = CatalogDisplay<RecommendedCompanion>;
 
 function toReportReceiptView(item: CommunityReportReceipt): CommunityReportReceiptView {
   const submittedAt = new Date(item.submittedAt);
@@ -26,7 +28,7 @@ function communityWriteErrorMessage(error: unknown, fallback: string): string {
 
 Page({
   data: {
-    posts: [] as CommunityPost[], recommendations: [] as RecommendedCompanion[], topic: "", content: "", kind: "femaleRequest",
+    posts: [] as CommunityPost[], recommendations: [] as DisplayRecommendation[], topic: "", content: "", kind: "femaleRequest",
     reportReceipts: [] as CommunityReportReceiptView[], reportReceiptsError: "",
     loading: true, submitting: false, reportingPostId: "", error: ""
   },
@@ -52,7 +54,7 @@ Page({
       ]);
       this.setData({
         posts: result.items || [],
-        recommendations: recommendationResult.items || [],
+        recommendations: withCatalogDisplays(recommendationResult.items || []),
         reportReceipts: receiptResult.items.map(toReportReceiptView),
         reportReceiptsError: receiptResult.error,
         loading: false,

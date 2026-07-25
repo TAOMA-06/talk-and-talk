@@ -27,7 +27,7 @@
       <view wx:if="{{favoriteCompanions.length}}" class="favorite-list">
         <view wx:for="{{favoriteCompanions}}" wx:key="id" class="favorite-item" bindtap="openFavoriteCompanion" data-id="{{item.id}}">
           <view class="favorite-item-main"><view class="favorite-item-name">{{item.name}} · {{item.role}}</view><view class="favorite-item-status">查看</view></view>
-          <view class="favorite-item-meta">¥{{item.pricePerHalfHour}} / 30 分钟 · {{item.availability}}</view>
+          <view class="favorite-item-meta">私人书签，不代表当前在售 · 进入资料页查看当前商品与可约时间</view>
           <view class="favorite-reminder" catchtap="stopFavoriteReminderTap">
             <view class="favorite-reminder-copy"><view class="favorite-reminder-title">可约提醒 <text class="favorite-reminder-state">{{item.availabilityReminderEnabled ? '已开启' : '未开启'}}</text></view><view class="favorite-reminder-description">{{item.availabilityReminderEnabled ? '已记录你的提醒意愿；不会立即发送提醒，实际可约仍以资料页为准。' : '开启时会请求一次微信订阅授权；不会通知陪伴者或改变订单。'}}</view><view class="favorite-reminder-limit">同一对象最多每 {{item.availabilityReminderMinimumIntervalHours}} 小时一次</view></view>
             <switch data-id="{{item.id}}" checked="{{item.availabilityReminderEnabled}}" disabled="{{favoriteReminderSavingId !== ''}}" color="#55748F" catchchange="setFavoriteAvailabilityReminder" />
@@ -41,7 +41,7 @@
       <view wx:if="{{recentlyViewedCompanions.length}}" class="recent-views-list">
         <view wx:for="{{recentlyViewedCompanions}}" wx:key="id" class="recent-view-item" bindtap="openRecentlyViewedCompanion" data-id="{{item.id}}">
           <view class="recent-view-item-main"><view class="recent-view-item-name">{{item.name}} · {{item.role}}</view><view class="recent-view-item-status">回看资料</view></view>
-          <view class="recent-view-item-meta">¥{{item.pricePerHalfHour}} / 30 分钟 · 进入资料页后再确认当前可约情况</view>
+          <view class="recent-view-item-meta">历史回看，不代表当前在售 · 进入资料页查看当前商品与可约时间</view>
         </view>
         <button class="recent-views-clear" loading="{{clearingRecentViews}}" disabled="{{clearingRecentViews}}" bindtap="clearRecentlyViewedCompanions">清空最近浏览</button>
       </view>

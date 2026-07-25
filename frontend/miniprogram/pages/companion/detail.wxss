@@ -36,7 +36,6 @@
 .service-meta { margin-top: 8rpx; color: #92707a; font-size: 24rpx; }
 .service-description { margin-top: 10rpx; color: #654b52; font-size: 24rpx; line-height: 1.55; }
 .service-state { margin-top: 18rpx; color: #8d7078; font-size: 25rpx; line-height: 1.5; }
-.service-legacy { padding-left: 16rpx; border-left: 4rpx solid #d8a6b3; color: #7a4857; }
 .booking-summary { margin-top: 18rpx; color: #7a4857; font-size: 25rpx; }
 .availability-section { margin-top: 22rpx; padding: 24rpx; border: 1rpx solid #f1dfe3; border-radius: 18rpx; background: #fffdfb; text-align: left; }
 .availability-heading { display: flex; align-items: baseline; justify-content: space-between; color: #4d2e37; font-size: 30rpx; font-weight: 700; }
@@ -52,11 +51,8 @@
 .availability-slot-time { color: #4d2e37; font-size: 28rpx; font-weight: 700; }
 .availability-slot-capacity { margin-top: 6rpx; color: #92707a; font-size: 21rpx; }
 .availability-state { margin-top: 18rpx; color: #8d7078; font-size: 25rpx; line-height: 1.55; }
-.availability-legacy { padding-left: 16rpx; border-left: 4rpx solid #d8a6b3; color: #7a4857; }
 .availability-unavailable { color: #98616d; }
 .booking-slot-summary { padding-left: 16rpx; border-left: 4rpx solid #b94a68; font-weight: 700; }
-.booking-row { display: flex; justify-content: center; gap: 18rpx; margin-top: 22rpx; }
-.booking-picker { padding: 14rpx 22rpx; border-radius: 12rpx; background: #fff5f6; color: #7a4857; }
 button { margin-top: 28rpx; }
 .section-title { margin: 34rpx 0 18rpx; }
 .row { display: flex; justify-content: space-between; }

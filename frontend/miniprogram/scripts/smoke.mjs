@@ -97,7 +97,15 @@ let recommendationPreference = {
 const companion = {
   id: "companion-1", name: "小安", role: "情绪倾听者", initials: "小安", bio: "安全、耐心地倾听",
   rating: 4.9, reviewCount: 12, pricePerHalfHour: 39, isOnline: true, isVerified: true,
-  availability: "online", tags: ["情绪倾听"], availableTimes: ["今晚"], topicIds: ["t1"], specialties: ["情绪倾听"]
+  availability: "online", tags: ["情绪倾听"], availableTimes: ["今晚"], topicIds: ["t1"], specialties: ["情绪倾听"],
+  catalog: {
+    sellable: true,
+    startingPriceCents: 3900,
+    startingDurationMinutes: 30,
+    currency: "CNY",
+    deliveryModes: ["text", "voice"],
+    nextAvailableAt: new Date(Date.now() + 2 * 60 * 60_000).toISOString()
+  }
 };
 const serviceOfferings = [
   {
@@ -980,6 +988,9 @@ await discover.load();
 await new Promise((resolve) => setTimeout(resolve, 10));
 assert.equal(discover.data.companions.length, 1);
 assert.equal(discover.data.companions[0].impressionId, recommendedCompanion.impressionId);
+assert.equal(discover.data.companions[0].catalogPriceText, "¥39 起", "discovery must display the current sellable catalog price");
+assert.match(discover.data.companions[0].catalogDetailText, /起价商品 30 分钟 · 可选方式：文字 \/ 语音/);
+assert.match(discover.data.companions[0].nextAvailableText, /北京时间/);
 assert.equal(discover.data.topicFilters.length, 3, "discovery should expose only the platform's small public topic taxonomy");
 const catalogCallsBeforeTyping = calls.filter((call) => call.path === "/companions").length;
 discover.setSearchInput({ detail: { value: "小安" } });
@@ -1255,6 +1266,7 @@ assert.equal(createdOrderPayload.durationMinutes, 60);
 assert.equal(createdOrderPayload.availabilityWindowId, "window-service-voice-60");
 
 failServiceOfferingsLoad = true;
+const orderCreatesBeforeCatalogFailure = calls.filter((call) => call.path === "/orders" && call.method === "POST").length;
 const legacyDetail = {
   ...detail,
   data: { ...structuredClone(detail.data), orderClientRequestId: "" },
@@ -1263,16 +1275,20 @@ const legacyDetail = {
 legacyDetail.companionId = companion.id;
 legacyDetail.themeId = "";
 await legacyDetail.load();
-assert.equal(legacyDetail.data.serviceCatalogStatus, "legacy");
+assert.equal(legacyDetail.data.serviceCatalogStatus, "empty");
 assert.equal(legacyDetail.data.selectedServiceOffering, null);
-assert.equal(legacyDetail.data.canBook, true);
-assert.match(legacyDetail.data.serviceCatalogMessage, /旧版半小时服务/);
+assert.equal(legacyDetail.data.canBook, false);
+assert.match(legacyDetail.data.serviceCatalogMessage, /服务目录暂时不可用/);
 await legacyDetail.book();
-assert.equal(createdOrderPayload.serviceOfferingId, undefined);
-assert.equal(createdOrderPayload.durationMinutes, 30);
+assert.equal(
+  calls.filter((call) => call.path === "/orders" && call.method === "POST").length,
+  orderCreatesBeforeCatalogFailure,
+  "a catalog outage must fail closed instead of creating an editable-profile-price order"
+);
 failServiceOfferingsLoad = false;
 
 availabilityMode = "legacy";
+const orderCreatesBeforeLegacyAvailability = calls.filter((call) => call.path === "/orders" && call.method === "POST").length;
 const serverLegacyDetail = {
   ...detail,
   data: { ...structuredClone(detail.data), orderClientRequestId: "" },
@@ -1282,12 +1298,15 @@ serverLegacyDetail.companionId = companion.id;
 serverLegacyDetail.themeId = "";
 await serverLegacyDetail.load();
 assert.equal(serverLegacyDetail.data.serviceCatalogStatus, "available");
-assert.equal(serverLegacyDetail.data.availabilityStatus, "legacy");
-assert.equal(serverLegacyDetail.data.canBook, true);
-assert.match(serverLegacyDetail.data.availabilityMessage, /常见可约时段/);
+assert.equal(serverLegacyDetail.data.availabilityStatus, "empty");
+assert.equal(serverLegacyDetail.data.canBook, false);
+assert.match(serverLegacyDetail.data.availabilityMessage, /真实时段/);
 await serverLegacyDetail.book();
-assert.equal(createdOrderPayload.serviceOfferingId, "service-text-30");
-assert.equal(createdOrderPayload.availabilityWindowId, undefined);
+assert.equal(
+  calls.filter((call) => call.path === "/orders" && call.method === "POST").length,
+  orderCreatesBeforeLegacyAvailability,
+  "commercial booking must not proceed without a structured availability window"
+);
 availabilityMode = "structured";
 
 const staleAvailabilityDetail = {
@@ -1369,6 +1388,9 @@ const community = await loadPage("community/index");
 await community.load();
 assert.equal(community.data.posts.length, 2);
 assert.equal(community.data.recommendations.length, 1);
+assert.equal(community.data.recommendations[0].catalogPriceText, "¥39 起", "community recommendations must use the current SKU price");
+assert.match(community.data.recommendations[0].catalogDetailText, /起价商品 30 分钟 · 可选方式：文字 \/ 语音/);
+assert.match(community.data.recommendations[0].nextAvailableText, /北京时间/, "availability hints must use the contractual timezone");
 assert.equal(community.data.reportReceipts.length, 1, "community only recalls the caller's receipt list");
 assert.equal(community.data.reportReceipts[0].status, "received");
 assert.equal(Object.hasOwn(community.data.reportReceipts[0], "postId"), false, "receipt recall must not expose a reported post");
@@ -1701,6 +1723,8 @@ order.refund = null;
 order.experienceFeedback = null;
 serviceOrder.experienceFeedback = null;
 await orders.load();
+assert.equal(orders.data.followupRecommendations[0].catalogPriceText, "¥39 起",
+  "follow-up recommendations must not reuse the legacy profile price");
 assert.equal(orders.data.orders[0].canSubmitExperienceFeedback, true,
   "only the customer should receive a private experience-feedback entry after completion");
 assert.equal(orders.data.orders[0].hasExperienceFeedback, false);

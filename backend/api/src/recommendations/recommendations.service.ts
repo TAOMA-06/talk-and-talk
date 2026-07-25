@@ -3,7 +3,9 @@ import { createHash } from "node:crypto";
 import { HttpStatus, Injectable } from "@nestjs/common";
 
 import { AppException } from "../common/errors/app.exception";
+import { CompanionsService, SellableCompanionMatch } from "../companions/companions.service";
 import { PrismaService } from "../database/prisma.service";
+import { loadAcceptedOrderIds } from "../orders/order-acceptance-facts";
 import {
   ListRecommendedCompanionsDto,
   RecommendationMetricsQueryDto,
@@ -50,6 +52,7 @@ type CompanionCandidate = {
   createdAt: Date;
   updatedAt: Date;
   serviceTags: Array<{ tag: { name: string } }>;
+  catalog: SellableCompanionMatch;
   recommendationPolicies: Array<{
     status: "active" | "paused";
     boostBps: number;
@@ -82,7 +85,10 @@ type RankedCandidate = {
 
 @Injectable()
 export class RecommendationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly companions: CompanionsService
+  ) {}
 
   topics() {
     return {
@@ -210,7 +216,12 @@ export class RecommendationsService {
     const preference = this.asPreference(preferenceRecord);
     const personalized = preference.personalizationEnabled;
     const now = new Date();
-    const candidates = await this.loadEligibleCandidates(placement);
+    const sellableMatches = await this.companions.findSellableCompanions(
+      query.themeId ? { topicId: query.themeId } : {},
+      7
+    );
+    const sellableById = new Map(sellableMatches.map((match) => [match.id, match]));
+    const candidates = await this.loadEligibleCandidates(placement, sellableById);
     if (candidates.length === 0) {
       return this.emptyPage(personalized, pageSize);
     }
@@ -393,14 +404,30 @@ export class RecommendationsService {
       include: {
         request: { select: { placement: true } },
         companion: { select: { id: true, name: true } },
-        order: { select: { id: true, status: true } }
+        order: {
+          select: {
+            id: true,
+            amountCents: true,
+            companionConfirmedAt: true,
+            paidAt: true,
+            serviceStartedAt: true,
+            completedAt: true,
+            reviews: { select: { id: true }, take: 1 },
+            refunds: { where: { status: "success" }, select: { id: true }, take: 1 }
+          }
+        }
       },
       orderBy: { servedAt: "desc" },
       take: 5001
     } as any);
     const truncated = impressions.length > 5000;
+    const sampledImpressions = (impressions as any[]).slice(0, 5000);
+    const attributedOrders = sampledImpressions.flatMap((impression) =>
+      impression.order ? [impression.order] : []
+    );
+    const acceptedOrderIds = await loadAcceptedOrderIds(this.prisma, attributedOrders);
     const buckets = new Map<string, any>();
-    for (const impression of impressions.slice(0, 5000) as any[]) {
+    for (const impression of sampledImpressions) {
       const placement = impression.request.placement;
       const key = `${placement}:${impression.companionId}`;
       const bucket = buckets.get(key) ?? {
@@ -410,14 +437,28 @@ export class RecommendationsService {
         viewed: 0,
         clicked: 0,
         orderCreated: 0,
-        paid: 0
+        accepted: 0,
+        paid: 0,
+        started: 0,
+        completed: 0,
+        reviewed: 0,
+        refunded: 0,
+        grossPaidCents: 0
       };
       bucket.served += 1;
       if (impression.viewedAt) bucket.viewed += 1;
       if (impression.clickedAt) bucket.clicked += 1;
       if (impression.order) {
         bucket.orderCreated += 1;
-        if (["paid", "inService", "completed"].includes(impression.order.status)) bucket.paid += 1;
+        if (acceptedOrderIds.has(impression.order.id)) bucket.accepted += 1;
+        if (impression.order.paidAt) {
+          bucket.paid += 1;
+          bucket.grossPaidCents += impression.order.amountCents;
+        }
+        if (impression.order.serviceStartedAt) bucket.started += 1;
+        if (impression.order.completedAt) bucket.completed += 1;
+        if ((impression.order.reviews?.length ?? 0) > 0) bucket.reviewed += 1;
+        if ((impression.order.refunds?.length ?? 0) > 0) bucket.refunded += 1;
       }
       buckets.set(key, bucket);
     }
@@ -427,7 +468,12 @@ export class RecommendationsService {
         viewRate: this.rate(bucket.viewed, bucket.served),
         clickRate: this.rate(bucket.clicked, bucket.served),
         orderRate: this.rate(bucket.orderCreated, bucket.served),
-        paidRate: this.rate(bucket.paid, bucket.served)
+        acceptanceRate: this.rate(bucket.accepted, bucket.orderCreated),
+        paidRate: this.rate(bucket.paid, bucket.orderCreated),
+        startRate: this.rate(bucket.started, bucket.paid),
+        completionRate: this.rate(bucket.completed, bucket.paid),
+        reviewRate: this.rate(bucket.reviewed, bucket.completed),
+        refundRate: this.rate(bucket.refunded, bucket.paid)
       }))
       .sort((left, right) => right.served - left.served || left.placement.localeCompare(right.placement));
     return {
@@ -445,7 +491,13 @@ export class RecommendationsService {
     if (!request) {
       throw new AppException("RECOMMENDATION_CURSOR_EXPIRED", "Recommendation result has expired", HttpStatus.GONE);
     }
-    const currentEligibility = this.eligibleCompanionWhere();
+    const themeId = typeof (request as any).context?.themeId === "string" ? (request as any).context.themeId : undefined;
+    const sellableMatches = await this.companions.findSellableCompanions(
+      themeId ? { topicId: themeId } : {},
+      7
+    );
+    const sellableById = new Map(sellableMatches.map((match) => [match.id, match]));
+    const currentEligibility = this.eligibleCompanionWhere([...sellableById.keys()]);
     const [impressions, total] = await Promise.all([
       this.prisma.recommendationImpression.findMany({
         where: { requestId, companion: currentEligibility },
@@ -461,12 +513,11 @@ export class RecommendationsService {
       this.prisma.recommendationImpression.count({ where: { requestId, companion: currentEligibility } })
     ]);
     const nextOffset = offset + impressions.length;
-    const themeId = typeof (request as any).context?.themeId === "string" ? (request as any).context.themeId : undefined;
     return {
       algorithmVersion: request.algorithmVersion,
       personalized: request.personalized,
       items: (impressions as any[]).map((impression) => ({
-        ...this.toCompanionDto(impression.companion),
+        ...this.toCompanionDto(impression.companion, sellableById.get(impression.companion.id)!),
         impressionId: impression.id,
         position: impression.position,
         score: this.round(impression.score),
@@ -481,10 +532,14 @@ export class RecommendationsService {
     };
   }
 
-  private async loadEligibleCandidates(placement: string): Promise<CompanionCandidate[]> {
-    return this.prisma.companionProfile.findMany({
+  private async loadEligibleCandidates(
+    placement: string,
+    sellableById: Map<string, SellableCompanionMatch>
+  ): Promise<CompanionCandidate[]> {
+    if (sellableById.size === 0) return [];
+    const companions = await this.prisma.companionProfile.findMany({
       where: {
-        ...this.eligibleCompanionWhere()
+        ...this.eligibleCompanionWhere([...sellableById.keys()])
       },
       include: {
         serviceTags: { include: { tag: true }, orderBy: { tag: { name: "asc" } } },
@@ -492,11 +547,16 @@ export class RecommendationsService {
       },
       orderBy: [{ isOnline: "desc" }, { rating: "desc" }, { reviewCount: "desc" }],
       take: MAX_CANDIDATES
-    } as any) as any;
+    } as any) as any[];
+    return companions.map((companion) => ({
+      ...companion,
+      catalog: sellableById.get(companion.id)!
+    }));
   }
 
-  private eligibleCompanionWhere() {
+  private eligibleCompanionWhere(companionIds?: string[]) {
     return {
+      ...(companionIds ? { id: { in: companionIds } } : {}),
       isPublished: true,
       isVerified: true,
       ownerUserId: { not: null },
@@ -605,9 +665,12 @@ export class RecommendationsService {
     }
     factors.push({ code: "availability", score: this.availabilityScore(candidate, input.preference), weight: 0.15, available: true });
     if (input.personalized && input.preference.maxPricePerHalfHour) {
+      const catalogPricePerHalfHour = candidate.catalog.startingPriceCents
+        / 100
+        * (30 / candidate.catalog.startingDurationMinutes);
       factors.push({
         code: "budget",
-        score: this.budgetScore(candidate.pricePerHalfHour, input.preference.maxPricePerHalfHour),
+        score: this.budgetScore(catalogPricePerHalfHour, input.preference.maxPricePerHalfHour),
         weight: 0.1,
         available: true
       });
@@ -704,7 +767,7 @@ export class RecommendationsService {
     };
   }
 
-  private toCompanionDto(companion: any) {
+  private toCompanionDto(companion: any, catalog: SellableCompanionMatch) {
     const topicIds = normalizeTopicIds(companion.topicIds).length > 0
       ? normalizeTopicIds(companion.topicIds)
       : deriveTopicIds(companion.specialties, companion.serviceTags.map((entry: any) => entry.tag.name));
@@ -729,6 +792,14 @@ export class RecommendationsService {
       distanceKm: companion.distanceKm,
       availability: companion.availability,
       cityDistrict: companion.cityDistrict,
+      catalog: {
+        sellable: true,
+        startingPriceCents: catalog.startingPriceCents,
+        startingDurationMinutes: catalog.startingDurationMinutes,
+        currency: catalog.currency,
+        deliveryModes: catalog.deliveryModes,
+        nextAvailableAt: catalog.earliestStartsAt.toISOString()
+      },
       isPublished: companion.isPublished,
       createdAt: companion.createdAt.toISOString(),
       updatedAt: companion.updatedAt.toISOString()

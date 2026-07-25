@@ -11,7 +11,7 @@
     </view>
     <view class="search-copy">提交后才会查询；只检索当前公开的名称、角色、服务和标签，不保存搜索历史。</view>
     <view class="filter-heading">按当前服务筛选</view>
-    <view class="filter-copy">只看当前公开且仍有对应上架服务的资料；价格按单次服务总价，“3天内可约”只认结构化时段中的剩余容量。最终下单会再次校验。</view>
+    <view class="filter-copy">默认只显示未来 7 天内有上架商品和结构化剩余容量的资料；价格按单次服务总价，“3天内可约”会进一步收窄范围。详情页和下单都会再次校验。</view>
     <view class="filter-group">
       <view class="filter-label">主题</view>
       <scroll-view class="filter-scroll" scroll-x="true" enable-flex="true" show-scrollbar="false">
@@ -68,7 +68,7 @@
   </view>
   <view wx:else>
     <view class="filter-result-note" wx:if="{{selectedSortBy === 'soonestAvailable'}}">{{activeFilterSummary || '最早可约'}} · 只按本次读取的结构化剩余容量排序，不保留时段；详情页和下单会再次校验</view>
-    <view class="filter-result-note" wx:elif="{{isFiltering}}">{{activeFilterSummary || '当前条件'}} · 仅显示仍公开且服务仍上架的结果</view>
+    <view class="filter-result-note" wx:elif="{{isFiltering}}">{{activeFilterSummary || '当前条件'}} · 仅显示仍公开、商品上架且有真实可约容量的结果</view>
     <view class="recommendation-note" wx:if="{{!recommendationFallback && !isFiltering}}">根据你的设置、当前场景与服务状态推荐；可在“我的”中关闭。</view>
     <view id="discover-recommendation-{{item.impressionId}}" class="card companion" wx:for="{{companions}}" wx:key="id" bindtap="openCompanion" data-id="{{item.id}}" data-impression-id="{{item.impressionId}}" data-theme-id="{{selectedTopicId || item.topicIds[0]}}">
       <view class="avatar">{{item.initials}}</view>
@@ -77,7 +77,8 @@
         <view class="muted">{{item.role}} · {{item.availability}}</view>
         <view wx:if="{{item.reasonText}}" class="reason">{{item.reasonText}}</view>
         <view class="bio">{{item.bio}}</view>
-        <view class="row footer"><text>★ {{item.rating}}（{{item.reviewCount}}）</text><text>¥{{item.pricePerHalfHour}} / 30 分钟</text></view>
+        <view class="muted">{{item.nextAvailableText}} · {{item.catalogDetailText}}</view>
+        <view class="row footer"><text>★ {{item.rating}}（{{item.reviewCount}}）</text><text>{{item.catalogPriceText}}</text></view>
       </view>
     </view>
   </view>

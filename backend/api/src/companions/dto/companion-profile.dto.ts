@@ -2,6 +2,7 @@ import {
   ArrayNotEmpty,
   IsArray,
   IsBoolean,
+  IsEmpty,
   IsIn,
   IsInt,
   IsNumber,
@@ -34,14 +35,13 @@ export class CreateCompanionDto {
   @IsString({ each: true })
   tags!: string[];
 
-  @IsNumber()
-  @Min(0)
-  @Max(5)
-  rating!: number;
+  @IsOptional()
+  @IsEmpty({ message: "rating is derived from verified reviews" })
+  rating?: unknown;
 
-  @IsInt()
-  @Min(0)
-  reviewCount!: number;
+  @IsOptional()
+  @IsEmpty({ message: "reviewCount is derived from verified reviews" })
+  reviewCount?: unknown;
 
   @IsInt()
   @Min(1)
@@ -76,12 +76,13 @@ export class CreateCompanionDto {
   @IsString({ each: true })
   topicIds?: string[];
 
-  @IsInt()
-  @Min(0)
-  completedOrders!: number;
+  @IsOptional()
+  @IsEmpty({ message: "completedOrders is derived from completed orders" })
+  completedOrders?: unknown;
 
-  @IsString()
-  responseTime!: string;
+  @IsOptional()
+  @IsEmpty({ message: "responseTime is derived from order response facts" })
+  responseTime?: unknown;
 
   @IsNumber()
   @Min(0)
@@ -122,15 +123,12 @@ export class UpdateCompanionDto {
   tags?: string[];
 
   @IsOptional()
-  @IsNumber()
-  @Min(0)
-  @Max(5)
-  rating?: number;
+  @IsEmpty({ message: "rating is derived from verified reviews" })
+  rating?: unknown;
 
   @IsOptional()
-  @IsInt()
-  @Min(0)
-  reviewCount?: number;
+  @IsEmpty({ message: "reviewCount is derived from verified reviews" })
+  reviewCount?: unknown;
 
   @IsOptional()
   @IsInt()
@@ -173,13 +171,12 @@ export class UpdateCompanionDto {
   topicIds?: string[];
 
   @IsOptional()
-  @IsInt()
-  @Min(0)
-  completedOrders?: number;
+  @IsEmpty({ message: "completedOrders is derived from completed orders" })
+  completedOrders?: unknown;
 
   @IsOptional()
-  @IsString()
-  responseTime?: string;
+  @IsEmpty({ message: "responseTime is derived from order response facts" })
+  responseTime?: unknown;
 
   @IsOptional()
   @IsNumber()
