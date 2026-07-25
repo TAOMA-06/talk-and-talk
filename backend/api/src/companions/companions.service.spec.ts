@@ -156,6 +156,9 @@ describe("CompanionsService", () => {
     createBlackout: jest.fn(),
     deactivateBlackout: jest.fn()
   } as any;
+  const config = {
+    get: jest.fn((key: string, fallback?: unknown) => key === "TRTC_ENABLED" ? true : fallback)
+  } as any;
 
   let service: CompanionsService;
 
@@ -170,7 +173,8 @@ describe("CompanionsService", () => {
       moderation,
       moderationCases,
       availabilityReminderCandidates,
-      availabilityScheduleRules
+      availabilityScheduleRules,
+      config
     );
   });
 
@@ -574,6 +578,38 @@ describe("CompanionsService", () => {
         topicIds: ["t1"]
       }]
     });
+  });
+
+  it("hides voice purchase entry points while real-time voice is disabled without changing owner catalog data", async () => {
+    const disabledConfig = {
+      get: jest.fn((key: string, fallback?: unknown) => key === "TRTC_ENABLED" ? false : fallback)
+    } as any;
+    const disabledService = new CompanionsService(
+      prisma,
+      moderation,
+      moderationCases,
+      availabilityReminderCandidates,
+      availabilityScheduleRules,
+      disabledConfig
+    );
+    prisma.companionProfile.findFirst.mockResolvedValue({
+      serviceOfferings: [
+        { ...serviceOfferingRecord, id: "offer-text", deliveryMode: "text" },
+        { ...serviceOfferingRecord, id: "offer-voice", deliveryMode: "voice", title: "语音陪伴" }
+      ]
+    } as any);
+
+    await expect(disabledService.list({ deliveryMode: "voice" })).resolves.toEqual({
+      items: [],
+      pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 }
+    });
+    await expect(disabledService.listPublishedServiceOfferings("c1")).resolves.toEqual({
+      items: [expect.objectContaining({ id: "offer-text", deliveryMode: "text" })]
+    });
+    expect(prisma.companionProfile.findMany).not.toHaveBeenCalled();
+    expect(prisma.companionProfile.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      select: expect.objectContaining({ serviceOfferings: expect.objectContaining({ where: { isActive: true } }) })
+    }));
   });
 
   it("does not expose a service catalog for an unpublished or missing companion", async () => {

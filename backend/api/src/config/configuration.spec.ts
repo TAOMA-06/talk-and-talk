@@ -28,6 +28,8 @@ describe("validateEnvironment", () => {
     COMPANION_SETTLEMENT_HOLD_HOURS: "96",
     REFUND_REQUEST_WINDOW_HOURS: "72",
     ORDER_RESPONSE_WINDOW_MINUTES: "10",
+    ORDER_CHAT_PRE_SERVICE_WINDOW_MINUTES: "15",
+    ORDER_CHAT_POST_SERVICE_WINDOW_MINUTES: "15",
     ORDER_RESCHEDULE_RESPONSE_WINDOW_MINUTES: "720",
     ORDER_RESCHEDULE_EXPIRY_ENABLED: "true",
     ORDER_RESCHEDULE_EXPIRY_INTERVAL_SECONDS: "60",
@@ -69,6 +71,16 @@ describe("validateEnvironment", () => {
     expect(env.DEEPSEEK_MODEL).toBe("deepseek-chat");
     expect(env.MEDIA_FEATURE_ENABLED).toBe(false);
     expect(env.MEDIA_PROVIDER).toBe("disabled");
+    expect(env.TRTC_ENABLED).toBe(false);
+    expect(env.TRTC_SDK_APP_ID).toBe(0);
+    expect(env.TRTC_PRIVATE_MAP_KEY_ENABLED).toBe(false);
+    expect(env.TRTC_USER_SIG_TTL_SECONDS).toBe(300);
+    expect(env.TRTC_ROOM_CONTROL_ENABLED).toBe(false);
+    expect(env.TRTC_EMERGENCY_STOP_ENABLED).toBe(false);
+    expect(env.TRTC_CONTROL_REGION).toBe("ap-guangzhou");
+    expect(env.TRTC_CONTROL_TIMEOUT_MS).toBe(5_000);
+    expect(env.TRTC_ROOM_CONTROL_INTERVAL_SECONDS).toBe(15);
+    expect(env.TRTC_ROOM_CONTROL_BATCH_SIZE).toBe(10);
     expect(env.APP_ENV).toBe("development");
     expect(env.SMS_PROVIDER).toBe("mock");
     expect(env.STAFF_TOTP_ENCRYPTION_KEY).toContain("development-staff-totp-key");
@@ -87,6 +99,8 @@ describe("validateEnvironment", () => {
     expect(env.COMMERCIAL_RELEASE_MODE).toBe("internal");
     expect(env.PLATFORM_FEE_BPS).toBe(0);
     expect(env.ORDER_RESPONSE_WINDOW_MINUTES).toBe(10);
+    expect(env.ORDER_CHAT_PRE_SERVICE_WINDOW_MINUTES).toBe(15);
+    expect(env.ORDER_CHAT_POST_SERVICE_WINDOW_MINUTES).toBe(15);
     expect(env.ORDER_RESCHEDULE_RESPONSE_WINDOW_MINUTES).toBe(720);
     expect(env.ORDER_MAX_SCHEDULE_DAYS).toBe(30);
     expect(env.SUPPORT_MAX_OPEN_PER_USER).toBe(5);
@@ -260,6 +274,57 @@ describe("validateEnvironment", () => {
       .toThrow("MEDIA_PROVIDER");
   });
 
+  it("requires a restricted, server-side TRTC signing configuration before enabling real-time voice", () => {
+    expect(() => validateEnvironment({ TRTC_ENABLED: "true" }))
+      .toThrow("TRTC_ENABLED=true requires");
+    expect(() => validateEnvironment({
+      TRTC_ENABLED: "true",
+      TRTC_SDK_APP_ID: "1400000001",
+      TRTC_SDK_SECRET_KEY: "too-short",
+      TRTC_PRIVATE_MAP_KEY_ENABLED: "true"
+    })).toThrow("TRTC_SDK_SECRET_KEY");
+    expect(() => validateEnvironment({ TRTC_USER_SIG_TTL_SECONDS: "59" }))
+      .toThrow("TRTC_USER_SIG_TTL_SECONDS");
+    expect(() => validateEnvironment({ TRTC_ROOM_CONTROL_ENABLED: "true" }))
+      .toThrow("TRTC_ROOM_CONTROL_ENABLED=true requires");
+    expect(() => validateEnvironment({ TRTC_EMERGENCY_STOP_ENABLED: "true" }))
+      .toThrow("TRTC_EMERGENCY_STOP_ENABLED=true requires");
+
+    const enabled = validateEnvironment({
+      TRTC_ENABLED: "true",
+      TRTC_SDK_APP_ID: "1400000001",
+      TRTC_SDK_SECRET_KEY: "trtc-test-secret-key-material",
+      TRTC_PRIVATE_MAP_KEY_ENABLED: "true",
+      TRTC_USER_SIG_TTL_SECONDS: "600",
+      TRTC_ROOM_CONTROL_ENABLED: "true",
+      TRTC_CONTROL_REGION: "ap-beijing",
+      TRTC_CONTROL_TIMEOUT_MS: "8000",
+      TRTC_ROOM_CONTROL_INTERVAL_SECONDS: "20",
+      TRTC_ROOM_CONTROL_BATCH_SIZE: "5",
+      TENCENTCLOUD_SECRET_ID: "AKID_test_voice_control",
+      TENCENTCLOUD_SECRET_KEY: "tencent-cloud-control-secret-material"
+    });
+    expect(enabled.TRTC_ENABLED).toBe(true);
+    expect(enabled.TRTC_SDK_APP_ID).toBe(1400000001);
+    expect(enabled.TRTC_USER_SIG_TTL_SECONDS).toBe(600);
+    expect(enabled.TRTC_ROOM_CONTROL_ENABLED).toBe(true);
+    expect(enabled.TRTC_EMERGENCY_STOP_ENABLED).toBe(false);
+    expect(enabled.TRTC_CONTROL_REGION).toBe("ap-beijing");
+    expect(enabled.TRTC_ROOM_CONTROL_INTERVAL_SECONDS).toBe(20);
+
+    const emergencyDrain = validateEnvironment({
+      TRTC_ENABLED: "true",
+      TRTC_SDK_APP_ID: "1400000001",
+      TRTC_SDK_SECRET_KEY: "trtc-test-secret-key-material",
+      TRTC_PRIVATE_MAP_KEY_ENABLED: "true",
+      TRTC_ROOM_CONTROL_ENABLED: "true",
+      TENCENTCLOUD_SECRET_ID: "AKID_test_voice_control",
+      TENCENTCLOUD_SECRET_KEY: "tencent-cloud-control-secret-material",
+      TRTC_EMERGENCY_STOP_ENABLED: "true"
+    });
+    expect(emergencyDrain.TRTC_EMERGENCY_STOP_ENABLED).toBe(true);
+  });
+
   it("provides JWT defaults in development", () => {
     const env = validateEnvironment({});
     expect(env.JWT_ACCESS_SECRET).toBe("dev-access-secret");
@@ -379,6 +444,10 @@ describe("validateEnvironment", () => {
       .toThrow("PAYOUT_CLAIMS_ENABLED");
     expect(() => validateEnvironment({ ...productionEnv, ORDER_RESCHEDULE_EXPIRY_ENABLED: "" }))
       .toThrow("ORDER_RESCHEDULE_EXPIRY_ENABLED");
+    expect(() => validateEnvironment({ ...productionEnv, ORDER_CHAT_POST_SERVICE_WINDOW_MINUTES: "" }))
+      .toThrow("ORDER_CHAT_POST_SERVICE_WINDOW_MINUTES");
+    expect(() => validateEnvironment({ ORDER_CHAT_PRE_SERVICE_WINDOW_MINUTES: "1441" }))
+      .toThrow("ORDER_CHAT_PRE_SERVICE_WINDOW_MINUTES");
   });
 
   it("rejects invalid dependency protocols and numeric limits", () => {

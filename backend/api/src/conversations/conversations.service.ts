@@ -1,4 +1,5 @@
-import { HttpStatus, Injectable } from "@nestjs/common";
+import { HttpStatus, Injectable, Optional } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { randomUUID } from "node:crypto";
 
 import { AppException } from "../common/errors/app.exception";
@@ -18,6 +19,9 @@ import { SetConversationNotificationPreferenceDto } from "./dto/set-conversation
 
 type Db = any;
 const CHAT_ENABLED_ORDER_STATUSES = ["paid", "inService", "completed"] as const;
+const CHAT_INTERACTION_ORDER_STATUSES = ["paid", "inService"] as const;
+const DEFAULT_ORDER_CHAT_PRE_SERVICE_WINDOW_MINUTES = 15;
+const DEFAULT_ORDER_CHAT_POST_SERVICE_WINDOW_MINUTES = 15;
 
 @Injectable()
 export class ConversationsService {
@@ -29,7 +33,8 @@ export class ConversationsService {
     private readonly mediaAssets: MediaAssetService,
     private readonly mediaWorker: MediaModerationWorker,
     private readonly notifications: NotificationsService,
-    private readonly audit: AuditService
+    private readonly audit: AuditService,
+    @Optional() private readonly config?: ConfigService
   ) {}
 
   status() {
@@ -42,7 +47,7 @@ export class ConversationsService {
 
   async conversationStatus(userId: string, externalId: string) {
     const conversation = await this.ensureConversation(userId, externalId);
-    const [restriction, preference, ownBlock, anyBlock] = await Promise.all([
+    const [restriction, preference, ownBlock, availability] = await Promise.all([
       this.chatRestrictions.activeForUser(userId),
       this.prisma.conversationNotificationPreference.findUnique({
         where: { conversationId_userId: { conversationId: conversation.id, userId } },
@@ -52,16 +57,13 @@ export class ConversationsService {
         where: { conversationId_blockedByUserId: { conversationId: conversation.id, blockedByUserId: userId } },
         select: { id: true }
       } as any),
-      this.prisma.conversationBlock.findFirst({
-        where: { conversationId: conversation.id },
-        select: { id: true }
-      } as any)
+      this.messageAvailability(conversation.id)
     ]);
     return {
       mediaEnabled: this.mediaAssets.isFeatureEnabled(),
       messageNotificationsMuted: Boolean(preference?.mutedAt),
       conversationBlockedByYou: Boolean(ownBlock),
-      messageInteractionAvailable: !anyBlock,
+      ...availability,
       chatRestriction: restriction
         ? {
             id: restriction.id,
@@ -101,6 +103,17 @@ export class ConversationsService {
         blocks: {
           select: { blockedByUserId: true },
           take: 2
+        },
+        // History remains visible after the normal order communication window
+        // closes, but only a current paid/in-service order may enable sending.
+        orders: {
+          where: { status: { in: [...CHAT_INTERACTION_ORDER_STATUSES] } },
+          select: {
+            status: true,
+            scheduledAt: true,
+            serviceStartedAt: true,
+            durationMinutes: true
+          }
         }
       },
       orderBy: { updatedAt: "desc" }
@@ -110,7 +123,8 @@ export class ConversationsService {
       conversations.map(async (conversation: any) => {
         const isCustomer = conversation.userId === userId;
         const conversationBlockedByYou = conversation.blocks.some((block: any) => block.blockedByUserId === userId);
-        const messageInteractionAvailable = conversation.blocks.length === 0;
+        const messageHistoryAvailable = conversation.blocks.length === 0;
+        const messageInteractionAvailable = messageHistoryAvailable && this.hasMessageInteractionWindow(conversation.orders);
         const readState = conversation.readStates[0];
         const unreadPosition = readState
           ? {
@@ -127,7 +141,7 @@ export class ConversationsService {
               ]
             }
           : {};
-        const unreadCount = !messageInteractionAvailable
+        const unreadCount = !messageHistoryAvailable
           ? 0
           : await this.prisma.message.count({
               where: {
@@ -149,7 +163,7 @@ export class ConversationsService {
           participant: isCustomer
             ? this.companionParticipantDto(conversation.companion)
             : this.customerParticipantDto(conversation.user),
-          lastMessage: messageInteractionAvailable && conversation.messages[0]
+          lastMessage: messageHistoryAvailable && conversation.messages[0]
             ? await this.toMessageDto(
                 conversation.messages[0],
                 isCustomer ? conversation.externalId : conversation.id
@@ -160,6 +174,7 @@ export class ConversationsService {
           // participant can learn the other participant's private preference.
           messageNotificationsMuted: Boolean(conversation.notificationPreferences[0]?.mutedAt),
           conversationBlockedByYou,
+          messageHistoryAvailable,
           messageInteractionAvailable,
           updatedAt: conversation.updatedAt.toISOString()
         };
@@ -232,10 +247,10 @@ export class ConversationsService {
           }, db);
         }
       }
-      const anyBlock = await this.findAnyConversationBlock(conversation.id, db);
+      const availability = await this.messageAvailability(conversation.id, db);
       return {
         conversationBlockedByYou: dto.blocked,
-        messageInteractionAvailable: !anyBlock
+        ...availability
       };
     });
   }
@@ -566,13 +581,92 @@ export class ConversationsService {
   }
 
   private async assertConversationInteractionAvailable(conversationId: string, db: Db = this.prisma as any) {
-    if (await this.findAnyConversationBlock(conversationId, db)) {
+    if (!(await this.messageAvailability(conversationId, db)).messageInteractionAvailable) {
       throw new AppException(
         "CONVERSATION_INTERACTION_UNAVAILABLE",
-        "This conversation cannot receive new messages",
+        "This conversation cannot receive new messages at this time",
         HttpStatus.FORBIDDEN
       );
     }
+  }
+
+  /**
+   * A block is a privacy boundary and hides history. A closed service window is
+   * different: the paid record remains readable for support, reporting, and
+   * audit, but no new ordinary message may be created.
+   */
+  private async messageAvailability(conversationId: string, db: Db = this.prisma as any) {
+    if (await this.findAnyConversationBlock(conversationId, db)) {
+      return {
+        messageHistoryAvailable: false,
+        messageInteractionAvailable: false
+      };
+    }
+    return {
+      messageHistoryAvailable: true,
+      messageInteractionAvailable: await this.hasCurrentMessageInteractionWindow(conversationId, db)
+    };
+  }
+
+  private async hasCurrentMessageInteractionWindow(conversationId: string, db: Db = this.prisma as any) {
+    const orders = await db.order.findMany({
+      where: {
+        conversationId,
+        status: { in: [...CHAT_INTERACTION_ORDER_STATUSES] }
+      },
+      select: {
+        status: true,
+        scheduledAt: true,
+        serviceStartedAt: true,
+        durationMinutes: true
+      }
+    } as any);
+    return this.hasMessageInteractionWindow(orders);
+  }
+
+  private hasMessageInteractionWindow(orders: unknown, now = Date.now()): boolean {
+    if (!Array.isArray(orders)) return false;
+    const preServiceWindowMs = this.orderChatPreServiceWindowMinutes() * 60_000;
+    const postServiceWindowMs = this.orderChatPostServiceWindowMinutes() * 60_000;
+
+    return orders.some((order: any) => {
+      if (!CHAT_INTERACTION_ORDER_STATUSES.includes(order?.status)) return false;
+      const scheduledAt = new Date(order.scheduledAt).getTime();
+      const serviceStartedAt = order.serviceStartedAt ? new Date(order.serviceStartedAt).getTime() : null;
+      const durationMinutes = Number(order.durationMinutes);
+      if (!Number.isFinite(scheduledAt)
+        || (serviceStartedAt !== null && !Number.isFinite(serviceStartedAt))
+        || !Number.isSafeInteger(durationMinutes)
+        || durationMinutes < 1) {
+        return false;
+      }
+
+      // A paid order opens shortly before its booked time for logistics. Once
+      // service begins, its recorded start is also honored; the end remains
+      // based on the later of booked and actual start so an allowed early start
+      // cannot shorten the paid conversation window.
+      const interactionStartsAt = Math.min(
+        scheduledAt - preServiceWindowMs,
+        serviceStartedAt ?? scheduledAt
+      );
+      const serviceAnchorAt = Math.max(scheduledAt, serviceStartedAt ?? scheduledAt);
+      const interactionEndsAt = serviceAnchorAt + durationMinutes * 60_000 + postServiceWindowMs;
+      return now >= interactionStartsAt && now < interactionEndsAt;
+    });
+  }
+
+  private orderChatPreServiceWindowMinutes(): number {
+    return this.config?.get<number>(
+      "ORDER_CHAT_PRE_SERVICE_WINDOW_MINUTES",
+      DEFAULT_ORDER_CHAT_PRE_SERVICE_WINDOW_MINUTES
+    ) ?? DEFAULT_ORDER_CHAT_PRE_SERVICE_WINDOW_MINUTES;
+  }
+
+  private orderChatPostServiceWindowMinutes(): number {
+    return this.config?.get<number>(
+      "ORDER_CHAT_POST_SERVICE_WINDOW_MINUTES",
+      DEFAULT_ORDER_CHAT_POST_SERVICE_WINDOW_MINUTES
+    ) ?? DEFAULT_ORDER_CHAT_POST_SERVICE_WINDOW_MINUTES;
   }
 
   private companionParticipantDto(companion: any) {

@@ -59,6 +59,7 @@ describe("PaymentsService", () => {
       amountCents: order.amountCents,
       companionId: order.companionId
     })),
+    assertVoiceOrderFeatureEnabled: jest.fn(),
     cancelPendingRescheduleRequest: jest.fn().mockResolvedValue(undefined)
   } as any;
 
@@ -197,6 +198,8 @@ describe("PaymentsService", () => {
   });
 
   it("cancels a pending reschedule inside the same transaction that creates a customer refund", async () => {
+    const voiceRoomControl = { terminateForOrder: jest.fn().mockResolvedValue({ state: "terminated" }) } as any;
+    service = new PaymentsService(prisma, config, ordersService, wechat, notifications, audit, metrics, voiceRoomControl);
     const order = {
       ...baseOrder,
       status: "paid",
@@ -235,6 +238,7 @@ describe("PaymentsService", () => {
     });
     expect(db.refundTransaction.create.mock.invocationCallOrder[0])
       .toBeLessThan(ordersService.cancelPendingRescheduleRequest.mock.invocationCallOrder[0]);
+    expect(voiceRoomControl.terminateForOrder).toHaveBeenCalledWith(order.id, "refund_requested");
   });
 
   it("uses a system lifecycle cleanup when a refund is already in progress", async () => {
@@ -849,6 +853,42 @@ describe("PaymentsService", () => {
     expect(result.payment.channel).toBe("miniProgram");
     expect(result.payment.wechatMiniProgramParams).toEqual(expect.objectContaining({ package: expect.stringMatching(/^prepay_id=/) }));
     expect(result.payment.wechatAppParams).toBeUndefined();
+  });
+
+  it("does not create a prepay when the order-level voice feature guard is closed", async () => {
+    const pendingVoiceOrder = {
+      ...baseOrder,
+      status: "pending",
+      serviceOfferingDeliveryModeSnapshot: "voice"
+    };
+    const createPayment = jest.fn();
+    prisma.$transaction.mockImplementation(async (fn: any) => fn({
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      paymentTransaction: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: createPayment
+      },
+      order: {
+        findUnique: jest.fn().mockResolvedValue(pendingVoiceOrder),
+        update: jest.fn()
+      }
+    }));
+    ordersService.assertVoiceOrderFeatureEnabled.mockImplementationOnce(() => {
+      throw new AppException(
+        "VOICE_FEATURE_DISABLED",
+        "Real-time voice is not configured for this environment",
+        HttpStatus.SERVICE_UNAVAILABLE
+      );
+    });
+
+    await expect(service.prepay("u1", "o1", "miniProgram")).rejects.toMatchObject({
+      code: "VOICE_FEATURE_DISABLED",
+      status: HttpStatus.SERVICE_UNAVAILABLE
+    });
+    expect(ordersService.assertVoiceOrderFeatureEnabled).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "o1", serviceOfferingDeliveryModeSnapshot: "voice" })
+    );
+    expect(createPayment).not.toHaveBeenCalled();
   });
 
   it("commits the local trade number before WeChat and preserves an ambiguous failed create", async () => {

@@ -9,6 +9,9 @@ describe("ConversationsService.ensureConversation", () => {
     companionProfile: {
       findFirst: jest.fn()
     },
+    order: {
+      findMany: jest.fn()
+    },
     message: {
       findFirst: jest.fn(),
       findMany: jest.fn(),
@@ -39,7 +42,12 @@ describe("ConversationsService.ensureConversation", () => {
     createFromResult: jest.fn()
   } as any;
   const chatRestrictions = { assertCanSend: jest.fn(), activeForUser: jest.fn() } as any;
-  const mediaAssets = { isFeatureEnabled: jest.fn(() => false) } as any;
+  const mediaAssets = {
+    isFeatureEnabled: jest.fn(() => false),
+    attachmentsForMessage: jest.fn().mockResolvedValue([]),
+    reserve: jest.fn(),
+    complete: jest.fn()
+  } as any;
   const mediaWorker = { enqueue: jest.fn() } as any;
   const notifications = { createConversationMessageReceivedIfUnmuted: jest.fn() } as any;
   const audit = { record: jest.fn().mockResolvedValue(undefined) } as any;
@@ -158,6 +166,62 @@ describe("ConversationsService.ensureConversation", () => {
     }));
   });
 
+  it("keeps completed-order history readable while closing every new-message path", async () => {
+    prisma.conversation.findFirst.mockResolvedValue({
+      id: "conv-1",
+      externalId: "c1",
+      userId: "u1",
+      companion: { ownerUserId: "companion-owner" },
+      user: { profile: null }
+    });
+    prisma.order.findMany.mockResolvedValue([{
+      status: "completed",
+      scheduledAt: new Date("2026-07-20T08:00:00.000Z"),
+      serviceStartedAt: new Date("2026-07-20T08:00:00.000Z"),
+      durationMinutes: 30
+    }]);
+    prisma.message.findMany.mockResolvedValue([]);
+    chatRestrictions.activeForUser.mockResolvedValue(null);
+
+    await expect(service.conversationStatus("u1", "c1")).resolves.toEqual(expect.objectContaining({
+      messageHistoryAvailable: true,
+      messageInteractionAvailable: false
+    }));
+    await expect(service.messages("u1", "c1", {})).resolves.toEqual(expect.objectContaining({ messages: [] }));
+    await expect((service as any).assertConversationInteractionAvailable("conv-1")).rejects.toMatchObject({
+      code: "CONVERSATION_INTERACTION_UNAVAILABLE"
+    });
+    expect(prisma.message.findMany).toHaveBeenCalled();
+  });
+
+  it("rejects media reservation and completion after the paid communication window closes", async () => {
+    prisma.conversation.findFirst.mockResolvedValue({
+      id: "conv-1",
+      externalId: "c1",
+      userId: "u1",
+      companion: { ownerUserId: "companion-owner" }
+    });
+    prisma.order.findMany.mockResolvedValue([{
+      status: "paid",
+      scheduledAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
+      serviceStartedAt: null,
+      durationMinutes: 30
+    }]);
+    chatRestrictions.assertCanSend.mockResolvedValue(undefined);
+
+    await expect(service.reserveMediaUpload("u1", "c1", {
+      kind: "image",
+      mimeType: "image/jpeg",
+      sizeBytes: 128,
+      sha256: "a".repeat(64)
+    })).rejects.toMatchObject({ code: "CONVERSATION_INTERACTION_UNAVAILABLE" });
+    await expect(service.completeMediaUpload("u1", "c1", "asset-1"))
+      .rejects.toMatchObject({ code: "CONVERSATION_INTERACTION_UNAVAILABLE" });
+
+    expect(mediaAssets.reserve).not.toHaveBeenCalled();
+    expect(mediaAssets.complete).not.toHaveBeenCalled();
+  });
+
   it("returns and changes only the current participant's persisted mute preference", async () => {
     prisma.conversation.findFirst.mockResolvedValue({
       id: "conv-1",
@@ -210,6 +274,7 @@ describe("ConversationsService.ensureConversation", () => {
 
     await expect(service.setConversationBlocked("u1", "c1", { blocked: true })).resolves.toEqual({
       conversationBlockedByYou: true,
+      messageHistoryAvailable: false,
       messageInteractionAvailable: false
     });
 
@@ -263,6 +328,7 @@ describe("ConversationsService.ensureConversation", () => {
       readStates: [],
       notificationPreferences: [{ mutedAt: new Date("2026-07-20T00:00:00.000Z") }],
       blocks: [],
+      orders: [],
       updatedAt: new Date("2026-07-20T00:00:00.000Z")
     }]);
     prisma.message.count.mockResolvedValue(0);
@@ -273,7 +339,10 @@ describe("ConversationsService.ensureConversation", () => {
     expect(prisma.conversation.findMany).toHaveBeenCalledWith(expect.objectContaining({
       include: expect.objectContaining({
         notificationPreferences: { where: { userId: "u1" }, select: { mutedAt: true }, take: 1 },
-        blocks: { select: { blockedByUserId: true }, take: 2 }
+        blocks: { select: { blockedByUserId: true }, take: 2 },
+        orders: expect.objectContaining({
+          where: { status: { in: ["paid", "inService"] } }
+        })
       })
     }));
   });

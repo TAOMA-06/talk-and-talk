@@ -30,11 +30,15 @@
     <view class="conversation-boundary-title">你已为自己拉黑本会话</view>
     <view class="conversation-boundary-copy">消息记录暂不展示，双方不能继续在这里收发消息。拉黑不取消订单，也不代表举报、客服、退款或安全处置已经完成；需要时仍可使用上方入口。</view>
   </view>
-  <view wx:elif="{{!messageInteractionAvailable}}" class="conversation-boundary">
+  <view wx:elif="{{!messageHistoryAvailable}}" class="conversation-boundary">
     <view class="conversation-boundary-title">当前会话暂不能继续收发消息</view>
-    <view class="conversation-boundary-copy">订单、退款、举报、客服和安全入口不受影响。页面不会说明是哪一方设置了关系边界。</view>
+    <view class="conversation-boundary-copy">消息记录暂不展示。订单、退款、举报、客服和安全入口不受影响；页面不会说明是哪一方设置了关系边界。</view>
   </view>
   <view wx:else class="messages">
+    <view wx:if="{{!messageInteractionAvailable}}" class="conversation-boundary conversation-read-only">
+      <view class="conversation-boundary-title">订单服务已结束，消息记录仅供查看</view>
+      <view class="conversation-boundary-copy">订单、退款、举报、客服和安全入口不受影响。如需帮助，请从订单或安全入口发起处理。</view>
+    </view>
     <view wx:if="{{loadingOlder}}" class="history-status">正在加载更早消息…</view>
     <view wx:elif="{{hasMore}}" class="history-status">上拉加载更早消息</view>
     <view wx:elif="{{messages.length}}" class="history-status">已显示全部消息</view>

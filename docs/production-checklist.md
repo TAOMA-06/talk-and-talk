@@ -8,7 +8,8 @@
 - [ ] `COMMERCIAL_RELEASE_MODE=commercial`；`REFUND_REQUEST_WINDOW_HOURS`、`COMPANION_SETTLEMENT_HOLD_HOURS` 与经批准规则一致，且结算至少晚于退款窗口 24 小时
 - [ ] `ORDER_INTAKE_ENABLED`、总量/单用户/单陪伴者容量与 `ORDER_MAX_SCHEDULE_DAYS` 已按排班和值班能力设置；事故演练能暂停新单但仍允许同幂等键找回原订单
 - [ ] `ORDER_RESCHEDULE_RESPONSE_WINDOW_MINUTES`、`ORDER_RESCHEDULE_EXPIRY_*`、`rescheduleRequested`、`rescheduleAccepted`、`rescheduleRejected`、`rescheduleExpired` 与 `rescheduleCancelled` 订阅消息模板已按值班能力配置；小程序真机已验证用户主动开启提醒时会按单次最多 3 项分批请求并记录授权；改期请求只在双方确认后、并通过第二次容量校验时才可替换原预约，拒绝、超时、订单取消、退款或履约开始/完成都不会改写原预约
-- [ ] `/admin/commercial/readiness` 返回 `clear`，并由值班人员核对失败/超时退款、超时工单、失败推送、过期推送租约、待复核商业档案、未结追偿、超时结算、审核服务故障、严重/超时审核、媒体删除失败、过期支付、预约响应/支付保留超时、已过履约窗口待退款和超时服务订单均为 0
+- [ ] `ORDER_CHAT_PRE_SERVICE_WINDOW_MINUTES` 与 `ORDER_CHAT_POST_SERVICE_WINDOW_MINUTES` 已按服务与客服能力明确设置；两名真实测试用户验证服务窗口内可发消息，完成订单仅可查看历史而不能新建文字/媒体，举报、售后和客服仍可用
+- [ ] `/admin/commercial/readiness` 返回 `clear`，并由值班人员核对失败/超时退款、超时工单、失败推送、过期推送租约、待复核商业档案、未结追偿、超时结算、审核服务故障、严重/超时审核、媒体删除失败、过期支付、预约响应/支付保留超时、已过履约窗口待退款、超时服务订单和语音关房积压均为 0；若启用语音，`voiceEmergencyStopActive=0` 且 `voice.roomControlEnabled=true`
 - [ ] `SUPPORT_MAX_OPEN_PER_USER` 与实际客服容量一致；普通工单达到上限会被拒绝，但紧急安全工单仍可进入队列
 - [ ] 每位上架陪伴者均具备已复核的实名状态与商业档案；收款对象、税务档案、身份和协议只保存受控外部证据引用
 - [ ] 已逐笔处置历史已支付/服务中/已完成订单、失败退款、未结工单及缺少结算快照的应结款；禁止伪造历史核验结果
@@ -24,6 +25,7 @@
 ## CORS / JWT / 密钥
 
 - [ ] `cd backend/api && npm run preflight:deployment -- .env.production` 通过
+- [ ] `cd backend/api && npm run verify:cloudbase-template` 通过；实际 CloudBase 清单从受控环境生成、最小实例不少于 1，且不含任何运行时变量或密钥
 - [ ] `CORS_ORIGINS` 为显式 allowlist（生产禁止依赖开发默认列表）
 - [ ] `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` 为高强度随机值，非 `CHANGE_ME` / 开发默认
 - [ ] access / refresh 密钥互不相同

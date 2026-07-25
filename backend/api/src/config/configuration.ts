@@ -29,6 +29,20 @@ interface Environment {
   DEEPSEEK_MODEL: string;
   MEDIA_FEATURE_ENABLED: boolean;
   MEDIA_PROVIDER: string;
+  TRTC_ENABLED: boolean;
+  TRTC_SDK_APP_ID: number;
+  TRTC_SDK_SECRET_KEY: string;
+  TRTC_PRIVATE_MAP_KEY_ENABLED: boolean;
+  TRTC_USER_SIG_TTL_SECONDS: number;
+  TRTC_ROOM_CONTROL_ENABLED: boolean;
+  TRTC_EMERGENCY_STOP_ENABLED: boolean;
+  TRTC_CONTROL_REGION: "ap-beijing" | "ap-guangzhou";
+  TRTC_CONTROL_TIMEOUT_MS: number;
+  TRTC_ROOM_CONTROL_INTERVAL_SECONDS: number;
+  TRTC_ROOM_CONTROL_BATCH_SIZE: number;
+  TENCENTCLOUD_SECRET_ID: string;
+  TENCENTCLOUD_SECRET_KEY: string;
+  TENCENTCLOUD_SECURITY_TOKEN: string;
   WECHAT_PAY_APP_ID: string;
   WECHAT_PAY_MCH_ID: string;
   WECHAT_PAY_API_V3_KEY: string;
@@ -66,6 +80,8 @@ interface Environment {
   COMPANION_SETTLEMENT_HOLD_HOURS: number;
   REFUND_REQUEST_WINDOW_HOURS: number;
   ORDER_RESPONSE_WINDOW_MINUTES: number;
+  ORDER_CHAT_PRE_SERVICE_WINDOW_MINUTES: number;
+  ORDER_CHAT_POST_SERVICE_WINDOW_MINUTES: number;
   ORDER_RESCHEDULE_RESPONSE_WINDOW_MINUTES: number;
   ORDER_MAX_SCHEDULE_DAYS: number;
   ORDER_INTAKE_ENABLED: boolean;
@@ -483,6 +499,23 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     1,
     24 * 60
   );
+  // Order chat is a logistics/service channel, not an indefinite private
+  // social channel. These values make its short pre-service and wrap-up
+  // periods explicit and can be tuned without changing code.
+  const orderChatPreServiceWindowMinutes = boundedInteger(
+    "ORDER_CHAT_PRE_SERVICE_WINDOW_MINUTES",
+    env.ORDER_CHAT_PRE_SERVICE_WINDOW_MINUTES,
+    15,
+    0,
+    24 * 60
+  );
+  const orderChatPostServiceWindowMinutes = boundedInteger(
+    "ORDER_CHAT_POST_SERVICE_WINDOW_MINUTES",
+    env.ORDER_CHAT_POST_SERVICE_WINDOW_MINUTES,
+    15,
+    0,
+    24 * 60
+  );
   const orderRescheduleResponseWindowMinutes = boundedInteger(
     "ORDER_RESCHEDULE_RESPONSE_WINDOW_MINUTES",
     env.ORDER_RESCHEDULE_RESPONSE_WINDOW_MINUTES,
@@ -739,6 +772,8 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
       "COMPANION_SETTLEMENT_HOLD_HOURS",
       "REFUND_REQUEST_WINDOW_HOURS",
       "ORDER_RESPONSE_WINDOW_MINUTES",
+      "ORDER_CHAT_PRE_SERVICE_WINDOW_MINUTES",
+      "ORDER_CHAT_POST_SERVICE_WINDOW_MINUTES",
       "ORDER_RESCHEDULE_RESPONSE_WINDOW_MINUTES",
       "ORDER_RESCHEDULE_EXPIRY_ENABLED",
       "ORDER_RESCHEDULE_EXPIRY_INTERVAL_SECONDS",
@@ -770,6 +805,73 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
   if (appEnv === "production" && mediaFeatureEnabled) {
     throw new Error("MEDIA_FEATURE_ENABLED requires a configured production media adapter and cannot use the bundled mock provider");
   }
+  // Real-time voice is intentionally independent from attachment/media
+  // uploads. It remains closed until the provider room restriction has been
+  // enabled in the TRTC console and all server-side signing inputs exist.
+  const trtcEnabled = parseBoolean(env.TRTC_ENABLED, false);
+  const trtcSdkAppId = boundedInteger("TRTC_SDK_APP_ID", env.TRTC_SDK_APP_ID, 0, 0, 2_147_483_647);
+  const trtcSdkSecretKey = optionalString(env.TRTC_SDK_SECRET_KEY);
+  const trtcPrivateMapKeyEnabled = parseBoolean(env.TRTC_PRIVATE_MAP_KEY_ENABLED, false);
+  const trtcUserSigTtlSeconds = boundedInteger(
+    "TRTC_USER_SIG_TTL_SECONDS", env.TRTC_USER_SIG_TTL_SECONDS, 300, 60, 900
+  );
+  // A client-side timer is only a convenience. A commercial voice service
+  // needs a server-side room-close path for refunds and elapsed service
+  // windows, otherwise an already-connected client can outlive the order.
+  const trtcRoomControlEnabled = parseBoolean(env.TRTC_ROOM_CONTROL_ENABLED, false);
+  // This is a temporary incident-control state, not a normal product switch.
+  // It blocks new credentials and makes the durable worker close every room
+  // it has recorded before operators turn the feature off completely.
+  const trtcEmergencyStopEnabled = parseBoolean(env.TRTC_EMERGENCY_STOP_ENABLED, false);
+  const trtcControlRegion = optionalString(env.TRTC_CONTROL_REGION) || "ap-guangzhou";
+  if (trtcControlRegion !== "ap-beijing" && trtcControlRegion !== "ap-guangzhou") {
+    throw new Error("TRTC_CONTROL_REGION must be ap-beijing or ap-guangzhou");
+  }
+  const trtcControlTimeoutMs = boundedInteger(
+    "TRTC_CONTROL_TIMEOUT_MS", env.TRTC_CONTROL_TIMEOUT_MS, 5_000, 1_000, 10_000
+  );
+  const trtcRoomControlIntervalSeconds = boundedInteger(
+    "TRTC_ROOM_CONTROL_INTERVAL_SECONDS", env.TRTC_ROOM_CONTROL_INTERVAL_SECONDS, 15, 10, 300
+  );
+  const trtcRoomControlBatchSize = boundedInteger(
+    "TRTC_ROOM_CONTROL_BATCH_SIZE", env.TRTC_ROOM_CONTROL_BATCH_SIZE, 10, 1, 10
+  );
+  const tencentCloudSecretId = optionalString(env.TENCENTCLOUD_SECRET_ID);
+  const tencentCloudSecretKey = optionalString(env.TENCENTCLOUD_SECRET_KEY);
+  const tencentCloudSecurityToken = optionalString(env.TENCENTCLOUD_SECURITY_TOKEN);
+  if (trtcEnabled) {
+    if (!trtcSdkAppId || !trtcSdkSecretKey || !trtcPrivateMapKeyEnabled || !trtcRoomControlEnabled) {
+      throw new Error(
+        "TRTC_ENABLED=true requires TRTC_SDK_APP_ID, TRTC_SDK_SECRET_KEY, TRTC_PRIVATE_MAP_KEY_ENABLED=true and TRTC_ROOM_CONTROL_ENABLED=true"
+      );
+    }
+    if (trtcSdkSecretKey.length < 16) {
+      throw new Error("TRTC_SDK_SECRET_KEY is unexpectedly short");
+    }
+    if (appEnv === "production") {
+      assertProductionValue("TRTC_SDK_SECRET_KEY", trtcSdkSecretKey);
+    }
+  }
+  if (trtcRoomControlEnabled) {
+    if (!trtcEnabled || !tencentCloudSecretId || !tencentCloudSecretKey) {
+      throw new Error(
+        "TRTC_ROOM_CONTROL_ENABLED=true requires TRTC_ENABLED=true, TENCENTCLOUD_SECRET_ID and TENCENTCLOUD_SECRET_KEY"
+      );
+    }
+    if (tencentCloudSecretId.length < 16 || tencentCloudSecretKey.length < 16) {
+      throw new Error("TENCENTCLOUD_SECRET_ID and TENCENTCLOUD_SECRET_KEY are unexpectedly short");
+    }
+    if (appEnv === "production") {
+      assertProductionValue("TENCENTCLOUD_SECRET_ID", tencentCloudSecretId);
+      assertProductionValue("TENCENTCLOUD_SECRET_KEY", tencentCloudSecretKey);
+      if (tencentCloudSecurityToken) assertProductionValue("TENCENTCLOUD_SECURITY_TOKEN", tencentCloudSecurityToken);
+    }
+  }
+  if (trtcEmergencyStopEnabled && (!trtcEnabled || !trtcRoomControlEnabled)) {
+    throw new Error(
+      "TRTC_EMERGENCY_STOP_ENABLED=true requires TRTC_ENABLED=true and TRTC_ROOM_CONTROL_ENABLED=true"
+    );
+  }
 
   return {
     NODE_ENV: nodeEnv,
@@ -796,6 +898,20 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     DEEPSEEK_MODEL: deepseekModel,
     MEDIA_FEATURE_ENABLED: mediaFeatureEnabled,
     MEDIA_PROVIDER: mediaProvider,
+    TRTC_ENABLED: trtcEnabled,
+    TRTC_SDK_APP_ID: trtcSdkAppId,
+    TRTC_SDK_SECRET_KEY: trtcSdkSecretKey,
+    TRTC_PRIVATE_MAP_KEY_ENABLED: trtcPrivateMapKeyEnabled,
+    TRTC_USER_SIG_TTL_SECONDS: trtcUserSigTtlSeconds,
+    TRTC_ROOM_CONTROL_ENABLED: trtcRoomControlEnabled,
+    TRTC_EMERGENCY_STOP_ENABLED: trtcEmergencyStopEnabled,
+    TRTC_CONTROL_REGION: trtcControlRegion,
+    TRTC_CONTROL_TIMEOUT_MS: trtcControlTimeoutMs,
+    TRTC_ROOM_CONTROL_INTERVAL_SECONDS: trtcRoomControlIntervalSeconds,
+    TRTC_ROOM_CONTROL_BATCH_SIZE: trtcRoomControlBatchSize,
+    TENCENTCLOUD_SECRET_ID: tencentCloudSecretId,
+    TENCENTCLOUD_SECRET_KEY: tencentCloudSecretKey,
+    TENCENTCLOUD_SECURITY_TOKEN: tencentCloudSecurityToken,
     WECHAT_PAY_APP_ID: optionalString(env.WECHAT_PAY_APP_ID),
     WECHAT_PAY_MCH_ID: wechatPayMchId,
     WECHAT_PAY_API_V3_KEY: wechatPayApiV3Key,
@@ -833,6 +949,8 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     COMPANION_SETTLEMENT_HOLD_HOURS: companionSettlementHoldHours,
     REFUND_REQUEST_WINDOW_HOURS: refundRequestWindowHours,
     ORDER_RESPONSE_WINDOW_MINUTES: orderResponseWindowMinutes,
+    ORDER_CHAT_PRE_SERVICE_WINDOW_MINUTES: orderChatPreServiceWindowMinutes,
+    ORDER_CHAT_POST_SERVICE_WINDOW_MINUTES: orderChatPostServiceWindowMinutes,
     ORDER_RESCHEDULE_RESPONSE_WINDOW_MINUTES: orderRescheduleResponseWindowMinutes,
     ORDER_MAX_SCHEDULE_DAYS: orderMaxScheduleDays,
     ORDER_INTAKE_ENABLED: orderIntakeEnabled,

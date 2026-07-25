@@ -57,7 +57,8 @@ function validProduction() {
     LEGAL_PLATFORM_RULES_URL: "https://api.talkandtalk.app/api/v1/legal/platform-rules",
     LEGAL_CONSENT_EFFECTIVE_DATE: "2026-07-20",
     LEGAL_PRIVACY_RETENTION_DAYS: "1095",
-    PAYMENT_RECONCILIATION_ENABLED: "true"
+    PAYMENT_RECONCILIATION_ENABLED: "true",
+    TRTC_ENABLED: "false"
   };
 }
 
@@ -70,6 +71,47 @@ test("parses quoted env values without exposing comments", () => {
 
 test("accepts a complete production Mini Program deployment", () => {
   assert.deepEqual(validateDeploymentConfig(validProduction()), []);
+});
+
+test("requires restricted TRTC signing inputs only when real-time voice is enabled", () => {
+  const enabled = { ...validProduction(), TRTC_ENABLED: "true" };
+  assert.match(validateDeploymentConfig(enabled).join("\n"), /TRTC_SDK_APP_ID is required/);
+
+  Object.assign(enabled, {
+    TRTC_SDK_APP_ID: "1400000001",
+    TRTC_SDK_SECRET_KEY: "trtc-production-secret-material",
+    TRTC_PRIVATE_MAP_KEY_ENABLED: "true",
+    TRTC_USER_SIG_TTL_SECONDS: "300",
+    TRTC_ROOM_CONTROL_ENABLED: "true",
+    TRTC_CONTROL_REGION: "ap-guangzhou",
+    TRTC_CONTROL_TIMEOUT_MS: "5000",
+    TRTC_ROOM_CONTROL_INTERVAL_SECONDS: "15",
+    TRTC_ROOM_CONTROL_BATCH_SIZE: "10",
+    TENCENTCLOUD_SECRET_ID: "AKID_test_voice_control",
+    TENCENTCLOUD_SECRET_KEY: "tencent-cloud-control-secret-material"
+  });
+  assert.deepEqual(validateDeploymentConfig(enabled), []);
+  assert.deepEqual(validateDeploymentConfig({ ...enabled, TRTC_EMERGENCY_STOP_ENABLED: "true" }), []);
+  assert.match(
+    validateDeploymentConfig({ ...enabled, TRTC_PRIVATE_MAP_KEY_ENABLED: "false" }).join("\n"),
+    /TRTC_PRIVATE_MAP_KEY_ENABLED must be true/
+  );
+  assert.match(
+    validateDeploymentConfig({ ...enabled, TRTC_USER_SIG_TTL_SECONDS: "901" }).join("\n"),
+    /TRTC_USER_SIG_TTL_SECONDS/
+  );
+  assert.match(
+    validateDeploymentConfig({ ...enabled, TRTC_ROOM_CONTROL_ENABLED: "false" }).join("\n"),
+    /TRTC_ROOM_CONTROL_ENABLED must be true/
+  );
+  assert.match(
+    validateDeploymentConfig({ ...enabled, TRTC_ENABLED: "false", TRTC_EMERGENCY_STOP_ENABLED: "true" }).join("\n"),
+    /TRTC_EMERGENCY_STOP_ENABLED=true requires/
+  );
+  assert.match(
+    validateDeploymentConfig({ ...enabled, TRTC_CONTROL_REGION: "ap-shanghai" }).join("\n"),
+    /TRTC_CONTROL_REGION must be ap-beijing or ap-guangzhou/
+  );
 });
 
 test("requires a live availability-reminder template only when the default-off delivery runner is explicitly enabled", () => {

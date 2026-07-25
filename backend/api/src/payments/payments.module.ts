@@ -3,6 +3,7 @@ import { ConfigService } from "@nestjs/config";
 
 import { NotificationsModule } from "../notifications/notifications.module";
 import { OrdersModule } from "../orders/orders.module";
+import { VoiceModule } from "../voice/voice.module";
 import { PaymentsController } from "./payments.controller";
 import { PaymentsReconciliationWorker } from "./payments-reconciliation.worker";
 import { PaymentsService } from "./payments.service";
@@ -12,7 +13,7 @@ import { RealWeChatPayProvider, isWeChatConfigured } from "./wechat/real-wechat-
 import { WECHAT_PAY_PROVIDER } from "./wechat/wechat-pay.provider";
 
 @Module({
-  imports: [forwardRef(() => OrdersModule), NotificationsModule],
+  imports: [forwardRef(() => OrdersModule), NotificationsModule, VoiceModule],
   controllers: [PaymentsController],
   providers: [
     PaymentsService,

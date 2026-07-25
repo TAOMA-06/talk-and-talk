@@ -1707,6 +1707,46 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
+  /orders/{id}/voice-room/access:
+    post:
+      tags: [orders]
+      summary: Issue a short-lived, order-scoped real-time voice room credential
+      description: Available only to the customer or companion owner of a voice SKU after manual acceptance, payment, and the companion's explicit service start. The server derives the room and participant identity; callers cannot choose either. UserSig and privateMapKey are short-lived response secrets and must not be persisted by clients. A refund, service completion, or elapsed service window can terminate an already connected room server-side; clients must handle the provider kicked-out event.
+      operationId: issueOrderVoiceRoomAccess
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: A short-lived TRTC access credential for this order participant
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/VoiceRoomAccess"
+        "404":
+          description: Order not found or caller is not an order participant
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "409":
+          description: Order is not a voice service, is not accepted/started, is in after-sales handling, or its service window has ended
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "503":
+          description: Real-time voice has not been configured or the signing provider is unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
   /orders/{id}/reschedule-requests:
     post:
       tags: [orders]
@@ -2379,7 +2419,7 @@ paths:
         - $ref: "#/components/parameters/IdPath"
       responses:
         "200":
-          description: Viewer-owned media/reminder status, a generic interaction-availability flag, and any active chat-only restriction
+          description: Viewer-owned media/reminder status, bounded order-chat availability, readable-history status, and any active chat-only restriction
           content:
             application/json:
               schema:
@@ -2397,9 +2437,12 @@ paths:
                           conversationBlockedByYou:
                             type: boolean
                             description: True only when the authenticated participant set an active block for this conversation. It never identifies another participant's choice.
+                          messageHistoryAvailable:
+                            type: boolean
+                            description: False only when an active privacy boundary hides ordinary chat history. A completed order remains readable even when ordinary sending is closed.
                           messageInteractionAvailable:
                             type: boolean
-                            description: False when either participant ended ordinary message interaction. It never identifies which participant set the boundary.
+                            description: True only during an eligible paid order's bounded communication window and when no active privacy boundary exists.
                           chatRestriction:
                             nullable: true
                             $ref: "#/components/schemas/ChatRestriction"
@@ -2468,7 +2511,7 @@ paths:
                   description: True creates or preserves the caller's active boundary; false removes only the caller's boundary.
       responses:
         "200":
-          description: The caller's block state and generic message availability
+          description: The caller's block state, readable-history state, and bounded message availability
           content:
             application/json:
               schema:
@@ -2478,9 +2521,10 @@ paths:
                     properties:
                       data:
                         type: object
-                        required: [conversationBlockedByYou, messageInteractionAvailable]
+                        required: [conversationBlockedByYou, messageHistoryAvailable, messageInteractionAvailable]
                         properties:
                           conversationBlockedByYou: { type: boolean }
+                          messageHistoryAvailable: { type: boolean }
                           messageInteractionAvailable: { type: boolean }
         "403":
           $ref: "#/components/responses/Error"
@@ -2961,7 +3005,7 @@ paths:
   /admin/commercial/readiness:
     get:
       tags: [admin, commercial]
-      summary: Aggregate operational blockers that must be clear before commercial traffic continues
+      summary: Aggregate operational blockers, including enabled-TRTC room-drain state, that must be clear before commercial traffic continues
       operationId: adminCommercialReadiness
       security:
         - bearerAuth: []
@@ -4076,6 +4120,26 @@ components:
           nullable: true
           allOf:
             - $ref: "#/components/schemas/OrderRescheduleRequest"
+    VoiceRoomAccess:
+      type: object
+      required: [provider, sdkAppId, roomId, userId, userSig, privateMapKey, participantRole, expiresAt, serviceEndsAt, participant]
+      description: Short-lived connection material. It is valid only for the caller, room and service window returned by the server; clients must keep it in memory only.
+      properties:
+        provider: { type: string, enum: [trtc] }
+        sdkAppId: { type: integer, minimum: 1 }
+        roomId: { type: string, maxLength: 64, description: Opaque provider room identifier derived by the server. }
+        userId: { type: string, maxLength: 32, description: Opaque provider participant identifier; not the platform account ID. }
+        userSig: { type: string, minLength: 1, description: Short-lived provider credential; never persist or log. }
+        privateMapKey: { type: string, minLength: 1, description: Provider room restriction for this participant; never persist or log. }
+        participantRole: { type: string, enum: [customer, companion] }
+        expiresAt: { type: string, format: date-time }
+        serviceEndsAt: { type: string, format: date-time }
+        participant:
+          type: object
+          required: [name, initials]
+          properties:
+            name: { type: string, maxLength: 80 }
+            initials: { type: string, maxLength: 16 }
     CompanionAvailabilityCandidate:
       type: object
       required: [id, availabilityWindowId, startsAt, endsAt, capacity, reservedCount, availableCapacity]
@@ -4138,7 +4202,7 @@ components:
         timestamp: { type: string, format: date-time }
     ConversationSummary:
       type: object
-      required: [id, companionId, viewerRole, participant, lastMessage, unreadCount, messageNotificationsMuted, conversationBlockedByYou, messageInteractionAvailable, updatedAt]
+      required: [id, companionId, viewerRole, participant, lastMessage, unreadCount, messageNotificationsMuted, conversationBlockedByYou, messageHistoryAvailable, messageInteractionAvailable, updatedAt]
       properties:
         id:
           type: string
@@ -4169,9 +4233,12 @@ components:
         conversationBlockedByYou:
           type: boolean
           description: The authenticated viewer's own active block state only; it is never a signal about the other participant.
+        messageHistoryAvailable:
+          type: boolean
+          description: False only when a current privacy boundary hides ordinary chat history; closed order windows remain readable.
         messageInteractionAvailable:
           type: boolean
-          description: Generic message availability only; false does not identify which participant set a boundary.
+          description: True only during a paid order's configured communication window and when no privacy boundary is active.
         updatedAt: { type: string, format: date-time }
     ChatRestriction:
       type: object

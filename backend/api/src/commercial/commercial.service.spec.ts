@@ -296,4 +296,52 @@ describe("CommercialService", () => {
       }
     });
   });
+
+  it("exposes only aggregate voice-drain readiness and blocks traffic during an emergency or due close", async () => {
+    config.get.mockImplementation((key: string, fallback?: unknown) => {
+      if (key === "TRTC_ENABLED") return true;
+      if (key === "TRTC_ROOM_CONTROL_ENABLED") return true;
+      if (key === "TRTC_EMERGENCY_STOP_ENABLED") return true;
+      return fallback ?? 24;
+    });
+    const readinessPrisma = {
+      refundTransaction: { count: jest.fn().mockResolvedValue(0) },
+      supportTicket: { count: jest.fn().mockResolvedValue(0) },
+      notificationDelivery: { count: jest.fn().mockResolvedValue(0) },
+      companionCommercialProfile: { count: jest.fn().mockResolvedValue(0) },
+      companionRecovery: { count: jest.fn().mockResolvedValue(0) },
+      companionEarning: { count: jest.fn().mockResolvedValue(0) },
+      moderationCase: { count: jest.fn().mockResolvedValue(0) },
+      mediaAsset: { count: jest.fn().mockResolvedValue(0) },
+      paymentTransaction: { count: jest.fn().mockResolvedValue(0) },
+      order: { count: jest.fn().mockResolvedValue(0) },
+      voiceSession: { count: jest.fn().mockResolvedValueOnce(2).mockResolvedValueOnce(3) },
+      $queryRaw: jest.fn().mockResolvedValue([])
+    } as any;
+    const readinessService = new CommercialService(readinessPrisma, config, audit);
+
+    const result = await readinessService.operationalReadiness();
+
+    expect(result.status).toBe("attentionRequired");
+    expect(result.blockers).toEqual(expect.objectContaining({
+      voiceRoomControlDisabled: 0,
+      voiceEmergencyStopActive: 1,
+      voiceTerminationBacklog: 2,
+      voiceEmergencyDrainPending: 3
+    }));
+    expect(result.voice).toEqual({
+      enabled: true,
+      roomControlEnabled: true,
+      emergencyStopEnabled: true,
+      terminationBacklog: 2,
+      emergencyDrainPending: 3
+    });
+    expect(readinessPrisma.voiceSession.count).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        terminationCompletedAt: null,
+        terminationRequestedAt: { not: null }
+      })
+    }));
+    expect(JSON.stringify(result)).not.toContain("TENCENTCLOUD_SECRET");
+  });
 });

@@ -229,6 +229,22 @@ export type Order = {
   refund?: OrderRefund | null;
 };
 
+/** Server-issued only after the order is accepted, paid and manually started.
+ * UserSig and privateMapKey are intentionally short-lived and must never be
+ * persisted in Mini Program storage, analytics, or logs. */
+export type VoiceRoomAccess = {
+  provider: "trtc";
+  sdkAppId: number;
+  roomId: string;
+  userId: string;
+  userSig: string;
+  privateMapKey: string;
+  participantRole: "customer" | "companion";
+  expiresAt: string;
+  serviceEndsAt: string;
+  participant: { name: string; initials: string };
+};
+
 export type RefundRequestResult = {
   refund: OrderRefund;
   order: Order;
@@ -273,7 +289,9 @@ export type Conversation = {
   messageNotificationsMuted: boolean;
   /** Viewer-owned only; exposes an unblock control without naming the other participant's choice. */
   conversationBlockedByYou: boolean;
-  /** Generic availability only; never identifies which participant set a boundary. */
+  /** False only for a privacy boundary; completed-order history remains readable. */
+  messageHistoryAvailable: boolean;
+  /** True only during the paid order's bounded communication window. */
   messageInteractionAvailable: boolean;
   updatedAt: string;
 };

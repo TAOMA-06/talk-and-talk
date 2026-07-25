@@ -12,6 +12,7 @@
     "pages/companion/services/index",
     "pages/companion/availability/index",
     "pages/chat/index",
+    "pages/voice/index",
     "pages/legal/index"
   ],
   "window": {

@@ -164,6 +164,7 @@
         <button wx:if="{{(item.status === 'pending' || item.status === 'paying') && item.companionConfirmedAt}}" class="primary-button action" loading="{{payingId === item.id}}" bindtap="pay" data-id="{{item.id}}">去支付</button>
         <button wx:if="{{item.status === 'pending' || item.status === 'paying'}}" class="plain action" bindtap="cancel" data-id="{{item.id}}">取消订单</button>
         <button wx:if="{{item.canInitiateReschedule && !item.pendingReschedule}}" class="plain action" bindtap="toggleReschedule" data-id="{{item.id}}">{{item.rescheduleToggleText}}</button>
+        <button wx:if="{{item.canOpenRealtimeVoice}}" class="primary-button action" bindtap="openVoiceRoom" data-id="{{item.id}}">进入实时语音</button>
         <button wx:if="{{item.canRequestRefund}}" class="plain action" bindtap="refund" data-id="{{item.id}}">{{item.refundActionText}}</button>
         <view wx:if="{{item.status === 'completed' && item.refundRequestDeadlineAt}}" class="muted">自助售后截止：{{item.refundDeadlineText}}；截止后仍可提交客服争议。</view>
         <button wx:if="{{item.status === 'completed'}}" class="primary-button action" bindtap="review" data-id="{{item.id}}">提交评价</button>
@@ -317,6 +318,7 @@
         <button wx:if="{{item.canInitiateReschedule && !item.pendingReschedule}}" class="plain action" bindtap="toggleReschedule" data-id="{{item.id}}">{{item.rescheduleToggleText}}</button>
         <view wx:if="{{item.status === 'pending' && item.companionConfirmedAt}}" class="muted">已确认，客户需在 {{item.paymentDeadlineText}} 前支付，超时自动释放时段</view>
         <button wx:if="{{item.status === 'paid' && item.canStartService}}" class="primary-button action" bindtap="startService" data-id="{{item.id}}">开始服务</button>
+        <button wx:if="{{item.canOpenRealtimeVoice}}" class="primary-button action" bindtap="openVoiceRoom" data-id="{{item.id}}">进入实时语音</button>
         <view wx:if="{{item.status === 'paid' && !item.canStartService && item.startServiceNotice}}" class="muted">{{item.startServiceNotice}}</view>
         <button wx:if="{{item.status === 'inService' && item.canCompleteService}}" class="primary-button action" bindtap="completeService" data-id="{{item.id}}">完成服务</button>
         <view wx:if="{{item.status === 'inService' && !item.canCompleteService}}" class="muted">服务时长未结束，{{item.completionEligibleAtText}} 后可标记完成</view>

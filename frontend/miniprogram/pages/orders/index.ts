@@ -60,6 +60,8 @@ type DisplayOrder = Order & {
   fulfillmentTone: "waiting" | "ready" | "active" | "complete" | "overdue";
   canOpenOrderConversation: boolean;
   orderConversationActionText: string;
+  isRealtimeVoiceService: boolean;
+  canOpenRealtimeVoice: boolean;
   canStartService: boolean;
   startServiceNotice: string;
   hasServiceGuidelines: boolean;
@@ -303,6 +305,10 @@ function hasActiveRefund(order: Order): boolean {
   return Boolean(order.refund && ["pendingReview", "pending", "processing", "failed"].includes(order.refund.status));
 }
 
+function isRealtimeVoiceService(order: Order): boolean {
+  return order.serviceOfferingSnapshot?.deliveryMode === "voice";
+}
+
 function timestamp(value?: string | null): number | null {
   const parsed = value ? Date.parse(value) : Number.NaN;
   return Number.isFinite(parsed) ? parsed : null;
@@ -320,6 +326,7 @@ function formatCountdown(milliseconds: number): string {
 
 function fulfillmentGuidance(order: Order, viewerRole: OrderViewerRole, now = Date.now()): FulfillmentGuidance {
   const scheduledAt = timestamp(order.scheduledAt);
+  const realTimeVoice = isRealtimeVoiceService(order);
   const chatEnabled = ["paid", "inService", "completed"].includes(order.status);
   const canOpenConversation = chatEnabled && (viewerRole === "customer"
     ? Boolean(order.conversationId)
@@ -359,7 +366,9 @@ function fulfillmentGuidance(order: Order, viewerRole: OrderViewerRole, now = Da
           ...base,
           show: true,
           title: "可以开始服务",
-          detail: "已进入开始窗口。开始前请在订单会话中确认本次服务方式和边界。",
+          detail: realTimeVoice
+            ? "已进入开始窗口。开始后双方可从订单进入实时语音；请先确认本次服务方式和边界。"
+            : "已进入开始窗口。开始前请在订单会话中确认本次服务方式和边界。",
           countdownLabel: "本次服务窗口结束",
           countdownText: formatCountdown(serviceEndAt - now),
           tone: "ready",
@@ -379,8 +388,10 @@ function fulfillmentGuidance(order: Order, viewerRole: OrderViewerRole, now = Da
       return {
         ...base,
         show: true,
-        title: "等待服务开始",
-        detail: "可先进入订单会话确认本次服务方式和边界；开始状态以陪伴者在订单内操作为准。",
+          title: "等待服务开始",
+          detail: realTimeVoice
+            ? "可先确认服务方式和边界；陪伴者开始服务后，双方可从订单进入实时语音。"
+            : "可先进入订单会话确认本次服务方式和边界；开始状态以陪伴者在订单内操作为准。",
         countdownLabel: "距预约开始",
         countdownText: formatCountdown(scheduledAt - now),
         tone: "waiting"
@@ -390,8 +401,10 @@ function fulfillmentGuidance(order: Order, viewerRole: OrderViewerRole, now = Da
       return {
         ...base,
         show: true,
-        title: "已到预约开始时间",
-        detail: "请在订单会话中与陪伴者确认；服务开始后，订单会同步显示进行中状态。",
+          title: "已到预约开始时间",
+          detail: realTimeVoice
+            ? "请等待陪伴者在订单中开始服务；开始后可进入实时语音。"
+            : "请在订单会话中与陪伴者确认；服务开始后，订单会同步显示进行中状态。",
         countdownLabel: "本次服务窗口结束",
         countdownText: formatCountdown(serviceEndAt - now),
         tone: "ready"
@@ -413,8 +426,12 @@ function fulfillmentGuidance(order: Order, viewerRole: OrderViewerRole, now = Da
         show: true,
         title: "服务进行中",
         detail: viewerRole === "companion"
-          ? "请在平台内完成本次服务；服务时长结束后再标记完成。"
-          : "请在平台内继续沟通；如遇履约或安全问题，可从订单联系平台客服。",
+          ? realTimeVoice
+            ? "请通过订单内实时语音完成本次服务；服务时长结束后再标记完成。"
+            : "请在平台内完成本次服务；服务时长结束后再标记完成。"
+          : realTimeVoice
+            ? "请通过订单内实时语音继续本次服务；如遇履约或安全问题，可从订单联系平台客服。"
+            : "请在平台内继续沟通；如遇履约或安全问题，可从订单联系平台客服。",
         countdownLabel: viewerRole === "companion" ? "可标记完成" : "预计结束",
         countdownText: formatCountdown(serviceEndAt - now),
         tone: "active"
@@ -452,10 +469,12 @@ function fulfillmentGuidance(order: Order, viewerRole: OrderViewerRole, now = Da
 function fulfillmentDisplayPatch(order: Order, viewerRole: OrderViewerRole): Pick<DisplayOrder,
   "hasFulfillmentGuidance" | "fulfillmentTitle" | "fulfillmentDetail" | "fulfillmentCountdownLabel" |
   "fulfillmentCountdownText" | "fulfillmentTone" | "canOpenOrderConversation" |
-  "orderConversationActionText" | "canStartService" | "startServiceNotice"
+  "orderConversationActionText" | "canStartService" | "startServiceNotice" |
+  "isRealtimeVoiceService" | "canOpenRealtimeVoice"
 > {
   const guidance = fulfillmentGuidance(order, viewerRole);
   const activeRefund = hasActiveRefund(order);
+  const realTimeVoice = isRealtimeVoiceService(order);
   return {
     hasFulfillmentGuidance: guidance.show && !activeRefund,
     fulfillmentTitle: guidance.title,
@@ -465,6 +484,11 @@ function fulfillmentDisplayPatch(order: Order, viewerRole: OrderViewerRole): Pic
     fulfillmentTone: guidance.tone,
     canOpenOrderConversation: guidance.canOpenConversation,
     orderConversationActionText: viewerRole === "customer" ? "进入订单会话" : "进入与客户的订单会话",
+    isRealtimeVoiceService: realTimeVoice,
+    // Keep the visible entry aligned with the server's credential rule. The
+    // server remains authoritative, but showing an entry after the paid window
+    // has elapsed would create a guaranteed failed attempt for both parties.
+    canOpenRealtimeVoice: realTimeVoice && order.status === "inService" && guidance.tone === "active" && !activeRefund,
     canStartService: guidance.canStartService && !activeRefund,
     startServiceNotice: activeRefund && order.status === "paid"
       ? "退款处理中，暂不能开始服务。"
@@ -1663,7 +1687,12 @@ Page({
     }
   },
   async startService(event: any) {
-    try { await api.startService(event.currentTarget.dataset.id); await this.load(); }
+    const id = String(event.currentTarget.dataset.id || "");
+    try {
+      const started = await api.startService(id);
+      await this.load();
+      if (started.serviceOfferingSnapshot?.deliveryMode === "voice") this.navigateToVoiceRoom(id);
+    }
     catch (error) {
       const apiError = error as ApiError;
       wx.showToast({ title: fulfillmentActionFailureMessage(apiError, "start"), icon: "none" });
@@ -1673,7 +1702,24 @@ Page({
     }
   },
   async confirmServiceOrder(event: any) {
-    try { await api.confirmServiceOrder(event.currentTarget.dataset.id); await this.load(); }
+    const id = String(event.currentTarget.dataset.id || "");
+    const context = this.orderContext(id);
+    if (!context || context.viewerRole !== "companion") {
+      wx.showToast({ title: "订单信息已变化，请刷新后重试", icon: "none" });
+      return;
+    }
+    const realTimeVoice = isRealtimeVoiceService(context.order);
+    const confirmation = await new Promise<any>((resolve) => wx.showModal({
+      title: "确认接单",
+      content: realTimeVoice
+        ? "确认后会为客户保留支付时段，客户支付后才生效。请在服务窗口内手动开始服务，双方才能进入订单内实时语音。"
+        : "确认后会为客户保留支付时段，客户支付后才生效。请在服务窗口内手动开始本次服务。",
+      confirmText: "确认接单",
+      success: resolve,
+      fail: () => resolve({ confirm: false })
+    }));
+    if (!confirmation?.confirm) return;
+    try { await api.confirmServiceOrder(id); await this.load(); }
     catch (error) { wx.showToast({ title: (error as Error).message || "无法确认预约", icon: "none" }); }
   },
   async rejectServiceOrder(event: any) {
@@ -1723,6 +1769,18 @@ Page({
       return;
     }
     wx.navigateTo({ url: `/pages/chat/index?id=${encodeURIComponent(conversationId)}` });
+  },
+  openVoiceRoom(event: any) {
+    const id = String(event.currentTarget.dataset.id || "");
+    const context = this.orderContext(id);
+    if (!context || !context.order.canOpenRealtimeVoice) {
+      wx.showToast({ title: "实时语音尚未到可进入时间，请刷新订单后重试", icon: "none" });
+      return;
+    }
+    this.navigateToVoiceRoom(id);
+  },
+  navigateToVoiceRoom(orderId: string) {
+    wx.navigateTo({ url: `/pages/voice/index?orderId=${encodeURIComponent(orderId)}` });
   },
   async openSupport(event: any) {
     const orderId = event.currentTarget.dataset.id;

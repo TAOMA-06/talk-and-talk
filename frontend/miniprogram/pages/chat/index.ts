@@ -72,6 +72,7 @@ Page({
     messageNotificationsMuted: false,
     messageNotificationUpdating: false,
     conversationBlockedByYou: false,
+    messageHistoryAvailable: true,
     messageInteractionAvailable: true,
     conversationBlockUpdating: false,
     recording: false,
@@ -184,6 +185,7 @@ Page({
         mediaEnabled: status.mediaEnabled,
         messageNotificationsMuted: status.messageNotificationsMuted,
         conversationBlockedByYou: status.conversationBlockedByYou,
+        messageHistoryAvailable: status.messageHistoryAvailable,
         messageInteractionAvailable: status.messageInteractionAvailable
       });
       this.applyRestriction(status.chatRestriction);
@@ -212,6 +214,7 @@ Page({
           mediaEnabled: status.mediaEnabled,
           messageNotificationsMuted: status.messageNotificationsMuted,
           conversationBlockedByYou: status.conversationBlockedByYou,
+          messageHistoryAvailable: status.messageHistoryAvailable,
           messageInteractionAvailable: status.messageInteractionAvailable,
           error: ""
         });
@@ -509,6 +512,7 @@ Page({
       const result = await api.setConversationBlocked(this.conversationId, blocked);
       this.setData({
         conversationBlockedByYou: result.conversationBlockedByYou,
+        messageHistoryAvailable: result.messageHistoryAvailable,
         messageInteractionAvailable: result.messageInteractionAvailable,
         ...(blocked ? { messages: [], draft: "", hasMore: false } : {})
       });
@@ -522,7 +526,7 @@ Page({
         title: result.messageInteractionAvailable ? "已解除拉黑" : "已解除；当前会话仍不可收发",
         icon: "none"
       });
-      if (result.messageInteractionAvailable) await this.load();
+      if (result.messageHistoryAvailable) await this.load();
     } catch (error) {
       wx.showToast({ title: (error as Error).message || "暂时无法更新拉黑状态", icon: "none" });
     } finally {

@@ -84,6 +84,9 @@ export class CommercialService {
 
   async operationalReadiness() {
     const now = new Date();
+    const trtcEnabled = this.config.get<boolean>("TRTC_ENABLED", false) === true;
+    const trtcRoomControlEnabled = this.config.get<boolean>("TRTC_ROOM_CONTROL_ENABLED", false) === true;
+    const trtcEmergencyStopEnabled = this.config.get<boolean>("TRTC_EMERGENCY_STOP_ENABLED", false) === true;
     const [
       failedRefunds,
       staleRefunds,
@@ -101,7 +104,9 @@ export class CommercialService {
       expiredOrderRequests,
       expiredPaymentReservations,
       expiredPaidServiceWindows,
-      staleInService
+      staleInService,
+      voiceTerminationBacklog,
+      voiceEmergencyDrainPending
     ] = await Promise.all([
       this.prisma.refundTransaction.count({ where: { status: "failed" } } as any),
       this.prisma.refundTransaction.count({
@@ -201,7 +206,22 @@ export class CommercialService {
           AND "scheduledAt" + "durationMinutes" * INTERVAL '1 minute' + INTERVAL '30 minutes' < NOW()
         ORDER BY "scheduledAt" ASC
         LIMIT 100
-      `
+      `,
+      trtcEnabled
+        ? this.prisma.voiceSession.count({
+            where: {
+              terminationCompletedAt: null,
+              terminationRequestedAt: { not: null },
+              AND: [
+                { OR: [{ terminationLeaseUntil: null }, { terminationLeaseUntil: { lte: now } }] },
+                { OR: [{ terminationNextAttemptAt: null }, { terminationNextAttemptAt: { lte: now } }] }
+              ]
+            }
+          } as any)
+        : Promise.resolve(0),
+      trtcEnabled && trtcEmergencyStopEnabled
+        ? this.prisma.voiceSession.count({ where: { terminationCompletedAt: null } } as any)
+        : Promise.resolve(0)
     ]);
     const blockers = {
       orderIntakeDisabled: this.config.get<boolean>("ORDER_INTAKE_ENABLED", true) ? 0 : 1,
@@ -222,12 +242,23 @@ export class CommercialService {
       expiredOrderRequests,
       expiredPaymentReservations,
       expiredPaidServiceWindows: Number(expiredPaidServiceWindows[0]?.count ?? 0),
-      staleInService: staleInService.length
+      staleInService: staleInService.length,
+      voiceRoomControlDisabled: trtcEnabled && !trtcRoomControlEnabled ? 1 : 0,
+      voiceEmergencyStopActive: trtcEmergencyStopEnabled ? 1 : 0,
+      voiceTerminationBacklog,
+      voiceEmergencyDrainPending
     };
     return {
       status: Object.values(blockers).some((value) => value > 0) ? "attentionRequired" : "clear",
       checkedAt: now.toISOString(),
       blockers,
+      voice: {
+        enabled: trtcEnabled,
+        roomControlEnabled: trtcRoomControlEnabled,
+        emergencyStopEnabled: trtcEmergencyStopEnabled,
+        terminationBacklog: voiceTerminationBacklog,
+        emergencyDrainPending: voiceEmergencyDrainPending
+      },
       staleInServiceOrders: staleInService.map((order) => ({
         id: order.id,
         scheduledAt: order.scheduledAt.toISOString()

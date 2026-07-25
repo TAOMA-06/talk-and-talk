@@ -1,0 +1,9 @@
+{
+  "name": "talk-and-talk-miniprogram",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Talk&Talk 微信小程序客户端依赖",
+  "dependencies": {
+    "trtc-wx-sdk": "1.1.15"
+  }
+}

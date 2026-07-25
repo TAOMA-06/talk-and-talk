@@ -54,6 +54,7 @@ let modalConfirm = false;
 let modalContent = "";
 let messageNotificationsMuted = false;
 let conversationBlockedByYou = false;
+let conversationMessageWindowOpen = true;
 let communityReportSubmissionCount = 0;
 let communityWriteRateLimited = false;
 let communityReportReceipts = [{
@@ -66,6 +67,10 @@ let nextOrderSupportFactNumber = 1;
 const supportTickets = [];
 let pullDownRefreshStops = 0;
 const paymentInvocations = [];
+const trtcEnterInvocations = [];
+const trtcExitInvocations = [];
+const trtcPusherStarts = [];
+const microphoneVolumes = [];
 const modalInvocations = [];
 const toasts = [];
 const navigations = [];
@@ -550,6 +555,37 @@ function responseFor(path, method, data, query = new URLSearchParams()) {
     };
   }
   if (path === "/orders/service") return { items: [serviceOrder] };
+  if (path === `/orders/service/${serviceOrder.id}/confirm` && method === "POST") {
+    assert.equal(serviceOrder.status, "pending", "only a pending request may be manually accepted");
+    assert.equal(serviceOrder.companionConfirmedAt, null, "manual acceptance must be one-time");
+    serviceOrder.companionConfirmedAt = new Date().toISOString();
+    serviceOrder.paymentReservationExpiresAt = new Date(Date.now() + 10 * 60_000).toISOString();
+    return { ...serviceOrder };
+  }
+  if (path === `/orders/service/${serviceOrder.id}/start` && method === "POST") {
+    assert.equal(serviceOrder.status, "paid", "the companion cannot start an unpaid service");
+    assert.ok(serviceOrder.companionConfirmedAt, "the companion must have manually accepted before start");
+    serviceOrder.status = "inService";
+    serviceOrder.serviceStartedAt = new Date().toISOString();
+    return { ...serviceOrder };
+  }
+  if (path === `/orders/${serviceOrder.id}/voice-room/access` && method === "POST") {
+    assert.equal(serviceOrder.status, "inService", "voice credentials require a manually started service");
+    assert.equal(serviceOrder.serviceOfferingSnapshot.deliveryMode, "voice", "voice credentials require a voice SKU");
+    assert.ok(serviceOrder.companionConfirmedAt, "voice credentials require manual companion acceptance");
+    return {
+      provider: "trtc",
+      sdkAppId: 1400000001,
+      roomId: "tt_voice_smoke_service_order_1",
+      userId: "tt_smokeopaqueuserid123456",
+      userSig: "smoke-user-sig-not-for-storage",
+      privateMapKey: "smoke-private-map-key-not-for-storage",
+      participantRole: "companion",
+      expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
+      serviceEndsAt: new Date(Date.now() + 25 * 60_000).toISOString(),
+      participant: { name: "客户", initials: "客户" }
+    };
+  }
   if (path === `/orders/${order.id}/service-guidelines-confirmations` && method === "POST") {
     order.customerServiceGuidelinesConfirmedAt = new Date().toISOString();
     return { ...order };
@@ -694,12 +730,13 @@ function responseFor(path, method, data, query = new URLSearchParams()) {
       unreadCount: conversationBlockedByYou ? 0 : 1,
       messageNotificationsMuted,
       conversationBlockedByYou,
-      messageInteractionAvailable: !conversationBlockedByYou,
+      messageHistoryAvailable: !conversationBlockedByYou,
+      messageInteractionAvailable: !conversationBlockedByYou && conversationMessageWindowOpen,
       updatedAt: new Date().toISOString()
     },
     {
       id: "conversation-internal-order-1", messageNotificationsMuted: false,
-      conversationBlockedByYou: false, messageInteractionAvailable: true,
+      conversationBlockedByYou: false, messageHistoryAvailable: true, messageInteractionAvailable: true,
       participant: { id: "customer-1", name: "小雨", role: "客户", initials: "小雨", isOnline: true, isVerified: true },
       lastMessage: null, unreadCount: 0, updatedAt: new Date().toISOString()
     }
@@ -709,7 +746,8 @@ function responseFor(path, method, data, query = new URLSearchParams()) {
       mediaEnabled: false,
       messageNotificationsMuted,
       conversationBlockedByYou,
-      messageInteractionAvailable: !conversationBlockedByYou,
+      messageHistoryAvailable: !conversationBlockedByYou,
+      messageInteractionAvailable: !conversationBlockedByYou && conversationMessageWindowOpen,
       chatRestriction: null
     };
   }
@@ -719,14 +757,18 @@ function responseFor(path, method, data, query = new URLSearchParams()) {
   }
   if (path === `/conversations/${companion.id}/block` && method === "PUT") {
     conversationBlockedByYou = data.blocked === true;
-    return { conversationBlockedByYou, messageInteractionAvailable: !conversationBlockedByYou };
+    return {
+      conversationBlockedByYou,
+      messageHistoryAvailable: !conversationBlockedByYou,
+      messageInteractionAvailable: !conversationBlockedByYou && conversationMessageWindowOpen
+    };
   }
   if (path === `/conversations/${companion.id}/messages` && method === "GET") {
     if (conversationBlockedByYou) return { messages: [], pagination: { nextCursor: null, hasMore: false } };
     return messagePage(query.get("cursor"));
   }
   if (path === `/conversations/${companion.id}/messages` && method === "POST") {
-    if (conversationBlockedByYou) {
+    if (conversationBlockedByYou || !conversationMessageWindowOpen) {
       return { __smokeError: { statusCode: 403, code: "CONVERSATION_INTERACTION_UNAVAILABLE", message: "conversation unavailable" } };
     }
     const sentMessage = {
@@ -772,6 +814,71 @@ function responseFor(path, method, data, query = new URLSearchParams()) {
 
 globalThis.Page = (options) => { registeredPage = options; };
 globalThis.App = () => undefined;
+globalThis.__TALK_AND_TALK_TRTC_SDK__ = class SmokeTrtc {
+  constructor(page) {
+    this.page = page;
+    this.EVENT = {
+      LOCAL_JOIN: "LOCAL_JOIN",
+      KICKED_OUT: "KICKED_OUT",
+      ERROR: "ERROR",
+      REMOTE_AUDIO_ADD: "REMOTE_AUDIO_ADD",
+      REMOTE_VIDEO_ADD: "REMOTE_VIDEO_ADD"
+    };
+    this.handlers = new Map();
+    this.pusher = { url: "", mode: "RTC", autopush: true, enableCamera: false, enableMic: false };
+    this.playerList = [];
+  }
+  on(eventCode, handler) { this.handlers.set(eventCode, handler); }
+  off(eventCode) { this.handlers.delete(eventCode); }
+  createPusher(attributes) {
+    this.pusher = { ...this.pusher, ...attributes };
+    return this.pusher;
+  }
+  enterRoom(options) {
+    trtcEnterInvocations.push(options);
+    this.pusher = {
+      ...this.pusher,
+      url: "trtc://smoke.local/pusher",
+      mode: "RTC",
+      autopush: true,
+      enableCamera: options.enableCamera,
+      enableMic: options.enableMic
+    };
+    return this.pusher;
+  }
+  getPusherInstance() {
+    return {
+      start: () => {
+        trtcPusherStarts.push(true);
+        this.handlers.get(this.EVENT.LOCAL_JOIN)?.({ data: {} });
+      }
+    };
+  }
+  setPusherAttributes(attributes) {
+    this.pusher = { ...this.pusher, ...attributes };
+    microphoneVolumes.push(attributes.enableMic === false ? 0 : 100);
+    return this.pusher;
+  }
+  getPlayerList() { return this.playerList; }
+  setPlayerAttributes(id, attributes) {
+    this.playerList = this.playerList.map((player) => player.id === id ? { ...player, ...attributes } : player);
+    return this.playerList;
+  }
+  exitRoom() {
+    trtcExitInvocations.push(true);
+    this.pusher = { url: "", mode: "RTC", autopush: true, enableCamera: false, enableMic: false };
+    this.playerList = [];
+    return { pusher: this.pusher, playerList: this.playerList };
+  }
+  pusherEventHandler() {}
+  pusherNetStatusHandler() {}
+  pusherErrorHandler() {}
+  playerEventHandler() {}
+  playerFullscreenChange() {}
+  playerNetStatus() {}
+  playerAudioVolumeNotify() {}
+  pusherAudioVolumeNotify() {}
+};
 globalThis.wx = {
   getStorageSync: (key) => storage.get(key),
   setStorageSync: (key, value) => storage.set(key, value),
@@ -814,6 +921,7 @@ globalThis.wx = {
   getPrivacySetting: ({ success }) => queueMicrotask(() => success({ needAuthorization: true })),
   requirePrivacyAuthorize: ({ success }) => { privacyAuthorizationRequests += 1; queueMicrotask(success); },
   requestPayment: (options) => { paymentInvocations.push(options); queueMicrotask(options.success); },
+  createLivePusherContext: () => ({ setMICVolume: (volume) => microphoneVolumes.push(volume) }),
   requestSubscribeMessage: ({ tmplIds, success }) => {
     subscriptionRequests.push([...tmplIds]);
     queueMicrotask(() => success(Object.fromEntries(tmplIds.map((templateId) => [templateId, "accept"]))));
@@ -821,6 +929,7 @@ globalThis.wx = {
   showToast: (options) => { toasts.push(options); },
   stopPullDownRefresh: () => { pullDownRefreshStops += 1; },
   navigateTo: (options) => { navigations.push(options.url); },
+  navigateBack: ({ delta = 1 } = {}) => { navigations.push(`__back:${delta}`); },
   switchTab: (options) => { navigations.push(options.url); },
   reLaunch: (options) => { navigations.push(options.url); queueMicrotask(() => options.complete?.()); },
   setNavigationBarTitle: () => undefined,
@@ -836,7 +945,7 @@ async function loadPage(name) {
   const page = {
     ...registeredPage,
     data: structuredClone(registeredPage.data),
-    setData(patch) { Object.assign(this.data, patch); }
+    setData(patch, callback) { Object.assign(this.data, patch); callback?.(); }
   };
   return page;
 }
@@ -1041,6 +1150,20 @@ assert.equal(chat.data.messages.at(-1).id, "message-remote-055");
 assert.equal(new Set(chat.data.messages.map((item) => item.id)).size, chat.data.messages.length, "refresh must preserve a duplicate-free timeline");
 assert.ok(calls.some((call) => call.path === `/conversations/${companion.id}/messages` && call.query.cursor),
   "chat refresh must request a cursor page when the newest page has no overlap");
+conversationMessageWindowOpen = false;
+await chat.refreshConversationStatus();
+assert.equal(chat.data.messageHistoryAvailable, true, "completed-order history must remain readable");
+assert.equal(chat.data.messageInteractionAvailable, false, "a closed order window must disable the composer");
+assert.ok(chat.data.messages.length > 0, "closing the order window must not erase local history");
+const readOnlyMessagePosts = calls.filter((call) => call.path === `/conversations/${companion.id}/messages` && call.method === "POST").length;
+chat.setDraft({ detail: { value: "只读历史不应继续发送" } });
+await chat.send();
+assert.equal(calls.filter((call) => call.path === `/conversations/${companion.id}/messages` && call.method === "POST").length, readOnlyMessagePosts,
+  "a completed-order chat must not attempt a new message request");
+await messages.load();
+assert.match(messages.data.conversations[0].preview, /仅供查看/, "the conversation list must explain the read-only state");
+conversationMessageWindowOpen = true;
+await chat.refreshConversationStatus();
 modalConfirm = true;
 const blockCallsBefore = calls.length;
 await chat.toggleConversationBlock();
@@ -1439,9 +1562,104 @@ assert.equal(orders.data.serviceOrders[0].serviceGuidelinesProgress, "1/2 已确
 assert.match(orders.data.serviceOrders[0].companionServiceGuidelinesStatus, /已于/);
 await orders.openOrderConversation({ currentTarget: { dataset: { id: serviceOrder.id } } });
 assert.equal(navigations.at(-1), "/pages/chat/index?id=conversation-internal-order-1", "companions must resolve their participant-safe conversation id before navigating");
+
+const serviceOfferingBeforeVoiceSmoke = { ...serviceOrder.serviceOfferingSnapshot };
+const serviceDurationBeforeVoiceSmoke = serviceOrder.durationMinutes;
 serviceOrder.status = "pending";
 serviceOrder.serviceStartedAt = null;
+serviceOrder.companionConfirmedAt = null;
+serviceOrder.paymentReservationExpiresAt = null;
+serviceOrder.scheduledAt = new Date(Date.now() + 10 * 60_000).toISOString();
+serviceOrder.durationMinutes = 60;
+serviceOrder.serviceOfferingSnapshot = {
+  ...serviceOrder.serviceOfferingSnapshot,
+  id: "service-voice-60",
+  code: "voice-60",
+  title: "60 分钟语音陪伴",
+  deliveryMode: "voice",
+  durationMinutes: 60,
+  priceCents: 6900
+};
+modalConfirm = true;
+await orders.load();
+await orders.confirmServiceOrder({ currentTarget: { dataset: { id: serviceOrder.id } } });
+assert.ok(serviceOrder.companionConfirmedAt, "the companion must manually accept a voice order before payment");
+assert.ok(serviceOrder.paymentReservationExpiresAt, "manual acceptance must create a bounded payment hold");
+assert.match(modalInvocations.at(-1).content, /双方才能进入订单内实时语音/);
+assert.ok(calls.some((call) => call.path === `/orders/service/${serviceOrder.id}/confirm` && call.method === "POST"));
+serviceOrder.status = "paid";
+await orders.load();
+await orders.startService({ currentTarget: { dataset: { id: serviceOrder.id } } });
+assert.equal(serviceOrder.status, "inService", "the companion must explicitly start the paid voice service");
+assert.equal(navigations.at(-1), `/pages/voice/index?orderId=${serviceOrder.id}`, "starting a voice service should enter the order-scoped RTC page");
+const voice = await loadPage("voice/index");
+const trtcEntersBeforeBackgroundCredentialRace = trtcEnterInvocations.length;
+const trtcStartsBeforeBackgroundCredentialRace = trtcPusherStarts.length;
+voice.onLoad({ orderId: serviceOrder.id });
+voice.onHide();
+await new Promise((resolve) => setTimeout(resolve, 10));
+assert.equal(
+  trtcEnterInvocations.length,
+  trtcEntersBeforeBackgroundCredentialRace,
+  "backgrounding while a credential request is in flight must never enter a room"
+);
+assert.equal(
+  trtcPusherStarts.length,
+  trtcStartsBeforeBackgroundCredentialRace,
+  "backgrounding while a credential request is in flight must never enable the microphone"
+);
+assert.equal(voice.data.roomState, "ended");
+assert.equal(voice.data.canRetry, true, "returning from background must still require an explicit reconnect");
+await voice.retry();
+await new Promise((resolve) => setTimeout(resolve, 10));
+assert.equal(voice.data.roomState, "connected");
+assert.equal(trtcEnterInvocations.length, 1, "the page must pass only the server-issued order credential to TRTC");
+assert.equal(trtcEnterInvocations[0].strRoomID, "tt_voice_smoke_service_order_1");
+assert.equal(trtcEnterInvocations[0].recvMode, 2, "the real-time voice room must be audio receive mode");
+assert.equal(trtcEnterInvocations[0].enableCamera, false, "the RTC pusher must remain audio-only");
+assert.equal(trtcEnterInvocations[0].enableMic, true, "the RTC pusher must start with microphone enabled");
+assert.equal(trtcPusherStarts.length, 1, "the native pusher must start after the TRTC attributes bind to the page");
+assert.equal(Object.hasOwn(voice.data, "userSig"), false, "raw UserSig must never be retained as a page field");
+assert.equal(Object.hasOwn(voice.data, "privateMapKey"), false, "raw PrivateMapKey must never be retained as a page field");
+voice.toggleMute();
+assert.equal(voice.data.pusher.enableMic, false, "muting must disable microphone publishing through TRTC");
+assert.equal(microphoneVolumes.at(-1), 0, "muting must immediately set native microphone volume to zero");
+await voice.leaveVoice();
+assert.equal(trtcExitInvocations.length, 1, "leaving must terminate the RTC room");
+assert.equal(navigations.at(-1), "__back:1");
+await voice.connect();
+await new Promise((resolve) => setTimeout(resolve, 10));
+voice.trtc.handlers.get("KICKED_OUT")?.({ data: { reason: "room-disband" } });
+await new Promise((resolve) => setTimeout(resolve, 10));
+assert.equal(voice.data.roomState, "ended", "a server-side room dismissal must end the local RTC page");
+assert.equal(voice.data.pusher.url, "", "a provider kick-out must clear native pusher attributes");
+assert.equal(trtcExitInvocations.length, 1, "KICKED_OUT must not race SDK cleanup with a second exitRoom call");
+await voice.connect();
+await new Promise((resolve) => setTimeout(resolve, 10));
+voice.onHide();
+await new Promise((resolve) => setTimeout(resolve, 10));
+assert.equal(voice.data.roomState, "ended", "backgrounding must tear down the native RTC transport");
+assert.equal(voice.data.canRetry, true, "returning from background must require an explicit, fresh reconnect");
+await voice.retry();
+await new Promise((resolve) => setTimeout(resolve, 10));
+assert.equal(voice.data.roomState, "connected", "an explicit retry after backgrounding must issue a fresh RTC connection");
+await voice.leaveVoice();
+assert.equal(voice.data.roomState, "ended", "the smoke test must release the retried RTC transport and its service timer");
+serviceOrder.scheduledAt = new Date(Date.now() - 61 * 60_000).toISOString();
+serviceOrder.serviceStartedAt = serviceOrder.scheduledAt;
+await orders.load();
+assert.equal(
+  orders.data.serviceOrders[0].canOpenRealtimeVoice,
+  false,
+  "an expired in-service voice order must hide the entry that the server would reject"
+);
+serviceOrder.status = "pending";
+serviceOrder.serviceStartedAt = null;
+serviceOrder.companionConfirmedAt = null;
+serviceOrder.paymentReservationExpiresAt = null;
 serviceOrder.scheduledAt = serviceScheduleBeforeFulfillment;
+serviceOrder.durationMinutes = serviceDurationBeforeVoiceSmoke;
+serviceOrder.serviceOfferingSnapshot = serviceOfferingBeforeVoiceSmoke;
 
 order.status = "inService";
 order.serviceStartedAt = new Date().toISOString();

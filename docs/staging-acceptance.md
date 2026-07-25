@@ -63,7 +63,7 @@ npm run start:dev
 | 7 | 十个微信模板分别授权、发送、拒绝、耗尽和换模板 | 授权绑定当时实际模板 ID；旧授权不能挪给新模板；结果未知不自动重发；失败进入站内通知和 readiness。 |
 | 8 | 文本审核提供方超时/无效响应，媒体删除适配器失败 | 聊天/社区转人工，公开资料写入返回 503 且不公开；删除失败不伪装成功并按退避重试。 |
 | 9 | 员工 token 签发后降权/限制，普通用户 restricted/banned，账户注销含未决资金 | 员工立即失去后台读写；普通 restricted 仅保留只读和法定自助入口；注销不绕过退款、支付和留存义务。 |
-| 10 | 清空所有演练积压后访问 `/api/v1/admin/commercial/readiness` | 所有 blocker 为 0、状态为 `clear`；随后分别制造失败退款、过期租约和审核积压，确认门禁转为 `attentionRequired` 并真实告警。 |
+| 10 | 清空所有演练积压后访问 `/api/v1/admin/commercial/readiness` | 所有 blocker 为 0、状态为 `clear`；随后分别制造失败退款、过期租约、审核积压和已到期的语音关房任务，确认门禁转为 `attentionRequired` 并真实告警。启用紧急语音清场后，即使尚未发现积压，`voiceEmergencyStopActive` 也必须让门禁保持 `attentionRequired`。 |
 
 ## 微信小程序验收
 
@@ -78,6 +78,7 @@ npm run start:dev
 | 5 | 聊天和举报 | 正常、warn、review、block 提示可见；举报只提交服务端回执 |
 | 6 | 陪伴者订单 | paid → inService → completed 状态流转正确；完成订单可评价 |
 | 7 | 隐私保护指引 | 首次涉及聊天、支付或发帖时，平台要求时可正常授权；隐私链接可打开 |
+| 8 | 订单聊天权益 | `paid` / `inService` 的服务前、服务中和收尾窗口可发普通消息；完成订单历史仍可查看但不能新发文字/媒体；举报、售后和客服不受影响 |
 
 ## 历史 iOS 回归（不属于当前商用放行范围）
 

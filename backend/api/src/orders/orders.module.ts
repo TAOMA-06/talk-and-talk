@@ -4,12 +4,13 @@ import { NotificationsModule } from "../notifications/notifications.module";
 import { PaymentsModule } from "../payments/payments.module";
 import { RecommendationsModule } from "../recommendations/recommendations.module";
 import { ModerationModule } from "../moderation/moderation.module";
+import { VoiceModule } from "../voice/voice.module";
 import { OrdersController } from "./orders.controller";
 import { OrderRescheduleExpiryWorker } from "./order-reschedule-expiry.worker";
 import { OrdersService } from "./orders.service";
 
 @Module({
-  imports: [forwardRef(() => PaymentsModule), NotificationsModule, RecommendationsModule, ModerationModule],
+  imports: [forwardRef(() => PaymentsModule), NotificationsModule, RecommendationsModule, ModerationModule, VoiceModule],
   controllers: [OrdersController],
   providers: [OrdersService, OrderRescheduleExpiryWorker],
   exports: [OrdersService]

@@ -593,6 +593,7 @@ model Order {
   experienceFeedback       OrderExperienceFeedback?
   rescheduleRequests       OrderRescheduleRequest[]
   timelineEvents           OrderTimelineEvent[]
+  voiceSession             VoiceSession?
   recommendationImpression RecommendationImpression?    @relation("RecommendationAttributedOrder", fields: [recommendationImpressionId], references: [id], onDelete: SetNull)
 
   @@unique([userId, clientRequestId])
@@ -605,6 +606,44 @@ model Order {
   @@index([status, refundRequestDeadlineAt])
   @@index([status, createdAt])
   @@index([conversationId])
+}
+
+/// A single provider room per paid service order. Runtime eligibility still
+/// derives from Order; this record only gives the provider a stable opaque room
+/// identifier and an audit-friendly access footprint.
+model VoiceSession {
+  id                           String   @id @default(uuid())
+  orderId                      String   @unique
+  provider                     String   @default("trtc")
+  roomId                       String   @unique
+  firstAccessedAt              DateTime?
+  lastAccessedAt               DateTime?
+  accessCount                  Int      @default(0)
+  terminationRequestedAt       DateTime?
+  terminationCompletedAt       DateTime?
+  terminationReason            String?
+  terminationAttempts          Int      @default(0)
+  terminationNextAttemptAt     DateTime?
+  terminationLeaseUntil        DateTime?
+  terminationLastError         String?
+  terminationProviderRequestId String?
+  createdAt                    DateTime @default(now())
+  updatedAt                    DateTime @updatedAt
+
+  order                        Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([terminationCompletedAt, terminationNextAttemptAt, terminationLeaseUntil])
+}
+
+/// A one-row, provider-wide dispatch lease. It prevents horizontally scaled
+/// API replicas from exceeding the external TRTC room-control rate limit while
+/// still letting a later replica recover automatically after a crash.
+model VoiceRoomControlDispatchLease {
+  id         String   @id
+  leaseToken String?
+  leaseUntil DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
 
 model OrderRescheduleRequest {

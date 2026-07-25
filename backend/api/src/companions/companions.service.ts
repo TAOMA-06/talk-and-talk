@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
-import { HttpStatus, Injectable } from "@nestjs/common";
+import { HttpStatus, Injectable, Optional } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 
 import { AppException } from "../common/errors/app.exception";
 import { PrismaService } from "../database/prisma.service";
@@ -57,12 +58,23 @@ export class CompanionsService {
     private readonly moderation: ModerationService,
     private readonly moderationCases: ModerationCaseService,
     private readonly availabilityReminderCandidates: AvailabilityReminderCandidateService,
-    private readonly availabilityScheduleRules: CompanionAvailabilityScheduleRuleService
+    private readonly availabilityScheduleRules: CompanionAvailabilityScheduleRuleService,
+    @Optional() private readonly config?: ConfigService
   ) {}
 
   async list(query: ListCompanionsQueryDto) {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 20;
+    // A disabled real-time provider must not leave a public voice discovery
+    // entry that can lead to an unfulfillable paid order. Owner catalog data is
+    // deliberately unaffected, and OrdersService still enforces this boundary
+    // under its transaction for stale clients and direct API attempts.
+    if (query.deliveryMode === "voice" && !this.isVoiceBookingEnabled()) {
+      return {
+        items: [],
+        pagination: { page, pageSize, total: 0, totalPages: 0 }
+      };
+    }
     const where = this.buildPublicWhere(query);
     const capacityDays = query.availableWithinDays
       ?? (query.sortBy === "soonestAvailable" ? DEFAULT_PUBLIC_AVAILABILITY_PRIORITY_DAYS : undefined);
@@ -188,7 +200,9 @@ export class CompanionsService {
     }
 
     return {
-      items: item.serviceOfferings.map((offering) => this.toServiceOfferingDto(offering))
+      items: item.serviceOfferings
+        .filter((offering) => this.isPublicServiceOfferingEnabled(offering))
+        .map((offering) => this.toServiceOfferingDto(offering))
     };
   }
 
@@ -226,7 +240,10 @@ export class CompanionsService {
       throw new AppException("COMPANION_NOT_FOUND", "Companion not found", HttpStatus.NOT_FOUND);
     }
 
-    const service = this.resolveAvailabilityService(companion.serviceOfferings, query);
+    const service = this.resolveAvailabilityService(
+      companion.serviceOfferings.filter((offering) => this.isPublicServiceOfferingEnabled(offering)),
+      query
+    );
     const [windows, reservations, structuredWindowCount] = await Promise.all([
       this.prisma.companionAvailabilityWindow.findMany({
         where: {
@@ -995,6 +1012,15 @@ export class CompanionsService {
       ...(query.deliveryMode ? { deliveryMode: query.deliveryMode } : {}),
       ...(query.maxServicePriceCents !== undefined ? { priceCents: { lte: query.maxServicePriceCents } } : {})
     };
+  }
+
+  private isPublicServiceOfferingEnabled(offering: { id?: string; deliveryMode?: string }): boolean {
+    return offering.deliveryMode !== "voice" || this.isVoiceBookingEnabled();
+  }
+
+  private isVoiceBookingEnabled(): boolean {
+    return this.config?.get<boolean>("TRTC_ENABLED", false) === true
+      && this.config?.get<boolean>("TRTC_EMERGENCY_STOP_ENABLED", false) !== true;
   }
 
   private publicSearchWhere(query: ListCompanionsQueryDto) {

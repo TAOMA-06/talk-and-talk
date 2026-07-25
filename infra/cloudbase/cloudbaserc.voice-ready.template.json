@@ -1,0 +1,25 @@
+{
+  "envId": "__REPLACE_WITH_CLOUDBASE_ENV_ID__",
+  "framework": {
+    "plugins": {
+      "talk-and-talk-api": {
+        "use": "@cloudbase/framework-plugin-container",
+        "inputs": {
+          "serviceName": "talk-and-talk-api",
+          "servicePath": "/",
+          "localPath": "./backend/api",
+          "mode": "high-availability",
+          "cpu": 1,
+          "mem": 2,
+          "minNum": 1,
+          "maxNum": 5,
+          "policyType": "cpu",
+          "policyThreshold": 60,
+          "containerPort": 3000,
+          "dockerfilePath": "./Dockerfile",
+          "buildDir": "./"
+        }
+      }
+    }
+  }
+}

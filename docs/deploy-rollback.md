@@ -2,13 +2,26 @@
 
 配套：[production-checklist.md](./production-checklist.md)、[staging-acceptance.md](./staging-acceptance.md)、根 [README.md](../README.md)。
 
+当前对外后端的标准路径是 **CloudBase 云托管容器**；本文件保留 Docker Compose 命令，供本地/自建兼容环境使用，不代表小程序正式环境需要部署在本机。云托管的具体入口、VPC 与环境变量见 [微信小程序后端方案选型与部署验收](./wechat-backend-selection.md)。
+
 ## 部署前
 
 1. 记录即将发布的 **git tag / commit** 与 `APP_VERSION`。
 2. 备份数据库：`DATABASE_URL=... ./backend/api/scripts/db-backup.sh`
 3. 确认目标环境 env 文件已填写且 **未提交 git**（`.env.staging` / `.env.production`）。
 4. 执行 `cd backend/api && npm run preflight:deployment -- .env.production`（staging 换相应文件）。
-5. 生产过一遍 [production-checklist.md](./production-checklist.md)。
+5. 执行 `cd backend/api && npm run verify:cloudbase-template`，确认语音就绪模板仍指向现有 Dockerfile、端口 3000、最少一个实例，并且没有把任何运行时变量写进仓库。
+6. 生产过一遍 [production-checklist.md](./production-checklist.md)。
+7. 若本次包含实时语音，先按 [实时语音上线核对表](./realtime-voice-release-checklist.md) 确认 npm 构建、迁移、CAM、出站网络和两台真机均已通过；**不允许**只因代码构建成功就打开 TRTC。
+
+## CloudBase 云托管标准发布顺序
+
+1. 从 [语音就绪 CloudBase 模板](../infra/cloudbase/cloudbaserc.voice-ready.template.json) 在受控 CI 工作目录生成实际清单：填入目标环境 ID，但不把密钥或运行时变量写进该清单或仓库。控制台先设置 VPC、已备案公网域名和加密变量。
+2. 将 API 镜像发布到 staging，首次保持 `TRTC_ENABLED=false`、`TRTC_ROOM_CONTROL_ENABLED=false`。
+3. 通过受控 CI 或一次性迁移 Job 执行 `cd backend/api && npm run prisma:deploy`。先备份，再确认 `20260720193000_voice_sessions` 和 `20260720200000_voice_room_control_dispatch_lease` 都已记录在 `_prisma_migrations`；不要用手工 SQL 跳过 Prisma 迁移历史。
+4. 在 staging 以真实 CloudBase 密钥变量运行 `npm run preflight:deployment -- .env.staging`，确认没有在构建日志、容器日志或小程序包中出现 SDK 密钥、CAM 密钥、`UserSig`、`PrivateMapKey`。
+5. 完成支付回调、退款、人工接单/开始服务和双真机语音验收；仅在全部通过后，才把 staging 的 `TRTC_ENABLED` 与 `TRTC_ROOM_CONTROL_ENABLED` 一起切为 `true`。
+6. production 先发布同一已经通过 staging 的镜像和迁移，再灰度流量；语音开关最后开启。任一门禁未通过，就保持两个主开关为 `false`，而不是删代码或修改订单流程。
 
 ## Staging
 
@@ -93,6 +106,7 @@ Prisma **不提供**生产 `migrate down`。步骤：
 - 保留 `.env.staging` / `.env.production` 历史副本（如 `.env.production.20260709`）。
 - `APP_VERSION` 与发布 tag 对齐，便于 health/metrics 对照。
 - 若可约提醒投递出现异常，先将 `AVAILABILITY_REMINDER_DELIVERY_ENABLED=false` 并滚动重启 API，停止新的内部扫描；保全 `talk_availability_reminder_delivery_*` 聚合指标和集中日志。不得手工删除、释放或重写 `AvailabilityReminderAttempt` / 订阅授权，也不得通过再次打开开关重发 `uncertain`、`rejected`、`failedBeforeSend` 或旧租约。
+- 若实时语音发生事故，不能直接把两个 TRTC 主开关关掉：那会阻断后续关房。先把 `TRTC_EMERGENCY_STOP_ENABLED=true` 发布到仍保持两个主开关为 `true` 的版本，确认所有 `VoiceSession.terminationCompletedAt` 已完成，再把三个开关一起切为 `false`。完整只读核对 SQL 与恢复顺序见 [实时语音上线核对表](./realtime-voice-release-checklist.md#6-回滚)。
 
 ## 回滚后验收
 

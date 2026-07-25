@@ -1,7 +1,7 @@
 import { BackendConfig, backendConfig } from "./config";
 import {
   AuthSession, AuthUser, ChatMessage, CommunityPost, CommunityPostReportReceipt, CommunityReportReceipt, Companion, Conversation, FavoriteAvailabilityReminderPreference, FavoriteCompanion, MediaAttachment, MiniProgramPayParams,
-  Notification, Order, OrderExperienceFeedbackTag, OrderRescheduleRequest, OrderTimeline, RecommendationPlacement, RecommendationPreference, RecommendationTopic, RecommendedCompanion, RefundRequestResult, Review,
+  Notification, Order, OrderExperienceFeedbackTag, OrderRescheduleRequest, OrderTimeline, RecommendationPlacement, RecommendationPreference, RecommendationTopic, RecommendedCompanion, RefundRequestResult, Review, VoiceRoomAccess,
   CompanionTodayServiceSchedule,
   CompanionAvailabilityResponse, CreateOwnAvailabilityWindowInput, CreateOwnServiceOfferingInput, OwnAvailabilityWindow, OwnServiceOffering, ServiceOffering,
   UpdateOwnAvailabilityWindowInput, UpdateOwnServiceOfferingInput
@@ -480,6 +480,9 @@ export const api = {
   serviceOrders: () => request<{ items: Order[] }>("/orders/service"),
   companionTodayServiceSchedule: () => request<CompanionTodayServiceSchedule>("/orders/service/today"),
   orderTimeline: (id: string) => request<OrderTimeline>(`/orders/${encodeURIComponent(id)}/timeline`),
+  voiceRoomAccess: (id: string) => request<VoiceRoomAccess>(
+    `/orders/${encodeURIComponent(id)}/voice-room/access`, { method: "POST" }
+  ),
   createOrderRescheduleRequest: (id: string, data: { requestedScheduledAt: string; availabilityWindowId?: string }) =>
     request<OrderRescheduleRequest>(`/orders/${encodeURIComponent(id)}/reschedule-requests`, { method: "POST", data }),
   acceptOrderRescheduleRequest: (orderId: string, requestId: string) => request<{ rescheduleRequest: OrderRescheduleRequest; order: Order }>(
@@ -520,6 +523,7 @@ export const api = {
     mediaEnabled: boolean;
     messageNotificationsMuted: boolean;
     conversationBlockedByYou: boolean;
+    messageHistoryAvailable: boolean;
     messageInteractionAvailable: boolean;
     chatRestriction: { id: string; reason: string; endsAt: string } | null;
   }>(`/conversations/${encodeURIComponent(id)}/status`),
@@ -528,6 +532,7 @@ export const api = {
   }>(`/conversations/${encodeURIComponent(id)}/notification-preference`, { method: "PUT", data: { muted } }),
   setConversationBlocked: (id: string, blocked: boolean) => request<{
     conversationBlockedByYou: boolean;
+    messageHistoryAvailable: boolean;
     messageInteractionAvailable: boolean;
   }>(`/conversations/${encodeURIComponent(id)}/block`, { method: "PUT", data: { blocked } }),
   messages: (id: string, options: { cursor?: string; limit?: number } = {}) => {

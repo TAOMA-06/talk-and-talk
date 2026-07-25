@@ -59,6 +59,9 @@ export function validateDeploymentConfig(env) {
   const errors = [];
   const production = env.APP_ENV === "production";
   const availabilityReminderDeliveryEnabled = env.AVAILABILITY_REMINDER_DELIVERY_ENABLED === "true";
+  const trtcEnabled = env.TRTC_ENABLED === "true";
+  const trtcRoomControlEnabled = env.TRTC_ROOM_CONTROL_ENABLED === "true";
+  const trtcEmergencyStopEnabled = env.TRTC_EMERGENCY_STOP_ENABLED === "true";
   const required = [
     "NODE_ENV", "APP_ENV", "API_PREFIX", "DATABASE_URL", "REDIS_URL", "CORS_ORIGINS",
     "JWT_ACCESS_SECRET", "JWT_REFRESH_SECRET", "WECHAT_MINIPROGRAM_APP_ID",
@@ -89,7 +92,8 @@ export function validateDeploymentConfig(env) {
       "NOTIFICATION_DELIVERY_ENABLED",
       "WECHAT_SUBSCRIBE_MESSAGES_ENABLED",
       "WECHAT_SUBSCRIBE_TEMPLATES_JSON",
-      "PAYMENT_RECONCILIATION_ENABLED"
+      "PAYMENT_RECONCILIATION_ENABLED",
+      "TRTC_ENABLED"
     );
   }
 
@@ -224,6 +228,69 @@ export function validateDeploymentConfig(env) {
   }
   if (production && env.PAYMENT_RECONCILIATION_ENABLED !== "true") {
     errors.push("PAYMENT_RECONCILIATION_ENABLED must be true in production");
+  }
+  if (env.TRTC_ENABLED && !["true", "false"].includes(env.TRTC_ENABLED)) {
+    errors.push("TRTC_ENABLED must be true or false when configured");
+  }
+  if (trtcEnabled) {
+    for (const key of [
+      "TRTC_SDK_APP_ID",
+      "TRTC_SDK_SECRET_KEY",
+      "TRTC_PRIVATE_MAP_KEY_ENABLED",
+      "TRTC_ROOM_CONTROL_ENABLED",
+      "TENCENTCLOUD_SECRET_ID",
+      "TENCENTCLOUD_SECRET_KEY"
+    ]) {
+      const value = env[key]?.trim() ?? "";
+      if (!value) errors.push(`${key} is required when TRTC_ENABLED=true`);
+      else if (PLACEHOLDER.test(value)) errors.push(`${key} still contains a placeholder`);
+    }
+    if (env.TRTC_SDK_APP_ID && (!/^\d+$/.test(env.TRTC_SDK_APP_ID) || Number(env.TRTC_SDK_APP_ID) < 1 || Number(env.TRTC_SDK_APP_ID) > 2_147_483_647)) {
+      errors.push("TRTC_SDK_APP_ID must be a positive 32-bit integer");
+    }
+    if (env.TRTC_SDK_SECRET_KEY && env.TRTC_SDK_SECRET_KEY.length < 16) {
+      errors.push("TRTC_SDK_SECRET_KEY is unexpectedly short");
+    }
+    if (env.TRTC_PRIVATE_MAP_KEY_ENABLED !== "true") {
+      errors.push("TRTC_PRIVATE_MAP_KEY_ENABLED must be true when TRTC_ENABLED=true");
+    }
+    if (env.TRTC_ROOM_CONTROL_ENABLED !== "true") {
+      errors.push("TRTC_ROOM_CONTROL_ENABLED must be true when TRTC_ENABLED=true");
+    }
+  }
+  if (env.TRTC_ROOM_CONTROL_ENABLED && !["true", "false"].includes(env.TRTC_ROOM_CONTROL_ENABLED)) {
+    errors.push("TRTC_ROOM_CONTROL_ENABLED must be true or false when configured");
+  }
+  if (env.TRTC_EMERGENCY_STOP_ENABLED && !["true", "false"].includes(env.TRTC_EMERGENCY_STOP_ENABLED)) {
+    errors.push("TRTC_EMERGENCY_STOP_ENABLED must be true or false when configured");
+  }
+  if (trtcRoomControlEnabled && !trtcEnabled) {
+    errors.push("TRTC_ROOM_CONTROL_ENABLED=true requires TRTC_ENABLED=true");
+  }
+  if (trtcEmergencyStopEnabled && (!trtcEnabled || !trtcRoomControlEnabled)) {
+    errors.push("TRTC_EMERGENCY_STOP_ENABLED=true requires TRTC_ENABLED=true and TRTC_ROOM_CONTROL_ENABLED=true");
+  }
+  if (trtcRoomControlEnabled) {
+    if (env.TRTC_CONTROL_REGION && !["ap-beijing", "ap-guangzhou"].includes(env.TRTC_CONTROL_REGION)) {
+      errors.push("TRTC_CONTROL_REGION must be ap-beijing or ap-guangzhou");
+    }
+    for (const [key, minimum, maximum] of [
+      ["TRTC_CONTROL_TIMEOUT_MS", 1000, 10000],
+      ["TRTC_ROOM_CONTROL_INTERVAL_SECONDS", 10, 300],
+      ["TRTC_ROOM_CONTROL_BATCH_SIZE", 1, 10]
+    ]) {
+      const value = env[key]?.trim();
+      if (!value) continue;
+      if (!/^\d+$/.test(value) || Number(value) < minimum || Number(value) > maximum) {
+        errors.push(`${key} must be an integer between ${minimum} and ${maximum}`);
+      }
+    }
+  }
+  if (env.TRTC_USER_SIG_TTL_SECONDS) {
+    const ttl = env.TRTC_USER_SIG_TTL_SECONDS;
+    if (!/^\d+$/.test(ttl) || Number(ttl) < 60 || Number(ttl) > 900) {
+      errors.push("TRTC_USER_SIG_TTL_SECONDS must be an integer between 60 and 900");
+    }
   }
   if (
     env.AVAILABILITY_REMINDER_DELIVERY_ENABLED

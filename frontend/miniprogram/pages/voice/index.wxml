@@ -1,0 +1,53 @@
+<view class="voice-page">
+  <!-- Native RTC components must remain mounted for audio transport. They are
+       visually hidden because this service is deliberately audio-only. -->
+  <live-pusher
+    id="voice-pusher"
+    class="voice-native-node"
+    url="{{pusher.url}}"
+    mode="{{pusher.mode}}"
+    autopush="{{pusher.autopush}}"
+    enable-camera="{{pusher.enableCamera}}"
+    enable-mic="{{pusher.enableMic}}"
+    bindstatechange="pusherStateChange"
+    bindnetstatus="pusherNetStatus"
+    binderror="pusherError"
+    bindaudiovolumenotify="pusherAudioVolumeNotify"
+  ></live-pusher>
+  <live-player
+    wx:for="{{playerList}}"
+    wx:key="id"
+    class="voice-native-node"
+    id="{{item.id}}"
+    src="{{item.src}}"
+    mode="RTC"
+    autoplay="{{true}}"
+    mute-video="{{true}}"
+    mute-audio="{{item.muteAudio}}"
+    data-userid="{{item.userID}}"
+    data-streamid="{{item.streamID}}"
+    data-streamtype="{{item.streamType}}"
+    bindstatechange="playerStateChange"
+    bindfullscreenchange="playerFullscreenChange"
+    bindnetstatus="playerNetStatus"
+    binderror="playerError"
+    bindaudiovolumenotify="playerAudioVolumeNotify"
+  ></live-player>
+
+  <view class="voice-card">
+    <view class="eyebrow">订单内实时语音</view>
+    <view class="participant-avatar">{{participantInitials}}</view>
+    <view class="participant-name">{{participantName}}</view>
+    <view class="participant-role">{{participantRole === 'companion' ? '你正在作为陪伴者服务' : '你正在接受本次陪伴服务'}}</view>
+    <view class="state state-{{roomState}}">{{statusText}}</view>
+    <view wx:if="{{serviceEndsAtText}}" class="service-end">本次服务预计于 {{serviceEndsAtText}} 结束</view>
+    <view class="boundary">仅限本次订单双方在服务时间内使用。遇到履约或安全问题，请退出后从订单提交客服工单。</view>
+
+    <view wx:if="{{roomState === 'connected'}}" class="voice-actions">
+      <button class="secondary" bindtap="toggleMute">{{muted ? '打开麦克风' : '静音麦克风'}}</button>
+      <button class="danger" bindtap="leaveVoice">结束并退出</button>
+    </view>
+    <button wx:elif="{{canRetry}}" class="primary" bindtap="retry">重新连接</button>
+    <button wx:elif="{{roomState === 'ended'}}" class="secondary" bindtap="leaveVoice">返回订单</button>
+  </view>
+</view>

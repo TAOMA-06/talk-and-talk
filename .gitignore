@@ -23,6 +23,12 @@ frontend/miniprogram/project.private.config.json
 frontend/miniprogram/miniprogram_npm/
 frontend/miniprogram-local/
 
+# CloudBase CLI deployment manifests are environment-specific. Keep only the
+# reviewed, credential-free templates in version control.
+cloudbaserc.json
+cloudbaserc.*.json
+!infra/cloudbase/*.template.json
+
 # Deployment secrets
 infra/nginx/certs/
 *.pem

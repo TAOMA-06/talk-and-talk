@@ -1,4 +1,4 @@
-import { forwardRef, HttpStatus, Inject, Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import { forwardRef, HttpStatus, Inject, Injectable, Logger, OnModuleInit, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { randomUUID } from "node:crypto";
 
@@ -8,6 +8,7 @@ import { MetricsService } from "../metrics/metrics.service";
 import { PrismaService } from "../database/prisma.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { OrdersService } from "../orders/orders.service";
+import { VoiceRoomControlService } from "../voice/voice-room-control.service";
 import {
   WECHAT_PAY_PROVIDER,
   WeChatNotifyPayload,
@@ -62,7 +63,8 @@ export class PaymentsService implements OnModuleInit {
     @Inject(WECHAT_PAY_PROVIDER) private readonly wechat: WeChatPayProvider,
     private readonly notifications: NotificationsService,
     private readonly audit: AuditService,
-    private readonly metrics: MetricsService
+    private readonly metrics: MetricsService,
+    @Optional() private readonly voiceRoomControl?: VoiceRoomControlService
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -121,6 +123,7 @@ export class PaymentsService implements OnModuleInit {
       });
 
       this.assertOrderCanPrepay(order, userId);
+      this.ordersService.assertVoiceOrderFeatureEnabled(order);
       await this.assertCompanionSlotAvailable(db, order, remotelyClosedPayments);
 
       const existing = await db.paymentTransaction.findFirst({
@@ -626,6 +629,8 @@ export class PaymentsService implements OnModuleInit {
       }
       return { order, refund, created: true };
     }, { maxWait: 5_000, timeout: 10_000 });
+
+    await this.voiceRoomControl?.terminateForOrder(orderId, "refund_requested");
 
     const needsReview = result.refund.status === "pendingReview";
     if (needsReview) {

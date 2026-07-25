@@ -119,6 +119,10 @@ describe("OrdersService", () => {
   });
 
   it("binds an active service offering and freezes its commercial snapshot", async () => {
+    const config = {
+      get: jest.fn((key: string, fallback?: unknown) => key === "TRTC_ENABLED" ? true : fallback)
+    } as any;
+    service = new OrdersService(prisma, notifications, wechat, undefined, config);
     prisma.companionProfile.findFirst.mockResolvedValue({
       id: "c1", name: "林屿", role: "温柔倾听者", initials: "LY", pricePerHalfHour: 39
     });
@@ -159,6 +163,30 @@ describe("OrdersService", () => {
       id: "offer-voice", code: "voice-60", title: "60 分钟语音陪伴", deliveryMode: "voice",
       durationMinutes: 60, priceCents: 6900, currency: "CNY"
     });
+  });
+
+  it("rejects a voice offering before it creates an order when real-time voice is disabled", async () => {
+    const config = {
+      get: jest.fn((key: string, fallback?: unknown) => key === "TRTC_ENABLED" ? false : fallback)
+    } as any;
+    service = new OrdersService(prisma, notifications, wechat, undefined, config);
+    prisma.companionProfile.findFirst.mockResolvedValue({
+      id: "c1", name: "林屿", role: "温柔倾听者", initials: "LY", pricePerHalfHour: 39
+    });
+    prisma.companionServiceOffering.findFirst.mockResolvedValue({
+      id: "offer-voice", companionId: "c1", code: "voice-60", title: "60 分钟语音陪伴",
+      description: null, deliveryMode: "voice", durationMinutes: 60, priceCents: 6900,
+      currency: "CNY", topicIds: ["t1"], isActive: true
+    });
+
+    await expect(service.create("u1", {
+      companionId: "c1", serviceOfferingId: "offer-voice", themeId: "t1", durationMinutes: 60,
+      scheduledAt: new Date(Date.now() + 3_600_000).toISOString()
+    })).rejects.toMatchObject({
+      code: "VOICE_FEATURE_DISABLED",
+      status: HttpStatus.SERVICE_UNAVAILABLE
+    });
+    expect(prisma.order.create).not.toHaveBeenCalled();
   });
 
   it("binds a structured availability candidate and freezes its scheduling snapshot", async () => {
@@ -1525,10 +1553,14 @@ describe("OrdersService", () => {
   });
 
   it("releases expired confirmation reservations once and notifies the customer", async () => {
-    prisma.order.findMany.mockResolvedValue([{ id: "o-expired", userId: "u1" }]);
+    const audit = { record: jest.fn().mockResolvedValue(undefined) } as any;
+    const expirationService = new OrdersService(prisma, notifications, wechat, undefined, undefined, audit);
+    prisma.order.findMany.mockResolvedValue([{
+      id: "o-expired", userId: "u1", paymentReservationExpiresAt: new Date(Date.now() - 1_000)
+    }]);
     prisma.order.updateMany.mockResolvedValue({ count: 1 });
 
-    await expect(service.expireUnpaidReservations()).resolves.toBe(1);
+    await expect(expirationService.expireUnpaidReservations()).resolves.toBe(1);
 
     expect(prisma.order.updateMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({ id: "o-expired", status: "pending" }),
@@ -1541,6 +1573,64 @@ describe("OrdersService", () => {
       expect.any(String),
       expect.objectContaining({ orderId: "o-expired", companionConfirmed: false })
     );
+    expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({
+      actorId: null,
+      action: "order.payment_reservation_expired",
+      resourceType: "order",
+      resourceId: "o-expired",
+      metadata: expect.objectContaining({ paymentReservationExpiresAt: expect.any(String), expiredAt: expect.any(String) })
+    }), expect.anything());
+  });
+
+  it("expires a companion response deadline once, notifies the customer, and records the system action", async () => {
+    const audit = { record: jest.fn().mockResolvedValue(undefined) } as any;
+    const expirationService = new OrdersService(prisma, notifications, wechat, undefined, undefined, audit);
+    prisma.order.findMany.mockResolvedValue([{
+      id: "o-response-expired", userId: "u1", companionResponseDeadlineAt: new Date(Date.now() - 1_000)
+    }]);
+    prisma.order.updateMany.mockResolvedValue({ count: 1 });
+
+    await expect(expirationService.expireUnconfirmedOrders()).resolves.toBe(1);
+
+    expect(prisma.order.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        id: "o-response-expired",
+        status: "pending",
+        companionConfirmedAt: null
+      }),
+      data: expect.objectContaining({
+        status: "cancelled",
+        companionResponseDeadlineAt: null
+      })
+    }));
+    expect(notifications.create).toHaveBeenCalledWith(
+      "u1",
+      "orderStatus",
+      "预约请求已超时",
+      expect.any(String),
+      expect.objectContaining({ orderId: "o-response-expired", reason: "companion_response_timeout" })
+    );
+    expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({
+      actorId: null,
+      action: "order.companion_response_expired",
+      resourceType: "order",
+      resourceId: "o-response-expired",
+      metadata: expect.objectContaining({ companionResponseDeadlineAt: expect.any(String), expiredAt: expect.any(String) })
+    }), expect.anything());
+  });
+
+  it("does not duplicate an expiry notice or audit when another replica already owns the response-timeout transition", async () => {
+    const audit = { record: jest.fn().mockResolvedValue(undefined) } as any;
+    const expirationService = new OrdersService(prisma, notifications, wechat, undefined, undefined, audit);
+    prisma.order.findMany.mockResolvedValue([{
+      id: "o-response-raced", userId: "u1", companionResponseDeadlineAt: new Date(Date.now() - 1_000)
+    }]);
+    prisma.order.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(expirationService.expireUnconfirmedOrders()).resolves.toBe(0);
+
+    expect(notifications.create).not.toHaveBeenCalled();
+    expect(audit.record).not.toHaveBeenCalled();
   });
 
   it("expires a due reschedule proposal once, preserves the order, and queues idempotent notices for both participants", async () => {
@@ -1612,7 +1702,10 @@ describe("OrdersService", () => {
 
   it("creates a held-period settlement ledger entry atomically when a service completes", async () => {
     const config = { get: jest.fn((key: string) => key === "COMPANION_SETTLEMENT_HOLD_HOURS" ? 24 : 0) } as any;
-    service = new OrdersService(prisma, notifications, wechat, undefined, config);
+    const voiceRoomControl = { terminateForOrder: jest.fn().mockResolvedValue({ state: "terminated" }) } as any;
+    service = new OrdersService(
+      prisma, notifications, wechat, undefined, config, undefined, undefined, undefined, voiceRoomControl
+    );
     const completedAt = new Date();
     const serviceStartedAt = new Date(completedAt.getTime() - 31 * 60 * 1000);
     const order = {
@@ -1650,6 +1743,7 @@ describe("OrdersService", () => {
     expect(notifications.create).toHaveBeenCalledWith(
       "u1", "orderStatus", "服务已完成", expect.any(String), expect.objectContaining({ orderId: "o-complete" })
     );
+    expect(voiceRoomControl.terminateForOrder).toHaveBeenCalledWith("o-complete", "service_completed");
   });
 
   it("holds a historical order instead of reconstructing missing settlement evidence from the current profile", async () => {

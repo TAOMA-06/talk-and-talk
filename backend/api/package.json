@@ -10,7 +10,7 @@
     "start:prod": "node dist/src/main.js",
     "verify:prod-artifacts": "npm run build && node scripts/verify-production-artifacts.mjs",
     "test": "npm run prisma:generate && jest --runInBand",
-    "test:preflight": "node --test scripts/deployment-preflight.test.mjs",
+    "test:preflight": "node --test scripts/deployment-preflight.test.mjs scripts/voice-release-artifacts.test.mjs scripts/cloudbase-template.test.mjs",
     "test:e2e": "npm run prisma:generate && jest --config test/jest-e2e.json --runInBand",
     "test:integration": "npm run test:e2e",
     "prisma:generate": "prisma generate",
@@ -22,7 +22,9 @@
     "staff:bootstrap": "node dist/src/database/bootstrap-staff.js",
     "staff:bootstrap:dev": "npm run build && npm run staff:bootstrap",
     "staff:totp-secret": "node scripts/generate-totp-secret.mjs",
-    "preflight:deployment": "node scripts/deployment-preflight.mjs"
+    "preflight:deployment": "node scripts/deployment-preflight.mjs",
+    "verify:voice-release-artifacts": "node scripts/voice-release-artifacts.mjs",
+    "verify:cloudbase-template": "node scripts/validate-cloudbase-template.mjs"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.28",
@@ -31,8 +33,8 @@
     "@nestjs/jwt": "^11.0.2",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.1.28",
-    "@prisma/adapter-pg": "^7.8.0",
-    "@prisma/client": "^7.8.0",
+    "@prisma/adapter-pg": "7.9.0",
+    "@prisma/client": "7.9.0",
     "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
@@ -44,9 +46,10 @@
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "pg": "^8.13.1",
-    "prisma": "^7.8.0",
+    "prisma": "7.9.0",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "tls-sig-api-v2": "1.0.2"
   },
   "devDependencies": {
     "@nestjs/testing": "^11.1.28",
@@ -68,6 +71,8 @@
     "node": ">=22"
   },
   "overrides": {
-    "@hono/node-server": "1.19.13"
+    "@hono/node-server": "1.19.13",
+    "find-my-way": "9.7.0",
+    "valibot": "1.4.2"
   }
 }

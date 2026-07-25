@@ -7,6 +7,7 @@ import { ModerationCaseService } from "../moderation/moderation-case.service";
 import { ModerationService } from "../moderation/moderation.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { RecommendationsService } from "../recommendations/recommendations.service";
+import { VoiceRoomControlService } from "../voice/voice-room-control.service";
 import {
   WECHAT_PAY_PROVIDER,
   WECHAT_PREPAY_TTL_MS,
@@ -111,7 +112,8 @@ export class OrdersService {
     @Optional() private readonly config?: ConfigService,
     @Optional() private readonly audit?: AuditService,
     @Optional() private readonly moderation?: ModerationService,
-    @Optional() private readonly moderationCases?: ModerationCaseService
+    @Optional() private readonly moderationCases?: ModerationCaseService,
+    @Optional() private readonly voiceRoomControl?: VoiceRoomControlService
   ) {}
 
   async create(userId: string, dto: CreateOrderDto) {
@@ -228,6 +230,7 @@ export class OrdersService {
           themeId: dto.themeId
         })
         : null;
+      this.assertVoiceDeliveryModeEnabled(serviceOffering?.deliveryMode);
       const durationMinutes = serviceOffering?.durationMinutes ?? requestedDurationMinutes;
       const availabilityWindow = availabilityWindowId
         ? await this.lockActiveAvailabilityWindow(db, {
@@ -433,6 +436,28 @@ export class OrdersService {
       );
     }
     return offering;
+  }
+
+  assertVoiceOrderFeatureEnabled(order: { serviceOfferingDeliveryModeSnapshot?: unknown } | null | undefined): void {
+    this.assertVoiceDeliveryModeEnabled(order?.serviceOfferingDeliveryModeSnapshot);
+  }
+
+  private assertVoiceDeliveryModeEnabled(deliveryMode: unknown): void {
+    if (deliveryMode !== "voice") return;
+    if (this.config?.get<boolean>("TRTC_ENABLED", false) !== true) {
+      throw new AppException(
+        "VOICE_FEATURE_DISABLED",
+        "Real-time voice is not configured for this environment",
+        HttpStatus.SERVICE_UNAVAILABLE
+      );
+    }
+    if (this.config?.get<boolean>("TRTC_EMERGENCY_STOP_ENABLED", false) === true) {
+      throw new AppException(
+        "VOICE_FEATURE_EMERGENCY_STOP",
+        "Real-time voice is temporarily unavailable",
+        HttpStatus.SERVICE_UNAVAILABLE
+      );
+    }
   }
 
   private async lockActiveAvailabilityWindow(
@@ -722,6 +747,7 @@ export class OrdersService {
       if (order.status !== "paid") {
         throw new AppException("ORDER_INVALID_STATE", "Only paid orders can start", HttpStatus.CONFLICT);
       }
+      this.assertVoiceOrderFeatureEnabled(order);
       const activeRefund = await db.refundTransaction.findFirst({
         where: {
           orderId,
@@ -815,6 +841,7 @@ export class OrdersService {
       if (order.status !== "pending") {
         throw new AppException("ORDER_INVALID_STATE", "Only pending orders can be confirmed", HttpStatus.CONFLICT);
       }
+      this.assertVoiceOrderFeatureEnabled(order);
       const now = new Date();
       if (order.scheduledAt.getTime() <= now.getTime()) {
         throw new AppException("ORDER_SCHEDULE_EXPIRED", "Past bookings cannot be confirmed", HttpStatus.CONFLICT);
@@ -1045,6 +1072,7 @@ export class OrdersService {
       });
       return updated;
     }, { maxWait: 5_000, timeout: 10_000 });
+    await this.voiceRoomControl?.terminateForOrder(orderId, "service_completed");
     return this.toDto(updated);
   }
 
@@ -2104,6 +2132,16 @@ export class OrdersService {
           eventKey: `order:${candidate.id}:reservation-expired:${candidate.paymentReservationExpiresAt?.toISOString() ?? now.toISOString()}`,
           templateKey: "reservationExpired"
         });
+        await this.recordAudit(db, {
+          actorId: null,
+          action: "order.payment_reservation_expired",
+          resourceType: "order",
+          resourceId: candidate.id,
+          metadata: {
+            paymentReservationExpiresAt: candidate.paymentReservationExpiresAt?.toISOString() ?? null,
+            expiredAt: now.toISOString()
+          }
+        });
         return true;
       });
       if (released) expired += 1;
@@ -2118,13 +2156,13 @@ export class OrdersService {
    */
   async expireUnconfirmedOrders(limit = 100): Promise<number> {
     const now = new Date();
-    const candidates: Array<{ id: string; userId: string }> = await this.prisma.order.findMany({
+    const candidates: Array<{ id: string; userId: string; companionResponseDeadlineAt: Date | null }> = await this.prisma.order.findMany({
       where: {
         status: "pending",
         companionConfirmedAt: null,
         companionResponseDeadlineAt: { lte: now }
       },
-      select: { id: true, userId: true },
+      select: { id: true, userId: true, companionResponseDeadlineAt: true },
       orderBy: { companionResponseDeadlineAt: "asc" },
       take: Math.min(Math.max(limit, 1), 200)
     } as any);
@@ -2154,6 +2192,16 @@ export class OrdersService {
           data: { orderId: candidate.id, status: "cancelled", reason: "companion_response_timeout" },
           eventKey: `order:${candidate.id}:response-expired`,
           templateKey: "orderResponseExpired"
+        });
+        await this.recordAudit(db, {
+          actorId: null,
+          action: "order.companion_response_expired",
+          resourceType: "order",
+          resourceId: candidate.id,
+          metadata: {
+            companionResponseDeadlineAt: candidate.companionResponseDeadlineAt?.toISOString() ?? null,
+            expiredAt: now.toISOString()
+          }
         });
         return true;
       });
