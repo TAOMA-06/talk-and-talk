@@ -6,8 +6,11 @@ import {
   WeChatPrepayInput,
   WeChatAppPrepayResult,
   WeChatMiniProgramPrepayInput,
-  WeChatMiniProgramPrepayResult
-  , WeChatRefundInput, WeChatRefundNotifyPayload, WeChatRefundResult
+  WeChatMiniProgramPrepayResult,
+  WeChatNativePrepayResult,
+  WeChatRefundInput,
+  WeChatRefundNotifyPayload,
+  WeChatRefundResult
 } from "./wechat-pay.provider";
 
 export const MOCK_WECHAT_NOTIFY_TOKEN = "mock-wechat-notify";
@@ -15,7 +18,10 @@ export const MOCK_WECHAT_NOTIFY_TOKEN = "mock-wechat-notify";
 export class MockWeChatPayProvider implements WeChatPayProvider {
   readonly mode = "mock" as const;
   readonly isMock = true;
-  private readonly prepays = new Map<string, { amountCents: number; channel: "app" | "miniProgram" }>();
+  private readonly prepays = new Map<
+    string,
+    { amountCents: number; channel: "app" | "miniProgram" | "native" }
+  >();
 
   async createAppPrepay(input: WeChatPrepayInput): Promise<WeChatAppPrepayResult> {
     this.prepays.set(input.outTradeNo, { amountCents: input.amountCents, channel: "app" });
@@ -62,6 +68,19 @@ export class MockWeChatPayProvider implements WeChatPayProvider {
         package: packageValue,
         signType: "RSA",
         paySign
+      }
+    };
+  }
+
+  async createNativePrepay(input: WeChatPrepayInput): Promise<WeChatNativePrepayResult> {
+    this.prepays.set(input.outTradeNo, { amountCents: input.amountCents, channel: "native" });
+    const prepayId = `mock_native_${input.outTradeNo}`;
+    return {
+      prepayId,
+      channel: "native",
+      mock: true,
+      clientParams: {
+        codeUrl: `weixin://wxpay/bizpayurl?pr=${encodeURIComponent(prepayId)}`
       }
     };
   }

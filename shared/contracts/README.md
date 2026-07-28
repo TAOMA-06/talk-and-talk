@@ -5,11 +5,13 @@
 Machine-readable OpenAPI 3 document:
 
 - [`openapi/v1.yaml`](./openapi/v1.yaml)
+- [`openapi/review-v1.yaml`](./openapi/review-v1.yaml) — independent internal review-department contract
 
 Human-readable companions (keep in sync when changing behavior):
 
 - [`docs/auth-api.md`](../../docs/auth-api.md)
 - [`docs/admin-moderation-api.md`](../../docs/admin-moderation-api.md)
+- [`docs/review-department.md`](../../docs/review-department.md)
 - [`docs/backend-migration.md`](../../docs/backend-migration.md) (full route inventory)
 
 ## Compatibility rules (v1)
@@ -65,4 +67,4 @@ python3 -c "import yaml; yaml.safe_load(open('shared/contracts/openapi/v1.yaml')
 cd backend/api && npm run test:integration
 ```
 
-Static admin UI at `/admin/` is **outside** the OpenAPI surface (HTML + staff JWT).
+The independent review workbench at `/review/` is static HTML outside the public contract; its internal API is documented separately in `openapi/review-v1.yaml` and uses ReviewStaff JWTs only.

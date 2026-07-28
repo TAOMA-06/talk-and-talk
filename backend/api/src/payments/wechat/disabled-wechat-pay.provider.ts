@@ -7,8 +7,11 @@ import {
   WeChatPrepayInput,
   WeChatAppPrepayResult,
   WeChatMiniProgramPrepayInput,
-  WeChatMiniProgramPrepayResult
-  , WeChatRefundInput, WeChatRefundNotifyPayload, WeChatRefundResult
+  WeChatMiniProgramPrepayResult,
+  WeChatNativePrepayResult,
+  WeChatRefundInput,
+  WeChatRefundNotifyPayload,
+  WeChatRefundResult
 } from "./wechat-pay.provider";
 
 /**
@@ -28,6 +31,10 @@ export class DisabledWeChatPayProvider implements WeChatPayProvider {
   }
 
   async createMiniProgramPrepay(_input: WeChatMiniProgramPrepayInput): Promise<WeChatMiniProgramPrepayResult> {
+    return this.unavailable();
+  }
+
+  async createNativePrepay(_input: WeChatPrepayInput): Promise<WeChatNativePrepayResult> {
     return this.unavailable();
   }
 

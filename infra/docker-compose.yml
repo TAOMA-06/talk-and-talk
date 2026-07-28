@@ -14,6 +14,8 @@ services:
       CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
       JWT_ACCESS_SECRET: docker-local-access-secret
       JWT_REFRESH_SECRET: docker-local-refresh-secret
+      REVIEW_JWT_ACCESS_SECRET: docker-local-review-access-secret
+      REVIEW_JWT_REFRESH_SECRET: docker-local-review-refresh-secret
       DEEPSEEK_API_KEY: ""
       DEEPSEEK_URL: https://api.deepseek.com
       DEEPSEEK_MODEL: deepseek-chat
@@ -25,6 +27,7 @@ services:
       APPLE_SIGN_IN_BUNDLE_ID: ""
       SMS_PROVIDER: none
       STAFF_TOTP_ENCRYPTION_KEY: docker-local-staff-totp-encryption-key
+      REVIEW_TOTP_ENCRYPTION_KEY: docker-local-review-totp-encryption-key
       METRICS_TOKEN: ""
     ports:
       - "3000:3000"

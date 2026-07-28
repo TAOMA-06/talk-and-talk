@@ -113,5 +113,5 @@ Prisma **不提供**生产 `migrate down`。步骤：
 - `GET /api/v1/health`：`dependencies.database/redis` 为 `ok`
 - `GET /api/v1/metrics` 携带 `Authorization: Bearer $METRICS_TOKEN` 可访问（内网 / staging）
 - 登录、`GET /companions`、下单 prepay；staging 可 mock-notify
-- Web `/admin/` moderator 可登录
+- Web `/review/` 独立 reviewer 可登录；普通用户 JWT 访问审核路由被拒绝
 - 法律页：`/legal/privacy.html`、`/legal/terms.html`

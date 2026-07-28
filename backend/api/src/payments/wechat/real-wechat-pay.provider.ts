@@ -15,8 +15,11 @@ import {
   WeChatPrepayInput,
   WeChatAppPrepayResult,
   WeChatMiniProgramPrepayInput,
-  WeChatMiniProgramPrepayResult
-  , WeChatRefundInput, WeChatRefundNotifyPayload, WeChatRefundResult
+  WeChatMiniProgramPrepayResult,
+  WeChatNativePrepayResult,
+  WeChatRefundInput,
+  WeChatRefundNotifyPayload,
+  WeChatRefundResult
 } from "./wechat-pay.provider";
 
 export type RealWeChatPayConfig = {
@@ -161,6 +164,40 @@ export class RealWeChatPayProvider implements WeChatPayProvider {
       channel: "miniProgram",
       mock: false,
       clientParams: { timeStamp, nonceStr, package: packageValue, signType: "RSA", paySign }
+    };
+  }
+
+  async createNativePrepay(input: WeChatPrepayInput): Promise<WeChatNativePrepayResult> {
+    const body = {
+      appid: this.config.appId,
+      mchid: this.config.mchId,
+      description: input.description.slice(0, 127),
+      out_trade_no: input.outTradeNo,
+      notify_url: input.notifyUrl,
+      ...(input.expiresAt ? { time_expire: input.expiresAt.toISOString() } : {}),
+      amount: {
+        total: input.amountCents,
+        currency: "CNY"
+      }
+    };
+    const response = await this.requestJson<{ code_url?: string }>(
+      "POST",
+      "/v3/pay/transactions/native",
+      body
+    );
+    const codeUrl = response.code_url?.trim();
+    if (!codeUrl) {
+      throw new AppException(
+        "WECHAT_PREPAY_FAILED",
+        "WeChat native prepay response missing code_url",
+        HttpStatus.BAD_GATEWAY
+      );
+    }
+    return {
+      prepayId: `native:${input.outTradeNo}`,
+      channel: "native",
+      mock: false,
+      clientParams: { codeUrl }
     };
   }
 

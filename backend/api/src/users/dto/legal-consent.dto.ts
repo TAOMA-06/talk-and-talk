@@ -1,6 +1,7 @@
 import {
   Equals,
   IsDateString,
+  IsIn,
   IsOptional,
   IsString,
   IsUrl,
@@ -37,8 +38,8 @@ export class CreateLegalConsentDto {
   @IsUrl({ protocols: ["https"], require_protocol: true })
   termsUrl!: string;
 
-  @Equals("wechatMiniProgram")
-  source!: "wechatMiniProgram";
+  @IsIn(["wechatMiniProgram", "web"])
+  source!: "wechatMiniProgram" | "web";
 }
 
 export class GetLegalConsentDto {

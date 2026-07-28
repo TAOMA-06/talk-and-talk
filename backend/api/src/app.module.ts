@@ -22,6 +22,7 @@ import { NotificationsModule } from "./notifications/notifications.module";
 import { OrdersModule } from "./orders/orders.module";
 import { PaymentsModule } from "./payments/payments.module";
 import { ReviewsModule } from "./reviews/reviews.module";
+import { ReviewModule } from "./review/review.module";
 import { RecommendationsModule } from "./recommendations/recommendations.module";
 import { SupportModule } from "./support/support.module";
 import { UsersModule } from "./users/users.module";
@@ -49,6 +50,7 @@ import { UsersModule } from "./users/users.module";
     CommercialModule,
     SupportModule,
     AdminModule,
+    ReviewModule,
     NotificationsModule,
     MetricsModule,
     HealthModule,

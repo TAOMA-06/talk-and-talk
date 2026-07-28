@@ -1,6 +1,5 @@
 import { access, readFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
 
 const packageJson = JSON.parse(await readFile("package.json", "utf8"));
 const entrypoint = await readFile("docker-entrypoint.sh", "utf8");
@@ -11,7 +10,10 @@ const productionCompose = await readFile(
   "utf8"
 );
 const mainSource = await readFile("src/main.ts", "utf8");
-const adminHtml = await readFile("public/admin/index.html", "utf8");
+const reviewHtml = await readFile("public/review/index.html", "utf8");
+const reviewScript = await readFile("public/review/assets/app.js", "utf8");
+const legacyAdminHtml = await readFile("public/admin/index.html", "utf8");
+const adminModule = await readFile("src/admin/admin.module.ts", "utf8");
 
 const expectedPackageScripts = {
   start: "node dist/src/main.js",
@@ -90,23 +92,27 @@ for (const insecureDefault of insecureSecretDefaults) {
 const artifacts = [
   "dist/src/main.js",
   "dist/src/database/seed.js",
-  "dist/src/database/bootstrap-staff.js"
+  "dist/src/database/bootstrap-staff.js",
+  "dist/src/database/bootstrap-review-staff.js"
 ];
 
-const inlineAdminScript = adminHtml.match(/<script>([\s\S]*?)<\/script>/)?.[1];
-if (!inlineAdminScript) {
-  throw new Error("Admin console script was not found");
+if (!mainSource.includes('scriptSrc: ["\'self\'"]')) {
+  throw new Error("Review workbench must allow only same-origin scripts");
 }
-const adminScriptHash = createHash("sha256").update(inlineAdminScript).digest("base64");
-if (!mainSource.includes(`'sha256-${adminScriptHash}'`)) {
-  throw new Error("Helmet CSP does not authorize the current admin console script hash");
+if (!reviewScript.includes('/api/v1/review/auth/login') || reviewHtml.includes('/auth/staff/login')) {
+  throw new Error("Review workbench must use the separate review password + TOTP login endpoint");
 }
-if (!adminHtml.includes('/auth/staff/login') || adminHtml.includes('/auth/sms/send-code')) {
-  throw new Error("Admin console must use the staff password + TOTP login endpoint");
+if (legacyAdminHtml.includes('/auth/staff/login') || legacyAdminHtml.includes('/admin/moderation')) {
+  throw new Error("Legacy /admin page must not retain a user-role review entrypoint");
+}
+if (adminModule.includes("AdminModerationController")) {
+  throw new Error("AdminModule must not register the review department controller");
 }
 
 const staticAssets = [
-  "public/admin/index.html",
+  "public/review/index.html",
+  "public/review/assets/app.js",
+  "public/review/assets/styles.css",
   "public/legal/privacy.html",
   "public/legal/terms.html"
 ];

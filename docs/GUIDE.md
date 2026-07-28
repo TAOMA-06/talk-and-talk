@@ -65,9 +65,9 @@ talk-and-talk/
 - 文本、图片、短语音统一走 `queued → pendingReview/published/blocked → 人工复核 → 处置/申诉`；接收方不会看到待审文本或未获批准媒体。
 - 聊天响应只返回用户可理解的审核决定与风险等级，举报响应只返回回执；规则命中、AI 原因和完整案件仅 staff API 可见。
 - 审核流水线：RuleEngine →（高风险 block 跳过）生产文本审核提供方 → Case/Evidence/ActionLog；提供方故障时不会降级公开。
-- Admin Moderation：概览、筛选队列、详情、会话证据、人工处置、样本标注/导出；动作写 `ModerationActionLog` + `AuditLog`。
+- Review Department：概览、筛选队列、详情、会话证据、人工处置、样本标注/导出；审核员使用独立 `ReviewStaff`，动作写 `ModerationActionLog`、`AuditLog` 与 `ReviewAuditLog`。
 - 用户举报、广场举报和订单客服均只返回权限内的收讫/状态，不向用户泄漏另一方或内部案件细节。
-- Web 运营后台与普通用户/陪伴者客户端完全分离：本地工具入口为 `http://localhost:3000/admin/`，生产部署需独立访问控制。
+- Web 审核部门与普通用户/陪伴者客户端完全分离：本地工具入口为 `http://localhost:3000/review/`，生产部署需独立访问控制。
 - 会话、消息、审核工单持久化到 Postgres。
 
 历史 iOS：
@@ -94,13 +94,13 @@ npm run start:dev
 curl http://localhost:3000/api/v1/health
 ```
 
-Web 审核后台：
+独立审核部门工作台：
 
 ```text
-http://localhost:3000/admin/
+http://localhost:3000/review/
 ```
 
-开发 seed phone 身份为 `13800000001`（admin）、`13800000002`（moderator），仅用于 API 测试。Web 审核后台使用独立密码 + TOTP，按 `docs/staff-operations.md` 初始化。
+开发 seed phone 身份为 `13800000001`（admin）、`13800000002`（moderator），仅用于 API 测试。Web 审核部门使用独立密码 + TOTP，按 `docs/review-department.md` 初始化。
 
 Docker（本地）：
 
@@ -162,7 +162,7 @@ xcodebuild test \
 | “聊天已经完全接正式后端” | 小程序正式聊天、举报、审核与权益均走后端；生产故障不得用本地假消息或自动回复兜底 |
 | “AI 是陪聊” | AI/审核逻辑只负责内容安全 |
 | “在根目录 npm start” | 后端命令在 `backend/api` 执行 |
-| “审核后台还是旧 demo” | 运维控制台在 `backend/api/public/admin` + `/api/v1/admin/moderation/*` |
+| “审核后台还是旧 demo” | 独立审核工作台在 `backend/api/public/review` + `/api/v1/review/*` |
 
 ## 8. 改代码建议
 
@@ -176,6 +176,6 @@ xcodebuild test \
 | iOS API client | `frontend/ios/Sources/Data/API/BackendClient.swift` |
 | 本地内容审核规则（DEBUG/非后端会话） | `frontend/ios/Sources/Data/Moderation/RuleBasedModerationEngine.swift` |
 | 正式审核 API（RuleEngine + DeepSeek） | `backend/api/src/moderation` |
-| Admin 审核 API / 处置 / 样本 | `backend/api/src/admin/moderation` |
-| Web 审核后台 | `backend/api/public/admin` |
+| 审核部门 API / 处置 / 样本 | `backend/api/src/review`（包括独立的受控案件决策服务） |
+| Web 审核工作台 | `backend/api/public/review` |
 | Admin 审核契约 | `docs/admin-moderation-api.md` |

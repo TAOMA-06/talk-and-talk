@@ -116,9 +116,9 @@
 ## 管理员与 Seed
 
 - [ ] 生产 `SEED_ON_STARTUP=false`
-- [ ] 按 [staff-operations.md](./staff-operations.md) 创建独立 admin 与 moderator，并完成密码 + TOTP 真实登录
+- [ ] 按 [review-department.md](./review-department.md) 创建独立 reviewer 与 lead，并完成密码 + TOTP 真实登录
 - [ ] 确认生产不存在 seed 手机账号、共享员工账号或默认密码
-- [ ] Web `/admin/` 仅内网或 VPN 可达（推荐；至少不公开宣传）
+- [ ] Web `/review/` 仅内网或 VPN 可达（推荐；至少不公开宣传）
 
 ## 监控与告警
 

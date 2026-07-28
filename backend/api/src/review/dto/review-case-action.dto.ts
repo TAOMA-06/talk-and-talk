@@ -1,6 +1,6 @@
 import { IsIn, IsOptional, IsString, MaxLength } from "class-validator";
 
-export const ADMIN_CASE_ACTIONS = [
+export const REVIEW_CASE_ACTIONS = [
   "confirmViolation",
   "dismiss",
   "escalate",
@@ -12,11 +12,11 @@ export const ADMIN_CASE_ACTIONS = [
   "upholdAppeal",
   "overturnAppeal"
 ] as const;
-export type AdminCaseAction = (typeof ADMIN_CASE_ACTIONS)[number];
+export type ReviewCaseAction = (typeof REVIEW_CASE_ACTIONS)[number];
 
-export class CaseActionDto {
-  @IsIn([...ADMIN_CASE_ACTIONS])
-  action!: AdminCaseAction;
+export class ReviewCaseActionDto {
+  @IsIn([...REVIEW_CASE_ACTIONS])
+  action!: ReviewCaseAction;
 
   @IsOptional()
   @IsString()

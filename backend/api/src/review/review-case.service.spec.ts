@@ -1,6 +1,6 @@
-import { AdminModerationService } from "./admin-moderation.service";
+import { ReviewCaseService, ReviewDecisionActor } from "./review-case.service";
 
-describe("AdminModerationService", () => {
+describe("ReviewCaseService", () => {
   const prisma = {
     moderationCase: {
       findMany: jest.fn(),
@@ -39,12 +39,14 @@ describe("AdminModerationService", () => {
     toAttachmentDto: jest.fn(async (asset: any) => asset)
   };
 
-  let service: AdminModerationService;
+  const reviewer: ReviewDecisionActor = { id: "mod-1", kind: "reviewStaff", displayName: "审核员一", role: "reviewer" };
+  const secondReviewer: ReviewDecisionActor = { id: "mod-2", kind: "reviewStaff", displayName: "审核员二", role: "reviewer" };
+  let service: ReviewCaseService;
 
   beforeEach(() => {
     jest.clearAllMocks();
     chatRestrictions.recordManualConfirmedViolation.mockResolvedValue({ escalated: false, confirmations: 1 });
-    service = new AdminModerationService(prisma as any, chatRestrictions as any, mediaAssets as any);
+    service = new ReviewCaseService(prisma as any, chatRestrictions as any, mediaAssets as any);
   });
 
   describe("statusForAction", () => {
@@ -109,7 +111,7 @@ describe("AdminModerationService", () => {
       };
       prisma.$transaction.mockImplementation(async (callback: any) => callback(db));
 
-      await expect(service.applyAction("case-race", "mod-2", "rejectMessage", "拒绝"))
+      await expect(service.applyAction("case-race", secondReviewer, "rejectMessage", "拒绝"))
         .rejects.toMatchObject({ code: "CASE_ALREADY_CLOSED" });
       expect(db.moderationCase.update).not.toHaveBeenCalled();
     });
@@ -171,7 +173,7 @@ describe("AdminModerationService", () => {
       prisma.conversation.count.mockResolvedValue(1);
       prisma.moderationLabel.count.mockResolvedValue(0);
 
-      const result = await service.applyAction("case-1", "mod-1", "confirmViolation", "确认");
+      const result = await service.applyAction("case-1", reviewer, "confirmViolation", "确认");
 
       expect(result.case.status).toBe("resolved");
       expect(result.action.action).toBe("confirmViolation");
@@ -210,7 +212,7 @@ describe("AdminModerationService", () => {
       prisma.conversation.count.mockResolvedValue(1);
       prisma.moderationLabel.count.mockResolvedValue(0);
 
-      await service.applyAction("case-remove", "mod-1", "confirmViolation", "确认违规");
+      await service.applyAction("case-remove", reviewer, "confirmViolation", "确认违规");
 
       expect(db.message.update).toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({ moderationStatus: "removed", visibility: "senderOnly" })
@@ -250,7 +252,7 @@ describe("AdminModerationService", () => {
       prisma.conversation.count.mockResolvedValue(1);
       prisma.moderationLabel.count.mockResolvedValue(0);
 
-      await service.applyAction("case-community", "mod-1", "dismiss", "人工确认可发布");
+      await service.applyAction("case-community", reviewer, "dismiss", "人工确认可发布");
 
       expect(db.communityPost.updateMany).toHaveBeenCalledWith({
         where: { id: "post-1" },
@@ -292,7 +294,7 @@ describe("AdminModerationService", () => {
       prisma.conversation.count.mockResolvedValue(1);
       prisma.moderationLabel.count.mockResolvedValue(0);
 
-      await service.applyAction("case-appeal", "mod-1", "overturnAppeal", "复核成立");
+      await service.applyAction("case-appeal", reviewer, "overturnAppeal", "复核成立");
 
       expect(db.message.update).toHaveBeenCalledWith(expect.objectContaining({
         data: expect.objectContaining({ moderationStatus: "published", visibility: "participants" })

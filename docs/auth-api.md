@@ -145,15 +145,16 @@ Talk&Talk 正式账号体系 API，前缀均为 `/api/v1`。所有 JSON 响应�
 
 ## 角色与 RBAC
 
-用户角色：`user`、`companion`、`moderator`、`admin`。
+用户角色：`user`、`companion`、`moderator`、`admin`。审核部门身份不属于 `UserRole`，而是独立的 `ReviewStaff`。
 
 受保护的管理端示例：
 
 - `GET /admin/status` 需要 `admin` 角色
-- `GET|POST /admin/moderation/*` 需要 `moderator` 或 `admin`
-- `GET /moderation/cases` 需要 `moderator` 或 `admin`
+- 旧 `GET|POST /admin/moderation/*` 不再注册
+- 旧 `GET /moderation/cases` 和 `POST /moderation/check` 返回 `REVIEW_DEPARTMENT_MOVED`
+- 审核案件只允许独立 `ReviewStaff` 访问 `/review/*`；见 [admin-moderation-api.md](./admin-moderation-api.md)
 
-开发 seed phone 身份（API 测试兼容；Web 审核后台改用密码 + TOTP）：
+开发 seed phone 身份（仅 API/运营测试兼容；不能登录审核工作台）：
 
 | 手机号 | 角色 |
 |--------|------|

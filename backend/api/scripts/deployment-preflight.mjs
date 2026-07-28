@@ -64,7 +64,7 @@ export function validateDeploymentConfig(env) {
   const trtcEmergencyStopEnabled = env.TRTC_EMERGENCY_STOP_ENABLED === "true";
   const required = [
     "NODE_ENV", "APP_ENV", "API_PREFIX", "DATABASE_URL", "REDIS_URL", "CORS_ORIGINS",
-    "JWT_ACCESS_SECRET", "JWT_REFRESH_SECRET", "WECHAT_MINIPROGRAM_APP_ID",
+    "JWT_ACCESS_SECRET", "JWT_REFRESH_SECRET", "REVIEW_JWT_ACCESS_SECRET", "REVIEW_JWT_REFRESH_SECRET", "WECHAT_MINIPROGRAM_APP_ID",
     "WECHAT_MINIPROGRAM_APP_SECRET"
   ];
   if (production) {
@@ -73,6 +73,7 @@ export function validateDeploymentConfig(env) {
       ...LEGAL_REQUIRED_FIELDS,
       "METRICS_TOKEN",
       "STAFF_TOTP_ENCRYPTION_KEY",
+      "REVIEW_TOTP_ENCRYPTION_KEY",
       "DEEPSEEK_API_KEY",
       "DEEPSEEK_URL",
       "DEEPSEEK_MODEL",
@@ -124,10 +125,10 @@ export function validateDeploymentConfig(env) {
     errors.push("DEEPSEEK_URL must be an HTTPS URL in production");
   }
 
-  for (const key of ["JWT_ACCESS_SECRET", "JWT_REFRESH_SECRET"]) {
+  for (const key of ["JWT_ACCESS_SECRET", "JWT_REFRESH_SECRET", "REVIEW_JWT_ACCESS_SECRET", "REVIEW_JWT_REFRESH_SECRET"]) {
     if (env[key] && env[key].length < 32) errors.push(`${key} must be at least 32 characters`);
   }
-  for (const key of ["METRICS_TOKEN", "STAFF_TOTP_ENCRYPTION_KEY"]) {
+  for (const key of ["METRICS_TOKEN", "STAFF_TOTP_ENCRYPTION_KEY", "REVIEW_TOTP_ENCRYPTION_KEY"]) {
     if (production && env[key] && env[key].length < 32) errors.push(`${key} must be at least 32 characters`);
   }
   if (production && env.DEEPSEEK_API_KEY && env.DEEPSEEK_API_KEY.length < 24) {
@@ -135,6 +136,18 @@ export function validateDeploymentConfig(env) {
   }
   if (env.JWT_ACCESS_SECRET && env.JWT_ACCESS_SECRET === env.JWT_REFRESH_SECRET) {
     errors.push("JWT access and refresh secrets must be different");
+  }
+  if (env.REVIEW_JWT_ACCESS_SECRET && env.REVIEW_JWT_ACCESS_SECRET === env.REVIEW_JWT_REFRESH_SECRET) {
+    errors.push("review JWT access and refresh secrets must be different");
+  }
+  if (production && (
+    (env.REVIEW_JWT_ACCESS_SECRET && env.JWT_ACCESS_SECRET && env.REVIEW_JWT_ACCESS_SECRET === env.JWT_ACCESS_SECRET) ||
+    (env.REVIEW_JWT_REFRESH_SECRET && env.JWT_REFRESH_SECRET && env.REVIEW_JWT_REFRESH_SECRET === env.JWT_REFRESH_SECRET)
+  )) {
+    errors.push("review JWT secrets must not reuse consumer JWT secrets");
+  }
+  if (production && env.REVIEW_TOTP_ENCRYPTION_KEY && env.STAFF_TOTP_ENCRYPTION_KEY && env.REVIEW_TOTP_ENCRYPTION_KEY === env.STAFF_TOTP_ENCRYPTION_KEY) {
+    errors.push("review TOTP encryption key must not reuse staff TOTP encryption key");
   }
 
   for (const origin of (env.CORS_ORIGINS ?? "").split(",").map((item) => item.trim()).filter(Boolean)) {

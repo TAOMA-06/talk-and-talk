@@ -1,17 +1,24 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
 
-import { AppException } from "../../common/errors/app.exception";
-import { PrismaService } from "../../database/prisma.service";
-import { ChatRestrictionService } from "../../moderation/chat-restriction.service";
-import { MediaAssetService } from "../../moderation/media/media-asset.service";
-import { AdminCaseAction } from "./dto/case-action.dto";
-import { CreateLabelDto } from "./dto/create-label.dto";
-import { ListAdminCasesQueryDto } from "./dto/list-admin-cases.dto";
+import { AppException } from "../common/errors/app.exception";
+import { PrismaService } from "../database/prisma.service";
+import { ChatRestrictionService } from "../moderation/chat-restriction.service";
+import { MediaAssetService } from "../moderation/media/media-asset.service";
+import { CreateReviewLabelDto } from "./dto/create-review-label.dto";
+import { ReviewCaseAction } from "./dto/review-case-action.dto";
+import { ListReviewCasesQueryDto } from "./dto/list-review-cases.dto";
 
 const OPEN_STATUSES = ["pending", "autoReviewing", "humanReview"] as const;
 
+export type ReviewDecisionActor = {
+  id: string;
+  kind: "reviewStaff";
+  displayName?: string;
+  role?: string;
+};
+
 @Injectable()
-export class AdminModerationService {
+export class ReviewCaseService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly chatRestrictions: ChatRestrictionService,
@@ -50,7 +57,7 @@ export class AdminModerationService {
     };
   }
 
-  async listCases(query: ListAdminCasesQueryDto) {
+  async listCases(query: ListReviewCasesQueryDto) {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 50;
     const where = this.buildCaseWhere(query);
@@ -158,7 +165,8 @@ export class AdminModerationService {
     };
   }
 
-  async applyAction(caseId: string, actorId: string, action: AdminCaseAction, note?: string) {
+  async applyAction(caseId: string, actor: ReviewDecisionActor, action: ReviewCaseAction, note?: string) {
+    const actorId = actor.id;
     const existing: any = await this.prisma.moderationCase.findUnique({
       where: { id: caseId },
       include: { appeals: true }
@@ -199,7 +207,8 @@ export class AdminModerationService {
       const actionLog = await db.moderationActionLog.create({
         data: {
           caseId,
-          actorId,
+          actorId: null,
+          reviewerId: actorId,
           action,
           note: note?.trim() || null
         }
@@ -214,10 +223,28 @@ export class AdminModerationService {
           metadata: {
             previousStatus: locked.status,
             nextStatus: statusUpdate.status,
-            note: note?.trim() || null
+            note: note?.trim() || null,
+            actorKind: "reviewStaff"
           }
         }
       });
+      if (typeof db.reviewAuditLog?.create === "function") {
+        await db.reviewAuditLog.create({
+          data: {
+            reviewerId: actorId,
+            action: `review.case.${action}`,
+            resourceType: "moderation_case",
+            resourceId: caseId,
+            metadata: {
+              previousStatus: locked.status,
+              nextStatus: statusUpdate.status,
+              note: note?.trim() || null,
+              reviewerName: actor.displayName ?? null,
+              reviewerRole: actor.role ?? null
+            }
+          }
+        });
+      }
 
       if (locked.messageId && publishesMessage(action)) {
         await db.message.update({
@@ -315,7 +342,8 @@ export class AdminModerationService {
     };
   }
 
-  async createLabel(actorId: string, dto: CreateLabelDto) {
+  async createLabel(actor: ReviewDecisionActor, dto: CreateReviewLabelDto) {
+    const actorId = actor.id;
     if (dto.caseId) {
       const exists = await this.prisma.moderationCase.findUnique({ where: { id: dto.caseId } } as any);
       if (!exists) {
@@ -332,7 +360,8 @@ export class AdminModerationService {
           actualDecision: dto.actualDecision,
           note: dto.note?.trim() || null,
           caseId: dto.caseId ?? null,
-          actorId,
+          actorId: null,
+          reviewerId: actorId,
           source: dto.source ?? null
         }
       });
@@ -346,10 +375,27 @@ export class AdminModerationService {
           metadata: {
             caseId: dto.caseId ?? null,
             expectedDecision: dto.expectedDecision,
-            actualDecision: dto.actualDecision
+            actualDecision: dto.actualDecision,
+            actorKind: "reviewStaff"
           }
         }
       });
+      if (typeof db.reviewAuditLog?.create === "function") {
+        await db.reviewAuditLog.create({
+          data: {
+            reviewerId: actorId,
+            action: "review.label.created",
+            resourceType: "moderation_label",
+            resourceId: created.id,
+            metadata: {
+              caseId: dto.caseId ?? null,
+              expectedDecision: dto.expectedDecision,
+              actualDecision: dto.actualDecision,
+              reviewerName: actor.displayName ?? null
+            }
+          }
+        });
+      }
 
       return created;
     });
@@ -374,7 +420,7 @@ export class AdminModerationService {
     };
   }
 
-  buildCaseWhere(query: ListAdminCasesQueryDto) {
+  buildCaseWhere(query: ListReviewCasesQueryDto) {
     const where: Record<string, unknown> = {};
 
     if (query.status) where.status = query.status;
@@ -413,7 +459,7 @@ export class AdminModerationService {
     return where;
   }
 
-  statusForAction(action: AdminCaseAction): {
+  statusForAction(action: ReviewCaseAction): {
     status: "resolved" | "dismissed" | "humanReview";
     resolvedAt: Date | null;
   } {
@@ -434,7 +480,7 @@ export class AdminModerationService {
     }
   }
 
-  private assertActionAllowed(existing: any, action: AdminCaseAction): void {
+  private assertActionAllowed(existing: any, action: ReviewCaseAction): void {
     if (
       [
         "confirmViolation", "dismiss", "approveMessage", "rejectMessage", "escalate",
@@ -590,6 +636,7 @@ export class AdminModerationService {
       action: log.action,
       note: log.note ?? null,
       actorId: log.actorId ?? null,
+      reviewerId: log.reviewerId ?? null,
       createdAt: log.createdAt.toISOString()
     };
   }
@@ -632,16 +679,17 @@ export class AdminModerationService {
       note: item.note ?? null,
       caseId: item.caseId ?? null,
       actorId: item.actorId ?? null,
+      reviewerId: item.reviewerId ?? null,
       source: item.source ?? null,
       createdAt: item.createdAt.toISOString()
     };
   }
 }
 
-function publishesMessage(action: AdminCaseAction): boolean {
+function publishesMessage(action: ReviewCaseAction): boolean {
   return action === "dismiss" || action === "approveMessage" || action === "overturnAppeal";
 }
 
-function blocksMessage(action: AdminCaseAction): boolean {
+function blocksMessage(action: ReviewCaseAction): boolean {
   return action === "confirmViolation" || action === "rejectMessage";
 }

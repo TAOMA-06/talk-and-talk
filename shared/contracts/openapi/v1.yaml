@@ -32,7 +32,6 @@ tags:
   - name: favorites
   - name: recently-viewed
   - name: admin
-  - name: admin-moderation
 paths:
   /legal/terms:
     get:
@@ -315,6 +314,77 @@ paths:
       responses:
         "200":
           description: User
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /users/me/legal-consents:
+    get:
+      tags: [users]
+      summary: Read the caller's latest legal-consent receipt
+      operationId: getLegalConsent
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: version
+          schema: { type: string }
+      responses:
+        "200":
+          description: Latest receipt and whether it matches the current published documents
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+    post:
+      tags: [users]
+      summary: Record consent to the current privacy policy and terms
+      operationId: recordLegalConsent
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - version
+                - privacyAccepted
+                - termsAccepted
+                - adultConfirmed
+                - acceptedAt
+                - privacyUrl
+                - termsUrl
+                - source
+              properties:
+                version: { type: string }
+                privacyAccepted: { type: boolean, enum: [true] }
+                termsAccepted: { type: boolean, enum: [true] }
+                adultConfirmed: { type: boolean, enum: [true] }
+                acceptedAt: { type: string, format: date-time }
+                privacyUrl: { type: string, format: uri }
+                termsUrl: { type: string, format: uri }
+                source: { type: string, enum: [wechatMiniProgram, web] }
+      responses:
+        "201":
+          description: Consent receipt recorded or existing current receipt returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+        "400":
+          $ref: "#/components/responses/Error"
+  /users/me/legal-consents/current:
+    delete:
+      tags: [users]
+      summary: Withdraw the caller's current legal consent
+      operationId: withdrawLegalConsent
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Withdrawal result
           content:
             application/json:
               schema:
@@ -1998,7 +2068,7 @@ paths:
   /orders/{id}/prepay:
     post:
       tags: [orders]
-      summary: WeChat App or Mini Program prepay
+      summary: WeChat App, Mini Program, or Native QR prepay
       operationId: prepayOrder
       security:
         - bearerAuth: []
@@ -2012,7 +2082,7 @@ paths:
               properties:
                 channel:
                   type: string
-                  enum: [app, miniProgram]
+                  enum: [app, miniProgram, native]
                   default: app
       responses:
         "200":
@@ -3760,156 +3830,6 @@ paths:
       responses:
         "200":
           description: Unpublished
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SuccessEnvelope"
-  /admin/moderation/overview:
-    get:
-      tags: [admin-moderation]
-      summary: Staff moderation overview
-      operationId: adminModerationOverview
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Stats + queue
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SuccessEnvelope"
-  /admin/moderation/cases:
-    get:
-      tags: [admin-moderation]
-      summary: Staff case list
-      operationId: adminListCases
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: query
-          name: status
-          schema: { type: string }
-        - in: query
-          name: riskLevel
-          schema: { type: string }
-        - in: query
-          name: priority
-          schema: { type: string, enum: [normal, high, critical] }
-        - in: query
-          name: source
-          schema: { type: string }
-        - in: query
-          name: keyword
-          schema: { type: string }
-        - in: query
-          name: from
-          schema: { type: string, format: date-time }
-        - in: query
-          name: to
-          schema: { type: string, format: date-time }
-        - in: query
-          name: page
-          schema: { type: integer }
-        - in: query
-          name: pageSize
-          schema: { type: integer }
-      responses:
-        "200":
-          description: Case page
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SuccessEnvelope"
-  /admin/moderation/cases/{id}:
-    get:
-      tags: [admin-moderation]
-      summary: Case detail
-      operationId: adminGetCase
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: "#/components/parameters/IdPath"
-      responses:
-        "200":
-          description: Case + evidences + actionLog
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SuccessEnvelope"
-  /admin/moderation/cases/{id}/conversation:
-    get:
-      tags: [admin-moderation]
-      summary: Conversation evidence
-      operationId: adminCaseConversation
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: "#/components/parameters/IdPath"
-      responses:
-        "200":
-          description: Messages for case
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SuccessEnvelope"
-  /admin/moderation/cases/{id}/actions:
-    post:
-      tags: [admin-moderation]
-      summary: Case action
-      operationId: adminCaseAction
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: "#/components/parameters/IdPath"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [action]
-              properties:
-                action:
-                  type: string
-                  enum: [confirmViolation, dismiss, escalate, approveMessage, rejectMessage, restrict24h, restrict7d, liftRestriction, upholdAppeal, overturnAppeal]
-                note: { type: string }
-      responses:
-        "200":
-          description: Updated case
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SuccessEnvelope"
-  /admin/moderation/labels:
-    post:
-      tags: [admin-moderation]
-      summary: Create training label
-      operationId: adminCreateLabel
-      security:
-        - bearerAuth: []
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: true
-      responses:
-        "200":
-          description: Label created
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SuccessEnvelope"
-  /admin/moderation/labels/export:
-    get:
-      tags: [admin-moderation]
-      summary: Export labels
-      operationId: adminExportLabels
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Label export
           content:
             application/json:
               schema:

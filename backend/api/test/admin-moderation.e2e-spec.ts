@@ -810,7 +810,8 @@ describe("Admin Moderation (e2e)", () => {
         durationMinutes: 30,
         amountCents: companion.pricePerHalfHour * 100,
         status: "paid",
-        scheduledAt: new Date(Date.now() + 60 * 60 * 1000),
+        // Moderation evidence must be produced through a currently open paid chat window.
+        scheduledAt: new Date(Date.now() + 5 * 60 * 1000),
         paidAt: new Date(),
         conversationId: conversation.id,
         companionNameSnapshot: companion.name,

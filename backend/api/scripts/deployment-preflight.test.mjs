@@ -13,8 +13,11 @@ function validProduction() {
     CORS_ORIGINS: "https://api.talkandtalk.app",
     JWT_ACCESS_SECRET: "access-secret-that-is-longer-than-32-characters",
     JWT_REFRESH_SECRET: "refresh-secret-that-is-longer-than-32-characters",
+    REVIEW_JWT_ACCESS_SECRET: "review-access-secret-that-is-longer-than-32-characters",
+    REVIEW_JWT_REFRESH_SECRET: "review-refresh-secret-that-is-longer-than-32-characters",
     METRICS_TOKEN: "metrics-token-that-is-longer-than-32-characters",
     STAFF_TOTP_ENCRYPTION_KEY: "staff-totp-key-that-is-longer-than-32-characters",
+    REVIEW_TOTP_ENCRYPTION_KEY: "review-totp-key-that-is-longer-than-32-characters",
     DEEPSEEK_API_KEY: "deepseek-production-key-1234567890",
     DEEPSEEK_URL: "https://api.deepseek.com",
     DEEPSEEK_MODEL: "deepseek-chat",
@@ -202,6 +205,8 @@ test("rejects placeholders, shared JWT secrets, insecure Redis, and missing paym
   env.DATABASE_URL = "postgresql://talk:CHANGE_ME@postgres:5432/talk_and_talk";
   env.REDIS_URL = "redis://redis:6379";
   env.JWT_REFRESH_SECRET = env.JWT_ACCESS_SECRET;
+  env.REVIEW_JWT_ACCESS_SECRET = env.JWT_ACCESS_SECRET;
+  env.REVIEW_TOTP_ENCRYPTION_KEY = env.STAFF_TOTP_ENCRYPTION_KEY;
   env.WECHAT_PAY_MCH_ID = "";
   env.SEED_ON_STARTUP = "true";
 
@@ -209,6 +214,8 @@ test("rejects placeholders, shared JWT secrets, insecure Redis, and missing paym
   assert.match(errors, /DATABASE_URL still contains a placeholder/);
   assert.match(errors, /production REDIS_URL must include a password/);
   assert.match(errors, /JWT access and refresh secrets must be different/);
+  assert.match(errors, /review JWT secrets must not reuse consumer JWT secrets/);
+  assert.match(errors, /review TOTP encryption key must not reuse staff TOTP encryption key/);
   assert.match(errors, /WECHAT_PAY_MCH_ID is required/);
   assert.match(errors, /production SEED_ON_STARTUP must be false/);
 });

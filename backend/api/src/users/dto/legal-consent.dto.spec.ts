@@ -21,11 +21,16 @@ describe("Legal consent DTOs", () => {
     await expect(validate(plainToInstance(CreateLegalConsentDto, valid))).resolves.toHaveLength(0);
   });
 
+  it("accepts the same explicit consent claim from the web client", async () => {
+    await expect(validate(plainToInstance(CreateLegalConsentDto, { ...valid, source: "web" })))
+      .resolves.toHaveLength(0);
+  });
+
   it.each([
     [{ privacyAccepted: false }, "privacyAccepted"],
     [{ termsAccepted: false }, "termsAccepted"],
     [{ adultConfirmed: false }, "adultConfirmed"],
-    [{ source: "web" }, "source"],
+    [{ source: "ios" }, "source"],
     [{ privacyUrl: "http://api.talkandtalk.app/legal/privacy.html" }, "privacyUrl"],
     [{ termsUrl: "not-a-url" }, "termsUrl"],
     [{ acceptedAt: "yesterday" }, "acceptedAt"],

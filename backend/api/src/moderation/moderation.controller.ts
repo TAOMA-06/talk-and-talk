@@ -37,17 +37,12 @@ export class ModerationController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles("moderator", "admin")
   async check(@Body() dto: CheckModerationDto) {
-    const moderation = await this.moderation.moderateAsync(dto.text, dto.source ?? "chat");
-    return {
-      moderation: {
-        decision: moderation.decision,
-        riskLevel: moderation.riskLevel,
-        score: moderation.score,
-        reasons: moderation.reasons,
-        matchedRules: moderation.matchedRules,
-        usedAI: moderation.usedAI
-      }
-    };
+    void dto;
+    throw new AppException(
+      "REVIEW_DEPARTMENT_MOVED",
+      "Manual moderation checks are available only to the independent review department",
+      HttpStatus.GONE
+    );
   }
 
   @Post("reports")
@@ -147,14 +142,11 @@ export class ModerationController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles("moderator", "admin")
   async cases() {
-    const cases = await this.prisma.moderationCase.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 100
-    });
-
-    return {
-      cases: cases.map((item) => this.toCaseDto(item))
-    };
+    throw new AppException(
+      "REVIEW_DEPARTMENT_MOVED",
+      "Moderation cases are available only to the independent review department",
+      HttpStatus.GONE
+    );
   }
 
   private toCaseDto(item: {

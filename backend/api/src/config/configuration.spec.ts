@@ -9,8 +9,11 @@ describe("validateEnvironment", () => {
     REDIS_URL: "rediss://redis:6379",
     JWT_ACCESS_SECRET: "a".repeat(32),
     JWT_REFRESH_SECRET: "b".repeat(32),
+    REVIEW_JWT_ACCESS_SECRET: "c".repeat(32),
+    REVIEW_JWT_REFRESH_SECRET: "d".repeat(32),
     METRICS_TOKEN: "m".repeat(32),
     STAFF_TOTP_ENCRYPTION_KEY: "t".repeat(32),
+    REVIEW_TOTP_ENCRYPTION_KEY: "r".repeat(32),
     DEEPSEEK_API_KEY: "deepseek-production-key-1234567890",
     DEEPSEEK_URL: "https://api.deepseek.com",
     DEEPSEEK_MODEL: "deepseek-chat",
@@ -84,6 +87,9 @@ describe("validateEnvironment", () => {
     expect(env.APP_ENV).toBe("development");
     expect(env.SMS_PROVIDER).toBe("mock");
     expect(env.STAFF_TOTP_ENCRYPTION_KEY).toContain("development-staff-totp-key");
+    expect(env.REVIEW_TOTP_ENCRYPTION_KEY).toContain("development-review-totp-key");
+    expect(env.REVIEW_JWT_ACCESS_TTL).toBe("15m");
+    expect(env.REVIEW_JWT_REFRESH_TTL).toBe("8h");
     expect(env.SEED_ON_STARTUP).toBe(false);
     expect(env.PAYMENT_RECONCILIATION_ENABLED).toBe(true);
     expect(env.PAYMENT_RECONCILIATION_INTERVAL_SECONDS).toBe(60);
@@ -175,7 +181,9 @@ describe("validateEnvironment", () => {
       APP_ENV: "staging",
       CORS_ORIGINS: "https://api-staging.example.com",
       JWT_ACCESS_SECRET: "staging-access",
-      JWT_REFRESH_SECRET: "staging-refresh"
+      JWT_REFRESH_SECRET: "staging-refresh",
+      REVIEW_JWT_ACCESS_SECRET: "staging-review-access",
+      REVIEW_JWT_REFRESH_SECRET: "staging-review-refresh"
     });
 
     expect(env.APP_ENV).toBe("staging");
@@ -259,6 +267,21 @@ describe("validateEnvironment", () => {
 
     expect(env.NODE_ENV).toBe("production");
     expect(env.CORS_ORIGINS).toEqual(["https://api.talkandtalk.example"]);
+  });
+
+  it("requires independent review-department secrets in production", () => {
+    expect(() => validateEnvironment({
+      ...productionEnv,
+      REVIEW_JWT_ACCESS_SECRET: ""
+    })).toThrow("REVIEW_JWT_ACCESS_SECRET");
+    expect(() => validateEnvironment({
+      ...productionEnv,
+      REVIEW_TOTP_ENCRYPTION_KEY: productionEnv.STAFF_TOTP_ENCRYPTION_KEY
+    })).toThrow("REVIEW_TOTP_ENCRYPTION_KEY must not reuse STAFF_TOTP_ENCRYPTION_KEY");
+    expect(() => validateEnvironment({
+      ...productionEnv,
+      REVIEW_JWT_ACCESS_SECRET: productionEnv.JWT_ACCESS_SECRET
+    })).toThrow("Review JWT secrets must not reuse consumer JWT secrets");
   });
 
   it("validates URL-shaped environment values", () => {

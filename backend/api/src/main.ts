@@ -28,13 +28,13 @@ async function bootstrap() {
     app.set("trust proxy", 1);
   }
 
-  // Keep Helmet's strict CSP while authorizing the reviewed, immutable admin bundle.
-  // scripts/verify-production-artifacts.mjs recomputes this hash so an HTML edit
-  // cannot silently ship a browser-blocked operations console.
+  // The independent review workbench only loads same-origin, versioned static
+  // assets. No inline script is permitted, which keeps its credential entry
+  // screen outside the consumer application's script trust boundary.
   app.use(helmet({
     contentSecurityPolicy: {
       directives: {
-        scriptSrc: ["'self'", "'sha256-zE+aCHqEs7k+xLRRMzhge2ZdiHQ4hW7T/e5CrlpJryc='"]
+        scriptSrc: ["'self'"]
       }
     }
   }));
@@ -48,9 +48,17 @@ async function bootstrap() {
   );
   app.use(urlencoded({ extended: true, limit: bodyLimit }));
 
-  app.useStaticAssets(join(__dirname, "..", "public"), {
+  const publicRoot = join(__dirname, "..", "public");
+  app.useStaticAssets(publicRoot, {
     index: false
   });
+  const router: any = app.getHttpAdapter();
+  router.get("/review", (_req: any, res: any) => res.redirect(302, "/review/"));
+  router.get("/review/", (_req: any, res: any) => res.sendFile(join(publicRoot, "review", "index.html")));
+  // Preserve a safe bookmark migration without leaving the former user-role
+  // review dashboard available as an alternate data path.
+  router.get("/admin", (_req: any, res: any) => res.redirect(302, "/review/"));
+  router.get("/admin/", (_req: any, res: any) => res.redirect(302, "/review/"));
 
   app.setGlobalPrefix(config.getOrThrow<string>("API_PREFIX"));
   app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }));

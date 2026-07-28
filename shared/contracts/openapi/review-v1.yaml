@@ -1,0 +1,280 @@
+openapi: 3.0.3
+info:
+  title: Talk&Talk Review Department API
+  version: 1.0.0
+  description: |
+    Internal-only contract for the independent review department.
+    This API is intentionally separate from consumer authentication and uses
+    ReviewStaff JWTs issued only by /review/auth/login.
+servers:
+  - url: http://localhost:3000/api/v1/review
+    description: Local development
+  - url: https://api-staging.talkandtalk.app/api/v1/review
+    description: Staging
+  - url: https://api.talkandtalk.app/api/v1/review
+    description: Production
+tags:
+  - name: review-auth
+  - name: review-cases
+  - name: review-labels
+paths:
+  /auth/login:
+    post:
+      tags: [review-auth]
+      summary: Authenticate an independent review staff member with password and TOTP
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewLoginInput'
+      responses:
+        '200':
+          description: Review access and refresh session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewAuthEnvelope'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /auth/refresh:
+    post:
+      tags: [review-auth]
+      summary: Rotate a single-use review refresh session
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefreshInput' }
+      responses:
+        '200':
+          description: New review access and refresh session
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReviewAuthEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /auth/logout:
+    post:
+      tags: [review-auth]
+      summary: Revoke the current review session
+      security: [{ ReviewBearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefreshInput' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /auth/me:
+    get:
+      tags: [review-auth]
+      summary: Return the current independent review identity
+      security: [{ ReviewBearerAuth: [] }]
+      responses:
+        '200':
+          description: Current reviewer
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReviewerEnvelope' }
+  /overview:
+    get:
+      tags: [review-cases]
+      summary: Review queue statistics and prioritized cases
+      security: [{ ReviewBearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /cases:
+    get:
+      tags: [review-cases]
+      summary: List cases visible only to the review department
+      security: [{ ReviewBearerAuth: [] }]
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [pending, autoReviewing, humanReview, resolved, dismissed] } }
+        - { name: riskLevel, in: query, schema: { type: string, enum: [low, medium, high] } }
+        - { name: priority, in: query, schema: { type: string, enum: [normal, high, critical] } }
+        - { name: source, in: query, schema: { type: string, enum: [chat, community, report, profile] } }
+        - { name: keyword, in: query, schema: { type: string, maxLength: 200 } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: pageSize, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /cases/{id}:
+    get:
+      tags: [review-cases]
+      summary: Retrieve an individual case, evidence, appeals, and decision trail
+      security: [{ ReviewBearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/CaseId' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /cases/{id}/conversation:
+    get:
+      tags: [review-cases]
+      summary: Retrieve the minimum necessary conversation evidence for a case
+      security: [{ ReviewBearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/CaseId' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /cases/{id}/actions:
+    post:
+      tags: [review-cases]
+      summary: Submit a controlled review decision
+      description: High-risk decisions require note. Chat restrictions are lead-only.
+      security: [{ ReviewBearerAuth: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/CaseId' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CaseActionInput' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /labels:
+    post:
+      tags: [review-labels]
+      summary: Persist a review sample label
+      security: [{ ReviewBearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LabelInput' }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /labels/export:
+    get:
+      tags: [review-labels]
+      summary: Export review labels as JSON
+      security: [{ ReviewBearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+components:
+  securitySchemes:
+    ReviewBearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: ReviewJWT
+      description: Issued exclusively by the independent review department.
+  parameters:
+    CaseId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+  responses:
+    Success:
+      description: Successful enveloped response
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/SuccessEnvelope' }
+    Unauthorized:
+      description: Missing, invalid, expired, or cross-domain token
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    Forbidden:
+      description: Review role or account status does not permit the action
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    NotFound:
+      description: Review case not found
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    Conflict:
+      description: Case state no longer permits the requested decision
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    ValidationError:
+      description: Input is invalid or a required reason is absent
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+  schemas:
+    ReviewLoginInput:
+      type: object
+      required: [username, password, totpCode]
+      properties:
+        username: { type: string, maxLength: 80 }
+        password: { type: string, minLength: 16, maxLength: 128, format: password }
+        totpCode: { type: string, pattern: '^[0-9]{6}$' }
+    RefreshInput:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken: { type: string }
+    CaseActionInput:
+      type: object
+      required: [action]
+      properties:
+        action:
+          type: string
+          enum: [confirmViolation, dismiss, escalate, approveMessage, rejectMessage, restrict24h, restrict7d, liftRestriction, upholdAppeal, overturnAppeal]
+        note: { type: string, maxLength: 1000 }
+    LabelInput:
+      type: object
+      required: [text, expectedDecision, actualDecision]
+      properties:
+        text: { type: string, minLength: 1, maxLength: 2000 }
+        expectedDecision: { type: string, enum: [allow, warn, block, review] }
+        actualDecision: { type: string, enum: [allow, warn, block, review] }
+        note: { type: string, maxLength: 1000 }
+        caseId: { type: string }
+        source: { type: string, enum: [chat, community, report, profile] }
+    Reviewer:
+      type: object
+      required: [id, username, displayName, role]
+      properties:
+        id: { type: string }
+        username: { type: string }
+        displayName: { type: string }
+        role: { type: string, enum: [reviewer, lead] }
+    ReviewAuthData:
+      type: object
+      required: [accessToken, refreshToken, expiresIn, reviewer]
+      properties:
+        accessToken: { type: string }
+        refreshToken: { type: string }
+        expiresIn: { type: integer }
+        reviewer: { $ref: '#/components/schemas/Reviewer' }
+    SuccessEnvelope:
+      type: object
+      required: [data, meta]
+      properties:
+        data: {}
+        meta: { type: object }
+    ReviewAuthEnvelope:
+      type: object
+      required: [data, meta]
+      properties:
+        data: { $ref: '#/components/schemas/ReviewAuthData' }
+        meta: { type: object }
+    ReviewerEnvelope:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: object
+          properties:
+            reviewer: { $ref: '#/components/schemas/Reviewer' }
+        meta: { type: object }
+    ErrorEnvelope:
+      type: object
+      required: [error, meta]
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+        meta: { type: object }

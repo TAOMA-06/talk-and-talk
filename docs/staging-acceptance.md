@@ -17,7 +17,7 @@ DEPLOY_ENV_FILE=../backend/api/.env.staging \
 
 `DEPLOY_ENV_FILE` 控制 API 容器加载的配置文件（默认 production 使用 `../backend/api/.env.production`，路径相对 `infra/`）。
 
-Seed 陪伴者 owner 登录手机号依次为 `13800000101`–`13800000105`。Web 审核后台需另按 [`staff-operations.md`](./staff-operations.md) 初始化密码和 TOTP 凭据。
+Seed 陪伴者 owner 登录手机号依次为 `13800000101`–`13800000105`。Web 审核部门需另按 [`review-department.md`](./review-department.md) 初始化独立密码和 TOTP 凭据。
 
 或本地（需 Postgres + Redis）：
 
@@ -39,7 +39,7 @@ npm run start:dev
 | 5 | 小程序支付模拟 **或** `POST /payments/wechat/mock-notify` | 订单 `paid`，会话激活 |
 | 6 | `POST /conversations/c1/messages` 正常文案 | `decision=allow`，有 `companionReply` |
 | 7 | 发送「加微信私下聊」等违规文案 | `decision=block`，`safetyMessage`，创建 ModerationCase |
-| 8 | Web `http://<host>/admin/` 使用 moderator 密码 + TOTP 登录处置 | `confirmViolation` / `dismiss` 写入 ActionLog |
+| 8 | Web `http://<host>/review/` 使用独立 reviewer 密码 + TOTP 登录处置 | `confirmViolation` / `dismiss` 写入 ReviewActionLog、AuditLog 与 ReviewAuditLog |
 | 9 | `GET /api/v1/health`；带 Bearer token 请求 `/api/v1/metrics` | health 仅含依赖状态；受保护 metrics 含请求/AI/微信计数 |
 
 ## 自动化冒烟

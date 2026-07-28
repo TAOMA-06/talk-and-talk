@@ -396,8 +396,6 @@ describe("Companions and me (e2e)", () => {
         role: "测试陪伴者",
         initials: "LA",
         tags: ["测试"],
-        rating: 4.5,
-        reviewCount: 0,
         pricePerHalfHour: 30,
         isOnline: false,
         isVerified: true,
@@ -405,8 +403,6 @@ describe("Companions and me (e2e)", () => {
         availableTimes: ["20:00"],
         languages: ["中文"],
         specialties: ["情绪倾听"],
-        completedOrders: 0,
-        responseTime: "约1分钟",
         distanceKm: 0,
         availability: "available",
         cityDistrict: "平台内"

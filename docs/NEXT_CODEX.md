@@ -32,13 +32,13 @@
 
 4. 配置并监控 `PAYMENT_RECONCILIATION_ENABLED=true`、60 秒间隔与告警。重点演练：预约保留超时释放、服务结束后未开始的自动退款、失败退款的受控重试、账号注销资金结算。
 
-5. 每次编辑 `backend/api/public/admin/index.html` 后，重新计算内联脚本 SHA-256 并更新 `src/main.ts` 的 Helmet CSP；`npm run verify:prod-artifacts` 必须通过，不能手工跳过。
+5. 每次编辑 `backend/api/public/review/` 后，保持审核网页仅加载同源外部脚本（不引入内联脚本或用户登录接口）；`npm run verify:prod-artifacts` 必须通过，不能手工跳过。
 
 ## 仍需外部环境完成的工作
 
 - 真实微信登录、JSAPI 支付、退款回调与商户证书轮换联调。
 - 真实媒体存储、图像/OCR、语音转写适配器的实现与验收。未注册真实、加密的适配器前，生产环境必须保持 `MEDIA_FEATURE_ENABLED=false`、`MEDIA_PROVIDER=disabled`。
-- 审核员在 `/admin/` 完成退款、注销结算、账号状态/实名、陪伴者上架和媒体证据预览的人工验收；确认每个动作均有审计记录。
+- 审核员在 `/review/` 完成内容案件、证据、申诉与样本标注的人工验收；确认每个动作均有 ReviewAuditLog。退款、注销结算和陪伴者商业上架仍属非审核运营流程。
 - 真机微信小程序验收通知深链、预约付款保留提示、聊天图片与短语音上传。
 
 ## 已完成的关键保障

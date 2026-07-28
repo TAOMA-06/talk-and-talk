@@ -22,6 +22,9 @@
     "staff:bootstrap": "node dist/src/database/bootstrap-staff.js",
     "staff:bootstrap:dev": "npm run build && npm run staff:bootstrap",
     "staff:totp-secret": "node scripts/generate-totp-secret.mjs",
+    "review:bootstrap": "node dist/src/database/bootstrap-review-staff.js",
+    "review:bootstrap:dev": "npm run build && npm run review:bootstrap",
+    "review:totp-secret": "node scripts/generate-totp-secret.mjs",
     "preflight:deployment": "node scripts/deployment-preflight.mjs",
     "verify:voice-release-artifacts": "node scripts/voice-release-artifacts.mjs",
     "verify:cloudbase-template": "node scripts/validate-cloudbase-template.mjs"

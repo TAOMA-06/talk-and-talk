@@ -498,7 +498,7 @@ export class UsersService {
           acceptedAt,
           privacyUrl: definition.privacyUrl,
           termsUrl: definition.termsUrl,
-          source: "wechatMiniProgram"
+          source: dto.source
         }
       });
 
@@ -568,7 +568,7 @@ export class UsersService {
       receipt.termsAccepted === true &&
       receipt.adultConfirmed === true &&
       receipt.withdrawnAt === null &&
-      receipt.source === "wechatMiniProgram" &&
+      ["wechatMiniProgram", "web"].includes(receipt.source) &&
       receipt.version === definition.version &&
       receipt.privacyVersion === definition.version &&
       receipt.termsVersion === definition.version &&

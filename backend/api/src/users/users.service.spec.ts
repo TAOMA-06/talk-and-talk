@@ -160,7 +160,7 @@ describe("UsersService", () => {
       withdrawnAt: null,
       privacyUrl: "https://api.talkandtalk.app/legal/privacy.html",
       termsUrl: "https://api.talkandtalk.app/legal/terms.html",
-      source: "wechatMiniProgram"
+      source: "web"
     };
     const tx = {
       $queryRaw: jest.fn().mockResolvedValue([]),
@@ -179,7 +179,7 @@ describe("UsersService", () => {
       adultConfirmed: true,
       privacyUrl: "https://api.talkandtalk.app/legal/privacy.html",
       termsUrl: "https://api.talkandtalk.app/legal/terms.html",
-      source: "wechatMiniProgram"
+      source: "web"
     });
 
     expect(tx.legalConsentReceipt.create).toHaveBeenCalledWith({
@@ -191,7 +191,7 @@ describe("UsersService", () => {
         adultConfirmed: true,
         privacyUrl: "https://api.talkandtalk.app/legal/privacy.html",
         termsUrl: "https://api.talkandtalk.app/legal/terms.html",
-        source: "wechatMiniProgram"
+        source: "web"
       })
     });
     expect(audit.record).toHaveBeenCalledWith(

@@ -24,6 +24,9 @@ describe("Conversations (e2e)", () => {
     process.env.JWT_ACCESS_SECRET = "e2e-access-secret";
     process.env.JWT_REFRESH_SECRET = "e2e-refresh-secret";
     process.env.SMS_PROVIDER = "mock";
+    // Keep the API-created paid-chat scenario inside the default 15-minute
+    // chat window while still leaving a deterministic confirmation/payment gap.
+    process.env.ORDER_RESPONSE_WINDOW_MINUTES = "5";
 
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule]
@@ -110,7 +113,8 @@ describe("Conversations (e2e)", () => {
         amountCents: companion.pricePerHalfHour * 100,
         currency: "CNY",
         status: "paid",
-        scheduledAt: new Date(Date.now() + 60 * 60 * 1000),
+        // Paid chat opens only inside the configured pre-service window.
+        scheduledAt: new Date(Date.now() + 5 * 60 * 1000),
         companionNameSnapshot: companion.name,
         companionRoleSnapshot: companion.role,
         companionInitialsSnapshot: companion.initials,
@@ -450,7 +454,7 @@ describe("Conversations (e2e)", () => {
         companionId: "c1",
         themeId: "t1",
         durationMinutes: 30,
-        scheduledAt: new Date(Date.now() + 60 * 60 * 1000).toISOString()
+        scheduledAt: new Date(Date.now() + 12 * 60 * 1000).toISOString()
       })
       .expect(201);
     await request(app.getHttpServer())

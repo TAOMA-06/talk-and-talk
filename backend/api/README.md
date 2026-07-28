@@ -146,7 +146,7 @@ Completed (v0.1 ship scope):
 - Chat send with RuleEngine + production-required DeepSeek-compatible review; provider outages fail closed into human review
 - Admin Moderation API: overview, filtered queue, detail, conversation evidence, actions, labels export
 - User reports: `POST /moderation/reports`
-- Orders + WeChat API v3 App/JSAPI prepay, notify verification/decryption, refund; mock only on staging/dev when real credentials are absent
+- Orders + WeChat API v3 App/JSAPI/Native QR prepay, notify verification/decryption, refund; mock only on staging/dev when real credentials are absent
 - Notifications + account deletion request
 - Web ops console at `/admin/` (static)
 - Legal pages: `/legal/privacy.html`, `/legal/terms.html`

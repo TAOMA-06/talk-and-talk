@@ -25,7 +25,8 @@ talk-and-talk/
 | [docs/GUIDE.md](./docs/GUIDE.md) | 项目总指引 |
 | [shared/contracts](./shared/contracts) | OpenAPI v1 冻结契约 |
 | [docs/auth-api.md](./docs/auth-api.md) | Auth API 说明 |
-| [docs/admin-moderation-api.md](./docs/admin-moderation-api.md) | 审核后台 API |
+| [docs/admin-moderation-api.md](./docs/admin-moderation-api.md) | 独立审核部门 API |
+| [docs/review-department.md](./docs/review-department.md) | 审核部门边界、账号与上线操作 |
 | [docs/staging-acceptance.md](./docs/staging-acceptance.md) | Staging 与小程序联调 |
 | [docs/deploy-rollback.md](./docs/deploy-rollback.md) | 部署与回滚 |
 | [docs/production-checklist.md](./docs/production-checklist.md) | 生产检查清单 |
@@ -60,9 +61,9 @@ npm run start:dev
 curl http://localhost:3000/api/v1/health
 ```
 
-Web 审核后台：`http://localhost:3000/admin/`（独立用户名、密码和 TOTP；初始化见 `docs/staff-operations.md`）
+独立审核部门工作台：`http://localhost:3000/review/`（独立审核员用户名、密码和 TOTP；初始化见 `docs/review-department.md`）
 法律页：`http://localhost:3000/legal/privacy.html`、`/legal/terms.html`（稳定入口会跳转到配置化的当前版本）
-开发普通 phone 身份：`13800000001`（admin）、`13800000002`（moderator）；审核后台不使用短信登录。
+开发普通 phone 身份：`13800000001`（admin）、`13800000002`（moderator）；它们只用于用户/运营 API 测试，审核部门不使用短信登录。
 
 Docker（本地 API + Postgres + Redis）：
 
@@ -110,7 +111,9 @@ Release 数据安全规则：正式构建不会编译 `MockData` 或离线身份
 | `JWT_ACCESS_TTL` / `JWT_REFRESH_TTL` | 默认 `15m` / `30d` | 按需 |
 | `SMS_CODE_TTL_SECONDS` | 验证码 TTL，默认 `300` | |
 | `SMS_PROVIDER` | `mock` / `none`（真实厂商见 NEXT_PHASE） | **禁止 mock**；`none` 则无短信登录 |
-| `STAFF_TOTP_ENCRYPTION_KEY` | 加密审核后台 TOTP 种子 | **必填、独立高强度密钥** |
+| `REVIEW_JWT_ACCESS_SECRET` / `REVIEW_JWT_REFRESH_SECRET` | 审核部门专属 JWT 密钥 | **必填、不得复用用户 JWT** |
+| `REVIEW_TOTP_ENCRYPTION_KEY` | 加密审核部门 TOTP 种子 | **必填、不得复用运营 staff 密钥** |
+| `STAFF_TOTP_ENCRYPTION_KEY` | 非审核运营 staff 的历史 TOTP 密钥 | 仅保留运营兼容能力 |
 | `DEEPSEEK_API_KEY` | 文本审核提供方凭据；本地可空 | **生产必填** |
 | `DEEPSEEK_URL` / `DEEPSEEK_MODEL` | 文本审核端点与模型 | **生产显式配置、HTTPS** |
 | `WECHAT_PAY_*` | 微信商户与证书路径、回调 base | 真实收款时必填 |
@@ -143,7 +146,7 @@ npm run prisma:seed
 npm run db:seed
 ```
 
-写入本地/staging 陪伴者、可登录 owner 与 staff phone 测试身份。陪伴者 owner 手机为 `13800000101`–`13800000105`。生产禁止 `SEED_ON_STARTUP=true`；正式陪伴者与 staff 必须通过受控运营流程预置，不能复用默认账号。审核后台员工凭据按 `docs/staff-operations.md` 初始化。
+写入本地/staging 陪伴者、可登录 owner 与 staff phone 测试身份。陪伴者 owner 手机为 `13800000101`–`13800000105`。生产禁止 `SEED_ON_STARTUP=true`；正式陪伴者与 staff 必须通过受控运营流程预置，不能复用默认账号。审核部门凭据按 `docs/review-department.md` 初始化，不能复用用户或运营账号。
 
 ## 测试
 

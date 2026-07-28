@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>审核部门 · Talk&Talk</title>
+    <link rel="stylesheet" href="/review/assets/styles.css" />
+    <script src="/review/assets/app.js" defer></script>
+  </head>
+  <body>
+    <main id="loginView" class="login-shell">
+      <section class="login-intro" aria-labelledby="loginTitle">
+        <a class="wordmark" href="/review/" aria-label="Talk and Talk 审核部门首页">
+          <span class="wordmark-mark" aria-hidden="true">TT</span>
+          <span>Talk&amp;Talk</span>
+        </a>
+        <div class="intro-copy">
+          <p class="eyebrow">REVIEW DEPARTMENT</p>
+          <h1 id="loginTitle">把判断留在<br /><em>独立的地方。</em></h1>
+          <p>这是面向审核团队的受控工作台。它拥有独立账号、独立会话和专属审计轨迹，不属于用户应用。</p>
+        </div>
+        <dl class="security-points">
+          <div><dt>01</dt><dd>独立身份<br />密码与动态口令</dd></div>
+          <div><dt>02</dt><dd>最小证据<br />仅展示判断所需信息</dd></div>
+          <div><dt>03</dt><dd>可追溯决策<br />每项处置均留档</dd></div>
+        </dl>
+      </section>
+
+      <section class="login-panel" aria-label="审核部门登录">
+        <div class="login-card">
+          <p class="eyebrow">SECURE ACCESS</p>
+          <h2>进入审核工作台</h2>
+          <p class="muted">仅限已获授权的审核员与审核负责人。</p>
+          <form id="loginForm" class="credential-form" novalidate>
+            <label>
+              <span>审核员账号</span>
+              <input id="loginUsername" name="username" autocomplete="username" maxlength="80" placeholder="例如：reviewer.liu" required />
+            </label>
+            <label>
+              <span>密码</span>
+              <input id="loginPassword" name="password" type="password" autocomplete="current-password" minlength="16" maxlength="128" placeholder="输入审核部门密码" required />
+            </label>
+            <label>
+              <span>动态口令</span>
+              <input id="loginTotp" name="totpCode" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="6 位验证器口令" required />
+            </label>
+            <button class="button primary full" id="loginButton" type="submit">
+              <span>安全登录</span><span aria-hidden="true">→</span>
+            </button>
+            <p id="loginMessage" class="form-message" role="alert"></p>
+          </form>
+          <p class="login-footer">遇到访问问题，请联系审核部门负责人；请勿使用用户账户尝试登录。</p>
+        </div>
+      </section>
+    </main>
+
+    <div id="portalView" class="portal hidden">
+      <aside class="sidebar" aria-label="审核部门导航">
+        <a class="wordmark sidebar-wordmark" href="/review/">
+          <span class="wordmark-mark" aria-hidden="true">TT</span>
+          <span>Talk&amp;Talk</span>
+        </a>
+        <div class="department-label"><span class="status-dot"></span>审核部门</div>
+        <nav class="nav-list">
+          <button class="nav-item active" data-view-target="workbench" type="button">
+            <span class="nav-icon" aria-hidden="true">⌁</span><span>审核工作台</span>
+          </button>
+          <button class="nav-item" data-view-target="labels" type="button">
+            <span class="nav-icon" aria-hidden="true">◇</span><span>样本标注</span>
+          </button>
+        </nav>
+        <div class="sidebar-bottom">
+          <div class="reviewer-card">
+            <span class="reviewer-avatar" id="reviewerInitials">审</span>
+            <div><strong id="reviewerName">审核员</strong><small id="reviewerRole">reviewer</small></div>
+          </div>
+          <button id="logoutButton" class="text-button" type="button">退出独立会话 <span aria-hidden="true">↗</span></button>
+        </div>
+      </aside>
+
+      <main class="portal-main">
+        <header class="portal-header">
+          <div>
+            <p class="eyebrow">TODAY'S REVIEW QUEUE</p>
+            <h1 id="pageTitle">审核工作台</h1>
+          </div>
+          <div class="header-actions">
+            <span id="lastUpdated" class="last-updated">尚未加载</span>
+            <button id="refreshButton" class="button quiet" type="button">刷新队列</button>
+          </div>
+        </header>
+
+        <section id="workbenchView" class="view-panel">
+          <div class="metrics-grid" aria-label="审核概览">
+            <article class="metric-card accent"><span>待处理</span><strong id="metricPending">—</strong><small id="metricPriority">优先处理 critical / high</small></article>
+            <article class="metric-card"><span>人工复核</span><strong id="metricReview">—</strong><small>需要明确处置的案件</small></article>
+            <article class="metric-card"><span>已拦截</span><strong id="metricBlocked">—</strong><small>本队列历史判断</small></article>
+            <article class="metric-card"><span>已标注</span><strong id="metricLabels">—</strong><small>用于规则质量复盘</small></article>
+          </div>
+
+          <section class="workbench" aria-label="审核案件">
+            <div class="queue-column panel-surface">
+              <div class="panel-heading">
+                <div><p class="eyebrow">QUEUE</p><h2>待审工单 <span id="caseCount" class="count-pill">0</span></h2></div>
+              </div>
+              <form id="filterForm" class="filter-form">
+                <div class="filter-row">
+                  <label><span class="sr-only">状态</span><select id="filterStatus"><option value="">全部状态</option><option value="pending">待处理</option><option value="autoReviewing">自动复核</option><option value="humanReview">人工复核</option><option value="resolved">已解决</option><option value="dismissed">已放行</option></select></label>
+                  <label><span class="sr-only">风险等级</span><select id="filterRisk"><option value="">全部风险</option><option value="high">高风险</option><option value="medium">中风险</option><option value="low">低风险</option></select></label>
+                </div>
+                <div class="filter-row">
+                  <label><span class="sr-only">优先级</span><select id="filterPriority"><option value="">全部优先级</option><option value="critical">紧急</option><option value="high">高</option><option value="normal">普通</option></select></label>
+                  <label><span class="sr-only">来源</span><select id="filterSource"><option value="">全部来源</option><option value="chat">聊天</option><option value="community">社区</option><option value="report">举报</option><option value="profile">资料</option></select></label>
+                </div>
+                <label class="search-field"><span aria-hidden="true">⌕</span><input id="filterKeyword" maxlength="200" placeholder="搜索内容、规则或理由" /></label>
+                <button class="button quiet full" type="submit">应用筛选</button>
+              </form>
+              <div id="caseList" class="case-list" aria-live="polite"></div>
+              <div id="pagination" class="pagination"></div>
+            </div>
+
+            <div class="detail-column panel-surface">
+              <div id="caseDetail" class="case-detail empty-state">
+                <div class="empty-mark" aria-hidden="true">◎</div>
+                <h2>选择一条工单</h2>
+                <p>左侧筛选并打开待审案件。证据、上下文和处置记录将在此处呈现。</p>
+              </div>
+            </div>
+          </section>
+        </section>
+
+        <section id="labelsView" class="view-panel hidden">
+          <div class="label-layout">
+            <article class="panel-surface label-intro">
+              <p class="eyebrow">QUALITY LOOP</p>
+              <h2>样本标注</h2>
+              <p>将模型判断与人工结论沉淀为可复盘样本。仅保存与审核目的相关的最小文本和说明。</p>
+              <dl>
+                <div><dt>期待判断</dt><dd>规则或模型原本应给出的结论</dd></div>
+                <div><dt>实际判断</dt><dd>审核员基于证据的最终结论</dd></div>
+                <div><dt>备注</dt><dd>记录边界、上下文或策略说明</dd></div>
+              </dl>
+            </article>
+            <form id="labelForm" class="panel-surface label-form" novalidate>
+              <div class="panel-heading"><div><p class="eyebrow">NEW LABEL</p><h2>新建审核样本</h2></div></div>
+              <label><span>样本文本</span><textarea id="labelText" minlength="1" maxlength="2000" placeholder="粘贴或从当前案件带入需要复盘的文本" required></textarea></label>
+              <div class="two-up">
+                <label><span>期待判断</span><select id="expectedDecision"><option value="block">拦截 block</option><option value="warn">提醒 warn</option><option value="review">复核 review</option><option value="allow">放行 allow</option></select></label>
+                <label><span>实际判断</span><select id="actualDecision"><option value="allow">放行 allow</option><option value="review">复核 review</option><option value="warn">提醒 warn</option><option value="block">拦截 block</option></select></label>
+              </div>
+              <label><span>备注（可选）</span><input id="labelNote" maxlength="1000" placeholder="说明策略边界或上下文" /></label>
+              <div class="form-actions"><button class="button primary" type="submit">保存样本</button><button id="exportLabelsButton" class="button quiet" type="button">导出 JSON</button></div>
+              <p id="labelMessage" class="form-message" role="alert"></p>
+            </form>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  </body>
+</html>

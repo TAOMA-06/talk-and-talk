@@ -19,6 +19,10 @@ export type WeChatMiniProgramPayParams = {
   paySign: string;
 };
 
+export type WeChatNativePayParams = {
+  codeUrl: string;
+};
+
 export type WeChatPrepayInput = {
   outTradeNo: string;
   description: string;
@@ -45,7 +49,17 @@ export type WeChatMiniProgramPrepayResult = {
   mock: boolean;
 };
 
-export type WeChatPrepayResult = WeChatAppPrepayResult | WeChatMiniProgramPrepayResult;
+export type WeChatNativePrepayResult = {
+  prepayId: string;
+  channel: "native";
+  clientParams: WeChatNativePayParams;
+  mock: boolean;
+};
+
+export type WeChatPrepayResult =
+  | WeChatAppPrepayResult
+  | WeChatMiniProgramPrepayResult
+  | WeChatNativePrepayResult;
 
 export type WeChatNotifyPayload = {
   appId: string;
@@ -89,6 +103,7 @@ export interface WeChatPayProvider {
   readonly isMock: boolean;
   createAppPrepay(input: WeChatPrepayInput): Promise<WeChatAppPrepayResult>;
   createMiniProgramPrepay(input: WeChatMiniProgramPrepayInput): Promise<WeChatMiniProgramPrepayResult>;
+  createNativePrepay(input: WeChatPrepayInput): Promise<WeChatNativePrepayResult>;
   closePayment(outTradeNo: string): Promise<void>;
   queryPayment(outTradeNo: string): Promise<WeChatNotifyPayload>;
   verifyNotifySignature(headers: Record<string, string | string[] | undefined>, rawBody: string): boolean;

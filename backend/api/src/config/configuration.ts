@@ -23,6 +23,10 @@ interface Environment {
   JWT_REFRESH_SECRET: string;
   JWT_ACCESS_TTL: string;
   JWT_REFRESH_TTL: string;
+  REVIEW_JWT_ACCESS_SECRET: string;
+  REVIEW_JWT_REFRESH_SECRET: string;
+  REVIEW_JWT_ACCESS_TTL: string;
+  REVIEW_JWT_REFRESH_TTL: string;
   SMS_CODE_TTL_SECONDS: number;
   DEEPSEEK_API_KEY: string;
   DEEPSEEK_URL: string;
@@ -55,6 +59,7 @@ interface Environment {
   APPLE_SIGN_IN_BUNDLE_ID: string;
   SMS_PROVIDER: string;
   STAFF_TOTP_ENCRYPTION_KEY: string;
+  REVIEW_TOTP_ENCRYPTION_KEY: string;
   RATE_LIMIT_PER_MINUTE: number;
   BODY_SIZE_LIMIT: string;
   SEED_ON_STARTUP: boolean;
@@ -384,6 +389,10 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
 
   const jwtAccessSecret = env.JWT_ACCESS_SECRET?.trim() || (nodeEnv === "production" ? "" : "dev-access-secret");
   const jwtRefreshSecret = env.JWT_REFRESH_SECRET?.trim() || (nodeEnv === "production" ? "" : "dev-refresh-secret");
+  const reviewJwtAccessSecret = env.REVIEW_JWT_ACCESS_SECRET?.trim() ||
+    (nodeEnv === "production" ? "" : "dev-review-access-secret");
+  const reviewJwtRefreshSecret = env.REVIEW_JWT_REFRESH_SECRET?.trim() ||
+    (nodeEnv === "production" ? "" : "dev-review-refresh-secret");
 
   if ((nodeEnv === "production" || appEnv === "production") && (!jwtAccessSecret || !jwtRefreshSecret)) {
     throw new Error("JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must be set in production");
@@ -393,6 +402,18 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
   }
   if (appEnv === "production" && jwtAccessSecret === jwtRefreshSecret) {
     throw new Error("JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must be different in production");
+  }
+  if ((nodeEnv === "production" || appEnv === "production") && (!reviewJwtAccessSecret || !reviewJwtRefreshSecret)) {
+    throw new Error("REVIEW_JWT_ACCESS_SECRET and REVIEW_JWT_REFRESH_SECRET must be set in production");
+  }
+  if (appEnv === "production" && (reviewJwtAccessSecret.length < 32 || reviewJwtRefreshSecret.length < 32)) {
+    throw new Error("REVIEW_JWT_ACCESS_SECRET and REVIEW_JWT_REFRESH_SECRET must each contain at least 32 characters in production");
+  }
+  if (appEnv === "production" && reviewJwtAccessSecret === reviewJwtRefreshSecret) {
+    throw new Error("REVIEW_JWT_ACCESS_SECRET and REVIEW_JWT_REFRESH_SECRET must be different in production");
+  }
+  if (appEnv === "production" && (reviewJwtAccessSecret === jwtAccessSecret || reviewJwtRefreshSecret === jwtRefreshSecret)) {
+    throw new Error("Review JWT secrets must not reuse consumer JWT secrets in production");
   }
 
   const metricsToken = optionalString(env.METRICS_TOKEN);
@@ -405,6 +426,8 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
   if (appEnv === "production") {
     assertProductionValue("JWT_ACCESS_SECRET", jwtAccessSecret);
     assertProductionValue("JWT_REFRESH_SECRET", jwtRefreshSecret);
+    assertProductionValue("REVIEW_JWT_ACCESS_SECRET", reviewJwtAccessSecret);
+    assertProductionValue("REVIEW_JWT_REFRESH_SECRET", reviewJwtRefreshSecret);
     assertProductionValue("METRICS_TOKEN", metricsToken);
     assertProductionValue("DATABASE_URL", env.DATABASE_URL!.trim());
     assertProductionValue("REDIS_URL", env.REDIS_URL!.trim());
@@ -433,11 +456,20 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
   }
   const staffTotpEncryptionKey = optionalString(env.STAFF_TOTP_ENCRYPTION_KEY) ||
     (appEnv === "production" ? "" : "development-staff-totp-key-not-for-production");
+  const reviewTotpEncryptionKey = optionalString(env.REVIEW_TOTP_ENCRYPTION_KEY) ||
+    (appEnv === "production" ? "" : "development-review-totp-key-not-for-production");
   if (appEnv === "production") {
     if (staffTotpEncryptionKey.length < 32) {
       throw new Error("STAFF_TOTP_ENCRYPTION_KEY must contain at least 32 characters in production");
     }
     assertProductionValue("STAFF_TOTP_ENCRYPTION_KEY", staffTotpEncryptionKey);
+    if (reviewTotpEncryptionKey.length < 32) {
+      throw new Error("REVIEW_TOTP_ENCRYPTION_KEY must contain at least 32 characters in production");
+    }
+    if (reviewTotpEncryptionKey === staffTotpEncryptionKey) {
+      throw new Error("REVIEW_TOTP_ENCRYPTION_KEY must not reuse STAFF_TOTP_ENCRYPTION_KEY in production");
+    }
+    assertProductionValue("REVIEW_TOTP_ENCRYPTION_KEY", reviewTotpEncryptionKey);
   }
   const seedOnStartup = parseBoolean(env.SEED_ON_STARTUP, appEnv === "staging");
   if (appEnv === "production" && seedOnStartup) {
@@ -892,6 +924,10 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     JWT_REFRESH_SECRET: jwtRefreshSecret,
     JWT_ACCESS_TTL: env.JWT_ACCESS_TTL?.trim() || "15m",
     JWT_REFRESH_TTL: env.JWT_REFRESH_TTL?.trim() || "30d",
+    REVIEW_JWT_ACCESS_SECRET: reviewJwtAccessSecret,
+    REVIEW_JWT_REFRESH_SECRET: reviewJwtRefreshSecret,
+    REVIEW_JWT_ACCESS_TTL: env.REVIEW_JWT_ACCESS_TTL?.trim() || "15m",
+    REVIEW_JWT_REFRESH_TTL: env.REVIEW_JWT_REFRESH_TTL?.trim() || "8h",
     SMS_CODE_TTL_SECONDS: positiveInteger("SMS_CODE_TTL_SECONDS", env.SMS_CODE_TTL_SECONDS, 300),
     DEEPSEEK_API_KEY: deepseekApiKey,
     DEEPSEEK_URL: deepseekUrl,
@@ -924,6 +960,7 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     APPLE_SIGN_IN_BUNDLE_ID: optionalString(env.APPLE_SIGN_IN_BUNDLE_ID),
     SMS_PROVIDER: smsProvider,
     STAFF_TOTP_ENCRYPTION_KEY: staffTotpEncryptionKey,
+    REVIEW_TOTP_ENCRYPTION_KEY: reviewTotpEncryptionKey,
     RATE_LIMIT_PER_MINUTE: positiveInteger("RATE_LIMIT_PER_MINUTE", env.RATE_LIMIT_PER_MINUTE, 120),
     BODY_SIZE_LIMIT: env.BODY_SIZE_LIMIT?.trim() || "1mb",
     SEED_ON_STARTUP: seedOnStartup,

@@ -8,12 +8,11 @@ import { SupportModule } from "../support/support.module";
 import { UsersModule } from "../users/users.module";
 import { AdminController } from "./admin.controller";
 import { AdminCommercialController } from "./commercial/admin-commercial.controller";
-import { AdminModerationController } from "./moderation/admin-moderation.controller";
-import { AdminModerationService } from "./moderation/admin-moderation.service";
 
 @Module({
   imports: [CompanionsModule, UsersModule, PaymentsModule, ModerationModule, CommercialModule, SupportModule],
-  controllers: [AdminController, AdminModerationController, AdminCommercialController],
-  providers: [AdminModerationService]
+  // Moderation is deliberately not an AdminModule concern. Review staff now
+  // authenticate through ReviewModule and receive a separate token domain.
+  controllers: [AdminController, AdminCommercialController]
 })
 export class AdminModule {}

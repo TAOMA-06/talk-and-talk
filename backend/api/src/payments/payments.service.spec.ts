@@ -855,6 +855,30 @@ describe("PaymentsService", () => {
     expect(result.payment.wechatAppParams).toBeUndefined();
   });
 
+  it("creates Native Pay parameters for a web checkout", async () => {
+    const pendingOrder = { ...baseOrder, status: "pending" };
+    prisma.$transaction.mockImplementation(async (fn: any) => fn({
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      paymentTransaction: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({ id: "p-native", outTradeNo: "T-native", status: "initiated" })
+      },
+      order: {
+        findUnique: jest.fn().mockResolvedValue(pendingOrder),
+        update: jest.fn().mockResolvedValue({ ...pendingOrder, status: "paying" })
+      }
+    }));
+
+    const result = await service.prepay("u1", "o1", "native");
+
+    expect(result.payment.channel).toBe("native");
+    expect(result.payment.wechatNativeParams).toEqual({
+      codeUrl: expect.stringMatching(/^weixin:\/\/wxpay\/bizpayurl/)
+    });
+    expect(result.payment.wechatAppParams).toBeUndefined();
+    expect(result.payment.wechatMiniProgramParams).toBeUndefined();
+  });
+
   it("does not create a prepay when the order-level voice feature guard is closed", async () => {
     const pendingVoiceOrder = {
       ...baseOrder,

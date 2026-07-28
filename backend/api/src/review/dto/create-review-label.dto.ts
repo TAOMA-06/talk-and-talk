@@ -3,7 +3,7 @@ import { IsIn, IsOptional, IsString, MaxLength, MinLength } from "class-validato
 const DECISIONS = ["allow", "warn", "block", "review"] as const;
 const SOURCES = ["chat", "community", "report", "profile"] as const;
 
-export class CreateLabelDto {
+export class CreateReviewLabelDto {
   @IsString()
   @MinLength(1)
   @MaxLength(2000)

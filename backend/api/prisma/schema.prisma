@@ -14,6 +14,18 @@ enum UserRole {
   admin
 }
 
+// Review staff belong to an independent internal department. They must never
+// be represented by a consumer-facing User row or share its login sessions.
+enum ReviewStaffRole {
+  reviewer
+  lead
+}
+
+enum ReviewStaffStatus {
+  active
+  suspended
+}
+
 enum AuthProvider {
   phone
   apple
@@ -320,6 +332,7 @@ enum DeletionRequestStatus {
 
 enum LegalConsentSource {
   wechatMiniProgram
+  web
 }
 
 enum RecommendationPlacement {
@@ -404,6 +417,59 @@ model StaffCredential {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([username, lockedUntil])
+}
+
+model ReviewStaff {
+  id                   String            @id @default(uuid())
+  username             String            @unique
+  displayName          String
+  role                 ReviewStaffRole   @default(reviewer)
+  status               ReviewStaffStatus @default(active)
+  passwordHash         String
+  totpSecretCiphertext String
+  failedAttempts       Int               @default(0)
+  lockedUntil          DateTime?
+  lastLoginAt          DateTime?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  sessions             ReviewSession[]
+  auditLogs            ReviewAuditLog[]
+  moderationActions    ModerationActionLog[] @relation("ReviewStaffModerationActions")
+  moderationLabels     ModerationLabel[]     @relation("ReviewStaffModerationLabels")
+
+  @@index([username, lockedUntil])
+  @@index([status, role])
+}
+
+model ReviewSession {
+  id         String   @id @default(uuid())
+  reviewerId String
+  tokenHash  String   @unique
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime @default(now())
+
+  reviewer ReviewStaff @relation(fields: [reviewerId], references: [id], onDelete: Cascade)
+
+  @@index([reviewerId])
+}
+
+// This log is owned by the review department. It intentionally has no User
+// relation, so a review decision cannot be mistaken for a consumer action.
+model ReviewAuditLog {
+  id           String   @id @default(uuid())
+  reviewerId   String
+  action       String
+  resourceType String
+  resourceId   String?
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  reviewer ReviewStaff @relation(fields: [reviewerId], references: [id], onDelete: Restrict)
+
+  @@index([reviewerId, createdAt])
+  @@index([resourceType, resourceId])
+  @@index([createdAt])
 }
 
 model UserProfile {
@@ -1119,16 +1185,19 @@ model ModerationEvidence {
 }
 
 model ModerationActionLog {
-  id        String   @id @default(uuid())
-  caseId    String
-  actorId   String?
-  action    String
-  note      String?
-  createdAt DateTime @default(now())
+  id         String       @id @default(uuid())
+  caseId     String
+  actorId    String?
+  reviewerId String?
+  action     String
+  note       String?
+  createdAt  DateTime     @default(now())
 
-  case ModerationCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  case     ModerationCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  reviewer ReviewStaff?   @relation("ReviewStaffModerationActions", fields: [reviewerId], references: [id], onDelete: SetNull)
 
   @@index([caseId])
+  @@index([reviewerId, createdAt])
 }
 
 model AuditLog {
@@ -1396,11 +1465,15 @@ model ModerationLabel {
   note             String?
   caseId           String?
   actorId          String?
+  reviewerId       String?
   source           ModerationSource?
   createdAt        DateTime           @default(now())
 
+  reviewer ReviewStaff? @relation("ReviewStaffModerationLabels", fields: [reviewerId], references: [id], onDelete: SetNull)
+
   @@index([createdAt])
   @@index([caseId])
+  @@index([reviewerId, createdAt])
 }
 
 model ServiceTag {

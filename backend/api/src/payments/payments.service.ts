@@ -92,7 +92,7 @@ export class PaymentsService implements OnModuleInit {
   async prepay(
     userId: string,
     orderId: string,
-    channel: "app" | "miniProgram" = "app"
+    channel: "app" | "miniProgram" | "native" = "app"
   ): Promise<any> {
     const orderRef = await this.prisma.order.findUnique({
       where: { id: orderId },
@@ -261,12 +261,16 @@ export class PaymentsService implements OnModuleInit {
       let prepay: any;
       let remoteCreated = false;
       try {
-        prepay = result.provision.channel === "miniProgram"
-          ? await this.wechat.createMiniProgramPrepay({
-              ...result.provision.input,
-              openId: await this.findMiniProgramOpenId(userId)
-            })
-          : await this.wechat.createAppPrepay(result.provision.input);
+        if (result.provision.channel === "miniProgram") {
+          prepay = await this.wechat.createMiniProgramPrepay({
+            ...result.provision.input,
+            openId: await this.findMiniProgramOpenId(userId)
+          });
+        } else if (result.provision.channel === "native") {
+          prepay = await this.wechat.createNativePrepay(result.provision.input);
+        } else {
+          prepay = await this.wechat.createAppPrepay(result.provision.input);
+        }
         remoteCreated = true;
         const persisted = await this.prisma.paymentTransaction.updateMany({
           where: {
@@ -310,7 +314,8 @@ export class PaymentsService implements OnModuleInit {
         mock: result.prepay.mock,
         channel: result.prepay.channel,
         wechatAppParams: result.prepay.channel === "app" ? result.prepay.clientParams : undefined,
-        wechatMiniProgramParams: result.prepay.channel === "miniProgram" ? result.prepay.clientParams : undefined
+        wechatMiniProgramParams: result.prepay.channel === "miniProgram" ? result.prepay.clientParams : undefined,
+        wechatNativeParams: result.prepay.channel === "native" ? result.prepay.clientParams : undefined
       }
     };
   }
@@ -1568,7 +1573,7 @@ export class PaymentsService implements OnModuleInit {
     );
   }
 
-  private prepayChannel(clientParams: unknown): "app" | "miniProgram" {
+  private prepayChannel(clientParams: unknown): "app" | "miniProgram" | "native" {
     if (!clientParams || typeof clientParams !== "object" || Array.isArray(clientParams)) {
       throw new AppException(
         "PAYMENT_INVALID_STATE",
@@ -1576,6 +1581,7 @@ export class PaymentsService implements OnModuleInit {
         HttpStatus.CONFLICT
       );
     }
+    if ("codeUrl" in clientParams) return "native";
     return "paySign" in clientParams ? "miniProgram" : "app";
   }
 

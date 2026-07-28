@@ -97,5 +97,5 @@ export function shouldFailClosed(req: Request, appEnv: string): boolean {
     return false;
   }
   const path = req.originalUrl || req.url || "";
-  return /(?:^|\/)auth\/(?:sms\/send-code|phone\/login|wechat\/mini-program|refresh)(?:[/?]|$)/.test(path);
+  return /(?:^|\/)(?:auth\/(?:sms\/send-code|phone\/login|wechat\/mini-program|refresh)|review\/auth\/(?:login|refresh))(?:[/?]|$)/.test(path);
 }

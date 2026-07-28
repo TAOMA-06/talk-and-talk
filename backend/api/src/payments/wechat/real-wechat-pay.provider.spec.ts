@@ -145,6 +145,46 @@ describe("RealWeChatPayProvider helpers", () => {
     unlinkSync(keyPath);
   });
 
+  it("creates Native Pay params with a browser-scannable code URL", async () => {
+    const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+    const fetchImpl = jest.fn().mockResolvedValue({
+      ok: true,
+      text: async () => JSON.stringify({ code_url: "weixin://wxpay/bizpayurl?pr=native-token" })
+    });
+    const provider = new RealWeChatPayProvider({
+      appId: "wx_web_app",
+      mchId: "1900000000",
+      apiV3Key: "B".repeat(32),
+      privateKey: privateKey.export({ type: "pkcs8", format: "pem" }).toString(),
+      certSerialNo: "SERIAL1",
+      apiBaseUrl: "https://example.test",
+      fetchImpl: fetchImpl as unknown as typeof fetch
+    });
+    const expiresAt = new Date("2026-07-19T04:00:00.000Z");
+
+    const result = await provider.createNativePrepay({
+      outTradeNo: "T-native",
+      description: "test",
+      amountCents: 100,
+      notifyUrl: "https://api.example/notify",
+      expiresAt
+    });
+
+    expect(result).toEqual({
+      prepayId: "native:T-native",
+      channel: "native",
+      mock: false,
+      clientParams: { codeUrl: "weixin://wxpay/bizpayurl?pr=native-token" }
+    });
+    expect(fetchImpl.mock.calls[0][0]).toBe("https://example.test/v3/pay/transactions/native");
+    expect(JSON.parse(fetchImpl.mock.calls[0][1].body)).toEqual(expect.objectContaining({
+      appid: "wx_web_app",
+      mchid: "1900000000",
+      out_trade_no: "T-native",
+      time_expire: expiresAt.toISOString()
+    }));
+  });
+
   it("maps an aborted WeChat request to a gateway timeout error", async () => {
     const dir = mkdtempSync(join(tmpdir(), "wx-pay-"));
     const keyPath = join(dir, "key.pem");

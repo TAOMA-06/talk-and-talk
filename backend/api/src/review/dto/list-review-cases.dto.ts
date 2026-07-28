@@ -1,7 +1,7 @@
 import { Type } from "class-transformer";
 import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from "class-validator";
 
-export class ListAdminCasesQueryDto {
+export class ListReviewCasesQueryDto {
   @IsOptional()
   @IsIn(["pending", "autoReviewing", "humanReview", "resolved", "dismissed"])
   status?: "pending" | "autoReviewing" | "humanReview" | "resolved" | "dismissed";

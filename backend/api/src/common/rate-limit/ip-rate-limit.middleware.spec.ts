@@ -34,7 +34,9 @@ describe("shouldFailClosed", () => {
     "/api/v1/auth/sms/send-code",
     "/api/v1/auth/phone/login",
     "/api/v1/auth/wechat/mini-program",
-    "/api/v1/auth/refresh"
+    "/api/v1/auth/refresh",
+    "/api/v1/review/auth/login",
+    "/api/v1/review/auth/refresh"
   ])("protects production authentication route %s", (originalUrl) => {
     expect(shouldFailClosed({ method: "POST", originalUrl } as any, "production")).toBe(true);
   });
