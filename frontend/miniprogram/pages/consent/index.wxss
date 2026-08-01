@@ -10,4 +10,9 @@
 .agreement checkbox { flex: none; transform: scale(.82); transform-origin: top left; }
 .accept { margin-top: 40rpx; }
 .accept[disabled] { background: #d9c6ca; color: #ffffff; }
+.rights-recovery { margin-top: 32rpx; padding: 28rpx; border: 1rpx solid #e5d9dc; border-radius: 20rpx; background: #ffffff; }
+.rights-title { color: #3f3034; font-size: 28rpx; font-weight: 700; }
+.rights-copy { margin-top: 12rpx; color: #6b585d; font-size: 25rpx; line-height: 1.65; }
+.recovery-button { width: 100%; margin-top: 22rpx; border: 1rpx solid #b94a68; background: #ffffff; color: #a43f5c; font-size: 27rpx; }
+.recovery-button[disabled] { border-color: #d9c6ca; color: #a88f96; }
 .customer-service { width: 100%; margin-top: 28rpx; text-align: center; }

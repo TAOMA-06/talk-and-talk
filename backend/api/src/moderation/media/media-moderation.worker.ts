@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 
+import { CrisisInterventionService } from "../../crisis-intervention/crisis-intervention.service";
 import { PrismaService } from "../../database/prisma.service";
 import { NotificationsService } from "../../notifications/notifications.service";
 import { ChatRestrictionService } from "../chat-restriction.service";
@@ -17,11 +18,15 @@ import { MediaAssetService } from "./media-asset.service";
 const MAX_RETRIES = 3;
 const RETRY_DELAYS_MS = [30_000, 2 * 60_000, 10 * 60_000];
 const PROCESSING_LEASE_MS = 10 * 60_000;
+const MAINTENANCE_MAX_BATCHES_PER_RUN = 10;
+const QUEUED_MEDIA_BATCH_SIZE = 20;
+const CONTINUATION_DELAY_MS = 1_000;
 
 @Injectable()
 export class MediaModerationWorker implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(MediaModerationWorker.name);
   private timer: NodeJS.Timeout | null = null;
+  private continuationTimer: NodeJS.Timeout | null = null;
   private processingPending = false;
 
   constructor(
@@ -32,7 +37,8 @@ export class MediaModerationWorker implements OnModuleInit, OnModuleDestroy {
     private readonly ruleEngine: RuleEngine,
     private readonly cases: ModerationCaseService,
     private readonly restrictions: ChatRestrictionService,
-    private readonly notifications: NotificationsService
+    private readonly notifications: NotificationsService,
+    private readonly crisisIntervention: CrisisInterventionService
   ) {}
 
   onModuleInit() {
@@ -44,7 +50,9 @@ export class MediaModerationWorker implements OnModuleInit, OnModuleDestroy {
 
   onModuleDestroy() {
     if (this.timer) clearInterval(this.timer);
+    if (this.continuationTimer) clearTimeout(this.continuationTimer);
     this.timer = null;
+    this.continuationTimer = null;
   }
 
   enqueue(messageId: string) {
@@ -55,26 +63,54 @@ export class MediaModerationWorker implements OnModuleInit, OnModuleDestroy {
   async processPending() {
     if (!this.mediaAssets.isFeatureEnabled() || this.processingPending) return;
     this.processingPending = true;
+    let continuationRequired = false;
     try {
-      await this.mediaAssets.expireDueAssets();
-      const staleBefore = new Date(Date.now() - PROCESSING_LEASE_MS);
-      const messages: any[] = await this.prisma.message.findMany({
+      for (let batch = 0; batch < MAINTENANCE_MAX_BATCHES_PER_RUN; batch += 1) {
+        const expiry = await this.mediaAssets.expireDueAssets();
+        if (!expiry?.hasMore) break;
+        if (batch === MAINTENANCE_MAX_BATCHES_PER_RUN - 1) {
+          continuationRequired = true;
+        }
+      }
+      const now = new Date();
+      const staleBefore = new Date(now.getTime() - PROCESSING_LEASE_MS);
+      const messageCandidates: any[] = await this.prisma.message.findMany({
         where: {
           moderationStatus: "queued",
-          attachments: { some: {} },
+          // A message is processed atomically with all of its attachments. Do
+          // not let an older message in provider backoff occupy the head of the
+          // queue and starve later ready messages.
+          attachments: {
+            some: {},
+            every: {
+              OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now } }]
+            }
+          },
           OR: [
             { moderationProcessingToken: null },
             { moderationProcessingAt: { lt: staleBefore } }
           ]
         },
         select: { id: true },
-        orderBy: { createdAt: "asc" },
-        take: 20
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        take: QUEUED_MEDIA_BATCH_SIZE + 1
       } as any);
+      const messages = messageCandidates.slice(0, QUEUED_MEDIA_BATCH_SIZE);
+      continuationRequired ||= messageCandidates.length > QUEUED_MEDIA_BATCH_SIZE;
       await Promise.all(messages.map((message) => this.processMessage(message.id)));
     } finally {
       this.processingPending = false;
+      if (continuationRequired) this.scheduleContinuation();
     }
+  }
+
+  private scheduleContinuation(): void {
+    if (this.continuationTimer) return;
+    this.continuationTimer = setTimeout(() => {
+      this.continuationTimer = null;
+      this.processPendingSafely();
+    }, CONTINUATION_DELAY_MS);
+    this.continuationTimer.unref?.();
   }
 
   private processPendingSafely(): void {
@@ -121,6 +157,7 @@ export class MediaModerationWorker implements OnModuleInit, OnModuleDestroy {
     } as any);
     if (claimed.count !== 1) return;
 
+    let criticalSafetyTransactionRequired = false;
     try {
       const analysis = await this.analyzeAssets(message.attachments);
       if (!analysis.available) {
@@ -129,6 +166,8 @@ export class MediaModerationWorker implements OnModuleInit, OnModuleDestroy {
       }
 
       const moderation = await this.moderateMessage(message, analysis);
+      criticalSafetyTransactionRequired = moderation.priority === "critical"
+        && (moderation.categories.includes("selfHarm") || moderation.categories.includes("violence"));
       const moderatedStatus = moderation.decision === "allow"
         ? "published"
         : moderation.decision === "block"
@@ -202,6 +241,14 @@ export class MediaModerationWorker implements OnModuleInit, OnModuleDestroy {
             );
           }
         }
+        // Media analysis runs later, but the claimed message still supplies the
+        // authenticated uploader. Keep crisis ownership away from the other
+        // conversation participant and persist no extracted text or message id.
+        await this.crisisIntervention.recordCriticalChatSignal(
+          message.senderId,
+          { priority: moderation.priority, categories: moderation.categories },
+          db
+        );
         if (moderation.priority === "critical") {
           await this.createCriticalSafetyMessage(db, message);
         }
@@ -228,6 +275,14 @@ export class MediaModerationWorker implements OnModuleInit, OnModuleDestroy {
       if (!transitioned) return;
 
     } catch (error) {
+      // Never turn a failed critical-safety transaction into an ordinary media
+      // provider retry that eventually expires into generic human review. The
+      // message stays queued and sender-only until the complete transaction,
+      // including the crisis gate, can commit.
+      if (criticalSafetyTransactionRequired) {
+        await this.releaseClaim(message.id, processingToken);
+        throw error;
+      }
       await this.scheduleRetryOrReview(message, {
         available: false,
         score: 0.05,

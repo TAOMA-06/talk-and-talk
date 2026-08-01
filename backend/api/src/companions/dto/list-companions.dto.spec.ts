@@ -12,7 +12,9 @@ describe("ListCompanionsQueryDto", () => {
       maxServicePriceCents: 8_800,
       availableWithinDays: 3,
       keyword: "晚间 文字",
-      sortBy: "soonestAvailable"
+      sortBy: "soonestAvailable",
+      language: "中文",
+      specialty: "情绪倾听"
     });
 
     await expect(validate(dto)).resolves.toHaveLength(0);
@@ -25,18 +27,28 @@ describe("ListCompanionsQueryDto", () => {
       maxServicePriceCents: 99,
       availableWithinDays: 8,
       keyword: "",
-      sortBy: "privateBehavior"
+      sortBy: "privateBehavior",
+      language: "",
+      specialty: "a".repeat(41)
     });
 
     const errors = await validate(dto);
 
     expect(errors.map((error) => error.property)).toEqual(expect.arrayContaining([
-      "topicId", "deliveryMode", "maxServicePriceCents", "availableWithinDays", "keyword", "sortBy"
+      "topicId", "deliveryMode", "maxServicePriceCents", "availableWithinDays", "keyword", "sortBy", "language", "specialty"
     ]));
 
     const normalized = plainToInstance(ListCompanionsQueryDto, { keyword: "  晚间\n  文字  " });
     await expect(validate(normalized)).resolves.toHaveLength(0);
     expect(normalized.keyword).toBe("晚间 文字");
+
+    const normalizedTrustFilters = plainToInstance(ListCompanionsQueryDto, {
+      language: "  English  ",
+      specialty: "  温和\n  倾听  "
+    });
+    await expect(validate(normalizedTrustFilters)).resolves.toHaveLength(0);
+    expect(normalizedTrustFilters.language).toBe("English");
+    expect(normalizedTrustFilters.specialty).toBe("温和 倾听");
 
     const tooLong = plainToInstance(ListCompanionsQueryDto, { keyword: "a".repeat(41) });
     await expect(validate(tooLong)).resolves.toEqual(expect.arrayContaining([

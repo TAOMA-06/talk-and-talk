@@ -173,7 +173,7 @@ export class NotificationsService {
     const [items, total] = await Promise.all([
       this.prisma.notification.findMany({
         where,
-        orderBy: { createdAt: "desc" },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         skip: (page - 1) * pageSize,
         take: pageSize
       } as any),

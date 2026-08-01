@@ -11,6 +11,7 @@ import { buildCorsOptions } from "../src/config/cors";
 import { PrismaService } from "../src/database/prisma.service";
 import { seedDatabase } from "../src/database/seed";
 import { grantCurrentLegalConsent } from "./legal-consent-fixture";
+import { issueSessionBoundAccessToken } from "./session-token-fixture";
 
 describe("Conversations (e2e)", () => {
   let app: INestApplication;
@@ -95,10 +96,7 @@ describe("Conversations (e2e)", () => {
     });
     await grantCurrentLegalConsent(prisma, user.id);
 
-    const token = jwt.sign(
-      { sub: user.id, role },
-      { secret: "e2e-access-secret", expiresIn: "15m" }
-    );
+    const token = await issueSessionBoundAccessToken(prisma, jwt, user);
     return { user, token };
   }
 

@@ -1,0 +1,134 @@
+<view class="page order-detail-page">
+  <view wx:if="{{loading}}" class="empty">正在核对订单最新状态…</view>
+  <view wx:elif="{{error}}" class="empty">
+    <view>{{error}}</view>
+    <button class="retry-button" bindtap="load">重新加载</button>
+  </view>
+  <view wx:elif="{{order && view}}">
+    <view class="status-hero status-{{order.status}}">
+      <view class="status-kicker">{{view.viewerRoleText}}视角 · 订单 {{order.id}}</view>
+      <view class="status-title">{{view.statusText}}</view>
+      <view class="status-copy">{{view.statusExplanation}}</view>
+    </view>
+
+    <view class="card">
+      <view class="section-title">本次预约</view>
+      <view class="detail-row"><text>{{view.participantLabel}}</text><text>{{view.participantName}}</text></view>
+      <view class="detail-row"><text>服务</text><text>{{view.serviceName}}</text></view>
+      <view class="detail-row"><text>方式</text><text>{{view.deliveryModeText}}</text></view>
+      <view class="detail-row"><text>本次意图</text><text>{{view.serviceIntentText}}</text></view>
+      <view class="detail-row"><text>预约时间</text><text>{{view.scheduledAtText}}（北京时间）</text></view>
+      <view class="detail-row"><text>服务时长</text><text>{{order.durationMinutes}} 分钟</text></view>
+      <view class="detail-row total"><text>订单金额</text><text>{{view.amountText}}</text></view>
+      <view class="snapshot-note">以上信息来自订单快照，不会随陪伴者之后修改商品而变化。陪伴意图按政策版本 {{view.serviceIntentPolicyVersion}} 记录，不代表诊断或结果承诺。</view>
+    </view>
+
+    <view wx:if="{{view.showRefundPolicyBeforePayment}}" class="card refund-policy-card">
+      <view class="section-title">付款前退款与售后边界</view>
+      <block wx:if="{{view.refundPolicySnapshotValid}}">
+        <view class="detail-row"><text>完成后窗口</text><text>{{view.refundRequestWindowHours}} 小时</text></view>
+        <view class="detail-row"><text>规则版本</text><text>{{view.refundPolicyVersion}}</text></view>
+        <view class="refund-policy-copy">服务未开始时可申请原路退款；服务中或服务完成后的申请进入人工审核。完成后 {{view.refundRequestWindowHours}} 小时内可自助提交，逾期仍可联系平台客服提交履约、合规或法定权利争议。本单小时数与版本已经固定。</view>
+        <button class="refund-policy-link" bindtap="openRefundTerms">查看用户协议与完整退款条款</button>
+      </block>
+      <view wx:else class="refund-policy-error">本单退款规则快照不可用，支付入口已暂停。请联系平台客服核对后再支付。</view>
+    </view>
+
+    <view wx:if="{{view.viewerRole === 'customer' && order.refund}}" class="card refund-card">
+      <view class="section-title">退款处理</view>
+      <view class="detail-row"><text>状态</text><text>{{view.statusText}}</text></view>
+      <view class="detail-row"><text>金额</text><text>¥{{order.refund.amountCents / 100}}</text></view>
+      <view wx:if="{{order.refund.reviewDueAt}}" class="detail-row"><text>审核目标</text><text>{{view.refundReviewDueText}} 前</text></view>
+      <view wx:if="{{order.refund.resolutionDueAt}}" class="detail-row"><text>处理目标</text><text>{{view.refundResolutionDueText}} 前</text></view>
+      <view class="refund-copy">{{order.refund.reviewNote || order.refund.failureReason || '平台正在核对退款结果；受理不等于到账。'}}</view>
+    </view>
+
+    <view wx:if="{{view.viewerRole === 'customer'}}" class="card payment-dispute-card">
+      <view class="payment-dispute-heading">
+        <view>
+          <view class="section-title">微信支付投诉状态</view>
+          <view class="payment-dispute-kicker">只读同步 · 正式记录以微信账单为准</view>
+        </view>
+        <view wx:if="{{paymentDisputeState === 'available'}}" class="payment-dispute-badge payment-dispute-{{paymentDispute.tone}}">{{paymentDispute.statusText}}</view>
+        <view wx:elif="{{paymentDisputeState === 'error'}}" class="payment-dispute-badge payment-dispute-attention">状态未知</view>
+      </view>
+      <view wx:if="{{paymentDisputeState === 'loading'}}" class="payment-dispute-copy">正在核对与本订单关联的微信支付投诉状态…</view>
+      <view wx:elif="{{paymentDisputeState === 'error'}}" class="payment-dispute-copy payment-dispute-error" aria-live="polite">
+        <view>平台暂时无法读取微信支付投诉同步状态，这不代表没有投诉。你仍可直接在微信账单查看最新记录。</view>
+        <button class="resource-retry" bindtap="retryPaymentDispute" aria-label="重新读取微信支付投诉状态">重新读取投诉状态</button>
+      </view>
+      <view wx:elif="{{paymentDisputeState === 'none'}}" class="payment-dispute-copy">未发现与当前订单关联的微信支付消费者投诉状态。若你已经在微信账单发起但这里尚未显示，请以微信账单为准并稍后刷新。</view>
+      <view wx:else>
+        <view class="payment-dispute-summary">{{paymentDispute.summary}}</view>
+        <view wx:if="{{paymentDispute.occurredAtText !== '待确认'}}" class="detail-row"><text>投诉发生</text><text>{{paymentDispute.occurredAtText}}</text></view>
+        <view class="detail-row"><text>{{paymentDispute.responseLabel}}</text><text>{{paymentDispute.responseText}}</text></view>
+        <view class="detail-row"><text>{{paymentDispute.resolutionLabel}}</text><text>{{paymentDispute.resolutionText}}</text></view>
+        <view class="detail-row"><text>状态更新</text><text>{{paymentDispute.updatedText}}</text></view>
+      </view>
+      <view class="payment-dispute-boundary">这里不能新建或撤销微信支付投诉。平台客服案件可协助核对订单，但不等于微信支付投诉，也不会替你向微信提交。</view>
+      <button class="payment-dispute-guide" bindtap="showWechatComplaintGuide">查看微信正式发起方式</button>
+    </view>
+
+    <view wx:if="{{view.hasAttendanceDispute}}" class="card attendance-dispute-card">
+      <view class="attendance-dispute-heading">
+        <view>
+          <view class="section-title">履约争议</view>
+          <view class="attendance-dispute-copy">{{view.attendanceDisputeIssueText}} · {{view.attendanceDisputeStatusText}}</view>
+        </view>
+        <view class="attendance-dispute-badge">双方可见</view>
+      </view>
+      <view class="snapshot-note">这是本订单参与者共同可见的独立案件。答辩、陈述、决定与申诉期限都以案件详情为准。</view>
+      <button class="secondary-button action-button" bindtap="openAttendanceDispute">查看履约争议详情</button>
+    </view>
+
+    <view class="card action-card">
+      <view class="section-title">现在可以做什么</view>
+      <view wx:if="{{view.canFindReplacement}}" class="replacement-notice">
+        <view class="replacement-title">仍需要这类服务？</view>
+        <view class="replacement-copy">{{view.replacementDescription}}</view>
+        <button class="replacement-action" bindtap="findReplacement">按原需求重新匹配</button>
+      </view>
+      <button wx:if="{{view.canConfirmServiceOrder}}" class="primary-button action-button" loading="{{action === 'confirm'}}" disabled="{{action !== ''}}" bindtap="confirmServiceOrder">确认接单</button>
+      <button wx:if="{{view.canRejectServiceOrder}}" class="danger-button action-button" loading="{{action === 'reject'}}" disabled="{{action !== ''}}" bindtap="rejectServiceOrder">无法接单</button>
+      <button wx:if="{{view.canPay}}" class="primary-button action-button" bindtap="openPayment">进入安全支付与结果页</button>
+      <button wx:if="{{view.canConfirmGuidelines}}" class="secondary-button action-button" loading="{{action === 'guidelines'}}" disabled="{{action !== ''}}" bindtap="confirmGuidelines">{{view.guidelinesActionText}}</button>
+      <button wx:if="{{view.canChat}}" class="secondary-button action-button" bindtap="openConversation">进入订单会话</button>
+      <button wx:if="{{view.canStartService}}" class="primary-button action-button" loading="{{action === 'start'}}" disabled="{{action !== ''}}" bindtap="startService">开始服务</button>
+      <button wx:if="{{view.canVoice}}" class="primary-button action-button" bindtap="openVoice">通话前检查并进入实时语音</button>
+      <button wx:if="{{view.canCompleteService}}" class="primary-button action-button" loading="{{action === 'complete'}}" disabled="{{action !== ''}}" bindtap="completeService">完成服务</button>
+      <view wx:if="{{view.serviceActionNotice}}" class="service-action-notice">{{view.serviceActionNotice}}</view>
+      <button wx:if="{{view.canAftercare}}" class="primary-button action-button" bindtap="openAftercare">评价、反馈与售后</button>
+      <view wx:if="{{!view.hasAttendanceDispute && view.attendanceDisputeNotice}}" class="service-action-notice">{{view.attendanceDisputeNotice}}</view>
+      <button wx:if="{{view.canOpenAttendanceDispute && !view.hasAttendanceDispute}}" class="secondary-button action-button" bindtap="openAttendanceDispute" aria-label="提交迟到爽约技术故障争议">{{view.attendanceDisputeActionText}}</button>
+      <button wx:if="{{order.status === 'pending' || order.status === 'paid'}}" class="secondary-button action-button" bindtap="openOrdersForReschedule">改期协商</button>
+      <button wx:if="{{view.canCancel}}" class="danger-button action-button" loading="{{action === 'cancel'}}" bindtap="cancelOrder">取消订单</button>
+      <button class="secondary-button action-button" bindtap="openSupport">订单需要平台协助</button>
+      <button class="safety-button action-button" bindtap="openSafetyReport">安全举报与案件进度</button>
+    </view>
+
+    <view class="card timeline-card">
+      <view class="section-title">订单进度</view>
+      <view wx:if="{{timelineState === 'loading'}}" class="timeline-resource-state" aria-live="polite">正在读取独立的订单进度…</view>
+      <view wx:elif="{{timelineState === 'error'}}" class="timeline-resource-state timeline-resource-error" aria-live="polite">
+        <view>{{timelineError}}</view>
+        <button class="resource-retry" bindtap="retryTimeline" aria-label="重新读取订单进度">重新读取订单进度</button>
+      </view>
+      <view wx:elif="{{timelineState === 'empty'}}" class="snapshot-note" aria-live="polite">服务端暂未记录更多进度节点；这是真实空状态，当前状态仍以顶部订单说明为准。</view>
+      <view wx:elif="{{timelineState === 'available'}}" class="timeline-item" wx:for="{{timeline}}" wx:key="id">
+        <view class="timeline-dot"></view>
+        <view class="timeline-copy">
+          <view class="timeline-heading"><text>{{item.title}}</text><text>{{item.timeText}}</text></view>
+          <view class="timeline-description">{{item.description}}</view>
+        </view>
+      </view>
+      <view wx:if="{{timelineState === 'available'}}" class="snapshot-note">已显示 {{timeline.length}} / {{timelineTotal}} 条进度</view>
+      <view wx:if="{{timelineLoadMoreError}}" class="timeline-resource-state timeline-resource-error" aria-live="polite">
+        <view>{{timelineLoadMoreError}}</view>
+        <button class="resource-retry" bindtap="loadMoreTimeline" aria-label="重试加载更多订单进度">重试加载更多</button>
+      </view>
+      <button wx:elif="{{timelineHasMore}}" class="resource-retry" loading="{{timelineLoadingMore}}" disabled="{{timelineLoadingMore}}" bindtap="loadMoreTimeline">{{timelineLoadingMore ? '正在加载…' : '加载更多订单进度'}}</button>
+    </view>
+
+    <view class="order-meta">创建于 {{view.createdAtText}} · 下拉可刷新服务端状态</view>
+  </view>
+</view>

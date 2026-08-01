@@ -63,7 +63,7 @@ export class CommercialFunnelService {
           select: { amountCents: true }
         }
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: MAX_COHORT_ORDERS + 1
     } as any) as any[];
     const truncated = records.length > MAX_COHORT_ORDERS;

@@ -84,7 +84,7 @@ export class WeChatSubscribeMessageProvider {
           body: JSON.stringify({
             touser: identity.providerId,
             template_id: template.templateId,
-            page: template.page,
+            page: this.resolvePage(template, input),
             miniprogram_state: this.miniProgramState(),
             lang: "zh_CN",
             data: this.renderTemplateData(template, input)
@@ -180,6 +180,53 @@ export class WeChatSubscribeMessageProvider {
       field,
       { value: this.interpolate(source, values).slice(0, 80) }
     ]));
+  }
+
+  private resolvePage(template: WeChatSubscribeTemplate, input: SubscribeMessageInput): string | undefined {
+    const data = input.data ?? {};
+    const value = (key: string) => {
+      const candidate = data[key];
+      if (typeof candidate !== "string") return "";
+      const normalized = candidate.trim();
+      return /^[A-Za-z0-9][A-Za-z0-9._:-]{0,190}$/.test(normalized) ? normalized : "";
+    };
+    const path = (page: string, key: string, id: string) =>
+      id ? `${page}?${key}=${encodeURIComponent(id)}` : undefined;
+
+    const attendanceDisputeId = value("attendanceDisputeId");
+    if (attendanceDisputeId) return path("pages/order/dispute", "id", attendanceDisputeId);
+    const supportId = value("supportTicketId") || value("ticketId");
+    if (supportId) return `pages/support/detail?kind=support&id=${encodeURIComponent(supportId)}`;
+    const reportId = value("reportId");
+    if (reportId) return `pages/support/detail?kind=safety&id=${encodeURIComponent(reportId)}`;
+
+    const route = value("route");
+    if (route === "companionDevelopment") {
+      const actionId = value("actionId");
+      if (actionId) return path("pages/companion/development/index", "actionId", actionId);
+    }
+    if (route === "account") {
+      const actionId = value("accountActionId") || value("actionId");
+      const appealId = value("accountAppealId") || value("appealId");
+      if (actionId) return path("pages/account/index", "actionId", actionId);
+      if (appealId) return path("pages/account/index", "appealId", appealId);
+      return "pages/account/index";
+    }
+    const caseId = value("caseId");
+    if (caseId) return path("pages/safety/index", "caseId", caseId);
+    const appealId = value("appealId");
+    if (appealId) return path("pages/safety/index", "appealId", appealId);
+    const restrictionId = value("restrictionId");
+    if (restrictionId) return path("pages/safety/index", "restrictionId", restrictionId);
+    const conversationId = value("conversationId");
+    if (conversationId) return path("pages/chat/index", "id", conversationId);
+    const orderId = value("orderId");
+    if (orderId) return path("pages/order/detail", "id", orderId);
+    const companionId = value("companionId");
+    if (companionId && input.templateKey === "availabilityReminder") {
+      return path("pages/companion/detail", "id", companionId);
+    }
+    return template.page;
   }
 
   private interpolate(source: string, values: Record<string, string>) {

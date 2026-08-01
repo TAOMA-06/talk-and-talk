@@ -1,4 +1,4 @@
-import { createHmac, randomBytes } from "node:crypto";
+import { createHash, createHmac, randomBytes } from "node:crypto";
 
 import {
   WeChatNotifyPayload,
@@ -10,10 +10,25 @@ import {
   WeChatNativePrepayResult,
   WeChatRefundInput,
   WeChatRefundNotifyPayload,
-  WeChatRefundResult
+  WeChatRefundResult,
+  WeChatComplaintNotifyPayload,
+  WeChatComplaintDetail,
+  WeChatComplaintListResult,
+  WeChatComplaintNegotiationEvent,
+  WeChatComplaintNegotiationResult,
+  WeChatProviderOperationResult,
+  WeChatDailyStatementInput,
+  WeChatDailyStatementKind,
+  WeChatDailyStatementResult
 } from "./wechat-pay.provider";
 
 export const MOCK_WECHAT_NOTIFY_TOKEN = "mock-wechat-notify";
+
+export type MockWeChatDailyStatementFixture = {
+  billDate: string;
+  kind: WeChatDailyStatementKind;
+  text: string;
+};
 
 export class MockWeChatPayProvider implements WeChatPayProvider {
   readonly mode = "mock" as const;
@@ -22,6 +37,15 @@ export class MockWeChatPayProvider implements WeChatPayProvider {
     string,
     { amountCents: number; channel: "app" | "miniProgram" | "native" }
   >();
+  private readonly complaints = new Map<string, WeChatComplaintDetail>();
+  private readonly complaintHistories = new Map<string, WeChatComplaintNegotiationEvent[]>();
+  private readonly dailyStatements = new Map<string, string>();
+
+  constructor(fixtures: readonly MockWeChatDailyStatementFixture[] = []) {
+    for (const fixture of fixtures) {
+      this.dailyStatements.set(`${fixture.billDate}:${fixture.kind}`, fixture.text);
+    }
+  }
 
   async createAppPrepay(input: WeChatPrepayInput): Promise<WeChatAppPrepayResult> {
     this.prepays.set(input.outTradeNo, { amountCents: input.amountCents, channel: "app" });
@@ -95,6 +119,7 @@ export class MockWeChatPayProvider implements WeChatPayProvider {
       outTradeNo,
       transactionId: `mock_query_txn_${outTradeNo}`,
       tradeState: prepay ? "SUCCESS" : "NOTPAY",
+      successTime: prepay ? new Date().toISOString() : null,
       amountCents: prepay?.amountCents ?? 0,
       currency: "CNY",
       raw: { out_trade_no: outTradeNo, trade_state: prepay ? "SUCCESS" : "NOTPAY" }
@@ -131,6 +156,8 @@ export class MockWeChatPayProvider implements WeChatPayProvider {
       outTradeNo,
       transactionId,
       tradeState,
+      successTime: optionalString(resource.success_time ?? resource.successTime ?? parsed.successTime)
+        ?? (tradeState === "SUCCESS" ? new Date().toISOString() : null),
       amountCents,
       currency: String(amount.currency ?? resource.currency ?? parsed.currency ?? "CNY"),
       raw: parsed
@@ -138,11 +165,25 @@ export class MockWeChatPayProvider implements WeChatPayProvider {
   }
 
   async createRefund(input: WeChatRefundInput): Promise<WeChatRefundResult> {
-    return { outRefundNo: input.outRefundNo, refundId: `mock_refund_${input.outRefundNo}`, status: "SUCCESS" };
+    const now = new Date().toISOString();
+    return {
+      outRefundNo: input.outRefundNo,
+      refundId: `mock_refund_${input.outRefundNo}`,
+      status: "SUCCESS",
+      acceptedTime: now,
+      successTime: now
+    };
   }
 
   async queryRefund(outRefundNo: string): Promise<WeChatRefundResult> {
-    return { outRefundNo, refundId: `mock_refund_${outRefundNo}`, status: "SUCCESS" };
+    const now = new Date().toISOString();
+    return {
+      outRefundNo,
+      refundId: `mock_refund_${outRefundNo}`,
+      status: "SUCCESS",
+      acceptedTime: now,
+      successTime: now
+    };
   }
 
   parseRefundNotifyPayload(rawBody: string): WeChatRefundNotifyPayload {
@@ -158,10 +199,151 @@ export class MockWeChatPayProvider implements WeChatPayProvider {
       outRefundNo: String(plaintext.outRefundNo ?? plaintext.out_refund_no ?? ""),
       refundId: String(plaintext.refundId ?? plaintext.refund_id ?? ""),
       status: String(plaintext.refund_status ?? plaintext.status ?? "SUCCESS"),
+      acceptedTime: optionalString(plaintext.create_time ?? plaintext.createTime)
+        ?? new Date().toISOString(),
+      successTime: optionalString(plaintext.success_time ?? plaintext.successTime)
+        ?? (String(plaintext.refund_status ?? plaintext.status ?? "SUCCESS") === "SUCCESS"
+          ? new Date().toISOString()
+          : null),
       totalAmountCents: Number(amount.total ?? plaintext.totalAmountCents ?? 0),
       refundAmountCents: Number(amount.refund ?? plaintext.refundAmountCents ?? 0),
       currency: optionalString(amount.currency ?? plaintext.currency),
       raw: parsed
+    };
+  }
+
+  parseComplaintNotifyPayload(rawBody: string): WeChatComplaintNotifyPayload {
+    const parsed = JSON.parse(rawBody) as Record<string, any>;
+    const plaintext = parsed.resource?.plaintext ?? parsed.resource ?? parsed;
+    const complaintId = String(plaintext.complaint_id ?? parsed.complaintId ?? "");
+    const complaintTime = String(plaintext.complaint_time ?? parsed.create_time ?? new Date().toISOString());
+    const outTradeNo = String(plaintext.out_trade_no ?? "");
+    const current = this.complaints.get(complaintId);
+    this.complaints.set(complaintId, {
+      complaintId,
+      complaintTime,
+      complaintDetail: String(plaintext.complaint_detail ?? current?.complaintDetail ?? "Mock complaint"),
+      complaintState: String(plaintext.complaint_state ?? current?.complaintState ?? "PENDING"),
+      complaintOrders: outTradeNo
+        ? [{ transactionId: String(plaintext.transaction_id ?? ""), outTradeNo, amountCents: Number(plaintext.amount ?? 0) }]
+        : current?.complaintOrders ?? [],
+      complaintFullRefunded: plaintext.complaint_full_refunded === true,
+      incomingUserResponse: plaintext.incoming_user_response !== false,
+      userComplaintTimes: Number(plaintext.user_complaint_times ?? 1),
+      complaintMedia: current?.complaintMedia ?? [],
+      problemType: optionalString(plaintext.problem_type),
+      applyRefundAmountCents: typeof plaintext.apply_refund_amount === "number" ? plaintext.apply_refund_amount : undefined,
+      inPlatformService: plaintext.in_platform_service === true,
+      needImmediateService: plaintext.need_immediate_service === true
+    });
+    if (!this.complaintHistories.has(complaintId)) {
+      this.complaintHistories.set(complaintId, [{
+        logId: `mock_log_create_${complaintId}`,
+        operator: "投诉人",
+        operateTime: complaintTime,
+        operateType: "USER_CREATE_COMPLAINT",
+        operateDetails: String(plaintext.complaint_detail ?? "Mock complaint"),
+        mediaUrls: []
+      }]);
+    }
+    return {
+      notificationId: String(parsed.id ?? `mock_notice_${complaintId}`),
+      createTime: String(parsed.create_time ?? new Date().toISOString()),
+      eventType: String(parsed.event_type ?? "COMPLAINT.CREATE"),
+      summary: optionalString(parsed.summary),
+      complaintId,
+      actionType: String(plaintext.action_type ?? "CREATE_COMPLAINT")
+    };
+  }
+
+  async listComplaints(input: { beginDate: string; endDate: string; limit: number; offset: number }): Promise<WeChatComplaintListResult> {
+    const all = [...this.complaints.values()];
+    return {
+      data: all.slice(input.offset, input.offset + input.limit),
+      limit: input.limit,
+      offset: input.offset,
+      totalCount: all.length
+    };
+  }
+
+  async queryComplaint(complaintId: string): Promise<WeChatComplaintDetail> {
+    return this.complaints.get(complaintId) ?? {
+      complaintId,
+      complaintTime: new Date().toISOString(),
+      complaintDetail: "Mock complaint",
+      complaintState: "PENDING",
+      complaintOrders: [],
+      complaintFullRefunded: false,
+      incomingUserResponse: true,
+      userComplaintTimes: 1,
+      complaintMedia: [],
+      inPlatformService: false,
+      needImmediateService: false
+    };
+  }
+
+  async listComplaintNegotiationHistory(input: {
+    complaintId: string;
+    limit: number;
+    offset: number;
+  }): Promise<WeChatComplaintNegotiationResult> {
+    const all = this.complaintHistories.get(input.complaintId) ?? [];
+    return {
+      data: all.slice(input.offset, input.offset + input.limit),
+      limit: input.limit,
+      offset: input.offset,
+      totalCount: all.length
+    };
+  }
+
+  async replyComplaint(input: { complaintId: string; responseContent: string; responseImages?: string[] }): Promise<WeChatProviderOperationResult> {
+    const current = await this.queryComplaint(input.complaintId);
+    this.complaints.set(input.complaintId, { ...current, complaintState: "PROCESSING", incomingUserResponse: false });
+    const history = this.complaintHistories.get(input.complaintId) ?? [];
+    history.push({
+      logId: `mock_log_reply_${history.length + 1}_${input.complaintId}`,
+      operator: "商户",
+      operateTime: new Date().toISOString(),
+      operateType: "MERCHANT_RESPONSE",
+      operateDetails: input.responseContent,
+      mediaUrls: input.responseImages ?? []
+    });
+    this.complaintHistories.set(input.complaintId, history);
+    return { providerReference: `mock_reply_${input.complaintId}` };
+  }
+
+  async completeComplaint(complaintId: string): Promise<WeChatProviderOperationResult> {
+    const current = await this.queryComplaint(complaintId);
+    this.complaints.set(complaintId, { ...current, complaintState: "PROCESSED", incomingUserResponse: false });
+    const history = this.complaintHistories.get(complaintId) ?? [];
+    history.push({
+      logId: `mock_log_complete_${history.length + 1}_${complaintId}`,
+      operator: "商户",
+      operateTime: new Date().toISOString(),
+      operateType: "MERCHANT_CONFIRM_COMPLETE",
+      mediaUrls: []
+    });
+    this.complaintHistories.set(complaintId, history);
+    return { providerReference: `mock_complete_${complaintId}` };
+  }
+
+  async downloadDailyStatement(
+    input: WeChatDailyStatementInput
+  ): Promise<WeChatDailyStatementResult> {
+    const text = this.dailyStatements.get(`${input.billDate}:${input.kind}`);
+    if (text === undefined) {
+      return { status: "noStatement", billDate: input.billDate, kind: input.kind };
+    }
+    const bytes = Buffer.from(text, "utf8");
+    return {
+      status: "downloaded",
+      billDate: input.billDate,
+      kind: input.kind,
+      bytes,
+      text,
+      sizeBytes: bytes.byteLength,
+      sha1: createHash("sha1").update(bytes).digest("hex"),
+      sha256: createHash("sha256").update(bytes).digest("hex")
     };
   }
 }

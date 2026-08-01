@@ -1,12 +1,12 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
 
 import { AppException } from "../common/errors/app.exception";
+import { hasBookableCapacityInWindow } from "../companions/companion-capacity-query";
 import { PrismaService } from "../database/prisma.service";
 import { publicFavoriteCompanionWhere } from "./favorite-companion-eligibility";
 
 const AVAILABILITY_REMINDER_TEMPLATE_KEY = "availabilityReminder";
 const AVAILABILITY_REMINDER_MINIMUM_INTERVAL_MS = 24 * 60 * 60 * 1_000;
-const AVAILABILITY_STEP_MS = 30 * 60 * 1_000;
 const MIN_BOOKING_LEAD_TIME_MS = 15 * 60 * 1_000;
 
 export type AvailabilityReminderEligibilityDecision = "eligible" | "skipped";
@@ -38,14 +38,6 @@ type ReminderWindow = {
   startsAt: Date;
   endsAt: Date;
   capacity: number;
-};
-
-type AvailabilityReservation = {
-  status: string;
-  scheduledAt: Date;
-  durationMinutes: number;
-  companionConfirmedAt: Date | null;
-  paymentReservationExpiresAt: Date | null;
 };
 
 export type AvailabilityReminderPreflightResult = {
@@ -243,24 +235,22 @@ export class AvailabilityReminderPreflightService {
       return this.skippedLiveResult(candidate, "availabilityUnavailable");
     }
 
-    // This intentionally selects only scheduling metadata, never a customer,
-    // conversation, message, payment, refund, or settlement field.
-    const reservations = await db.order.findMany({
-      where: {
-        companionId: candidate.companionId,
-        scheduledAt: { lt: availabilityWindow.endsAt },
-        status: { in: ["pending", "paying", "paid", "inService", "completed"] }
-      },
-      select: {
-        status: true,
-        scheduledAt: true,
-        durationMinutes: true,
-        companionConfirmedAt: true,
-        paymentReservationExpiresAt: true
-      }
-    }) as AvailabilityReservation[];
-
-    if (!this.hasRemainingBookableCapacity(availabilityWindow, offerings, reservations, evaluatedAt)) {
+    const durationMinutes = [...new Set(offerings
+      .map((offering) => offering.durationMinutes)
+      .filter((duration) => Number.isInteger(duration) && duration >= 30 && duration <= 240 && duration % 30 === 0))]
+      .sort((left, right) => left - right);
+    const hasCapacity = await hasBookableCapacityInWindow(db, {
+      companionId: candidate.companionId,
+      availabilityWindowId: availabilityWindow.id,
+      durationMinutes,
+      earliestStart: new Date(Math.max(
+        availabilityWindow.startsAt.getTime(),
+        evaluatedAt.getTime() + MIN_BOOKING_LEAD_TIME_MS
+      )),
+      until: availabilityWindow.endsAt,
+      evaluatedAt
+    });
+    if (!hasCapacity) {
       return this.skippedLiveResult(candidate, "availabilityUnavailable");
     }
 
@@ -307,53 +297,6 @@ export class AvailabilityReminderPreflightService {
       }
     }) as Pick<ReminderCandidate, "id" | "preflightDecision" | "preflightReason" | "preflightedAt">;
     return this.toResult(persisted);
-  }
-
-  private hasRemainingBookableCapacity(
-    window: ReminderWindow,
-    offerings: Array<{ durationMinutes: number }>,
-    reservations: AvailabilityReservation[],
-    now: Date
-  ) {
-    const earliestStart = this.roundUpToAvailabilityStep(new Date(Math.max(
-      window.startsAt.getTime(),
-      now.getTime() + MIN_BOOKING_LEAD_TIME_MS
-    )));
-    const durations = [...new Set(offerings
-      .map((offering) => offering.durationMinutes)
-      .filter((duration) => Number.isInteger(duration) && duration >= 30 && duration <= 240 && duration % 30 === 0))]
-      .sort((left, right) => left - right);
-
-    for (const durationMinutes of durations) {
-      const durationMs = durationMinutes * 60 * 1_000;
-      let startsAt = earliestStart;
-      while (startsAt.getTime() < window.endsAt.getTime()) {
-        const endsAt = new Date(startsAt.getTime() + durationMs);
-        if (endsAt.getTime() > window.endsAt.getTime()) break;
-        const reservedCount = reservations.filter((order) => this.reservesAvailability(order, startsAt, endsAt, now)).length;
-        if (window.capacity - reservedCount > 0) return true;
-        startsAt = new Date(startsAt.getTime() + AVAILABILITY_STEP_MS);
-      }
-    }
-    return false;
-  }
-
-  private roundUpToAvailabilityStep(value: Date) {
-    return new Date(Math.ceil(value.getTime() / AVAILABILITY_STEP_MS) * AVAILABILITY_STEP_MS);
-  }
-
-  private reservesAvailability(order: AvailabilityReservation, candidateStart: Date, candidateEnd: Date, now: Date) {
-    if (!this.orderReservesAvailability(order, now)) return false;
-    const orderStart = order.scheduledAt.getTime();
-    const orderEnd = orderStart + order.durationMinutes * 60 * 1_000;
-    return orderStart < candidateEnd.getTime() && orderEnd > candidateStart.getTime();
-  }
-
-  private orderReservesAvailability(order: AvailabilityReservation, now: Date) {
-    if (["paying", "paid", "inService", "completed"].includes(order.status)) return true;
-    return order.status === "pending"
-      && Boolean(order.companionConfirmedAt)
-      && (!order.paymentReservationExpiresAt || order.paymentReservationExpiresAt.getTime() > now.getTime());
   }
 
   private isRateLimited(lastDeliveredAt: Date | null, now: Date) {

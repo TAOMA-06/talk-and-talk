@@ -21,6 +21,9 @@
 .plain-button[disabled] { color: #bca4aa; background: #f5f0f1; }
 .action-button { min-width: 104rpx; }
 .direction-button { min-width: 92rpx; }
+.catalog-pagination { margin: 18rpx 0 10rpx; color: #8d6e73; font-size: 23rpx; text-align: center; }
+.catalog-pagination-error { margin: 12rpx 0; color: #a53c55; font-size: 23rpx; line-height: 1.5; text-align: center; }
+.load-more-button { width: 100%; margin: 14rpx 0 24rpx; }
 .editor-mask { position: fixed; z-index: 10; inset: 0; display: flex; align-items: flex-end; background: rgba(45, 32, 35, 0.42); }
 .editor-sheet { box-sizing: border-box; width: 100%; max-height: 90vh; padding: 30rpx 28rpx calc(40rpx + env(safe-area-inset-bottom)); border-radius: 30rpx 30rpx 0 0; background: #fff8f8; }
 .editor-header { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; }
@@ -44,3 +47,6 @@ textarea { min-height: 172rpx; line-height: 1.55; }
 .editor-actions { display: flex; gap: 16rpx; margin-top: 28rpx; }
 .cancel-button, .save-button { flex: 1; margin: 0; }
 .cancel-button { line-height: 84rpx; }
+.topic-state-error { margin-top: 10rpx; padding: 14rpx; border-left: 5rpx solid #b65a6e; background: #fff5f6; color: #8d4858; font-size: 23rpx; line-height: 1.6; }
+.topic-retry { width: 100%; margin: 12rpx 0 0; border: 1rpx solid #d6b9c1; background: #fff; color: #8c4056; font-size: 23rpx; }
+.topic-retry::after { border: 0; }

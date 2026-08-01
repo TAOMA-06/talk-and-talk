@@ -1,5 +1,6 @@
 import { Module, forwardRef } from "@nestjs/common";
 
+import { CrisisInterventionModule } from "../crisis-intervention/crisis-intervention.module";
 import { NotificationsModule } from "../notifications/notifications.module";
 import { PaymentsModule } from "../payments/payments.module";
 import { RecommendationsModule } from "../recommendations/recommendations.module";
@@ -10,7 +11,7 @@ import { OrderRescheduleExpiryWorker } from "./order-reschedule-expiry.worker";
 import { OrdersService } from "./orders.service";
 
 @Module({
-  imports: [forwardRef(() => PaymentsModule), NotificationsModule, RecommendationsModule, ModerationModule, VoiceModule],
+  imports: [forwardRef(() => PaymentsModule), NotificationsModule, RecommendationsModule, ModerationModule, VoiceModule, CrisisInterventionModule],
   controllers: [OrdersController],
   providers: [OrdersService, OrderRescheduleExpiryWorker],
   exports: [OrdersService]

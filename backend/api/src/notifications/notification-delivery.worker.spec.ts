@@ -11,11 +11,7 @@ describe("NotificationDeliveryWorker", () => {
     } as any;
     const prisma = {
       notificationDelivery: {
-        updateMany: jest.fn()
-          .mockResolvedValueOnce({ count: 0 }) // recover expired leases
-          .mockResolvedValueOnce({ count: 1 }) // claim the pending row
-          .mockResolvedValueOnce({ count: 1 }), // finish failed
-        findMany: jest.fn().mockResolvedValue([{ id: "d1" }])
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }) // finish failed
       },
       $transaction: jest.fn()
     } as any;
@@ -26,21 +22,22 @@ describe("NotificationDeliveryWorker", () => {
           attemptCount: 0, createdAt: new Date(), notification: { title: "支付成功", body: "订单已支付", data: { orderId: "o1" } }
         })
       },
-      $queryRaw: jest.fn().mockResolvedValue([{ id: "g1", templateId: "tmpl-payment" }]),
+      $queryRaw: jest.fn()
+        .mockResolvedValueOnce([]) // bounded expired-lease recovery
+        .mockResolvedValueOnce([{ id: "d1", leaseToken: "lease-d1" }]) // SKIP LOCKED claim
+        .mockResolvedValueOnce([{ id: "g1", templateId: "tmpl-payment" }]),
       weChatSubscriptionGrant: { update: jest.fn() }
     } as any;
-    // The lease token is generated inside the worker, so the mock reads it
-    // from the preceding claim update instead of attempting to predict UUID.
-    db.notificationDelivery.findUnique.mockImplementation(async () => ({
+    db.notificationDelivery.findUnique.mockResolvedValue({
       id: "d1",
       status: "processing",
-      leaseToken: prisma.notificationDelivery.updateMany.mock.calls[1][0].data.leaseToken,
+      leaseToken: "lease-d1",
       userId: "u1",
       templateKey: "paymentSuccess",
       attemptCount: 0,
       createdAt: new Date(),
       notification: { title: "支付成功", body: "订单已支付", data: { orderId: "o1" } }
-    }));
+    });
     prisma.$transaction.mockImplementation(async (fn: any) => fn(db));
     const provider = { send: jest.fn().mockResolvedValue({
       outcome: "failed", attempted: true, errorCode: "DELIVERY_UNKNOWN", message: "TypeError"
@@ -53,13 +50,59 @@ describe("NotificationDeliveryWorker", () => {
     const worker = new NotificationDeliveryWorker(config, prisma, provider, metrics);
 
     await expect(worker.deliverDue()).resolves.toEqual({ scanned: 1, sent: 0, failed: 1, skipped: 0, recovered: 0 });
-    expect(db.$queryRaw.mock.calls[0][0].join("")).toEqual(expect.stringContaining("CompanionFavorite"));
-    expect(db.$queryRaw.mock.calls[0][0].join("")).toEqual(expect.stringContaining("AvailabilityReminderAttempt"));
+    expect(db.$queryRaw.mock.calls[1][0].join("")).toEqual(expect.stringContaining("FOR UPDATE SKIP LOCKED"));
+    expect(db.$queryRaw.mock.calls[2][0].join("")).toEqual(expect.stringContaining("CompanionFavorite"));
+    expect(db.$queryRaw.mock.calls[2][0].join("")).toEqual(expect.stringContaining("AvailabilityReminderAttempt"));
     expect(provider.send).toHaveBeenCalledTimes(1);
     expect(prisma.notificationDelivery.updateMany).toHaveBeenLastCalledWith(expect.objectContaining({
       data: expect.objectContaining({ status: "failed", errorCode: "DELIVERY_UNKNOWN" })
     }));
     expect(metrics.recordNotificationDeliveryFailure).toHaveBeenCalledTimes(1);
+  });
+
+  it("bounds expired-lease recovery and refills the claim scan after recovery", async () => {
+    const config = {
+      get: jest.fn((key: string) => ({
+        NOTIFICATION_DELIVERY_ENABLED: true,
+        NOTIFICATION_DELIVERY_BATCH_SIZE: 2
+      } as Record<string, unknown>)[key])
+    } as any;
+    const prisma = {
+      notificationDelivery: { updateMany: jest.fn() },
+      $transaction: jest.fn()
+    } as any;
+    const db = {
+      $queryRaw: jest.fn()
+        .mockResolvedValueOnce([{ id: "expired-1" }, { id: "expired-2" }])
+        .mockResolvedValueOnce([{ id: "expired-3" }, { id: "expired-4" }])
+        .mockResolvedValueOnce([{ id: "expired-5" }, { id: "expired-6" }])
+        .mockResolvedValueOnce([{ id: "expired-7" }, { id: "expired-8" }])
+        .mockResolvedValueOnce([])
+    } as any;
+    prisma.$transaction.mockImplementation(async (fn: any) => fn(db));
+    const provider = { send: jest.fn() } as any;
+    const metrics = {
+      recordNotificationDeliveryFailure: jest.fn(),
+      recordNotificationDeliverySuccess: jest.fn(),
+      recordNotificationDeliverySkipped: jest.fn()
+    } as any;
+    const worker = new NotificationDeliveryWorker(config, prisma, provider, metrics);
+
+    await expect(worker.deliverDue()).resolves.toEqual({
+      scanned: 0, sent: 0, failed: 0, skipped: 0, recovered: 8
+    });
+    expect(prisma.$transaction).toHaveBeenCalledTimes(5);
+    expect(db.$queryRaw.mock.calls[0][0].join("")).toEqual(expect.stringContaining(
+      'delivery."leaseExpiresAt" IS NULL'
+    ));
+    expect(db.$queryRaw.mock.calls[0][0].join("")).toEqual(expect.stringContaining(
+      "FOR UPDATE SKIP LOCKED"
+    ));
+    expect(db.$queryRaw.mock.calls[4][0].join("")).toEqual(expect.stringContaining(
+      'delivery."status" = \'pending\''
+    ));
+    expect(metrics.recordNotificationDeliveryFailure).toHaveBeenCalledTimes(8);
+    expect(provider.send).not.toHaveBeenCalled();
   });
 
   it("reports a deployment template mismatch as a failed delivery, not a skipped authorization", async () => {
@@ -71,30 +114,28 @@ describe("NotificationDeliveryWorker", () => {
       } as Record<string, unknown>)[key])
     } as any;
     const prisma = {
-      notificationDelivery: {
-        updateMany: jest.fn()
-          .mockResolvedValueOnce({ count: 0 })
-          .mockResolvedValueOnce({ count: 1 }),
-        findMany: jest.fn().mockResolvedValue([{ id: "d-missing-template" }])
-      },
+      notificationDelivery: { updateMany: jest.fn() },
       $transaction: jest.fn()
     } as any;
     const db = {
       notificationDelivery: {
         findUnique: jest.fn(),
         updateMany: jest.fn().mockResolvedValue({ count: 1 })
-      }
+      },
+      $queryRaw: jest.fn()
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ id: "d-missing-template", leaseToken: "lease-missing" }])
     } as any;
-    db.notificationDelivery.findUnique.mockImplementation(async () => ({
+    db.notificationDelivery.findUnique.mockResolvedValue({
       id: "d-missing-template",
       status: "processing",
-      leaseToken: prisma.notificationDelivery.updateMany.mock.calls[1][0].data.leaseToken,
+      leaseToken: "lease-missing",
       userId: "u1",
       templateKey: "paymentSuccess",
       attemptCount: 0,
       createdAt: new Date(),
       notification: { title: "支付成功", body: "订单已支付", data: null }
-    }));
+    });
     prisma.$transaction.mockImplementation(async (fn: any) => fn(db));
     const provider = { send: jest.fn() } as any;
     const metrics = {
@@ -124,12 +165,7 @@ describe("NotificationDeliveryWorker", () => {
       } as Record<string, unknown>)[key])
     } as any;
     const prisma = {
-      notificationDelivery: {
-        updateMany: jest.fn()
-          .mockResolvedValueOnce({ count: 0 }) // recover expired leases
-          .mockResolvedValueOnce({ count: 1 }), // claim the pending row
-        findMany: jest.fn().mockResolvedValue([{ id: "d-muted" }])
-      },
+      notificationDelivery: { updateMany: jest.fn() },
       $transaction: jest.fn()
     } as any;
     const db = {
@@ -140,12 +176,16 @@ describe("NotificationDeliveryWorker", () => {
       conversationNotificationPreference: {
         findUnique: jest.fn().mockResolvedValue({ mutedAt: new Date() })
       },
-      conversationBlock: { findFirst: jest.fn() }
+      conversationBlock: { findFirst: jest.fn() },
+      $queryRaw: jest.fn()
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ id: "d-muted", leaseToken: "lease-muted" }])
+        .mockResolvedValueOnce([])
     } as any;
-    db.notificationDelivery.findUnique.mockImplementation(async () => ({
+    db.notificationDelivery.findUnique.mockResolvedValue({
       id: "d-muted",
       status: "processing",
-      leaseToken: prisma.notificationDelivery.updateMany.mock.calls[1][0].data.leaseToken,
+      leaseToken: "lease-muted",
       userId: "u-recipient",
       templateKey: "messageReceived",
       attemptCount: 0,
@@ -157,7 +197,7 @@ describe("NotificationDeliveryWorker", () => {
         body: "打开 Talk&Talk 的平台内会话查看。",
         data: { conversationId: "c1" }
       }
-    }));
+    });
     prisma.$transaction.mockImplementation(async (fn: any) => fn(db));
     const provider = { send: jest.fn() } as any;
     const metrics = {
@@ -188,12 +228,7 @@ describe("NotificationDeliveryWorker", () => {
       } as Record<string, unknown>)[key])
     } as any;
     const prisma = {
-      notificationDelivery: {
-        updateMany: jest.fn()
-          .mockResolvedValueOnce({ count: 0 })
-          .mockResolvedValueOnce({ count: 1 }),
-        findMany: jest.fn().mockResolvedValue([{ id: "d-blocked" }])
-      },
+      notificationDelivery: { updateMany: jest.fn() },
       $transaction: jest.fn()
     } as any;
     const db = {
@@ -202,12 +237,16 @@ describe("NotificationDeliveryWorker", () => {
         updateMany: jest.fn().mockResolvedValue({ count: 1 })
       },
       conversationNotificationPreference: { findUnique: jest.fn().mockResolvedValue(null) },
-      conversationBlock: { findFirst: jest.fn().mockResolvedValue({ id: "block-1" }) }
+      conversationBlock: { findFirst: jest.fn().mockResolvedValue({ id: "block-1" }) },
+      $queryRaw: jest.fn()
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ id: "d-blocked", leaseToken: "lease-blocked" }])
+        .mockResolvedValueOnce([])
     } as any;
-    db.notificationDelivery.findUnique.mockImplementation(async () => ({
+    db.notificationDelivery.findUnique.mockResolvedValue({
       id: "d-blocked",
       status: "processing",
-      leaseToken: prisma.notificationDelivery.updateMany.mock.calls[1][0].data.leaseToken,
+      leaseToken: "lease-blocked",
       userId: "u-recipient",
       templateKey: "messageReceived",
       attemptCount: 0,
@@ -219,7 +258,7 @@ describe("NotificationDeliveryWorker", () => {
         body: "打开 Talk&Talk 的平台内会话查看。",
         data: { conversationId: "c1" }
       }
-    }));
+    });
     prisma.$transaction.mockImplementation(async (fn: any) => fn(db));
     const provider = { send: jest.fn() } as any;
     const metrics = {

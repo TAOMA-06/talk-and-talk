@@ -12,6 +12,10 @@ enum UserRole {
   companion
   moderator
   admin
+  support
+  finance
+  supply
+  operations
 }
 
 // Review staff belong to an independent internal department. They must never
@@ -26,6 +30,14 @@ enum ReviewStaffStatus {
   suspended
 }
 
+// Commercial operations staff remain in the User identity domain, but their
+// credential lifecycle is deliberately independent from consumer account
+// restrictions and from the ReviewStaff identity domain.
+enum StaffCredentialStatus {
+  active
+  suspended
+}
+
 enum AuthProvider {
   phone
   apple
@@ -36,6 +48,47 @@ enum AccountStatus {
   active
   restricted
   banned
+}
+
+enum UserAccountActionKind {
+  restriction
+  ban
+}
+
+enum UserAccountActionSourceType {
+  moderationCase
+  supportTicket
+  paymentDispute
+  attendanceDispute
+  conversationSafety
+  manualSafetyReview
+  legalCompliance
+  userAccountAction
+}
+
+enum UserAccountAppealStatus {
+  pending
+  upheld
+  overturned
+  dismissed
+}
+
+enum IdentityVerificationRequestStatus {
+  pending
+  approved
+  rejected
+}
+
+enum CustomerAdultEligibilityStatus {
+  pending
+  adult
+  ineligible
+}
+
+enum CustomerAdultEligibilityMethod {
+  externalProvider
+  governmentNetworkIdentity
+  secureManualReview
 }
 
 enum Availability {
@@ -81,9 +134,17 @@ enum MediaAssetStatus {
   uploaded
   scanning
   approved
+  reviewRequired
   blocked
   expired
   failed
+}
+
+enum MediaAssetPurpose {
+  chatMessage
+  orderSupportFact
+  attendanceDisputeStatement
+  companionIncidentReport
 }
 
 enum ModerationDecision {
@@ -176,6 +237,61 @@ enum OrderTimelineActorRole {
   system
 }
 
+enum VoiceAttendanceParticipantRole {
+  customer
+  companion
+  system
+}
+
+enum VoiceAttendanceEventSource {
+  provider
+  client
+}
+
+enum VoiceAttendanceEventType {
+  roomCreated
+  roomDismissed
+  join
+  leave
+  reconnect
+  heartbeat
+  audioStarted
+  audioStopped
+}
+
+enum AttendanceDisputeIssue {
+  companionAbsent
+  customerAbsent
+  lateArrival
+  technicalFailure
+  earlyExit
+  serviceMismatch
+  safetyBoundary
+  other
+}
+
+enum AttendanceDisputeStatus {
+  evidenceCollection
+  counterpartyResponse
+  review
+  decided
+  appealed
+  final
+}
+
+enum AttendanceDisputeDecision {
+  noRefund
+  fullRefund
+}
+
+enum AttendanceDisputeStatementKind {
+  initial
+  evidence
+  counterpartyResponse
+  appeal
+  appealResponse
+}
+
 enum PaymentTxnStatus {
   initiated
   success
@@ -190,6 +306,63 @@ enum RefundTxnStatus {
   success
   failed
   rejected
+}
+
+enum WeChatBillKind {
+  tradeAll
+  fundBasic
+  fundOperation
+  fundFees
+}
+
+enum WeChatBillRunStatus {
+  pending
+  processing
+  noStatement
+  reconciled
+  failed
+}
+
+enum WeChatReconciliationIssueStatus {
+  open
+  investigating
+  resolved
+  acceptedException
+}
+
+enum WeChatReconciliationResolutionProposalStatus {
+  pending
+  approved
+  rejected
+}
+
+enum WeChatBillImportProposalStatus {
+  pending
+  approved
+  rejected
+}
+
+// Channel-neutral dispute lifecycle. Provider-specific states remain in
+// providerStatus so future payment rails are not forced into card semantics.
+enum PaymentDisputeStatus {
+  pendingSync
+  open
+  processing
+  resolved
+  syncFailed
+}
+
+enum PaymentDisputeFundingStatus {
+  unlinked
+  held
+  recoveryRequired
+  released
+}
+
+enum PaymentDisputeReplyStatus {
+  submitting
+  submitted
+  outcomeUnknown
 }
 
 enum CommunityPostKind {
@@ -237,12 +410,79 @@ enum CompanionRecoveryStatus {
 enum CompanionRecoveryReason {
   confirmedPaidBeforeRefund
   payoutStateUncertain
+  paymentDisputeAfterPayout
 }
 
 enum CompanionCommercialStatus {
   pendingReview
   verified
   suspended
+}
+
+enum CompanionAdultEligibilityVerdict {
+  pending
+  adult
+  ineligible
+}
+
+enum OrderServiceIntent {
+  listen
+  comfort
+  organize
+  advice
+  lightCompanionship
+}
+
+enum CompanionVoiceIntroStatus {
+  notSubmitted
+  pendingReview
+  approved
+  rejected
+}
+
+enum CompanionTrainingStatus {
+  inProgress
+  passed
+  expired
+}
+
+enum CompanionAccountActionKind {
+  warning
+  serviceRestriction
+  suspension
+}
+
+enum CompanionAppealStatus {
+  pending
+  upheld
+  overturned
+  dismissed
+}
+
+enum CompanionIncidentCategory {
+  technicalIssue
+  lateArrival
+  noShow
+  harassment
+  safetyBoundary
+  other
+}
+
+enum CompanionIncidentStatus {
+  open
+  inReview
+  resolved
+  closed
+}
+
+enum CompanionWithdrawalStatus {
+  requested
+  reviewing
+  approved
+  processing
+  paid
+  rejected
+  cancelled
 }
 
 enum SupportTicketCategory {
@@ -283,6 +523,17 @@ enum AvailabilityReminderCandidateSkipReason {
   authorizationUnavailable
   availabilityUnavailable
   rateLimited
+}
+
+// Fanout is a separate durable boundary from candidate evaluation and provider
+// delivery. A window write only creates one pending job; bounded workers expand
+// it into private candidates without holding the owner calendar transaction.
+enum AvailabilityReminderFanoutStatus {
+  pending
+  processing
+  retryScheduled
+  completed
+  failed
 }
 
 // A private authorization binding is deliberately separate from both a
@@ -330,6 +581,30 @@ enum DeletionRequestStatus {
   cancelled
 }
 
+enum DataRightsRequestType {
+  access
+  export
+  correction
+  deletion
+}
+
+enum DataRightsRequestStatus {
+  submitted
+  inReview
+  needsInformation
+  completed
+  rejected
+}
+
+enum InvoiceRequestStatus {
+  submitted
+  inReview
+  issued
+  rejected
+  voided
+  cancelled
+}
+
 enum LegalConsentSource {
   wechatMiniProgram
   web
@@ -350,44 +625,143 @@ enum RecommendationTagSource {
   behavioral
 }
 
+// A crisis intervention stores only the minimum routing fact required to keep
+// emergency resources ahead of discovery and ordering. User-entered text,
+// message content, and inferred narrative must never be copied into this row.
+enum CrisisInterventionSource {
+  homeIntent
+  homeBrowseAll
+  homeRecommendation
+  discover
+  companionDetail
+  order
+  chatSafetyRule
+  directEmergencyHelp
+}
+
+enum CrisisInterventionRiskCode {
+  userRequested
+  selfHarmSignal
+  violenceSignal
+  immediateDangerSignal
+  chatSafetyRule
+}
+
+enum CrisisInterventionStatus {
+  resourcesPending
+  resourcesViewed
+}
+
 model User {
-  id                                  String                               @id @default(uuid())
-  role                                UserRole                             @default(user)
-  accountStatus                       AccountStatus                        @default(active)
-  createdAt                           DateTime                             @default(now())
-  updatedAt                           DateTime                             @updatedAt
-  identities                          AuthIdentity[]
-  staffCredential                     StaffCredential?
-  profile                             UserProfile?
-  refreshTokens                       RefreshToken[]
-  conversations                       Conversation[]
-  readStates                          MessageReadState[]
-  conversationNotificationPreferences ConversationNotificationPreference[]
-  conversationBlocks                  ConversationBlock[]                  @relation("ConversationBlocker")
-  orders                              Order[]
-  notifications                       Notification[]
-  notificationDeliveries              NotificationDelivery[]
-  subscriptionGrants                  WeChatSubscriptionGrant[]
-  supportTickets                      SupportTicket[]                      @relation("SupportRequester")
-  assignedSupportTickets              SupportTicket[]                      @relation("SupportAssignee")
-  orderSupportFacts                   OrderSupportFact[]
-  deletionRequests                    AccountDeletionRequest[]
-  legalConsentReceipts                LegalConsentReceipt[]
-  companionProfile                    CompanionProfile?                    @relation("CompanionOwner")
-  communityPosts                      CommunityPost[]
-  communityLikes                      CommunityLike[]
-  communityPostReports                CommunityPostReport[]                @relation("CommunityPostReporter")
-  reviews                             Review[]
-  mediaAssets                         MediaAsset[]                         @relation("MediaAssetUploader")
-  chatRestrictions                    ChatRestriction[]
-  moderationSubjectCases              ModerationCase[]                     @relation("ModerationSubject")
-  moderationReporterCases             ModerationCase[]                     @relation("ModerationReporter")
-  moderationAppeals                   ModerationAppeal[]                   @relation("ModerationAppealer")
-  recommendationPreference            UserRecommendationPreference?
-  recommendationTags                  UserRecommendationTag[]
-  recommendationRequests              RecommendationRequest[]
-  companionFavorites                  CompanionFavorite[]
-  companionRecentViews                CompanionRecentView[]
+  id                                   String                                   @id @default(uuid())
+  role                                 UserRole                                 @default(user)
+  accountStatus                        AccountStatus                            @default(active)
+  createdAt                            DateTime                                 @default(now())
+  updatedAt                            DateTime                                 @updatedAt
+  dataProcessingRestrictedAt           DateTime?
+  deletionCompletedAt                  DateTime?
+  identities                           AuthIdentity[]
+  staffCredential                      StaffCredential?                         @relation("StaffCredentialOwner")
+  suspendedStaffCredentials            StaffCredential[]                        @relation("StaffCredentialSuspendedBy")
+  staffCredentialHandoffs              StaffCredential[]                        @relation("StaffCredentialHandoffTo")
+  profile                              UserProfile?
+  refreshTokens                        RefreshToken[]
+  conversations                        Conversation[]
+  readStates                           MessageReadState[]
+  conversationNotificationPreferences  ConversationNotificationPreference[]
+  conversationBlocks                   ConversationBlock[]                      @relation("ConversationBlocker")
+  orders                               Order[]
+  notifications                        Notification[]
+  notificationDeliveries               NotificationDelivery[]
+  subscriptionGrants                   WeChatSubscriptionGrant[]
+  supportTickets                       SupportTicket[]                          @relation("SupportRequester")
+  assignedSupportTickets               SupportTicket[]                          @relation("SupportAssignee")
+  orderSupportFacts                    OrderSupportFact[]
+  boundCaseEvidenceAttachments         ControlledCaseEvidenceAttachment[]       @relation("CaseEvidenceBoundBy")
+  deletionRequests                     AccountDeletionRequest[]
+  startedDeletionRequests              AccountDeletionRequest[]                 @relation("AccountDeletionStartedBy")
+  approvedDeletionRequests             AccountDeletionRequest[]                 @relation("AccountDeletionApprovedBy")
+  completedDeletionRequests            AccountDeletionRequest[]                 @relation("AccountDeletionCompletedBy")
+  dataRightsRequests                   DataRightsRequest[]                      @relation("DataRightsRequester")
+  dataRightsRequestFollowUps           DataRightsRequestFollowUp[]
+  handledDataRightsRequests            DataRightsRequest[]                      @relation("DataRightsHandler")
+  invoiceRequests                      InvoiceRequest[]                         @relation("InvoiceRequester")
+  handledInvoiceRequests               InvoiceRequest[]                         @relation("InvoiceHandler")
+  identityVerificationRequests         IdentityVerificationRequest[]            @relation("IdentityVerificationSubject")
+  submittedIdentityVerifications       IdentityVerificationRequest[]            @relation("IdentityVerificationSubmitter")
+  reviewedIdentityVerifications        IdentityVerificationRequest[]            @relation("IdentityVerificationReviewer")
+  customerAdultEligibilityRecords      CustomerAdultEligibility[]               @relation("CustomerAdultEligibilitySubject")
+  submittedAdultEligibilityRecords     CustomerAdultEligibility[]               @relation("CustomerAdultEligibilitySubmitter")
+  reviewedAdultEligibilityRecords      CustomerAdultEligibility[]               @relation("CustomerAdultEligibilityReviewer")
+  legalConsentReceipts                 LegalConsentReceipt[]
+  companionProfile                     CompanionProfile?                        @relation("CompanionOwner")
+  communityPosts                       CommunityPost[]
+  communityLikes                       CommunityLike[]
+  communityPostReports                 CommunityPostReport[]                    @relation("CommunityPostReporter")
+  reviews                              Review[]
+  mediaAssets                          MediaAsset[]                             @relation("MediaAssetUploader")
+  chatRestrictions                     ChatRestriction[]
+  moderationSubjectCases               ModerationCase[]                         @relation("ModerationSubject")
+  moderationReporterCases              ModerationCase[]                         @relation("ModerationReporter")
+  moderationAppeals                    ModerationAppeal[]                       @relation("ModerationAppealer")
+  recommendationPreference             UserRecommendationPreference?
+  recommendationTags                   UserRecommendationTag[]
+  recommendationRequests               RecommendationRequest[]
+  companionRecommendationExclusions    UserCompanionRecommendationExclusion[]
+  futureBookingBoundariesAsCustomer    CompanionCustomerFutureBoundary[]         @relation("FutureBookingBoundaryCustomer")
+  companionFavorites                   CompanionFavorite[]
+  companionRecentViews                 CompanionRecentView[]
+  voiceAttendanceEvents                VoiceAttendanceEvent[]                   @relation("VoiceAttendanceEventParticipant")
+  openedAttendanceDisputes             AttendanceDispute[]                      @relation("AttendanceDisputeOpenedBy")
+  attendanceDisputeCounterparties      AttendanceDispute[]                      @relation("AttendanceDisputeCounterparty")
+  assignedAttendanceDisputes           AttendanceDispute[]                      @relation("AttendanceDisputeAssignee")
+  assignedRefunds                      RefundTransaction[]                      @relation("RefundAssignee")
+  decidedAttendanceDisputes            AttendanceDispute[]                      @relation("AttendanceDisputeDecider")
+  appealedAttendanceDisputes           AttendanceDispute[]                      @relation("AttendanceDisputeAppealedBy")
+  appealAssignedAttendanceDisputes     AttendanceDispute[]                      @relation("AttendanceDisputeAppealAssignee")
+  appealReviewedAttendanceDisputes     AttendanceDispute[]                      @relation("AttendanceDisputeAppealReviewer")
+  attendanceDisputeStatements          AttendanceDisputeStatement[]
+  requestedOrderReschedules            OrderRescheduleRequest[]                 @relation("OrderRescheduleRequestedBy")
+  respondedOrderReschedules            OrderRescheduleRequest[]                 @relation("OrderRescheduleRespondedBy")
+  paymentDisputeReplies                PaymentDisputeReply[]                    @relation("PaymentDisputeReplyActor")
+  userAccountActions                   UserAccountAction[]                      @relation("UserAccountActionSubject")
+  createdUserAccountActions            UserAccountAction[]                      @relation("UserAccountActionCreator")
+  revokedUserAccountActions            UserAccountAction[]                      @relation("UserAccountActionRevoker")
+  userAccountAppeals                   UserAccountAppeal[]                      @relation("UserAccountAppealSubject")
+  assignedUserAccountAppeals           UserAccountAppeal[]                      @relation("UserAccountAppealAssignee")
+  resolvedUserAccountAppeals           UserAccountAppeal[]                      @relation("UserAccountAppealResolver")
+  accountDataRetentionRecords          AccountDataRetentionRecord[]
+  requestedRetentionLegalHoldActions   AccountDataRetentionLegalHoldAction[]    @relation("RetentionLegalHoldActionRequester")
+  decidedRetentionLegalHoldActions     AccountDataRetentionLegalHoldAction[]    @relation("RetentionLegalHoldActionDecider")
+  placedRetentionLegalHolds            AccountDataRetentionLegalHold[]          @relation("RetentionLegalHoldPlacer")
+  releasedRetentionLegalHolds          AccountDataRetentionLegalHold[]          @relation("RetentionLegalHoldReleaser")
+  auditSubjectReferences               AuditSubjectReference[]                  @relation("AuditSubjectReferenceSubject")
+  proposedReconciliationResolutions    WeChatReconciliationResolutionProposal[] @relation("WeChatReconciliationResolutionProposer")
+  reviewedReconciliationResolutions    WeChatReconciliationResolutionProposal[] @relation("WeChatReconciliationResolutionReviewer")
+  proposedWeChatBillImports            WeChatBillImportProposal[]               @relation("WeChatBillImportProposer")
+  reviewedWeChatBillImports            WeChatBillImportProposal[]               @relation("WeChatBillImportReviewer")
+  proposedCashLedgerClassifications    CashLedgerClassificationProposal[]       @relation("CashLedgerClassificationProposer")
+  reviewedCashLedgerClassifications    CashLedgerClassificationProposal[]       @relation("CashLedgerClassificationReviewer")
+  crisisInterventions                  CrisisIntervention[]
+  resolvedAvailabilityReminderAttempts AvailabilityReminderAttempt[]            @relation("AvailabilityReminderAttemptOperationalResolver")
+}
+
+model CrisisIntervention {
+  id                    String                     @id @default(uuid())
+  userId                String
+  source                CrisisInterventionSource
+  riskCode              CrisisInterventionRiskCode
+  region                String
+  resourcePolicyVersion String
+  status                CrisisInterventionStatus   @default(resourcesPending)
+  resourcesViewedAt     DateTime?
+  createdAt             DateTime                   @default(now())
+  updatedAt             DateTime                   @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status, createdAt])
+  @@index([status, createdAt])
 }
 
 model AuthIdentity {
@@ -402,36 +776,70 @@ model AuthIdentity {
   @@index([userId])
 }
 
-model StaffCredential {
-  id                   String    @id @default(uuid())
-  userId               String    @unique
-  username             String    @unique
-  passwordHash         String
-  totpSecretCiphertext String
-  failedAttempts       Int       @default(0)
-  lockedUntil          DateTime?
-  lastLoginAt          DateTime?
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
+// Pseudonymous deny-relink evidence for an external identity whose owning
+// account entered irreversible deletion processing. The clear provider id
+// remains only in AuthIdentity and is erased by the deletion worker; login
+// compares HMAC candidates so it cannot silently create a fresh active User.
+model AuthIdentityTombstone {
+  id                   String       @id @default(uuid())
+  deletionRequestId    String
+  sourceAuthIdentityId String
+  provider             AuthProvider
+  providerIdHmac       String       @db.Char(64)
+  keyId                String       @db.VarChar(64)
+  createdAt            DateTime     @default(now())
+  expiresAt            DateTime?
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deletionRequest AccountDeletionRequest @relation(fields: [deletionRequestId], references: [id], onDelete: Restrict)
+
+  @@unique([deletionRequestId, sourceAuthIdentityId], map: "AuthIdentityTombstone_deletionRequestId_sourceAuthIdentityId_ke")
+  @@unique([deletionRequestId, provider, keyId, providerIdHmac], map: "AuthIdentityTombstone_deletionRequestId_provider_keyId_provider")
+  @@index([provider, keyId, providerIdHmac, expiresAt], map: "AuthIdentityTombstone_login_lookup")
+  @@index([deletionRequestId, expiresAt])
+  @@index([expiresAt, id], map: "AuthIdentityTombstone_expiry_due")
+}
+
+model StaffCredential {
+  id                     String                @id @default(uuid())
+  userId                 String                @unique
+  username               String                @unique
+  status                 StaffCredentialStatus @default(active)
+  passwordHash           String
+  totpSecretCiphertext   String
+  failedAttempts         Int                   @default(0)
+  lockedUntil            DateTime?
+  lastLoginAt            DateTime?
+  suspendedAt            DateTime?
+  suspendedByUserId      String?
+  suspensionReason       String?
+  handoffToUserId        String?
+  offboardingOperationId String?               @unique
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+
+  user        User  @relation("StaffCredentialOwner", fields: [userId], references: [id], onDelete: Cascade)
+  suspendedBy User? @relation("StaffCredentialSuspendedBy", fields: [suspendedByUserId], references: [id], onDelete: Restrict)
+  handoffTo   User? @relation("StaffCredentialHandoffTo", fields: [handoffToUserId], references: [id], onDelete: Restrict)
 
   @@index([username, lockedUntil])
+  @@index([status, updatedAt])
+  @@index([suspendedByUserId, suspendedAt])
+  @@index([handoffToUserId, suspendedAt])
 }
 
 model ReviewStaff {
-  id                   String            @id @default(uuid())
-  username             String            @unique
+  id                   String                @id @default(uuid())
+  username             String                @unique
   displayName          String
-  role                 ReviewStaffRole   @default(reviewer)
-  status               ReviewStaffStatus @default(active)
+  role                 ReviewStaffRole       @default(reviewer)
+  status               ReviewStaffStatus     @default(active)
   passwordHash         String
   totpSecretCiphertext String
-  failedAttempts       Int               @default(0)
+  failedAttempts       Int                   @default(0)
   lockedUntil          DateTime?
   lastLoginAt          DateTime?
-  createdAt            DateTime          @default(now())
-  updatedAt            DateTime          @updatedAt
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
   sessions             ReviewSession[]
   auditLogs            ReviewAuditLog[]
   moderationActions    ModerationActionLog[] @relation("ReviewStaffModerationActions")
@@ -439,19 +847,21 @@ model ReviewStaff {
 
   @@index([username, lockedUntil])
   @@index([status, role])
+  @@index([status, role, displayName, username, id])
 }
 
 model ReviewSession {
-  id         String   @id @default(uuid())
+  id         String    @id @default(uuid())
   reviewerId String
-  tokenHash  String   @unique
+  tokenHash  String    @unique
   expiresAt  DateTime
   revokedAt  DateTime?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime  @default(now())
 
   reviewer ReviewStaff @relation(fields: [reviewerId], references: [id], onDelete: Cascade)
 
   @@index([reviewerId])
+  @@index([reviewerId, revokedAt])
 }
 
 // This log is owned by the review department. It intentionally has no User
@@ -469,6 +879,7 @@ model ReviewAuditLog {
 
   @@index([reviewerId, createdAt])
   @@index([resourceType, resourceId])
+  @@index([resourceType, resourceId, action, createdAt])
   @@index([createdAt])
 }
 
@@ -484,47 +895,114 @@ model UserProfile {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+model IdentityVerificationRequest {
+  id                  String                            @id @default(uuid())
+  userId              String
+  requestedIsVerified Boolean
+  previousIsVerified  Boolean
+  status              IdentityVerificationRequestStatus @default(pending)
+  reason              String
+  evidenceReference   String                            @unique
+  submittedById       String
+  submittedAt         DateTime                          @default(now())
+  reviewedById        String?
+  reviewedAt          DateTime?
+  reviewReason        String?
+  createdAt           DateTime                          @default(now())
+  updatedAt           DateTime                          @updatedAt
+
+  subject     User  @relation("IdentityVerificationSubject", fields: [userId], references: [id], onDelete: Restrict)
+  submittedBy User  @relation("IdentityVerificationSubmitter", fields: [submittedById], references: [id], onDelete: Restrict)
+  reviewedBy  User? @relation("IdentityVerificationReviewer", fields: [reviewedById], references: [id], onDelete: Restrict)
+
+  @@index([status, submittedAt])
+  @@index([userId, status, createdAt])
+  @@index([submittedById, createdAt])
+  @@index([reviewedById, reviewedAt])
+}
+
+model CustomerAdultEligibility {
+  id                 String                         @id @default(uuid())
+  userId             String
+  status             CustomerAdultEligibilityStatus @default(pending)
+  verificationMethod CustomerAdultEligibilityMethod
+  evidenceReference  String                         @unique
+  submittedById      String
+  submittedAt        DateTime                       @default(now())
+  reviewedById       String?
+  verifiedAt         DateTime?
+  validUntil         DateTime?
+  reviewReason       String?
+  createdAt          DateTime                       @default(now())
+  updatedAt          DateTime                       @updatedAt
+
+  subject     User  @relation("CustomerAdultEligibilitySubject", fields: [userId], references: [id], onDelete: Restrict)
+  submittedBy User  @relation("CustomerAdultEligibilitySubmitter", fields: [submittedById], references: [id], onDelete: Restrict)
+  reviewedBy  User? @relation("CustomerAdultEligibilityReviewer", fields: [reviewedById], references: [id], onDelete: Restrict)
+
+  @@index([status, submittedAt])
+  @@index([userId, submittedAt])
+  @@index([reviewedById, verifiedAt])
+  @@index([status, validUntil])
+}
+
 model CompanionProfile {
-  id                        String                          @id
-  ownerUserId               String?                         @unique
-  name                      String
-  role                      String
-  initials                  String
-  rating                    Float                           @default(0)
-  reviewCount               Int                             @default(0)
-  pricePerHalfHour          Int
-  isOnline                  Boolean                         @default(false)
-  isVerified                Boolean                         @default(false)
-  bio                       String
-  availableTimes            String[]
-  languages                 String[]
-  specialties               String[]
-  completedOrders           Int                             @default(0)
-  responseTime              String
-  distanceKm                Float                           @default(0)
-  availability              Availability                    @default(available)
-  cityDistrict              String
-  topicIds                  String[]                        @default([])
-  isPublished               Boolean                         @default(false)
-  createdAt                 DateTime                        @default(now())
-  updatedAt                 DateTime                        @updatedAt
-  serviceTags               CompanionServiceTag[]
-  serviceOfferings          CompanionServiceOffering[]
-  availabilityWindows       CompanionAvailabilityWindow[]
-  recurringAvailabilityRules CompanionRecurringAvailabilityRule[]
-  availabilityBlackouts     CompanionAvailabilityBlackout[]
-  conversations             Conversation[]
-  orders                    Order[]
-  owner                     User?                           @relation("CompanionOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
-  reviews                   Review[]
-  recommendationImpressions RecommendationImpression[]
-  recommendationPolicies    CompanionRecommendationPolicy[]
-  earnings                  CompanionEarning[]
-  recoveries                CompanionRecovery[]
-  commercialProfile         CompanionCommercialProfile?
-  favorites                 CompanionFavorite[]
-  recentViews               CompanionRecentView[]
-  availabilityReminderCandidates AvailabilityReminderCandidate[]
+  id                               String                                 @id
+  ownerUserId                      String?                                @unique
+  name                             String
+  role                             String
+  initials                         String
+  rating                           Float                                  @default(0)
+  ratingSum                        Int                                    @default(0)
+  reviewCount                      Int                                    @default(0)
+  pricePerHalfHour                 Int
+  isOnline                         Boolean                                @default(false)
+  isVerified                       Boolean                                @default(false)
+  bio                              String
+  availableTimes                   String[]
+  languages                        String[]
+  specialties                      String[]
+  completedOrders                  Int                                    @default(0)
+  responseTime                     String
+  distanceKm                       Float                                  @default(0)
+  availability                     Availability                           @default(available)
+  cityDistrict                     String
+  topicIds                         String[]                               @default([])
+  livedExperience                  String?
+  serviceBoundaries                String[]                               @default([])
+  voiceIntroAssetRef               String?
+  voiceIntroDurationSeconds        Int?
+  voiceIntroStatus                 CompanionVoiceIntroStatus              @default(notSubmitted)
+  isPublished                      Boolean                                @default(false)
+  createdAt                        DateTime                               @default(now())
+  updatedAt                        DateTime                               @updatedAt
+  serviceTags                      CompanionServiceTag[]
+  serviceOfferings                 CompanionServiceOffering[]
+  availabilityWindows              CompanionAvailabilityWindow[]
+  recurringAvailabilityRules       CompanionRecurringAvailabilityRule[]
+  availabilityBlackouts            CompanionAvailabilityBlackout[]
+  conversations                    Conversation[]
+  orders                           Order[]
+  owner                            User?                                  @relation("CompanionOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  reviews                          Review[]
+  recommendationImpressions        RecommendationImpression[]
+  recommendationPolicies           CompanionRecommendationPolicy[]
+  recommendationExclusions         UserCompanionRecommendationExclusion[]
+  futureBookingBoundaries          CompanionCustomerFutureBoundary[]
+  earnings                         CompanionEarning[]
+  recoveries                       CompanionRecovery[]
+  commercialProfile                CompanionCommercialProfile?
+  trainingRecords                  CompanionTrainingRecord[]
+  accountActions                   CompanionAccountAction[]
+  accountAppeals                   CompanionAccountAppeal[]
+  incidentReports                  CompanionIncidentReport[]
+  evidenceUploadAssets             MediaAsset[]                           @relation("CompanionIncidentEvidenceScope")
+  withdrawalRequests               CompanionWithdrawalRequest[]
+  favorites                        CompanionFavorite[]
+  recentViews                      CompanionRecentView[]
+  availabilityReminderCandidates   AvailabilityReminderCandidate[]
+  availabilityReminderFanoutJobs   AvailabilityReminderFanoutJob[]
+  accountDeletionRatingRefreshJobs AccountDeletionRatingRefreshJob[]
 
   @@index([isPublished, availability])
   @@index([isOnline])
@@ -535,23 +1013,24 @@ model CompanionProfile {
 // never returned through a companion profile, never notifies the companion,
 // and current public-visibility checks are reapplied whenever it is listed.
 model CompanionFavorite {
-  id                               String   @id @default(uuid())
-  userId                           String
-  companionId                      String
-  availabilityReminderEnabled      Boolean  @default(false)
-  availabilityReminderGrantId      String?  @unique
-  availabilityReminderUpdatedAt    DateTime?
+  id                                  String    @id @default(uuid())
+  userId                              String
+  companionId                         String
+  availabilityReminderEnabled         Boolean   @default(false)
+  availabilityReminderGrantId         String?   @unique
+  availabilityReminderUpdatedAt       DateTime?
   availabilityReminderLastDeliveredAt DateTime?
-  createdAt                        DateTime @default(now())
+  createdAt                           DateTime  @default(now())
 
-  user                          User                           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  companion                     CompanionProfile               @relation(fields: [companionId], references: [id], onDelete: Cascade)
+  user                           User                            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companion                      CompanionProfile                @relation(fields: [companionId], references: [id], onDelete: Cascade)
   availabilityReminderCandidates AvailabilityReminderCandidate[]
 
   @@unique([userId, companionId])
   @@index([userId, createdAt])
   @@index([companionId])
   @@index([companionId, availabilityReminderEnabled])
+  @@index([companionId, availabilityReminderEnabled, userId, id], map: "CompanionFavorite_reminder_fanout_keyset")
 }
 
 // A bounded, customer-owned recall list. It is intentionally separate from
@@ -595,7 +1074,7 @@ model Conversation {
 }
 
 model Order {
-  id                                    String                        @id @default(uuid())
+  id                                    String                            @id @default(uuid())
   userId                                String
   companionId                           String
   serviceOfferingId                     String?
@@ -612,23 +1091,23 @@ model Order {
   themeId                               String
   durationMinutes                       Int
   amountCents                           Int
-  currency                              String                        @default("CNY")
-  status                                OrderStatus                   @default(pending)
+  currency                              String                            @default("CNY")
+  status                                OrderStatus                       @default(pending)
   scheduledAt                           DateTime
   companionNameSnapshot                 String
   companionRoleSnapshot                 String
   companionInitialsSnapshot             String
   themeNameSnapshot                     String
   conversationId                        String?
-  recommendationImpressionId            String?                       @unique
+  recommendationImpressionId            String?                           @unique
   clientRequestId                       String?
   companionConfirmedAt                  DateTime?
   companionResponseDeadlineAt           DateTime?
   paymentReservationExpiresAt           DateTime?
   serviceStartedAt                      DateTime?
-  platformFeeBps                        Int                           @default(0)
-  platformFeeCents                      Int                           @default(0)
-  companionPayableCents                 Int                           @default(0)
+  platformFeeBps                        Int                               @default(0)
+  platformFeeCents                      Int                               @default(0)
+  companionPayableCents                 Int                               @default(0)
   paidAt                                DateTime?
   cancelledAt                           DateTime?
   completedAt                           DateTime?
@@ -636,14 +1115,23 @@ model Order {
   customerServiceGuidelinesConfirmedAt  DateTime?
   companionServiceGuidelinesConfirmedAt DateTime?
   refundRequestDeadlineAt               DateTime?
+  refundPolicyVersionSnapshot           String
+  refundRequestWindowHoursSnapshot      Int
   settlementRecipientRefSnapshot        String?
   settlementRecipientMaskedSnapshot     String?
   taxProfileRefSnapshot                 String?
   identityEvidenceRefSnapshot           String?
+  adultEligibilityVerdictSnapshot       CompanionAdultEligibilityVerdict?
+  adultEligibilityVerifiedAtSnapshot    DateTime?
+  adultEligibilityValidUntilSnapshot    DateTime?
+  serviceIntentSnapshot                 OrderServiceIntent?
+  serviceIntentPolicyVersionSnapshot    String                            @default("legacy")
   serviceAgreementVersionSnapshot       String?
   serviceAgreementEvidenceRefSnapshot   String?
-  createdAt                             DateTime                      @default(now())
-  updatedAt                             DateTime                      @updatedAt
+  fulfillmentPolicyVersionSnapshot      String                            @default("legacy")
+  fulfillmentTimezoneSnapshot           String                            @default("Asia/Shanghai")
+  createdAt                             DateTime                          @default(now())
+  updatedAt                             DateTime                          @updatedAt
 
   user                     User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
   companion                CompanionProfile             @relation(fields: [companionId], references: [id], onDelete: Restrict)
@@ -661,15 +1149,23 @@ model Order {
   timelineEvents           OrderTimelineEvent[]
   voiceSession             VoiceSession?
   recommendationImpression RecommendationImpression?    @relation("RecommendationAttributedOrder", fields: [recommendationImpressionId], references: [id], onDelete: SetNull)
+  companionIncidentReports CompanionIncidentReport[]
+  invoiceRequests          InvoiceRequest[]
+  attendanceDispute        AttendanceDispute?
+  paymentDisputes          PaymentDispute[]
+  paymentDisputeOrders     PaymentDisputeOrder[]
 
   @@unique([userId, clientRequestId])
   @@index([userId, createdAt])
   @@index([companionId, status])
+  @@index([companionId, status, scheduledAt, id], map: "Order_companion_status_scheduledAt_id")
   @@index([serviceOfferingId])
   @@index([availabilityWindowId])
+  @@index([companionId, companionConfirmedAt])
   @@index([companionId, paymentReservationExpiresAt])
   @@index([status, companionResponseDeadlineAt])
   @@index([status, refundRequestDeadlineAt])
+  @@index([serviceIntentSnapshot, createdAt])
   @@index([status, createdAt])
   @@index([conversationId])
 }
@@ -678,44 +1174,147 @@ model Order {
 /// derives from Order; this record only gives the provider a stable opaque room
 /// identifier and an audit-friendly access footprint.
 model VoiceSession {
-  id                           String   @id @default(uuid())
-  orderId                      String   @unique
-  provider                     String   @default("trtc")
-  roomId                       String   @unique
+  id                           String    @id @default(uuid())
+  orderId                      String    @unique
+  provider                     String    @default("trtc")
+  roomId                       String    @unique
   firstAccessedAt              DateTime?
   lastAccessedAt               DateTime?
-  accessCount                  Int      @default(0)
+  accessCount                  Int       @default(0)
   terminationRequestedAt       DateTime?
   terminationCompletedAt       DateTime?
   terminationReason            String?
-  terminationAttempts          Int      @default(0)
+  terminationAttempts          Int       @default(0)
   terminationNextAttemptAt     DateTime?
   terminationLeaseUntil        DateTime?
   terminationLastError         String?
   terminationProviderRequestId String?
-  createdAt                    DateTime @default(now())
-  updatedAt                    DateTime @updatedAt
+  createdAt                    DateTime  @default(now())
+  updatedAt                    DateTime  @updatedAt
 
-  order                        Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order            Order                  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  attendanceEvents VoiceAttendanceEvent[]
 
-  @@index([terminationCompletedAt, terminationNextAttemptAt, terminationLeaseUntil])
+  @@index([terminationCompletedAt, terminationNextAttemptAt, terminationLeaseUntil], map: "VoiceSession_terminationCompletedAt_terminationNextAttemptAt_te")
+}
+
+/// Immutable, metadata-only attendance evidence. Provider events are verified
+/// against the raw Tencent callback body; client events are always auxiliary
+/// and must never be used as the sole basis for a decision. No recording,
+/// IP address, terminal type, or device fingerprint is retained.
+model VoiceAttendanceEvent {
+  id                 String                         @id @default(uuid())
+  voiceSessionId     String
+  participantUserId  String?
+  participantRole    VoiceAttendanceParticipantRole
+  type               VoiceAttendanceEventType
+  source             VoiceAttendanceEventSource
+  providerEventId    String?                        @unique
+  clientEventId      String?
+  providerOccurredAt DateTime?
+  clientClaimedAt    DateTime?
+  serverReceivedAt   DateTime                       @default(now())
+  providerReasonCode Int?
+  providerUniqueId   String?
+  createdAt          DateTime                       @default(now())
+
+  voiceSession VoiceSession @relation(fields: [voiceSessionId], references: [id], onDelete: Cascade)
+  participant  User?        @relation("VoiceAttendanceEventParticipant", fields: [participantUserId], references: [id], onDelete: SetNull)
+
+  @@unique([voiceSessionId, participantUserId, clientEventId])
+  @@index([voiceSessionId, participantRole, providerOccurredAt])
+  @@index([voiceSessionId, participantUserId, source, serverReceivedAt], map: "VoiceAttendanceEvent_session_participant_source_received_idx")
+  @@index([participantUserId, serverReceivedAt])
+}
+
+/// A structured, bilateral fulfillment case. It is deliberately independent
+/// from the free-text support queue and owns its own evidence and appeal state.
+model AttendanceDispute {
+  id                        String                         @id @default(uuid())
+  orderId                   String                         @unique
+  openedByUserId            String?
+  openedByRole              VoiceAttendanceParticipantRole
+  counterpartyUserId        String?
+  issue                     AttendanceDisputeIssue
+  status                    AttendanceDisputeStatus        @default(evidenceCollection)
+  policyVersionSnapshot     String
+  timezoneSnapshot          String
+  evidenceDueAt             DateTime
+  counterpartyResponseDueAt DateTime
+  assignedToUserId          String?
+  assignedAt                DateTime?
+  decision                  AttendanceDisputeDecision?
+  decisionReason            String?
+  decidedByUserId           String?
+  decidedAt                 DateTime?
+  appealDeadlineAt          DateTime?
+  appealedByUserId          String?
+  appealedAt                DateTime?
+  appealResponseDueAt       DateTime?
+  appealAssignedToUserId    String?
+  appealAssignedAt          DateTime?
+  appealReviewedByUserId    String?
+  appealReviewedAt          DateTime?
+  finalDecision             AttendanceDisputeDecision?
+  finalReason               String?
+  finalizedAt               DateTime?
+  refundTransactionId       String?                        @unique
+  createdAt                 DateTime                       @default(now())
+  updatedAt                 DateTime                       @updatedAt
+
+  order                Order                        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  openedBy             User?                        @relation("AttendanceDisputeOpenedBy", fields: [openedByUserId], references: [id], onDelete: SetNull)
+  counterparty         User?                        @relation("AttendanceDisputeCounterparty", fields: [counterpartyUserId], references: [id], onDelete: SetNull)
+  assignedTo           User?                        @relation("AttendanceDisputeAssignee", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+  decidedBy            User?                        @relation("AttendanceDisputeDecider", fields: [decidedByUserId], references: [id], onDelete: SetNull)
+  appealedBy           User?                        @relation("AttendanceDisputeAppealedBy", fields: [appealedByUserId], references: [id], onDelete: SetNull)
+  appealAssignedTo     User?                        @relation("AttendanceDisputeAppealAssignee", fields: [appealAssignedToUserId], references: [id], onDelete: SetNull)
+  appealReviewedBy     User?                        @relation("AttendanceDisputeAppealReviewer", fields: [appealReviewedByUserId], references: [id], onDelete: SetNull)
+  refundTransaction    RefundTransaction?           @relation(fields: [refundTransactionId], references: [id], onDelete: SetNull)
+  statements           AttendanceDisputeStatement[]
+  evidenceUploadAssets MediaAsset[]                 @relation("AttendanceDisputeEvidenceScope")
+
+  @@index([status, evidenceDueAt, counterpartyResponseDueAt])
+  @@index([assignedToUserId, status, createdAt])
+  @@index([appealAssignedToUserId, status, createdAt])
+  @@index([openedByUserId, createdAt])
+  @@index([counterpartyUserId, createdAt])
+  @@index([decidedByUserId, createdAt])
+  @@index([appealedByUserId, createdAt])
+  @@index([appealReviewedByUserId, createdAt])
+}
+
+model AttendanceDisputeStatement {
+  id                String                         @id @default(uuid())
+  disputeId         String
+  submittedByUserId String
+  kind              AttendanceDisputeStatementKind
+  statement         String
+  createdAt         DateTime                       @default(now())
+
+  dispute             AttendanceDispute                  @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+  submittedBy         User                               @relation(fields: [submittedByUserId], references: [id], onDelete: Restrict)
+  evidenceAttachments ControlledCaseEvidenceAttachment[]
+
+  @@index([disputeId, createdAt])
+  @@index([submittedByUserId, createdAt])
 }
 
 /// A one-row, provider-wide dispatch lease. It prevents horizontally scaled
 /// API replicas from exceeding the external TRTC room-control rate limit while
 /// still letting a later replica recover automatically after a crash.
 model VoiceRoomControlDispatchLease {
-  id         String   @id
+  id         String    @id
   leaseToken String?
   leaseUntil DateTime?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 }
 
 model OrderRescheduleRequest {
   id                                          String                       @id @default(uuid())
   orderId                                     String
-  requestedByUserId                           String
+  requestedByUserId                           String?
   requestedByRole                             OrderRescheduleRequesterRole
   originalScheduledAt                         DateTime
   requestedScheduledAt                        DateTime
@@ -731,10 +1330,13 @@ model OrderRescheduleRequest {
   updatedAt                                   DateTime                     @updatedAt
 
   order          Order                @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  requestedBy    User?                @relation("OrderRescheduleRequestedBy", fields: [requestedByUserId], references: [id], onDelete: SetNull)
+  respondedBy    User?                @relation("OrderRescheduleRespondedBy", fields: [respondedByUserId], references: [id], onDelete: SetNull)
   timelineEvents OrderTimelineEvent[]
 
   @@index([orderId, status, expiresAt])
-  @@index([requestedByUserId, createdAt])
+  @@index([requestedByUserId, createdAt, id])
+  @@index([respondedByUserId, respondedAt, id])
 }
 
 model OrderTimelineEvent {
@@ -755,60 +1357,498 @@ model OrderTimelineEvent {
 }
 
 model PaymentTransaction {
-  id            String           @id @default(uuid())
-  orderId       String
-  outTradeNo    String           @unique
-  provider      String           @default("wechat")
-  amountCents   Int
-  status        PaymentTxnStatus @default(initiated)
-  prepayId      String?
-  transactionId String?
-  clientParams  Json?
-  notifyPayload Json?
-  paidAt        DateTime?
-  expiresAt     DateTime?
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
+  id             String           @id @default(uuid())
+  orderId        String
+  outTradeNo     String           @unique
+  provider       String           @default("wechat")
+  amountCents    Int
+  status         PaymentTxnStatus @default(initiated)
+  prepayId       String?
+  transactionId  String?
+  clientParams   Json?
+  notifyPayload  Json?
+  paidAt         DateTime?
+  /// Immutable payment-success timestamp returned by WeChat. Local wall-clock
+  /// timestamps must never be substituted for daily provider reconciliation.
+  providerPaidAt DateTime?
+  expiresAt      DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 
-  order   Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  refunds RefundTransaction[]
+  order           Order                 @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  refunds         RefundTransaction[]
+  invoiceRequests InvoiceRequest[]
+  disputes        PaymentDispute[]
+  disputeOrders   PaymentDisputeOrder[]
 
   @@unique([provider, transactionId])
   @@index([orderId])
   @@index([status])
   @@index([status, expiresAt])
+  @@index([status, providerPaidAt])
 }
 
 model RefundTransaction {
-  id                    String          @id @default(uuid())
-  orderId               String
-  paymentId             String
-  outRefundNo           String          @unique
-  amountCents           Int
-  status                RefundTxnStatus @default(pending)
-  reason                String?
-  providerRefundId      String?         @unique
-  initiatedById         String?
-  supportTicketId       String?
-  exceptionReasonCode   String?
-  reviewedById          String?
-  reviewedAt            DateTime?
-  reviewNote            String?
-  failureReason         String?
-  providerQueryAttempts Int             @default(0)
-  nextReconcileAt       DateTime?
-  createdAt             DateTime        @default(now())
-  updatedAt             DateTime        @updatedAt
+  id                        String          @id @default(uuid())
+  orderId                   String
+  paymentId                 String
+  outRefundNo               String          @unique
+  amountCents               Int
+  status                    RefundTxnStatus @default(pending)
+  reason                    String?
+  providerRefundId          String?         @unique
+  /// Immutable provider acceptance/success timestamp returned by WeChat.
+  providerRefundAcceptedAt  DateTime?
+  /// Immutable provider success_time. Refund success may occur on a later
+  /// Shanghai bill date than create_time and must be attributed accordingly.
+  providerRefundSucceededAt DateTime?
+  initiatedById             String?
+  supportTicketId           String?
+  exceptionReasonCode       String?
+  assignedToUserId          String?
+  assignedAt                DateTime?
+  reviewDueAt               DateTime?
+  resolutionDueAt           DateTime
+  reviewedById              String?
+  reviewedAt                DateTime?
+  reviewNote                String?
+  failureReason             String?
+  providerQueryAttempts     Int             @default(0)
+  nextReconcileAt           DateTime?
+  createdAt                 DateTime        @default(now())
+  updatedAt                 DateTime        @updatedAt
 
-  order         Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  payment       PaymentTransaction @relation(fields: [paymentId], references: [id], onDelete: Cascade)
-  supportTicket SupportTicket?     @relation(fields: [supportTicketId], references: [id], onDelete: SetNull)
-  recovery      CompanionRecovery?
+  order             Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  payment           PaymentTransaction @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  supportTicket     SupportTicket?     @relation(fields: [supportTicketId], references: [id], onDelete: SetNull)
+  assignedTo        User?              @relation("RefundAssignee", fields: [assignedToUserId], references: [id], onDelete: Restrict)
+  recovery          CompanionRecovery?
+  attendanceDispute AttendanceDispute?
 
   @@index([orderId])
   @@index([paymentId])
   @@index([supportTicketId])
+  @@index([assignedToUserId, status])
+  @@index([status, reviewDueAt])
+  @@index([status, resolutionDueAt])
   @@index([status, nextReconcileAt])
+  @@index([status, providerRefundAcceptedAt])
+  @@index([status, providerRefundSucceededAt])
+}
+
+/// Immutable identity and processing ledger for one official WeChat T+1 bill.
+/// The downloaded statement itself is not retained: only provider/in-house
+/// digests and normalized financial references are persisted.
+model WeChatBillReconciliationRun {
+  id               String              @id @default(uuid())
+  provider         String              @default("wechat")
+  source           String              @default("api")
+  billDate         DateTime            @db.Date
+  kind             WeChatBillKind
+  status           WeChatBillRunStatus @default(pending)
+  hashType         String?
+  providerHash     String?
+  contentSha256    String?
+  downloadedBytes  Int?
+  entryCount       Int                 @default(0)
+  issueCount       Int                 @default(0)
+  attemptCount     Int                 @default(0)
+  leaseToken       String?
+  leaseExpiresAt   DateTime?
+  nextAttemptAt    DateTime            @default(now())
+  lastErrorCode    String?
+  lastErrorSummary String?
+  requestedAt      DateTime?
+  downloadedAt     DateTime?
+  importedAt       DateTime?
+  reconciledAt     DateTime?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  importProposalId String?             @unique
+
+  entries        WeChatBillEntry[]
+  issues         WeChatReconciliationIssue[]
+  importProposal WeChatBillImportProposal?   @relation(fields: [importProposalId], references: [id], onDelete: Restrict)
+
+  @@unique([provider, billDate, kind])
+  @@index([status, nextAttemptAt])
+  @@index([billDate, kind])
+}
+
+/// A merchant-platform export is parsed before persistence. Raw statement text
+/// is never stored; only its immutable digest, private evidence reference and
+/// the same minimal normalized facts used by API-downloaded bills survive.
+model WeChatBillImportProposal {
+  id                String                         @id @default(uuid())
+  provider          String                         @default("wechat")
+  source            String                         @default("merchantPlatform")
+  billDate          DateTime                       @db.Date
+  kind              WeChatBillKind
+  status            WeChatBillImportProposalStatus @default(pending)
+  contentSha256     String
+  normalizedSha256  String
+  sizeBytes         Int
+  entryCount        Int
+  evidenceReference String
+  proposedByUserId  String
+  proposedAt        DateTime                       @default(now())
+  reviewedByUserId  String?
+  reviewedAt        DateTime?
+  reviewNote        String?
+
+  proposedBy User                         @relation("WeChatBillImportProposer", fields: [proposedByUserId], references: [id], onDelete: Restrict)
+  reviewedBy User?                        @relation("WeChatBillImportReviewer", fields: [reviewedByUserId], references: [id], onDelete: Restrict)
+  entries    WeChatBillImportEntry[]
+  run        WeChatBillReconciliationRun?
+
+  // Active-content uniqueness is enforced by a partial database index. A
+  // rejected proposal remains immutable evidence but must not permanently
+  // prevent a corrected operational submission of the same official file.
+  @@index([status, proposedAt])
+  @@index([billDate, kind, status])
+}
+
+model WeChatBillImportEntry {
+  id                        String    @id @default(uuid())
+  proposalId                String
+  lineNumber                Int
+  entryType                 String
+  providerOccurredAt        DateTime?
+  providerRefundAcceptedAt  DateTime?
+  providerRefundSucceededAt DateTime?
+  outTradeNo                String?
+  transactionId             String?
+  outRefundNo               String?
+  providerRefundId          String?
+  businessReference         String?
+  businessName              String?
+  businessType              String?
+  tradeState                String?
+  refundState               String?
+  amountCents               Int?
+  refundAmountCents         Int?
+  feeCents                  Int?
+  fundDirection             String?
+  fundAmountCents           Int?
+  accountType               String?
+  rowDigest                 String
+  createdAt                 DateTime  @default(now())
+
+  proposal WeChatBillImportProposal @relation(fields: [proposalId], references: [id], onDelete: Restrict)
+
+  @@unique([proposalId, lineNumber])
+  @@index([outTradeNo])
+  @@index([outRefundNo])
+  @@index([businessReference])
+}
+
+/// Minimal normalized row from a verified official bill. Raw CSV text and
+/// personal fields (for example openid/product description) are never stored.
+model WeChatBillEntry {
+  id                        String    @id @default(uuid())
+  runId                     String
+  lineNumber                Int
+  entryType                 String
+  providerOccurredAt        DateTime?
+  providerRefundAcceptedAt  DateTime?
+  providerRefundSucceededAt DateTime?
+  outTradeNo                String?
+  transactionId             String?
+  outRefundNo               String?
+  providerRefundId          String?
+  businessReference         String?
+  businessName              String?
+  businessType              String?
+  tradeState                String?
+  refundState               String?
+  amountCents               Int?
+  refundAmountCents         Int?
+  feeCents                  Int?
+  fundDirection             String?
+  fundAmountCents           Int?
+  accountType               String?
+  rowDigest                 String
+  createdAt                 DateTime  @default(now())
+
+  run    WeChatBillReconciliationRun @relation(fields: [runId], references: [id], onDelete: Restrict)
+  issues WeChatReconciliationIssue[]
+
+  @@unique([runId, lineNumber])
+  @@index([outTradeNo])
+  @@index([transactionId])
+  @@index([outRefundNo])
+  @@index([businessReference])
+}
+
+/// Local double-entry boundary used for provider fund-statement comparison.
+/// The provider bill is evidence, never the source of these rows.
+model CashLedgerEntry {
+  id                    String    @id @default(uuid())
+  provider              String    @default("wechat")
+  accountType           String
+  bookedAt              DateTime
+  expectedStatementDate DateTime? @db.Date
+  businessName          String
+  businessType          String
+  direction             String
+  grossCents            Int
+  feeCents              Int       @default(0)
+  netCents              Int
+  providerReference     String
+  sourceResourceType    String
+  sourceResourceId      String
+  evidenceReference     String
+  createdAt             DateTime  @default(now())
+
+  classificationProposals CashLedgerClassificationProposal[]
+
+  @@unique([provider, accountType, providerReference, businessType], map: "CashLedgerEntry_provider_account_reference_business_key")
+  @@unique([sourceResourceType, sourceResourceId, businessType], map: "CashLedgerEntry_source_resource_business_key")
+  @@index([expectedStatementDate, accountType])
+  @@index([providerReference])
+  @@index([bookedAt])
+}
+
+/// Append-only, independently reviewed classification of an automatically
+/// captured provider cash fact. Provider/source/amount facts stay immutable;
+/// approval may only fill the initially unknown account and statement date.
+model CashLedgerClassificationProposal {
+  id                    String                         @id @default(uuid())
+  cashLedgerEntryId     String
+  accountType           String
+  expectedStatementDate DateTime                       @db.Date
+  evidenceReference     String
+  evidenceDigestSha256  String
+  proposedByUserId      String
+  proposedAt            DateTime                       @default(now())
+  status                WeChatBillImportProposalStatus @default(pending)
+  reviewedByUserId      String?
+  reviewedAt            DateTime?
+  reviewNote            String?
+
+  cashLedgerEntry CashLedgerEntry @relation(fields: [cashLedgerEntryId], references: [id], onDelete: Restrict)
+  proposedBy      User            @relation("CashLedgerClassificationProposer", fields: [proposedByUserId], references: [id], onDelete: Restrict)
+  reviewedBy      User?           @relation("CashLedgerClassificationReviewer", fields: [reviewedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([cashLedgerEntryId, status], map: "CashLedgerClassificationProposal_entry_status")
+  @@index([status, proposedAt])
+}
+
+model WeChatReconciliationIssue {
+  id                String                          @id @default(uuid())
+  runId             String
+  entryId           String?
+  fingerprint       String                          @unique
+  kind              String
+  severity          String                          @default("high")
+  status            WeChatReconciliationIssueStatus @default(open)
+  localResourceType String?
+  localResourceId   String?
+  providerReference String?
+  expectedCents     Int?
+  actualCents       Int?
+  detailCode        String
+  assignedToUserId  String?
+  assignedAt        DateTime?
+  resolvedByUserId  String?
+  resolvedAt        DateTime?
+  resolutionCode    String?
+  resolutionNote    String?
+  createdAt         DateTime                        @default(now())
+  updatedAt         DateTime                        @updatedAt
+
+  run                 WeChatBillReconciliationRun              @relation(fields: [runId], references: [id], onDelete: Restrict)
+  entry               WeChatBillEntry?                         @relation(fields: [entryId], references: [id], onDelete: SetNull)
+  resolutionProposals WeChatReconciliationResolutionProposal[]
+
+  @@index([status, createdAt])
+  @@index([assignedToUserId, status])
+  @@index([runId, status])
+  @@index([localResourceType, localResourceId])
+}
+
+/// Append-only human resolution evidence. Financial discrepancies remain
+/// investigating until an independent reviewer approves one pending proposal.
+model WeChatReconciliationResolutionProposal {
+  id                   String                                       @id @default(uuid())
+  issueId              String
+  outcome              WeChatReconciliationIssueStatus
+  resolutionCode       String
+  resolutionNote       String
+  evidenceReference    String
+  evidenceDigestSha256 String
+  proposedByUserId     String
+  proposedAt           DateTime                                     @default(now())
+  status               WeChatReconciliationResolutionProposalStatus @default(pending)
+  reviewedByUserId     String?
+  reviewedAt           DateTime?
+  reviewNote           String?
+
+  issue      WeChatReconciliationIssue @relation(fields: [issueId], references: [id], onDelete: Restrict)
+  proposedBy User                      @relation("WeChatReconciliationResolutionProposer", fields: [proposedByUserId], references: [id], onDelete: Restrict)
+  reviewedBy User?                     @relation("WeChatReconciliationResolutionReviewer", fields: [reviewedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([issueId, status, proposedAt], map: "WeChatResolutionProposal_issue_status_time")
+  @@index([status, proposedAt])
+}
+
+model PaymentDispute {
+  id                          String                      @id @default(uuid())
+  channel                     String
+  type                        String
+  providerDisputeId           String
+  idempotencyKey              String                      @unique
+  orderId                     String?
+  paymentId                   String?
+  outTradeNo                  String?
+  status                      PaymentDisputeStatus        @default(pendingSync)
+  providerStatus              String?
+  problemType                 String?
+  complaintDetail             String?
+  complaintOccurredAt         DateTime?
+  firstResponseDueAt          DateTime?
+  resolutionDueAt             DateTime?
+  firstRespondedAt            DateTime?
+  resolvedAt                  DateTime?
+  incomingUserResponse        Boolean                     @default(false)
+  complaintCount              Int                         @default(1)
+  complaintFullRefunded       Boolean                     @default(false)
+  requiresImmediateService    Boolean                     @default(false)
+  inPlatformService           Boolean                     @default(false)
+  applyRefundAmountCents      Int?
+  latestActionType            String?
+  fundingStatus               PaymentDisputeFundingStatus @default(unlinked)
+  assignedSupportUserId       String?
+  assignedAt                  DateTime?
+  completionRequestId         String?                     @unique
+  completionStatus            PaymentDisputeReplyStatus?
+  completionProviderReference String?
+  completionRequestedById     String?
+  completionRequestedAt       DateTime?
+  providerQueryAttempts       Int                         @default(0)
+  lastProviderSyncAt          DateTime?
+  nextReconcileAt             DateTime?
+  reconcileLeaseToken         String?
+  reconcileLeaseUntil         DateTime?
+  createdAt                   DateTime                    @default(now())
+  updatedAt                   DateTime                    @updatedAt
+
+  order             Order?                           @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  payment           PaymentTransaction?              @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  replies           PaymentDisputeReply[]
+  attachments       PaymentDisputeAttachment[]
+  notifications     PaymentDisputeNotification[]
+  negotiationEvents PaymentDisputeNegotiationEvent[]
+  complaintOrders   PaymentDisputeOrder[]
+  recoveries        CompanionRecovery[]
+
+  @@unique([channel, providerDisputeId])
+  @@index([status, resolutionDueAt])
+  @@index([nextReconcileAt, reconcileLeaseUntil])
+  @@index([orderId, status])
+  @@index([paymentId])
+  @@index([outTradeNo])
+  @@index([assignedSupportUserId, status])
+}
+
+/// One provider complaint can cover multiple transactions. An unmatched
+/// outTradeNo remains durable and keeps the complaint financially unlinked.
+model PaymentDisputeOrder {
+  id             String    @id @default(uuid())
+  disputeId      String
+  orderId        String?
+  paymentId      String?
+  outTradeNo     String
+  transactionId  String?
+  amountCents    Int
+  providerSeenAt DateTime  @default(now())
+  matchedAt      DateTime?
+
+  dispute PaymentDispute      @relation(fields: [disputeId], references: [id], onDelete: Restrict)
+  order   Order?              @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  payment PaymentTransaction? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+
+  @@unique([disputeId, outTradeNo])
+  @@index([orderId, disputeId])
+  @@index([paymentId])
+  @@index([outTradeNo])
+}
+
+model PaymentDisputeReply {
+  id                String                    @id @default(uuid())
+  disputeId         String
+  actorId           String
+  clientRequestId   String                    @unique
+  content           String
+  status            PaymentDisputeReplyStatus @default(submitting)
+  providerReference String?
+  submittedAt       DateTime?
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+
+  dispute     PaymentDispute             @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+  actor       User                       @relation("PaymentDisputeReplyActor", fields: [actorId], references: [id], onDelete: Restrict)
+  attachments PaymentDisputeAttachment[]
+
+  @@index([disputeId, createdAt])
+  @@index([actorId, createdAt])
+}
+
+// Only provider media identifiers or irreversible URL digests are retained;
+// remote complaint URLs and binary complaint evidence are not copied here.
+model PaymentDisputeAttachment {
+  id              String   @id @default(uuid())
+  disputeId       String
+  replyId         String?
+  source          String
+  mediaType       String
+  providerMediaId String?
+  remoteUrlDigest String?
+  createdAt       DateTime @default(now())
+
+  dispute PaymentDispute       @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+  reply   PaymentDisputeReply? @relation(fields: [replyId], references: [id], onDelete: Cascade)
+
+  @@unique([disputeId, source, providerMediaId])
+  @@unique([disputeId, source, remoteUrlDigest])
+  @@index([replyId])
+}
+
+// The encrypted callback body is deliberately not persisted. Retain only the
+// official notification identifiers, compact summary and a replay digest.
+model PaymentDisputeNotification {
+  id                     String    @id @default(uuid())
+  disputeId              String
+  providerNotificationId String    @unique
+  eventType              String
+  actionType             String
+  summary                String?
+  rawDigest              String
+  providerCreatedAt      DateTime?
+  receivedAt             DateTime  @default(now())
+
+  dispute PaymentDispute @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+
+  @@index([disputeId, receivedAt])
+}
+
+// Immutable, provider-authored negotiation history. Text is needed by the
+// assigned case worker; remote evidence URLs are reduced to SHA-256 digests.
+model PaymentDisputeNegotiationEvent {
+  id             String    @id @default(uuid())
+  disputeId      String
+  providerLogId  String
+  operator       String
+  operateType    String
+  operateDetails String?
+  operatedAt     DateTime?
+  mediaDigests   String[]  @default([])
+  createdAt      DateTime  @default(now())
+
+  dispute PaymentDispute @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+
+  @@unique([disputeId, providerLogId])
+  @@index([disputeId, operatedAt])
 }
 
 model CommunityPost {
@@ -876,8 +1916,8 @@ model Review {
   user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   companion CompanionProfile @relation(fields: [companionId], references: [id], onDelete: Restrict)
 
-  @@index([companionId, createdAt])
-  @@index([userId, createdAt])
+  @@index([companionId, createdAt, id])
+  @@index([userId, createdAt, id])
 }
 
 // Private, post-service feedback belongs to the order rather than the public
@@ -924,6 +1964,49 @@ model UserRecommendationTag {
 
   @@unique([userId, topicId, source])
   @@index([userId, disabledAt, updatedAt])
+}
+
+// A private, reversible user preference that removes one companion from every
+// recommendation placement. Its display fields are the public snapshot the
+// user saw when choosing it, so later unpublished edits are not leaked. It is
+// intentionally independent from conversation blocks, reports, public profile
+// visibility, search and order history.
+model UserCompanionRecommendationExclusion {
+  id                        String   @id @default(uuid())
+  userId                    String
+  companionId               String
+  companionNameSnapshot     String
+  companionRoleSnapshot     String
+  companionInitialsSnapshot String
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companion CompanionProfile @relation(fields: [companionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, companionId])
+  @@index([userId, createdAt])
+  @@index([companionId])
+}
+
+// A companion-owned, reason-free boundary for future marketplace activity
+// with one customer. It never changes existing orders, conversations, support,
+// moderation, reviews, or account standing, and is never exposed to the
+// customer. Removing the row restores the default without retaining a private
+// relationship-choice history.
+model CompanionCustomerFutureBoundary {
+  id             String   @id @default(uuid())
+  companionId    String
+  customerUserId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  companion CompanionProfile @relation(fields: [companionId], references: [id], onDelete: Cascade)
+  customer  User             @relation("FutureBookingBoundaryCustomer", fields: [customerUserId], references: [id], onDelete: Cascade)
+
+  @@unique([companionId, customerUserId])
+  @@index([customerUserId, createdAt])
+  @@index([companionId, createdAt])
 }
 
 model RecommendationRequest {
@@ -979,7 +2062,7 @@ model CompanionRecommendationPolicy {
   companion CompanionProfile @relation(fields: [companionId], references: [id], onDelete: Cascade)
 
   @@unique([companionId, placement])
-  @@index([placement, status, startsAt, endsAt])
+  @@index([placement, status, startsAt, endsAt], map: "CompanionRecommendationPolicy_placement_status_startsAt_endsAt_")
 }
 
 model Message {
@@ -1008,36 +2091,60 @@ model Message {
 }
 
 model MediaAsset {
-  id              String           @id @default(uuid())
-  uploaderId      String
-  conversationId  String
-  messageId       String?
-  kind            MediaAssetKind
-  status          MediaAssetStatus @default(reserved)
-  storageKey      String           @unique
-  mimeType        String
-  sizeBytes       Int
-  sha256          String
-  durationMs      Int?
-  extractedText   String?
-  analysis        Json?
-  provider        String?
-  providerVersion String?
-  retryCount      Int              @default(0)
-  nextAttemptAt   DateTime?
-  lastError       String?
-  expiresAt       DateTime?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  id                          String            @id @default(uuid())
+  uploaderId                  String
+  conversationId              String?
+  messageId                   String?
+  purpose                     MediaAssetPurpose @default(chatMessage)
+  supportTicketId             String?
+  attendanceDisputeId         String?
+  companionId                 String?
+  kind                        MediaAssetKind
+  status                      MediaAssetStatus  @default(reserved)
+  storageKey                  String            @unique
+  mimeType                    String
+  sizeBytes                   Int
+  sha256                      String
+  durationMs                  Int?
+  extractedText               String?
+  analysis                    Json?
+  provider                    String?
+  providerVersion             String?
+  retryCount                  Int               @default(0)
+  nextAttemptAt               DateTime?
+  lastError                   String?
+  uploadExpiresAt             DateTime?
+  moderationProcessingToken   String?           @unique
+  moderationProcessingAt      DateTime?
+  expiresAt                   DateTime?
+  storageDeleteRequestedAt    DateTime?
+  storageDeletedAt            DateTime?
+  storageDeleteLeaseToken     String?           @unique
+  storageDeleteLeaseExpiresAt DateTime?
+  storageDeleteAttemptCount   Int               @default(0)
+  storageDeleteNextAttemptAt  DateTime?
+  storageDeleteLastErrorCode  String?
+  createdAt                   DateTime          @default(now())
+  updatedAt                   DateTime          @updatedAt
 
-  uploader     User         @relation("MediaAssetUploader", fields: [uploaderId], references: [id], onDelete: Cascade)
-  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  message      Message?     @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  uploader                 User                              @relation("MediaAssetUploader", fields: [uploaderId], references: [id], onDelete: Cascade)
+  conversation             Conversation?                     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  message                  Message?                          @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  supportTicket            SupportTicket?                    @relation("SupportTicketEvidenceScope", fields: [supportTicketId], references: [id], onDelete: Restrict)
+  attendanceDispute        AttendanceDispute?                @relation("AttendanceDisputeEvidenceScope", fields: [attendanceDisputeId], references: [id], onDelete: Restrict)
+  companion                CompanionProfile?                 @relation("CompanionIncidentEvidenceScope", fields: [companionId], references: [id], onDelete: Restrict)
+  controlledCaseAttachment ControlledCaseEvidenceAttachment?
 
   @@index([conversationId, status, createdAt])
   @@index([uploaderId, createdAt])
+  @@index([purpose, supportTicketId, uploaderId, status, createdAt], map: "MediaAsset_support_evidence_scope")
+  @@index([purpose, attendanceDisputeId, uploaderId, status, createdAt], map: "MediaAsset_attendance_evidence_scope")
+  @@index([purpose, companionId, uploaderId, status, createdAt], map: "MediaAsset_incident_evidence_scope")
+  @@index([purpose, status, nextAttemptAt, moderationProcessingAt, createdAt], map: "MediaAsset_controlled_moderation_queue")
   @@index([messageId])
   @@index([expiresAt])
+  @@index([storageDeletedAt, expiresAt, storageDeleteNextAttemptAt, id], map: "MediaAsset_storage_delete_due")
+  @@index([storageDeleteLeaseExpiresAt, id], map: "MediaAsset_storage_delete_lease")
 }
 
 model MessageReadState {
@@ -1115,6 +2222,8 @@ model ModerationCase {
   matchedRules         String[]
   usedAI               Boolean               @default(false)
   resolvedAt           DateTime?
+  appealDeadlineAt     DateTime?
+  appealPolicyVersion  String?
   createdAt            DateTime              @default(now())
   evidences            ModerationEvidence[]
   actionLogs           ModerationActionLog[]
@@ -1130,27 +2239,33 @@ model ModerationCase {
   @@index([subjectUserId, createdAt])
   @@index([reporterUserId, createdAt])
   @@index([priority, dueAt])
+  @@index([assignedToUserId, status])
   @@index([status, createdAt])
+  @@index([appealDeadlineAt])
   @@index([riskLevel, createdAt])
   @@index([createdAt])
 }
 
 model ModerationAppeal {
-  id            String                 @id @default(uuid())
-  caseId        String                 @unique
-  subjectUserId String
-  reason        String
-  status        ModerationAppealStatus @default(pending)
-  reviewerId    String?
-  reviewNote    String?
-  reviewedAt    DateTime?
-  createdAt     DateTime               @default(now())
+  id                 String                 @id @default(uuid())
+  caseId             String                 @unique
+  subjectUserId      String
+  reason             String
+  status             ModerationAppealStatus @default(pending)
+  reviewerId         String?
+  reviewNote         String?
+  reviewedAt         DateTime?
+  originalReviewerId String?
+  reviewDueAt        DateTime
+  policyVersion      String                 @default("2026.1")
+  createdAt          DateTime               @default(now())
 
   case        ModerationCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
   subjectUser User           @relation("ModerationAppealer", fields: [subjectUserId], references: [id], onDelete: Cascade)
 
   @@index([subjectUserId, createdAt])
   @@index([status, createdAt])
+  @@index([status, reviewDueAt])
 }
 
 model ChatRestriction {
@@ -1185,13 +2300,13 @@ model ModerationEvidence {
 }
 
 model ModerationActionLog {
-  id         String       @id @default(uuid())
+  id         String   @id @default(uuid())
   caseId     String
   actorId    String?
   reviewerId String?
   action     String
   note       String?
-  createdAt  DateTime     @default(now())
+  createdAt  DateTime @default(now())
 
   case     ModerationCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
   reviewer ReviewStaff?   @relation("ReviewStaffModerationActions", fields: [reviewerId], references: [id], onDelete: SetNull)
@@ -1201,17 +2316,48 @@ model ModerationActionLog {
 }
 
 model AuditLog {
-  id           String   @id @default(uuid())
-  actorId      String?
-  action       String
-  resourceType String
-  resourceId   String?
-  metadata     Json?
-  createdAt    DateTime @default(now())
+  id                String                  @id @default(uuid())
+  actorId           String?
+  action            String
+  resourceType      String
+  resourceId        String?
+  metadata          Json?
+  createdAt         DateTime                @default(now())
+  subjectReferences AuditSubjectReference[]
 
   @@index([resourceType, resourceId])
   @@index([actorId, createdAt])
-  @@index([createdAt])
+  @@index([createdAt, id])
+}
+
+// A controlled, normalized subject edge lets retention follow audit identity
+// references without recursively guessing identifiers out of arbitrary JSON.
+model AuditSubjectReference {
+  id            String   @id @default(uuid())
+  auditLogId    String
+  subjectUserId String
+  relationKind  String
+  createdAt     DateTime @default(now())
+
+  auditLog AuditLog @relation(fields: [auditLogId], references: [id], onDelete: Cascade)
+  subject  User     @relation("AuditSubjectReferenceSubject", fields: [subjectUserId], references: [id], onDelete: Restrict)
+
+  @@unique([auditLogId, subjectUserId])
+  @@index([subjectUserId, auditLogId])
+}
+
+// One durable keyset cursor per controlled metadata registry version. A later
+// bounded worker can resume historical AuditLog normalization after a crash.
+model AuditSubjectReferenceBackfillState {
+  id              String    @id
+  version         String    @unique
+  cursorCreatedAt DateTime?
+  cursorId        String?
+  processedCount  Int       @default(0)
+  completedAt     DateTime?
+  lastErrorCode   String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 }
 
 model Notification {
@@ -1232,6 +2378,7 @@ model Notification {
 
   @@index([userId, createdAt])
   @@index([userId, readAt])
+  @@index([createdAt, id], map: "Notification_retention_due")
 }
 
 model NotificationDelivery {
@@ -1255,9 +2402,9 @@ model NotificationDelivery {
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([notificationId, templateKey])
-  @@index([status, nextAttemptAt])
+  @@index([status, nextAttemptAt, id], map: "NotificationDelivery_status_nextAttemptAt_id_idx")
   @@index([userId, createdAt])
-  @@index([leaseExpiresAt])
+  @@index([status, leaseExpiresAt, id], map: "NotificationDelivery_status_leaseExpiresAt_id_idx")
 }
 
 model WeChatSubscriptionGrant {
@@ -1270,10 +2417,11 @@ model WeChatSubscriptionGrant {
   consumedByDeliveryId String?   @unique
   createdAt            DateTime  @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                        User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
   availabilityReminderAttempt AvailabilityReminderAttempt?
 
-  @@index([userId, templateKey, templateId, consumedAt, grantedAt])
+  @@index([userId, templateKey, templateId, consumedAt, grantedAt], map: "WeChatSubscriptionGrant_userId_templateKey_templateId_consumedA")
+  @@index([createdAt, id], map: "WeChatSubscriptionGrant_retention_due")
 }
 
 model CompanionEarning {
@@ -1312,32 +2460,148 @@ model CompanionEarning {
 }
 
 model CompanionCommercialProfile {
-  companionId                 String                    @id
-  status                      CompanionCommercialStatus @default(pendingReview)
-  settlementRecipientRef      String                    @unique
+  companionId                 String                           @id
+  status                      CompanionCommercialStatus        @default(pendingReview)
+  settlementRecipientRef      String                           @unique
   settlementRecipientMasked   String
   taxProfileRef               String
   identityEvidenceRef         String
+  adultEligibilityVerdict     CompanionAdultEligibilityVerdict @default(pending)
+  adultEligibilityVerifiedAt  DateTime?
+  adultEligibilityValidUntil  DateTime?
+  adultEligibilityEvidenceRef String?
   serviceAgreementVersion     String
   serviceAgreementEvidenceRef String
-  submittedAt                 DateTime                  @default(now())
+  submittedAt                 DateTime                         @default(now())
   submittedById               String
   verifiedAt                  DateTime?
   verifiedById                String?
   suspendedAt                 DateTime?
   suspendedById               String?
   suspendedReason             String?
-  createdAt                   DateTime                  @default(now())
-  updatedAt                   DateTime                  @updatedAt
+  nextReviewDueAt             DateTime?
+  createdAt                   DateTime                         @default(now())
+  updatedAt                   DateTime                         @updatedAt
 
   companion CompanionProfile @relation(fields: [companionId], references: [id], onDelete: Cascade)
 
+  @@index([status, adultEligibilityVerdict, adultEligibilityValidUntil], map: "CompanionCommercialProfile_status_adultEligibilityVerdict_adult")
   @@index([status, updatedAt])
+}
+
+model CompanionTrainingRecord {
+  id              String                  @id @default(uuid())
+  companionId     String
+  moduleCode      String
+  moduleVersion   String
+  status          CompanionTrainingStatus @default(inProgress)
+  attemptCount    Int                     @default(0)
+  bestScore       Int                     @default(0)
+  lastAttemptedAt DateTime?
+  passedAt        DateTime?
+  expiresAt       DateTime?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  companion CompanionProfile @relation(fields: [companionId], references: [id], onDelete: Cascade)
+
+  @@unique([companionId, moduleCode, moduleVersion], map: "CompanionTrainingRecord_companionId_moduleCode_moduleVersion_ke")
+  @@index([companionId, status, expiresAt])
+}
+
+model CompanionAccountAction {
+  id               String                     @id @default(uuid())
+  companionId      String
+  kind             CompanionAccountActionKind
+  reasonCode       String
+  message          String
+  startsAt         DateTime                   @default(now())
+  endsAt           DateTime?
+  appealDeadlineAt DateTime
+  createdById      String
+  revokedAt        DateTime?
+  revokedById      String?
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
+
+  companion CompanionProfile         @relation(fields: [companionId], references: [id], onDelete: Cascade)
+  appeals   CompanionAccountAppeal[]
+
+  @@index([companionId, revokedAt, startsAt])
+  @@index([kind, revokedAt, createdAt])
+  @@index([appealDeadlineAt])
+}
+
+model CompanionAccountAppeal {
+  id                 String                @id @default(uuid())
+  actionId           String
+  companionId        String
+  statement          String
+  evidenceReferences String[]              @default([])
+  status             CompanionAppealStatus @default(pending)
+  reviewDueAt        DateTime
+  resolution         String?
+  resolvedAt         DateTime?
+  resolvedById       String?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  action    CompanionAccountAction @relation(fields: [actionId], references: [id], onDelete: Cascade)
+  companion CompanionProfile       @relation(fields: [companionId], references: [id], onDelete: Cascade)
+
+  @@unique([actionId, companionId])
+  @@index([companionId, status, createdAt])
+  @@index([status, reviewDueAt])
+}
+
+model CompanionIncidentReport {
+  id                           String                    @id @default(uuid())
+  companionId                  String
+  orderId                      String?
+  category                     CompanionIncidentCategory
+  summary                      String
+  legacyEvidenceReferenceCount Int                       @default(0)
+  status                       CompanionIncidentStatus   @default(open)
+  resolution                   String?
+  resolvedAt                   DateTime?
+  resolvedById                 String?
+  createdAt                    DateTime                  @default(now())
+  updatedAt                    DateTime                  @updatedAt
+
+  companion           CompanionProfile                   @relation(fields: [companionId], references: [id], onDelete: Cascade)
+  order               Order?                             @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  evidenceAttachments ControlledCaseEvidenceAttachment[]
+
+  @@index([companionId, status, createdAt])
+  @@index([status, createdAt])
+  @@index([orderId])
+}
+
+model CompanionWithdrawalRequest {
+  id                        String                    @id @default(uuid())
+  companionId               String
+  earningIds                String[]                  @default([])
+  amountCents               Int
+  settlementRecipientMasked String
+  status                    CompanionWithdrawalStatus @default(requested)
+  reviewedAt                DateTime?
+  reviewedById              String?
+  processedAt               DateTime?
+  payoutReferenceMasked     String?
+  rejectionReason           String?
+  createdAt                 DateTime                  @default(now())
+  updatedAt                 DateTime                  @updatedAt
+
+  companion CompanionProfile @relation(fields: [companionId], references: [id], onDelete: Restrict)
+
+  @@index([companionId, status, createdAt])
+  @@index([status, createdAt])
 }
 
 model CompanionRecovery {
   id                    String                  @id @default(uuid())
-  refundId              String                  @unique
+  refundId              String?                 @unique
+  disputeId             String?
   earningId             String
   companionId           String
   amountCents           Int
@@ -1351,12 +2615,15 @@ model CompanionRecovery {
   createdAt             DateTime                @default(now())
   updatedAt             DateTime                @updatedAt
 
-  refund    RefundTransaction @relation(fields: [refundId], references: [id], onDelete: Restrict)
-  earning   CompanionEarning  @relation(fields: [earningId], references: [id], onDelete: Restrict)
-  companion CompanionProfile  @relation(fields: [companionId], references: [id], onDelete: Restrict)
+  refund    RefundTransaction? @relation(fields: [refundId], references: [id], onDelete: Restrict)
+  dispute   PaymentDispute?    @relation(fields: [disputeId], references: [id], onDelete: Restrict)
+  earning   CompanionEarning   @relation(fields: [earningId], references: [id], onDelete: Restrict)
+  companion CompanionProfile   @relation(fields: [companionId], references: [id], onDelete: Restrict)
 
+  @@unique([disputeId, earningId])
   @@index([companionId, status, createdAt])
   @@index([status, createdAt])
+  @@index([disputeId])
 }
 
 model SupportTicket {
@@ -1376,11 +2643,12 @@ model SupportTicket {
   createdAt        DateTime              @default(now())
   updatedAt        DateTime              @updatedAt
 
-  requester  User                @relation("SupportRequester", fields: [userId], references: [id], onDelete: Cascade)
-  order      Order?              @relation(fields: [orderId], references: [id], onDelete: SetNull)
-  assignedTo User?               @relation("SupportAssignee", fields: [assignedToUserId], references: [id], onDelete: SetNull)
-  refunds    RefundTransaction[]
-  orderFacts OrderSupportFact[]
+  requester            User                @relation("SupportRequester", fields: [userId], references: [id], onDelete: Cascade)
+  order                Order?              @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  assignedTo           User?               @relation("SupportAssignee", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+  refunds              RefundTransaction[]
+  orderFacts           OrderSupportFact[]
+  evidenceUploadAssets MediaAsset[]        @relation("SupportTicketEvidenceScope")
 
   @@index([userId, createdAt])
   @@index([orderId, status])
@@ -1389,8 +2657,8 @@ model SupportTicket {
 }
 
 // A short, immutable statement a requester voluntarily adds to an active
-// order-related support ticket. It intentionally has no attachment, message,
-// moderation, or settlement relation: it is private support context only.
+// order-related support ticket. Any optional evidence is separately uploaded,
+// moderated and bound through ControlledCaseEvidenceAttachment.
 model OrderSupportFact {
   id                String   @id @default(uuid())
   supportTicketId   String
@@ -1399,27 +2667,368 @@ model OrderSupportFact {
   statement         String
   createdAt         DateTime @default(now())
 
-  supportTicket SupportTicket @relation(fields: [supportTicketId], references: [id], onDelete: Cascade)
-  order         Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  submittedBy   User          @relation(fields: [submittedByUserId], references: [id], onDelete: Cascade)
+  supportTicket       SupportTicket                      @relation(fields: [supportTicketId], references: [id], onDelete: Cascade)
+  order               Order                              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  submittedBy         User                               @relation(fields: [submittedByUserId], references: [id], onDelete: Cascade)
+  evidenceAttachments ControlledCaseEvidenceAttachment[]
 
   @@index([supportTicketId, createdAt])
   @@index([orderId, createdAt])
   @@index([submittedByUserId, createdAt])
 }
 
-model AccountDeletionRequest {
-  id        String                @id @default(uuid())
-  userId    String
-  status    DeletionRequestStatus @default(pending)
-  note      String?
-  createdAt DateTime              @default(now())
-  updatedAt DateTime              @updatedAt
+// A business record can consume an approved controlled upload exactly once.
+// The database trigger added by migration 077 enforces purpose, owner, scope,
+// expiry and the exactly-one-target invariant under concurrent submissions.
+model ControlledCaseEvidenceAttachment {
+  id                           String            @id @default(uuid())
+  mediaAssetId                 String            @unique
+  purpose                      MediaAssetPurpose
+  orderSupportFactId           String?
+  attendanceDisputeStatementId String?
+  companionIncidentReportId    String?
+  boundByUserId                String?
+  createdAt                    DateTime          @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mediaAsset                 MediaAsset                  @relation(fields: [mediaAssetId], references: [id], onDelete: Restrict, map: "CaseEvidence_media_asset_fk")
+  orderSupportFact           OrderSupportFact?           @relation(fields: [orderSupportFactId], references: [id], onDelete: Cascade, map: "CaseEvidence_order_fact_fk")
+  attendanceDisputeStatement AttendanceDisputeStatement? @relation(fields: [attendanceDisputeStatementId], references: [id], onDelete: Cascade, map: "CaseEvidence_attendance_statement_fk")
+  companionIncidentReport    CompanionIncidentReport?    @relation(fields: [companionIncidentReportId], references: [id], onDelete: Cascade, map: "CaseEvidence_companion_incident_fk")
+  boundBy                    User?                       @relation("CaseEvidenceBoundBy", fields: [boundByUserId], references: [id], onDelete: SetNull, map: "CaseEvidence_bound_by_fk")
+
+  @@index([orderSupportFactId, createdAt], map: "CaseEvidence_order_fact_created")
+  @@index([attendanceDisputeStatementId, createdAt], map: "CaseEvidence_attendance_statement_created")
+  @@index([companionIncidentReportId, createdAt], map: "CaseEvidence_companion_incident_created")
+  @@index([boundByUserId, createdAt], map: "CaseEvidence_bound_by_created")
+}
+
+model UserAccountAction {
+  id                   String                       @id @default(uuid())
+  userId               String
+  kind                 UserAccountActionKind
+  reasonCode           String
+  message              String
+  policyVersion        String
+  sourceType           UserAccountActionSourceType?
+  sourceReference      String?
+  evidenceReference    String?
+  evidenceDigest       String?
+  evidenceAnonymizedAt DateTime?
+  startsAt             DateTime                     @default(now())
+  endsAt               DateTime?
+  appealDeadlineAt     DateTime
+  createdById          String?
+  revokedAt            DateTime?
+  revokedById          String?
+  createdAt            DateTime                     @default(now())
+  updatedAt            DateTime                     @updatedAt
+
+  user      User               @relation("UserAccountActionSubject", fields: [userId], references: [id], onDelete: Cascade)
+  createdBy User?              @relation("UserAccountActionCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  revokedBy User?              @relation("UserAccountActionRevoker", fields: [revokedById], references: [id], onDelete: Restrict)
+  appeal    UserAccountAppeal?
+
+  @@index([userId, revokedAt, startsAt])
+  @@index([kind, revokedAt, createdAt])
+  @@index([appealDeadlineAt])
+  @@index([sourceType, sourceReference])
+}
+
+model UserAccountAppeal {
+  id               String                  @id @default(uuid())
+  actionId         String                  @unique
+  userId           String
+  statement        String
+  status           UserAccountAppealStatus @default(pending)
+  reviewDueAt      DateTime
+  assignedToUserId String?
+  assignedAt       DateTime?
+  resolution       String?
+  resolvedAt       DateTime?
+  resolvedById     String?
+  policyVersion    String
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  action     UserAccountAction @relation(fields: [actionId], references: [id], onDelete: Cascade)
+  user       User              @relation("UserAccountAppealSubject", fields: [userId], references: [id], onDelete: Cascade)
+  assignedTo User?             @relation("UserAccountAppealAssignee", fields: [assignedToUserId], references: [id], onDelete: Restrict)
+  resolvedBy User?             @relation("UserAccountAppealResolver", fields: [resolvedById], references: [id], onDelete: Restrict)
+
+  @@index([userId, status, createdAt])
+  @@index([status, reviewDueAt, createdAt])
+  @@index([assignedToUserId, status, reviewDueAt])
+}
+
+model AccountDeletionRequest {
+  id                            String                @id @default(uuid())
+  userId                        String
+  status                        DeletionRequestStatus @default(pending)
+  note                          String?
+  cancelledAt                   DateTime?
+  companionReactivationRequired Boolean               @default(false)
+  processingStartedById         String?
+  processingStartedAt           DateTime?
+  approvedById                  String?
+  approvedAt                    DateTime?
+  approvalNote                  String?
+  retentionApprovalReference    String?
+  companionIdSnapshot           String?
+  executionStatus               String                @default("idle")
+  executionPhase                String                @default("awaiting_second_review")
+  executionCursor               String?
+  executionAttemptCount         Int                   @default(0)
+  executionFailureCount         Int                   @default(0)
+  executionNextAttemptAt        DateTime?
+  executionLastErrorCode        String?
+  executionFailedAt             DateTime?
+  executionLeaseToken           String?               @unique
+  executionLeaseExpiresAt       DateTime?
+  executionProcessedCount       Int                   @default(0)
+  executionDeletedCounts        Json?
+  executionRetainedCounts       Json?
+  executionStartedAt            DateTime?
+  executionFinishedAt           DateTime?
+  completedById                 String?
+  completedAt                   DateTime?
+  dueAt                         DateTime
+  policyVersion                 String
+  createdAt                     DateTime              @default(now())
+  updatedAt                     DateTime              @updatedAt
+
+  user                      User                                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  processingStartedBy       User?                                      @relation("AccountDeletionStartedBy", fields: [processingStartedById], references: [id], onDelete: Restrict)
+  approvedBy                User?                                      @relation("AccountDeletionApprovedBy", fields: [approvedById], references: [id], onDelete: Restrict)
+  completedBy               User?                                      @relation("AccountDeletionCompletedBy", fields: [completedById], references: [id], onDelete: Restrict)
+  retentionRecords          AccountDataRetentionRecord[]
+  ratingRefreshJobs         AccountDeletionRatingRefreshJob[]
+  authIdentityTombstones    AuthIdentityTombstone[]
+  retentionSnapshotProgress AccountDeletionRetentionSnapshotProgress[]
 
   @@index([userId, status])
   @@index([createdAt])
+  @@index([processingStartedById, status])
+  @@index([approvedById, approvedAt])
+  @@index([completedById, completedAt])
+  @@index([status, dueAt])
+  @@index([status, executionStatus, executionNextAttemptAt, createdAt, id], map: "AccountDeletionRequest_execution_due")
+  @@index([executionStatus, executionLeaseExpiresAt, id], map: "AccountDeletionRequest_execution_lease")
+}
+
+// Bounded retained-category counts are pinned to the deletion approval time.
+// Each source advances an explicit (createdAt, id) cursor independently.
+model AccountDeletionRetentionSnapshotProgress {
+  id                String    @id @default(uuid())
+  deletionRequestId String
+  category          String
+  sourceKey         String
+  highWaterAt       DateTime
+  cursorCreatedAt   DateTime?
+  cursorId          String?
+  observedCount     Int       @default(0)
+  completedAt       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  deletionRequest AccountDeletionRequest @relation(fields: [deletionRequestId], references: [id], onDelete: Cascade, map: "AccountDeletionRetentionSnapshotProgress_request_fkey")
+
+  @@unique([deletionRequestId, category, sourceKey], map: "RetentionSnapshotProgress_request_category_source_key")
+  @@index([deletionRequestId, category, completedAt, sourceKey], map: "AccountDeletionRetentionSnapshotProgress_request_category_due")
+}
+
+// Durable outbox for rating projections affected by bounded review erasure.
+// Review rows and these jobs are committed together; the projection refresh is
+// then set-based and bounded before an account deletion may finalize.
+model AccountDeletionRatingRefreshJob {
+  id                String    @id
+  deletionRequestId String
+  companionId       String
+  completedAt       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  deletionRequest AccountDeletionRequest @relation(fields: [deletionRequestId], references: [id], onDelete: Cascade)
+  companion       CompanionProfile       @relation(fields: [companionId], references: [id], onDelete: Restrict)
+
+  @@unique([deletionRequestId, companionId], map: "AccountDeletionRatingRefreshJob_deletionRequestId_companionId_k")
+  @@index([deletionRequestId, completedAt, companionId], map: "AccountDeletionRatingRefreshJob_request_due")
+}
+
+model AccountDataRetentionRecord {
+  id                      String    @id @default(uuid())
+  deletionRequestId       String
+  userId                  String
+  category                String
+  disposition             String
+  legalBasisCode          String
+  policyVersion           String
+  policyApprovalStatus    String
+  policyApprovalReference String?
+  recordCount             Int
+  processingRestrictedAt  DateTime
+  retentionEndsAt         DateTime?
+  expiryProcessedAt       DateTime?
+  expiryAttemptCount      Int       @default(0)
+  expiryNextAttemptAt     DateTime?
+  expiryLastErrorCode     String?
+  expiryPhase             String?
+  expiryCursor            String?
+  expiryLeaseToken        String?   @unique
+  expiryLeaseExpiresAt    DateTime?
+  expiryErasedRecordCount Int       @default(0)
+  details                 Json?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  deletionRequest  AccountDeletionRequest                @relation(fields: [deletionRequestId], references: [id], onDelete: Cascade)
+  user             User                                  @relation(fields: [userId], references: [id], onDelete: Restrict)
+  legalHolds       AccountDataRetentionLegalHold[]
+  legalHoldActions AccountDataRetentionLegalHoldAction[]
+
+  @@unique([deletionRequestId, category])
+  @@index([userId, disposition])
+  @@index([disposition, retentionEndsAt, expiryProcessedAt], map: "AccountDataRetentionRecord_disposition_retentionEndsAt_expiryPr")
+  @@index([disposition, expiryNextAttemptAt, retentionEndsAt], map: "AccountDataRetentionRecord_disposition_expiryNextAttemptAt_rete")
+  @@index([policyApprovalStatus, createdAt])
+  @@index([disposition, expiryProcessedAt, expiryNextAttemptAt, expiryLeaseExpiresAt, retentionEndsAt, id], map: "AccountDataRetentionRecord_expiry_claim")
+}
+
+// A category-level preservation barrier. Active state is derived from
+// releasedAt so it cannot drift from the immutable placement/release actions.
+model AccountDataRetentionLegalHold {
+  id                String    @id @default(uuid())
+  retentionRecordId String
+  placementActionId String    @unique(map: "RetentionLegalHold_placementActionId_key")
+  placedById        String
+  placedAt          DateTime
+  releaseActionId   String?   @unique(map: "RetentionLegalHold_releaseActionId_key")
+  releasedById      String?
+  releasedAt        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  retentionRecord AccountDataRetentionRecord            @relation(fields: [retentionRecordId], references: [id], onDelete: Restrict, map: "RetentionLegalHold_record_fkey")
+  placementAction AccountDataRetentionLegalHoldAction   @relation("RetentionLegalHoldPlacementAction", fields: [placementActionId], references: [id], onDelete: Restrict, map: "RetentionLegalHold_placementAction_fkey")
+  releaseAction   AccountDataRetentionLegalHoldAction?  @relation("RetentionLegalHoldReleaseAction", fields: [releaseActionId], references: [id], onDelete: Restrict, map: "RetentionLegalHold_releaseAction_fkey")
+  releaseRequests AccountDataRetentionLegalHoldAction[] @relation("RetentionLegalHoldReleaseRequests")
+  placedBy        User                                  @relation("RetentionLegalHoldPlacer", fields: [placedById], references: [id], onDelete: Restrict, map: "RetentionLegalHold_placedBy_fkey")
+  releasedBy      User?                                 @relation("RetentionLegalHoldReleaser", fields: [releasedById], references: [id], onDelete: Restrict, map: "RetentionLegalHold_releasedBy_fkey")
+
+  @@index([retentionRecordId, releasedAt, placedAt, id], map: "RetentionLegalHold_record_state")
+}
+
+// Append-only proposal/decision provenance. A pending placement is already a
+// disposal barrier, while a pending release deliberately leaves its hold active.
+model AccountDataRetentionLegalHoldAction {
+  id                        String    @id @default(uuid())
+  retentionRecordId         String
+  legalHoldId               String?
+  action                    String
+  status                    String    @default("pending")
+  reasonCode                String    @db.VarChar(64)
+  authorityReference        String    @db.VarChar(160)
+  policyVersion             String    @db.VarChar(64)
+  policyApprovalReference   String    @db.VarChar(160)
+  requestedById             String
+  requestedAt               DateTime  @default(now())
+  decidedById               String?
+  decidedAt                 DateTime?
+  decisionReference         String?   @db.VarChar(160)
+  decisionReasonCode        String?   @db.VarChar(64)
+  clientRequestId           String    @db.VarChar(80)
+  partialErasurePhase       String?
+  partialErasureCursor      String?
+  partialErasedRecordCount  Int
+  partialExpiryAttemptCount Int
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+
+  retentionRecord AccountDataRetentionRecord     @relation(fields: [retentionRecordId], references: [id], onDelete: Restrict, map: "RetentionLegalHoldAction_record_fkey")
+  legalHold       AccountDataRetentionLegalHold? @relation("RetentionLegalHoldReleaseRequests", fields: [legalHoldId], references: [id], onDelete: Restrict, map: "RetentionLegalHoldAction_hold_fkey")
+  placementFor    AccountDataRetentionLegalHold? @relation("RetentionLegalHoldPlacementAction")
+  releaseFor      AccountDataRetentionLegalHold? @relation("RetentionLegalHoldReleaseAction")
+  requestedBy     User                           @relation("RetentionLegalHoldActionRequester", fields: [requestedById], references: [id], onDelete: Restrict, map: "RetentionLegalHoldAction_requestedBy_fkey")
+  decidedBy       User?                          @relation("RetentionLegalHoldActionDecider", fields: [decidedById], references: [id], onDelete: Restrict, map: "RetentionLegalHoldAction_decidedBy_fkey")
+
+  @@unique([requestedById, clientRequestId], map: "RetentionLegalHoldAction_requester_client_key")
+  @@index([retentionRecordId, action, status, requestedAt, id], map: "RetentionLegalHoldAction_record_queue")
+  @@index([legalHoldId, action, status, requestedAt, id], map: "RetentionLegalHoldAction_hold_queue")
+  @@index([status, requestedAt, id], map: "RetentionLegalHoldAction_pending_sla")
+}
+
+model DataRightsRequest {
+  id                          String                  @id @default(uuid())
+  userId                      String
+  type                        DataRightsRequestType
+  status                      DataRightsRequestStatus @default(submitted)
+  description                 String
+  statusReason                String?
+  handledById                 String?
+  handledAt                   DateTime?
+  resolvedAt                  DateTime?
+  resolutionEvidenceReference String?
+  createdAt                   DateTime                @default(now())
+  updatedAt                   DateTime                @updatedAt
+
+  requester User                        @relation("DataRightsRequester", fields: [userId], references: [id], onDelete: Cascade)
+  handledBy User?                       @relation("DataRightsHandler", fields: [handledById], references: [id], onDelete: SetNull)
+  followUps DataRightsRequestFollowUp[]
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@index([handledById, status])
+}
+
+model DataRightsRequestFollowUp {
+  id                   String   @id @default(uuid())
+  requestId            String
+  userId               String
+  requestedInformation String
+  statement            String
+  createdAt            DateTime @default(now())
+
+  request DataRightsRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  user    User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([requestId, createdAt])
+  @@index([userId, createdAt])
+}
+
+model InvoiceRequest {
+  id                             String               @id @default(uuid())
+  userId                         String
+  orderId                        String
+  paymentTransactionId           String
+  status                         InvoiceRequestStatus @default(submitted)
+  invoiceTitle                   String
+  amountCents                    Int
+  currency                       String
+  paymentPaidAt                  DateTime
+  serviceTitleSnapshot           String
+  serviceDeliveryModeSnapshot    String?
+  serviceDurationMinutesSnapshot Int
+  companionNameSnapshot          String
+  statusReason                   String?
+  handledById                    String?
+  handledAt                      DateTime?
+  issuedAt                       DateTime?
+  voidedAt                       DateTime?
+  cancelledAt                    DateTime?
+  issuanceEvidenceReference      String?
+  voidEvidenceReference          String?
+  createdAt                      DateTime             @default(now())
+  updatedAt                      DateTime             @updatedAt
+
+  requester          User               @relation("InvoiceRequester", fields: [userId], references: [id], onDelete: Cascade)
+  order              Order              @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  paymentTransaction PaymentTransaction @relation(fields: [paymentTransactionId], references: [id], onDelete: Restrict)
+  handledBy          User?              @relation("InvoiceHandler", fields: [handledById], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([orderId, createdAt])
+  @@index([status, createdAt])
+  @@index([handledById, status])
+  @@index([paymentTransactionId])
 }
 
 model LegalConsentReceipt {
@@ -1472,6 +3081,7 @@ model ModerationLabel {
   reviewer ReviewStaff? @relation("ReviewStaffModerationLabels", fields: [reviewerId], references: [id], onDelete: SetNull)
 
   @@index([createdAt])
+  @@index([createdAt, id], map: "ModerationLabel_createdAt_id")
   @@index([caseId])
   @@index([reviewerId, createdAt])
 }
@@ -1518,47 +3128,48 @@ model CompanionServiceOffering {
 }
 
 model CompanionAvailabilityWindow {
-  id                            String   @id @default(uuid())
-  companionId                   String
-  startsAt                      DateTime
-  endsAt                        DateTime
-  capacity                      Int      @default(1)
-  isActive                      Boolean  @default(true)
-  recurringAvailabilityRuleId   String?
-  recurringOccurrenceStartsAt   DateTime?
-  createdAt                     DateTime @default(now())
-  updatedAt                     DateTime @updatedAt
+  id                          String    @id @default(uuid())
+  companionId                 String
+  startsAt                    DateTime
+  endsAt                      DateTime
+  capacity                    Int       @default(1)
+  isActive                    Boolean   @default(true)
+  recurringAvailabilityRuleId String?
+  recurringOccurrenceStartsAt DateTime?
+  createdAt                   DateTime  @default(now())
+  updatedAt                   DateTime  @updatedAt
 
-  companion                     CompanionProfile               @relation(fields: [companionId], references: [id], onDelete: Cascade)
-  recurringAvailabilityRule     CompanionRecurringAvailabilityRule? @relation("RecurringAvailabilityGeneratedWindows", fields: [recurringAvailabilityRuleId], references: [id], onDelete: SetNull)
-  orders                        Order[]
+  companion                      CompanionProfile                    @relation(fields: [companionId], references: [id], onDelete: Cascade)
+  recurringAvailabilityRule      CompanionRecurringAvailabilityRule? @relation("RecurringAvailabilityGeneratedWindows", fields: [recurringAvailabilityRuleId], references: [id], onDelete: SetNull)
+  orders                         Order[]
   availabilityReminderCandidates AvailabilityReminderCandidate[]
+  availabilityReminderFanoutJobs AvailabilityReminderFanoutJob[]
 
+  @@unique([recurringAvailabilityRuleId, recurringOccurrenceStartsAt], map: "CompanionAvailabilityWindow_recurringAvailabilityRuleId_recurri")
   @@index([companionId, isActive, startsAt])
   @@index([companionId, isActive, endsAt])
-  @@index([companionId, recurringAvailabilityRuleId, recurringOccurrenceStartsAt])
-  @@unique([recurringAvailabilityRuleId, recurringOccurrenceStartsAt])
+  @@index([companionId, recurringAvailabilityRuleId, recurringOccurrenceStartsAt], map: "CompanionAvailabilityWindow_companionId_recurringAvailabilityRu")
 }
 
 // A weekly template is intentionally not itself a bookable window. It stores
 // only a Shanghai-local day/time range for a future, separately controlled
 // materializer; no order, public availability, or notification reads it yet.
 model CompanionRecurringAvailabilityRule {
-  id                String   @id @default(uuid())
-  companionId       String
-  weekday           Int
-  startsAtMinute    Int
-  endsAtMinute      Int
-  capacity          Int      @default(1)
-  timezone          String   @default("Asia/Shanghai")
-  isActive          Boolean  @default(true)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id             String   @id @default(uuid())
+  companionId    String
+  weekday        Int
+  startsAtMinute Int
+  endsAtMinute   Int
+  capacity       Int      @default(1)
+  timezone       String   @default("Asia/Shanghai")
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  companion                   CompanionProfile             @relation(fields: [companionId], references: [id], onDelete: Cascade)
+  companion                    CompanionProfile              @relation(fields: [companionId], references: [id], onDelete: Cascade)
   generatedAvailabilityWindows CompanionAvailabilityWindow[] @relation("RecurringAvailabilityGeneratedWindows")
 
-  @@index([companionId, isActive, weekday, startsAtMinute])
+  @@index([companionId, isActive, weekday, startsAtMinute], map: "CompanionRecurringAvailabilityRule_companionId_isActive_weekday")
 }
 
 // A blackout is a one-off, private schedule exception. It deliberately has no
@@ -1584,40 +3195,92 @@ model CompanionAvailabilityBlackout {
 // created or reactivated. It is not a notification intent or delivery record;
 // the future delivery path must recheck every current condition before use.
 model AvailabilityReminderCandidate {
-  id                            String   @id @default(uuid())
-  favoriteId                    String
-  companionId                   String
-  availabilityWindowId          String
+  id                          String                                   @id @default(uuid())
+  favoriteId                  String
+  companionId                 String
+  availabilityWindowId        String
   availabilityWindowUpdatedAt DateTime
-  preflightDecision             AvailabilityReminderCandidateDecision @default(pending)
-  preflightReason               AvailabilityReminderCandidateSkipReason?
-  preflightedAt                 DateTime?
-  createdAt                     DateTime @default(now())
+  preflightDecision           AvailabilityReminderCandidateDecision    @default(pending)
+  preflightReason             AvailabilityReminderCandidateSkipReason?
+  preflightedAt               DateTime?
+  preparationLeaseToken       String?                                  @unique(map: "AvailabilityReminderCandidate_preparation_token")
+  preparationLeaseExpiresAt   DateTime?
+  preparationFailureCount     Int                                      @default(0)
+  preparationNextAttemptAt    DateTime                                 @default(now())
+  preparationLastErrorCode    String?
+  preparationFailedAt         DateTime?
+  createdAt                   DateTime                                 @default(now())
 
-  favorite           CompanionFavorite           @relation(fields: [favoriteId], references: [id], onDelete: Cascade)
-  companion          CompanionProfile            @relation(fields: [companionId], references: [id], onDelete: Cascade)
-  availabilityWindow CompanionAvailabilityWindow @relation(fields: [availabilityWindowId], references: [id], onDelete: Cascade)
+  favorite           CompanionFavorite            @relation(fields: [favoriteId], references: [id], onDelete: Cascade)
+  companion          CompanionProfile             @relation(fields: [companionId], references: [id], onDelete: Cascade)
+  availabilityWindow CompanionAvailabilityWindow  @relation(fields: [availabilityWindowId], references: [id], onDelete: Cascade)
   handoff            AvailabilityReminderHandoff?
 
-  @@unique([favoriteId, availabilityWindowId, availabilityWindowUpdatedAt])
+  @@unique([favoriteId, availabilityWindowId, availabilityWindowUpdatedAt], map: "AvailabilityReminderCandidate_favoriteId_availabilityWindowId_a")
   @@index([favoriteId, createdAt])
   @@index([companionId, createdAt])
-  @@index([availabilityWindowId, createdAt])
+  @@index([availabilityWindowId, createdAt], map: "AvailabilityReminderCandidate_availabilityWindowId_createdAt_id")
   @@index([preflightDecision, createdAt])
+  @@index([preflightDecision, preparationNextAttemptAt, createdAt, id], map: "AvailabilityReminderCandidate_preparation_due")
+  @@index([preparationLeaseExpiresAt], map: "AvailabilityReminderCandidate_preparation_lease")
+}
+
+// One immutable window-version event is expanded in stable favorite-id pages.
+// A processing lease makes crashes recoverable; the unique window/version key
+// and candidate key make enqueueing and every batch idempotent.
+model AvailabilityReminderFanoutJob {
+  id                          String                           @id @default(uuid())
+  companionId                 String
+  availabilityWindowId        String
+  availabilityWindowUpdatedAt DateTime
+  audienceCutoffAt            DateTime
+  status                      AvailabilityReminderFanoutStatus @default(pending)
+  cursorUserId                String?
+  cursorFavoriteId            String?
+  scannedCount                Int                              @default(0)
+  candidateCreatedCount       Int                              @default(0)
+  failureCount                Int                              @default(0)
+  nextAttemptAt               DateTime                         @default(now())
+  leaseToken                  String?                          @unique
+  leaseExpiresAt              DateTime?
+  lastErrorCode               String?
+  completedAt                 DateTime?
+  failedAt                    DateTime?
+  createdAt                   DateTime                         @default(now())
+  updatedAt                   DateTime                         @updatedAt
+
+  companion          CompanionProfile            @relation(fields: [companionId], references: [id], onDelete: Cascade)
+  availabilityWindow CompanionAvailabilityWindow @relation(fields: [availabilityWindowId], references: [id], onDelete: Cascade)
+
+  @@unique([availabilityWindowId, availabilityWindowUpdatedAt], map: "AvailabilityReminderFanoutJob_windowId_windowUpdatedAt")
+  @@index([status, nextAttemptAt, updatedAt, id], map: "AvailabilityReminderFanoutJob_due")
+  @@index([status, leaseExpiresAt], map: "AvailabilityReminderFanoutJob_lease")
+  @@index([companionId, createdAt, id], map: "AvailabilityReminderFanoutJob_companion_createdAt_id")
 }
 
 // A one-to-one, server-only handoff for an already eligible candidate. It is
 // intentionally not a notification, delivery, schedule, recipient record, or
 // provider attempt. The later delivery stage must recheck live state again.
 model AvailabilityReminderHandoff {
-  id          String   @id @default(uuid())
-  candidateId String   @unique
-  createdAt   DateTime @default(now())
+  id                        String                                    @id @default(uuid())
+  candidateId               String                                    @unique
+  reservationProcessedAt    DateTime?
+  reservationOutcomeReason  AvailabilityReminderAttemptOutcomeReason?
+  reservationLeaseToken     String?                                   @unique(map: "AvailabilityReminderHandoff_reservation_token")
+  reservationLeaseExpiresAt DateTime?
+  reservationFailureCount   Int                                       @default(0)
+  reservationNextAttemptAt  DateTime                                  @default(now())
+  reservationLastErrorCode  String?
+  reservationFailedAt       DateTime?
+  createdAt                 DateTime                                  @default(now())
 
   candidate AvailabilityReminderCandidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
   attempt   AvailabilityReminderAttempt?
 
   @@index([createdAt])
+  @@index([reservationProcessedAt, createdAt, id], map: "AvailabilityReminderHandoff_reservation_due")
+  @@index([reservationProcessedAt, reservationNextAttemptAt, createdAt, id], map: "AvailabilityReminderHandoff_worker_due")
+  @@index([reservationLeaseExpiresAt], map: "AvailabilityReminderHandoff_worker_lease")
 }
 
 // A durable, one-to-one authorization state record for a private handoff. It
@@ -1625,27 +3288,43 @@ model AvailabilityReminderHandoff {
 // stages may consume only this exact bound grant, issue a short private lease,
 // and retain a minimal provider acknowledgement or error classification.
 model AvailabilityReminderAttempt {
-  id                       String                                  @id @default(uuid())
-  handoffId                String                                  @unique
-  subscriptionGrantId      String                                  @unique
-  status                   AvailabilityReminderAttemptStatus       @default(reserved)
-  outcomeReason            AvailabilityReminderAttemptOutcomeReason?
-  authorizationConsumedAt  DateTime?
-  sendLeaseToken           String?                                 @unique
-  sendLeaseExpiresAt       DateTime?
-  providerAttemptStartedAt DateTime?
-  providerResolvedAt       DateTime?
-  providerMessageId        String?
-  providerErrorCode        String?
-  createdAt                DateTime                                @default(now())
-  updatedAt                DateTime                                @updatedAt
+  id                        String                                    @id @default(uuid())
+  handoffId                 String                                    @unique
+  subscriptionGrantId       String                                    @unique
+  status                    AvailabilityReminderAttemptStatus         @default(reserved)
+  outcomeReason             AvailabilityReminderAttemptOutcomeReason?
+  authorizationConsumedAt   DateTime?
+  sendLeaseToken            String?                                   @unique
+  sendLeaseExpiresAt        DateTime?
+  providerAttemptStartedAt  DateTime?
+  providerResolvedAt        DateTime?
+  providerMessageId         String?
+  providerErrorCode         String?
+  deliveryClaimToken        String?                                   @unique(map: "AvailabilityReminderAttempt_delivery_token")
+  deliveryClaimExpiresAt    DateTime?
+  deliveryFailureCount      Int                                       @default(0)
+  deliveryNextAttemptAt     DateTime                                  @default(now())
+  deliveryLastErrorCode     String?
+  deliveryFailedAt          DateTime?
+  operationalResolvedAt     DateTime?
+  operationalResolvedById   String?
+  operationalResolutionCode String?
+  operationalResolutionNote String?
+  operationalEvidenceRef    String?
+  createdAt                 DateTime                                  @default(now())
+  updatedAt                 DateTime                                  @updatedAt
 
-  handoff           AvailabilityReminderHandoff @relation(fields: [handoffId], references: [id], onDelete: Cascade)
-  subscriptionGrant WeChatSubscriptionGrant      @relation(fields: [subscriptionGrantId], references: [id], onDelete: Cascade)
+  handoff               AvailabilityReminderHandoff @relation(fields: [handoffId], references: [id], onDelete: Cascade)
+  subscriptionGrant     WeChatSubscriptionGrant     @relation(fields: [subscriptionGrantId], references: [id], onDelete: Cascade)
+  operationalResolvedBy User?                       @relation("AvailabilityReminderAttemptOperationalResolver", fields: [operationalResolvedById], references: [id], onDelete: Restrict)
 
   @@index([status, createdAt])
   @@index([status, sendLeaseExpiresAt])
   @@index([status, providerAttemptStartedAt])
+  @@index([status, deliveryNextAttemptAt, createdAt, id], map: "AvailabilityReminderAttempt_delivery_due")
+  @@index([deliveryClaimExpiresAt], map: "AvailabilityReminderAttempt_delivery_claim")
+  @@index([status, operationalResolvedAt, createdAt, id], map: "AvailabilityReminderAttempt_terminal_resolution")
+  @@index([operationalResolvedById, operationalResolvedAt], map: "AvailabilityReminderAttempt_operational_resolver")
 }
 
 model VerificationCode {
@@ -1656,18 +3335,23 @@ model VerificationCode {
   consumedAt DateTime?
   createdAt  DateTime  @default(now())
 
-  @@index([phone, createdAt])
+  @@index([phone, consumedAt, expiresAt, createdAt, id], map: "VerificationCode_active_lookup")
+  @@index([expiresAt, id], map: "VerificationCode_retention_due")
 }
 
 model RefreshToken {
-  id        String    @id @default(uuid())
-  userId    String
-  tokenHash String    @unique
-  expiresAt DateTime
-  revokedAt DateTime?
-  createdAt DateTime  @default(now())
+  id             String    @id @default(uuid())
+  userId         String
+  tokenHash      String    @unique
+  sessionLabel   String?
+  clientPlatform String?
+  lastUsedAt     DateTime  @default(now())
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  createdAt      DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId])
+  @@index([userId, revokedAt, expiresAt])
+  @@index([expiresAt, id], map: "RefreshToken_retention_due")
 }

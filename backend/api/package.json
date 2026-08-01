@@ -10,7 +10,7 @@
     "start:prod": "node dist/src/main.js",
     "verify:prod-artifacts": "npm run build && node scripts/verify-production-artifacts.mjs",
     "test": "npm run prisma:generate && jest --runInBand",
-    "test:preflight": "node --test scripts/deployment-preflight.test.mjs scripts/voice-release-artifacts.test.mjs scripts/cloudbase-template.test.mjs",
+    "test:preflight": "node --test scripts/deployment-preflight.test.mjs scripts/voice-release-artifacts.test.mjs scripts/cloudbase-template.test.mjs scripts/admin-review-static-assets.test.mjs scripts/staff-offboarding-static-assets.test.mjs scripts/staff-offboarding-concurrency.test.mjs scripts/notification-delivery-claim-concurrency.test.mjs scripts/openapi-controller-contract.test.mjs scripts/finance-terminal-audit-controls.test.mjs scripts/availability-capacity-worker-scale.test.mjs scripts/account-deletion-phased-erasure-scale.test.mjs scripts/account-deletion-auth-tombstone-concurrency.test.mjs scripts/order-refund-policy-snapshots.test.mjs scripts/future-booking-boundary.test.mjs",
     "test:e2e": "npm run prisma:generate && jest --config test/jest-e2e.json --runInBand",
     "test:integration": "npm run test:e2e",
     "prisma:generate": "prisma generate",

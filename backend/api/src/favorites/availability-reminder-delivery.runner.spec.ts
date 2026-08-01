@@ -11,7 +11,10 @@ const EMPTY_RESULT = {
   uncertain: 0,
   inFlight: 0,
   notReady: 0,
-  errors: 0
+  errors: 0,
+  retryScheduled: 0,
+  failed: 0,
+  leaseLost: 0
 };
 
 function createRunner(values: Record<string, unknown> = {}) {
@@ -19,7 +22,8 @@ function createRunner(values: Record<string, unknown> = {}) {
     get: jest.fn((key: string) => values[key])
   } as any;
   const prisma = {
-    availabilityReminderAttempt: { findMany: jest.fn().mockResolvedValue([]) }
+    $queryRaw: jest.fn().mockResolvedValue([]),
+    availabilityReminderAttempt: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) }
   } as any;
   const consumption = {
     acquireFinalSendAuthorization: jest.fn(),
@@ -36,7 +40,10 @@ function createRunner(values: Record<string, unknown> = {}) {
 }
 
 describe("AvailabilityReminderDeliveryRunner", () => {
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
 
   it("does nothing by default, including when only the delivery switch is set", async () => {
     const { prisma, runner } = createRunner({ AVAILABILITY_REMINDER_DELIVERY_ENABLED: true });
@@ -46,7 +53,7 @@ describe("AvailabilityReminderDeliveryRunner", () => {
 
     expect(interval).not.toHaveBeenCalled();
     await expect(runner.deliverDue()).resolves.toBeUndefined();
-    expect(prisma.availabilityReminderAttempt.findMany).not.toHaveBeenCalled();
+    expect(prisma.$queryRaw).not.toHaveBeenCalled();
     runner.onModuleDestroy();
   });
 
@@ -56,9 +63,11 @@ describe("AvailabilityReminderDeliveryRunner", () => {
       WECHAT_SUBSCRIBE_MESSAGES_ENABLED: true,
       AVAILABILITY_REMINDER_DELIVERY_BATCH_SIZE: 4
     });
-    prisma.availabilityReminderAttempt.findMany
-      .mockResolvedValueOnce([{ id: "expired-attempt" }])
-      .mockResolvedValueOnce([{ id: "fresh-attempt" }, { id: "skipped-attempt" }]);
+    prisma.$queryRaw
+      .mockResolvedValueOnce([{ id: "expired-attempt", status: "readyToSend", deliveryFailureCount: 0 }])
+      .mockResolvedValueOnce([{ id: "fresh-attempt", status: "reserved", deliveryFailureCount: 0 }])
+      .mockResolvedValueOnce([{ id: "skipped-attempt", status: "reserved", deliveryFailureCount: 0 }])
+      .mockResolvedValueOnce([]);
     consumption.recoverExpiredSendLease.mockResolvedValue({ decision: "recoveryRequired" });
     consumption.acquireFinalSendAuthorization
       .mockResolvedValueOnce({ decision: "authorized", sendLeaseToken: "fresh-lease" })
@@ -77,19 +86,15 @@ describe("AvailabilityReminderDeliveryRunner", () => {
       uncertain: 1,
       inFlight: 0,
       notReady: 0,
-      errors: 0
+      errors: 0,
+      retryScheduled: 0,
+      failed: 0,
+      leaseLost: 0
     });
 
-    expect(prisma.availabilityReminderAttempt.findMany).toHaveBeenNthCalledWith(1, expect.objectContaining({
-      where: expect.objectContaining({ status: { in: ["readyToSend", "sending"] } }),
-      select: { id: true },
-      take: 4
-    }));
-    expect(prisma.availabilityReminderAttempt.findMany).toHaveBeenNthCalledWith(2, expect.objectContaining({
-      where: { status: "reserved" },
-      select: { id: true },
-      take: 3
-    }));
+    const claimSql = Array.from(prisma.$queryRaw.mock.calls[0][0] as string[]).join("");
+    expect(claimSql).toContain("FOR UPDATE SKIP LOCKED");
+    expect(claimSql).toContain("deliveryNextAttemptAt");
     expect(consumption.recoverExpiredSendLease).toHaveBeenCalledWith("expired-attempt", expect.any(Date));
     expect(consumption.acquireFinalSendAuthorization).toHaveBeenNthCalledWith(
       1, "fresh-attempt", expect.any(Date)
@@ -109,10 +114,10 @@ describe("AvailabilityReminderDeliveryRunner", () => {
       WECHAT_SUBSCRIBE_MESSAGES_ENABLED: true,
       AVAILABILITY_REMINDER_DELIVERY_BATCH_SIZE: 2
     });
-    prisma.availabilityReminderAttempt.findMany.mockResolvedValueOnce([
-      { id: "expired-ready" },
-      { id: "expired-sending" }
-    ]);
+    prisma.$queryRaw
+      .mockResolvedValueOnce([{ id: "expired-ready", status: "readyToSend", deliveryFailureCount: 0 }])
+      .mockResolvedValueOnce([{ id: "expired-sending", status: "sending", deliveryFailureCount: 0 }])
+      .mockResolvedValueOnce([]);
     consumption.recoverExpiredSendLease.mockResolvedValue({ decision: "recoveryRequired" });
 
     await expect(runner.deliverDue()).resolves.toEqual({
@@ -122,7 +127,7 @@ describe("AvailabilityReminderDeliveryRunner", () => {
       uncertain: 2
     });
 
-    expect(prisma.availabilityReminderAttempt.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(3);
     expect(delivery.deliver).not.toHaveBeenCalled();
   });
 
@@ -131,9 +136,10 @@ describe("AvailabilityReminderDeliveryRunner", () => {
       AVAILABILITY_REMINDER_DELIVERY_ENABLED: true,
       WECHAT_SUBSCRIBE_MESSAGES_ENABLED: true
     });
-    prisma.availabilityReminderAttempt.findMany
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([{ id: "bad-attempt" }, { id: "good-attempt" }]);
+    prisma.$queryRaw
+      .mockResolvedValueOnce([{ id: "bad-attempt", status: "reserved", deliveryFailureCount: 0 }])
+      .mockResolvedValueOnce([{ id: "good-attempt", status: "reserved", deliveryFailureCount: 0 }])
+      .mockResolvedValueOnce([]);
     consumption.acquireFinalSendAuthorization
       .mockRejectedValueOnce(new Error("private identifier must not be logged"))
       .mockResolvedValueOnce({ decision: "authorized", sendLeaseToken: "new-lease" });
@@ -145,12 +151,73 @@ describe("AvailabilityReminderDeliveryRunner", () => {
       scanned: 2,
       authorized: 1,
       rejected: 1,
-      errors: 1
+      errors: 1,
+      retryScheduled: 1
     });
 
     expect(delivery.deliver).toHaveBeenCalledWith("good-attempt", "new-lease", expect.any(Date));
     expect(metrics.recordAvailabilityReminderDeliveryFailure).toHaveBeenCalledTimes(2);
     expect(log.mock.calls.flat().join(" ")).not.toContain("bad-attempt");
+  });
+
+  it("uses fresh wall time for each claim, authorization, and provider handoff", async () => {
+    const now = new Date("2026-08-01T08:00:00.000Z");
+    jest.useFakeTimers().setSystemTime(now);
+    const { prisma, consumption, delivery, runner } = createRunner({
+      AVAILABILITY_REMINDER_DELIVERY_ENABLED: true,
+      WECHAT_SUBSCRIBE_MESSAGES_ENABLED: true,
+      AVAILABILITY_REMINDER_DELIVERY_BATCH_SIZE: 3
+    });
+    prisma.$queryRaw
+      .mockResolvedValueOnce([{ id: "attempt-1", status: "reserved", deliveryFailureCount: 0 }])
+      .mockResolvedValueOnce([{ id: "attempt-2", status: "reserved", deliveryFailureCount: 0 }])
+      .mockResolvedValueOnce([]);
+    consumption.acquireFinalSendAuthorization.mockResolvedValue({
+      decision: "authorized",
+      sendLeaseToken: "send-lease"
+    });
+    delivery.deliver
+      .mockImplementationOnce(async () => {
+        jest.setSystemTime(new Date(now.getTime() + 30_000));
+        return { decision: "sent" };
+      })
+      .mockResolvedValueOnce({ decision: "sent" });
+
+    await expect(runner.deliverDue()).resolves.toMatchObject({ scanned: 2, authorized: 2, sent: 2 });
+    const firstAuthorizationAt = consumption.acquireFinalSendAuthorization.mock.calls[0][1] as Date;
+    const secondAuthorizationAt = consumption.acquireFinalSendAuthorization.mock.calls[1][1] as Date;
+    expect(firstAuthorizationAt.toISOString()).toBe(now.toISOString());
+    expect(secondAuthorizationAt.toISOString()).toBe(new Date(now.getTime() + 30_000).toISOString());
+    expect((delivery.deliver.mock.calls[1][2] as Date).toISOString()).toBe(secondAuthorizationAt.toISOString());
+  });
+
+  it("stops refilling after the wall budget and schedules failures from current time", async () => {
+    const now = new Date("2026-08-01T08:00:00.000Z");
+    jest.useFakeTimers().setSystemTime(now);
+    const { prisma, consumption, runner } = createRunner({
+      AVAILABILITY_REMINDER_DELIVERY_ENABLED: true,
+      WECHAT_SUBSCRIBE_MESSAGES_ENABLED: true,
+      AVAILABILITY_REMINDER_DELIVERY_BATCH_SIZE: 3
+    });
+    prisma.$queryRaw
+      .mockResolvedValueOnce([{ id: "slow-attempt", status: "reserved", deliveryFailureCount: 0 }])
+      .mockResolvedValueOnce([{ id: "must-wait-next-tick", status: "reserved", deliveryFailureCount: 0 }]);
+    consumption.acquireFinalSendAuthorization.mockImplementation(async () => {
+      jest.setSystemTime(new Date(now.getTime() + 121_000));
+      throw new Error("provider boundary stalled");
+    });
+
+    await expect(runner.deliverDue()).resolves.toMatchObject({
+      scanned: 1,
+      errors: 1,
+      retryScheduled: 1
+    });
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(prisma.availabilityReminderAttempt.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        deliveryNextAttemptAt: new Date(now.getTime() + 126_000)
+      })
+    }));
   });
 
   it("prevents overlapping passes and starts an unref'd immediate pass only after both switches are enabled", async () => {
@@ -160,7 +227,7 @@ describe("AvailabilityReminderDeliveryRunner", () => {
       AVAILABILITY_REMINDER_DELIVERY_INTERVAL_SECONDS: 45
     });
     let resolveScan: ((value: Array<{ id: string }>) => void) | undefined;
-    prisma.availabilityReminderAttempt.findMany.mockImplementationOnce(() => new Promise((resolve) => {
+    prisma.$queryRaw.mockImplementationOnce(() => new Promise((resolve) => {
       resolveScan = resolve;
     }));
     const interval = jest.spyOn(global, "setInterval");
@@ -170,7 +237,7 @@ describe("AvailabilityReminderDeliveryRunner", () => {
     await Promise.resolve();
     await expect(runner.deliverDue()).resolves.toBeUndefined();
     expect(interval).toHaveBeenCalledWith(expect.any(Function), 45_000);
-    expect(prisma.availabilityReminderAttempt.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
 
     resolveScan!([]);
     await Promise.resolve();
@@ -184,12 +251,11 @@ describe("AvailabilityReminderDeliveryRunner", () => {
       AVAILABILITY_REMINDER_DELIVERY_ENABLED: true,
       WECHAT_SUBSCRIBE_MESSAGES_ENABLED: true
     });
-    prisma.availabilityReminderAttempt.findMany.mockRejectedValue(new Error("database unavailable"));
+    prisma.$queryRaw.mockRejectedValue(new Error("database unavailable"));
     const error = jest.spyOn((runner as any).logger, "error").mockImplementation(() => undefined);
 
     (runner as any).deliverDueSafely();
-    await Promise.resolve();
-    await Promise.resolve();
+    await new Promise<void>((resolve) => setImmediate(resolve));
 
     expect(metrics.recordAvailabilityReminderDeliveryFailure).toHaveBeenCalledTimes(1);
     expect(error).toHaveBeenCalledWith(expect.stringContaining("Error"));

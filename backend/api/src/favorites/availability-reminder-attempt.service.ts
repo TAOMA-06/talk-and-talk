@@ -72,10 +72,34 @@ export class AvailabilityReminderAttemptService {
           where: { handoffId: handoff.id },
           select: { id: true, handoffId: true, status: true, outcomeReason: true, createdAt: true }
         }) as ReminderAttempt | null;
-        if (existing) return this.existingResult(existing);
+        if (existing) {
+          await this.markHandoffProcessed(
+            db,
+            handoff.id,
+            existing.status === "skipped" ? existing.outcomeReason ?? "authorizationUnavailable" : null,
+            now
+          );
+          return this.existingResult(existing);
+        }
 
-        const live = await this.preflight.recheckEligibleCandidateWithinTransaction(db, handoff.candidateId, now);
-        if (live.decision === "skipped") return this.skipped(handoff.id, live.reason!);
+        let live;
+        try {
+          live = await this.preflight.recheckEligibleCandidateWithinTransaction(db, handoff.candidateId, now);
+        } catch (error) {
+          if (this.hasCode(error, "AVAILABILITY_REMINDER_CANDIDATE_NOT_FOUND")) {
+            await this.markHandoffProcessed(db, handoff.id, "handoffUnavailable", now);
+            return this.skipped(handoff.id, "handoffUnavailable");
+          }
+          if (this.hasCode(error, "AVAILABILITY_REMINDER_CANDIDATE_NOT_ELIGIBLE")) {
+            await this.markHandoffProcessed(db, handoff.id, "preflightUnavailable", now);
+            return this.skipped(handoff.id, "preflightUnavailable");
+          }
+          throw error;
+        }
+        if (live.decision === "skipped") {
+          await this.markHandoffProcessed(db, handoff.id, live.reason!, now);
+          return this.skipped(handoff.id, live.reason!);
+        }
 
         try {
           const attempt = await db.availabilityReminderAttempt.create({
@@ -85,6 +109,7 @@ export class AvailabilityReminderAttemptService {
             },
             select: { id: true, handoffId: true, status: true, createdAt: true }
           }) as ReminderAttempt;
+          await this.markHandoffProcessed(db, handoff.id, null, now);
           return this.reserved(attempt, true);
         } catch (error) {
           if (!this.isUniqueConstraintError(error)) throw error;
@@ -97,6 +122,10 @@ export class AvailabilityReminderAttemptService {
             where: { handoffId: handoff.id },
             select: { id: true, handoffId: true, status: true, outcomeReason: true, createdAt: true }
           }) as ReminderAttempt | null;
+          const outcomeReason = racedAttempt?.status === "skipped"
+            ? racedAttempt.outcomeReason ?? "authorizationUnavailable"
+            : racedAttempt ? null : "authorizationUnavailable";
+          await this.markHandoffProcessed(db, handoff.id, outcomeReason, now);
           return racedAttempt
             ? this.existingResult(racedAttempt)
             : this.skipped(handoff.id, "authorizationUnavailable");
@@ -203,6 +232,21 @@ export class AvailabilityReminderAttemptService {
   private async lockHandoff(db: any, handoffId: string) {
     if (typeof db.$queryRaw !== "function") return;
     await db.$queryRaw`SELECT "id" FROM "AvailabilityReminderHandoff" WHERE "id" = ${handoffId} FOR UPDATE`;
+  }
+
+  private async markHandoffProcessed(
+    db: any,
+    handoffId: string,
+    outcomeReason: AttemptSkipReason | null,
+    processedAt: Date
+  ) {
+    await db.availabilityReminderHandoff.update({
+      where: { id: handoffId },
+      data: {
+        reservationProcessedAt: processedAt,
+        reservationOutcomeReason: outcomeReason
+      }
+    });
   }
 
   private isUniqueConstraintError(error: unknown) {

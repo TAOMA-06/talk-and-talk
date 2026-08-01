@@ -1,5 +1,7 @@
 import { IsIn, IsOptional, IsString, MaxLength } from "class-validator";
 
+import { IsSafeOperationalText } from "../../common/validation/sensitive-free-text";
+
 export const REVIEW_CASE_ACTIONS = [
   "confirmViolation",
   "dismiss",
@@ -20,6 +22,7 @@ export class ReviewCaseActionDto {
 
   @IsOptional()
   @IsString()
+  @IsSafeOperationalText()
   @MaxLength(1000)
   note?: string;
 }

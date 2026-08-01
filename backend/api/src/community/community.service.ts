@@ -4,7 +4,7 @@ import { AppException } from "../common/errors/app.exception";
 import { PrismaService } from "../database/prisma.service";
 import { ModerationCaseService } from "../moderation/moderation-case.service";
 import { ModerationService } from "../moderation/moderation.service";
-import { CreateCommunityPostDto, CreateCommunityPostReportDto } from "./dto/community.dto";
+import { CreateCommunityPostDto, CreateCommunityPostReportDto, ListCommunityItemsDto } from "./dto/community.dto";
 
 const REPORT_REASON_SENSITIVE_VALUE = /(?:1[3-9]\d{9}|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}|\d{17}[\dX])/i;
 const OPEN_COMMUNITY_REPORT_CASE_STATUSES = ["pending", "autoReviewing", "humanReview"] as const;
@@ -20,32 +20,52 @@ export class CommunityService {
     private readonly moderationCases: ModerationCaseService
   ) {}
 
-  async list(userId?: string) {
-    const items = await this.prisma.communityPost.findMany({
-      where: this.publicPostWhere(),
-      include: { author: { include: { profile: true, companionProfile: true } }, likes: true },
-      orderBy: { createdAt: "desc" },
-      take: 100
-    } as any);
-    return { items: items.map((item: any) => this.toDto(item, userId)) };
+  async list(userId: string | undefined, query: ListCommunityItemsDto = new ListCommunityItemsDto()) {
+    const where = this.publicPostWhere();
+    const [items, total] = await Promise.all([
+      this.prisma.communityPost.findMany({
+        where,
+        include: {
+          author: { include: { profile: true, companionProfile: true } },
+          likes: userId
+            ? { where: { userId }, select: { userId: true }, take: 1 }
+            : false,
+          _count: { select: { likes: true } }
+        },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize
+      } as any),
+      this.prisma.communityPost.count({ where } as any)
+    ]);
+    return {
+      items: items.map((item: any) => this.toDto(item, userId)),
+      pagination: this.pagination(query, total)
+    };
   }
 
-  async listMyReportReceipts(userId: string) {
+  async listMyReportReceipts(userId: string, query: ListCommunityItemsDto = new ListCommunityItemsDto()) {
     // This is deliberately not a case-status endpoint. Selecting only the
     // reporter-owned receipt and its time prevents this view from becoming a
     // side channel for post, author, staff, decision, or SLA information.
-    const items = await this.prisma.communityPostReport.findMany({
-      where: { reporterUserId: userId },
-      select: { id: true, createdAt: true },
-      orderBy: { createdAt: "desc" },
-      take: 50
-    } as any);
+    const where = { reporterUserId: userId };
+    const [items, total] = await Promise.all([
+      this.prisma.communityPostReport.findMany({
+        where,
+        select: { id: true, createdAt: true },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize
+      } as any),
+      this.prisma.communityPostReport.count({ where } as any)
+    ]);
     return {
       items: items.map((item: { id: string; createdAt: Date }) => ({
         id: item.id,
         submittedAt: item.createdAt.toISOString(),
         status: "received" as const
-      }))
+      })),
+      pagination: this.pagination(query, total)
     };
   }
 
@@ -124,7 +144,12 @@ export class CommunityService {
       await this.prisma.communityLike.deleteMany({ where: { postId, userId } } as any);
     }
     const item = await this.prisma.communityPost.findUnique({
-      where: { id: postId }, include: { author: { include: { profile: true, companionProfile: true } }, likes: true }
+      where: { id: postId },
+      include: {
+        author: { include: { profile: true, companionProfile: true } },
+        likes: { where: { userId }, select: { userId: true }, take: 1 },
+        _count: { select: { likes: true } }
+      }
     } as any);
     return this.toDto(item, userId);
   }
@@ -191,6 +216,7 @@ export class CommunityService {
             reportId: receipt.id,
             postId: currentPost.id,
             reporterUserId: userId,
+            subjectUserId: currentPost.authorId,
             reason,
             result,
             db
@@ -241,7 +267,8 @@ export class CommunityService {
       id: item.id, authorId: item.authorId, authorName: name, authorInitials: name.slice(0, 2),
       companionId: item.kind === "malePromotion" ? item.author.companionProfile?.id ?? null : null,
       kind: item.kind, topic: item.topic, content: item.content, coverImageUrl: item.coverImageUrl,
-      likeCount: item.likes.length, isLiked: userId ? item.likes.some((like: any) => like.userId === userId) : false,
+      likeCount: item._count?.likes ?? item.likes?.length ?? 0,
+      isLiked: userId ? (item.likes ?? []).some((like: any) => like.userId === userId) : false,
       moderationStatus: item.status, createdAt: item.createdAt.toISOString()
     };
   }
@@ -368,6 +395,15 @@ export class CommunityService {
           }
         }
       ]
+    };
+  }
+
+  private pagination(query: ListCommunityItemsDto, total: number) {
+    return {
+      page: query.page,
+      pageSize: query.pageSize,
+      total,
+      totalPages: Math.ceil(total / query.pageSize)
     };
   }
 }

@@ -44,7 +44,10 @@ describe("AvailabilityReminderAttemptDeliveryService", () => {
     prisma.availabilityReminderAttempt.updateMany.mockResolvedValue({ count: 1 });
     prisma.weChatSubscriptionGrant.findFirst.mockResolvedValue(grant());
     prisma.availabilityReminderHandoff.findUnique.mockResolvedValue({ candidateId: "candidate-1" });
-    prisma.availabilityReminderCandidate.findUnique.mockResolvedValue({ favoriteId: "favorite-1" });
+    prisma.availabilityReminderCandidate.findUnique.mockResolvedValue({
+      favoriteId: "favorite-1",
+      companionId: "companion-1"
+    });
     prisma.companionFavorite.findFirst.mockResolvedValue({ userId: "customer-1" });
     prisma.companionFavorite.updateMany.mockResolvedValue({ count: 1 });
   });
@@ -72,7 +75,11 @@ describe("AvailabilityReminderAttemptDeliveryService", () => {
       templateId: "tmpl-reminder",
       title: "你收藏的陪伴者有新的可约时段",
       body: "打开小程序查看当前可预约时段。",
-      data: null
+      data: { companionId: "companion-1" }
+    });
+    expect(prisma.availabilityReminderCandidate.findUnique).toHaveBeenNthCalledWith(1, {
+      where: { id: "candidate-1" },
+      select: { favoriteId: true, companionId: true }
     });
     expect(prisma.$transaction).toHaveBeenCalledTimes(2);
     expect(prisma.$transaction.mock.invocationCallOrder[0])

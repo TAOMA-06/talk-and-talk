@@ -1,0 +1,64 @@
+<view class="page adult-page">
+  <view class="hero">
+    <view class="eyebrow">PAID SERVICE ELIGIBILITY</view>
+    <view class="hero-title">成年资格核验</view>
+    <view class="hero-copy">生日、资料页或协议勾选不作为付费服务资格。下单、支付、改期和实时语音都会由服务端再次核对独立复核结果及有效期。</view>
+  </view>
+
+  <view wx:if="{{state === 'loading'}}" class="card state-card">正在读取服务端核验事实…</view>
+  <view wx:elif="{{state === 'error'}}" class="card state-card error-card">
+    <view>{{error}}</view>
+    <button class="secondary-button full-button" bindtap="load">重新读取</button>
+  </view>
+  <block wx:else>
+    <view class="card status-card status-{{status.tone}}">
+      <view class="status-head"><view class="section-title">当前状态</view><view class="status-pill">{{status.statusText}}</view></view>
+      <view wx:if="{{status.evidenceReferenceMasked}}" class="fact-row"><text>证据引用</text><text>{{status.evidenceReferenceMasked}}</text></view>
+      <view wx:if="{{status.verificationMethod}}" class="fact-row"><text>核验方式</text><text>{{status.methodText}}</text></view>
+      <view wx:if="{{status.submittedAt}}" class="fact-row"><text>提交时间</text><text>{{status.submittedText}}</text></view>
+      <view wx:if="{{status.verifiedAt}}" class="fact-row"><text>复核时间</text><text>{{status.verifiedText}}</text></view>
+      <view wx:if="{{status.validUntil}}" class="fact-row"><text>有效至</text><text>{{status.validUntilText}}</text></view>
+      <view wx:if="{{status.reviewReason}}" class="review-reason">复核说明：{{status.reviewReason}}</view>
+      <view wx:if="{{status.status === 'pending'}}" class="boundary-note">提交成功不等于核验通过。另一名授权人员完成复核前，新的付费服务仍保持关闭。</view>
+      <view wx:if="{{status.status === 'ineligible'}}" class="boundary-note warning-note">平台不会在客户端改写复核结论。你仍可查看和处理已有订单、取消未支付订单，并对已支付未履约订单申请退款。</view>
+      <view wx:if="{{status.status === 'expired'}}" class="boundary-note warning-note">旧结果已经失效；新预约的服务结束时间也必须落在新核验有效期内。</view>
+    </view>
+
+    <view class="card">
+      <view class="section-title">隐私与证据边界</view>
+      <view class="boundary-list">
+        <view>• 只填写平台或已接入核验服务签发的不透明业务引用。</view>
+        <view>• 不要填写身份证号、手机号、姓名、住址或验证码。</view>
+        <view>• 本页不接收证件照片，也不会把资料页年龄当作核验结果。</view>
+        <view>• 如尚未取得引用，请先联系平台客服进入受控核验流程。</view>
+      </view>
+      <button class="secondary-button full-button" bindtap="openSupport">联系平台客服取得核验指引</button>
+    </view>
+
+    <view wx:if="{{status.canSubmit}}" class="card">
+      <view class="section-title">提交核验引用</view>
+      <view class="section-copy">系统只接受受控前缀与不透明令牌组成的引用，例如 provider:opaque-token；示例不可直接提交。</view>
+      <button wx:if="{{!formOpen}}" class="primary-button full-button" bindtap="toggleForm">开始提交</button>
+      <view wx:else class="form">
+        <picker mode="selector" range="{{methodLabels}}" value="{{methodIndex}}" bindchange="selectMethod">
+          <view class="picker-field"><text>{{methodLabels[methodIndex]}}</text><text>⌄</text></view>
+        </picker>
+        <view class="method-help">{{methodHelp}}</view>
+        <input class="form-input" maxlength="160" value="{{evidenceReference}}" placeholder="受控引用，例如 provider:opaque-token" bindinput="setEvidenceReference" />
+        <checkbox-group bindchange="setEvidenceConfirmation">
+          <label class="confirmation-row">
+            <checkbox value="confirmed" checked="{{evidenceProcessingConfirmed}}" color="#a3435d" />
+            <text>我确认这里只填写受控流程签发的不透明引用，不包含证件号、图片、姓名、手机号或其他原始身份资料。</text>
+          </label>
+        </checkbox-group>
+        <button class="primary-button full-button" loading="{{submitting}}" disabled="{{submitting}}" bindtap="submit">提交独立复核</button>
+        <button class="text-button" disabled="{{submitting}}" bindtap="toggleForm">取消</button>
+      </view>
+    </view>
+
+    <view wx:else class="card rights-card">
+      <view class="section-title">已有订单权利不受隐藏</view>
+      <view class="section-copy">无论核验处于等待、过期或不满足状态，你仍可查看已有订单，取消未支付订单，并对已支付未履约订单提交退款或联系客服。</view>
+    </view>
+  </block>
+</view>

@@ -131,6 +131,9 @@ Page({
     expiredWindows: [] as DisplayWindow[],
     retiredWindows: [] as DisplayWindow[],
     totalWindows: 0,
+    windowPage: 1,
+    windowTotalPages: 1,
+    loadingMoreWindows: false,
     editorVisible: false,
     editingWindowId: "",
     formDate: INITIAL_FORM.date,
@@ -152,7 +155,7 @@ Page({
     this.setData({ loading: true, accessState: "loading", loadError: "" });
     try {
       await ensureSession();
-      const result = await api.ownAvailabilityWindows();
+      const result = await api.ownAvailabilityWindows({ page: 1, pageSize: 50 });
       const items = (result.items || [])
         .map(displayWindow)
         .sort((left, right) => Date.parse(left.startsAt) - Date.parse(right.startsAt));
@@ -160,7 +163,9 @@ Page({
         activeWindows: items.filter((item) => item.statusClass === "active" || item.statusClass === "inProgress"),
         expiredWindows: items.filter((item) => item.statusClass === "expired"),
         retiredWindows: items.filter((item) => item.statusClass === "retired"),
-        totalWindows: items.length,
+        totalWindows: result.pagination.total,
+        windowPage: result.pagination.page,
+        windowTotalPages: Math.max(1, result.pagination.totalPages),
         loading: false,
         accessState: "ready"
       });
@@ -177,6 +182,35 @@ Page({
     }
   },
   retry() { this.setData({ actionError: "" }); void this.load(); },
+  async loadMoreWindows() {
+    if (this.data.loadingMoreWindows || this.data.windowPage >= this.data.windowTotalPages) return;
+    this.setData({ loadingMoreWindows: true, actionError: "" });
+    try {
+      const result = await api.ownAvailabilityWindows({ page: this.data.windowPage + 1, pageSize: 50 });
+      const loaded = [
+        ...this.data.activeWindows,
+        ...this.data.expiredWindows,
+        ...this.data.retiredWindows
+      ];
+      const existingIds = new Set(loaded.map((item) => item.id));
+      const items = [
+        ...loaded,
+        ...(result.items || []).filter((item) => !existingIds.has(item.id)).map(displayWindow)
+      ].sort((left, right) => Date.parse(left.startsAt) - Date.parse(right.startsAt));
+      this.setData({
+        activeWindows: items.filter((item) => item.statusClass === "active" || item.statusClass === "inProgress"),
+        expiredWindows: items.filter((item) => item.statusClass === "expired"),
+        retiredWindows: items.filter((item) => item.statusClass === "retired"),
+        totalWindows: result.pagination.total,
+        windowPage: result.pagination.page,
+        windowTotalPages: Math.max(1, result.pagination.totalPages)
+      });
+    } catch (error) {
+      this.setData({ actionError: errorMessage(error, "更多可约时段暂时无法读取；当前列表不完整。") });
+    } finally {
+      this.setData({ loadingMoreWindows: false });
+    }
+  },
   async retireWindow(event: any) {
     const id = event.currentTarget.dataset.id as string;
     const window = this.data.activeWindows.find((item) => item.id === id && item.statusClass === "active");

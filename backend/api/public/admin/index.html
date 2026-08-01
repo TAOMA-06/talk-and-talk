@@ -2,11 +2,471 @@
 <html lang="zh-CN">
   <head>
     <meta charset="utf-8" />
-    <meta http-equiv="refresh" content="0; url=/review/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex, nofollow" />
-    <title>审核系统已迁移</title>
+    <title>商业运营台 · Talk&amp;Talk</title>
+    <link rel="stylesheet" href="/admin/assets/styles.css" />
+    <script src="/admin/assets/app.js" defer></script>
   </head>
   <body>
-    <p>审核系统已迁移至 <a href="/review/">独立审核部门工作台</a>。</p>
+    <main id="loginView" class="login-shell">
+      <section class="login-story" aria-labelledby="loginTitle">
+        <a class="wordmark" href="/admin/" aria-label="Talk and Talk 商业运营台首页">
+          <span class="wordmark-mark" aria-hidden="true">TT</span>
+          <span>Talk&amp;Talk</span>
+        </a>
+        <div class="story-copy">
+          <p class="eyebrow">COMMERCIAL CONTROL ROOM</p>
+          <h1 id="loginTitle">让每一笔服务<br />都能被<strong>解释</strong>。</h1>
+          <p>这是交易、客服、供给与财务的受控运营入口。默认只读；高风险操作需要主动解锁、填写理由并二次确认。</p>
+        </div>
+        <dl class="story-facts">
+          <div><dt>交易真相</dt><dd>直接读取订单、支付与退款权威状态</dd></div>
+          <div><dt>职责分离</dt><dd>商业运营与独立内容审核使用不同身份域</dd></div>
+          <div><dt>操作留痕</dt><dd>服务端审计为准，错误返回可追踪操作编号</dd></div>
+        </dl>
+      </section>
+
+      <section class="login-panel" aria-label="商业运营人员登录">
+        <div class="login-card">
+          <p class="eyebrow">STAFF ACCESS</p>
+          <h2>进入商业运营台</h2>
+          <p class="muted">仅接受已启用的管理员账号、密码与动态口令。审核员请前往独立审核部门。</p>
+          <form id="loginForm" class="credential-form" novalidate>
+            <label>
+              <span>运营账号</span>
+              <input id="loginUsername" autocomplete="username" maxlength="80" placeholder="例如：admin.ops" required />
+            </label>
+            <label>
+              <span>密码</span>
+              <input id="loginPassword" type="password" autocomplete="current-password" minlength="16" maxlength="128" placeholder="输入运营人员密码" required />
+            </label>
+            <label>
+              <span>动态口令</span>
+              <input id="loginTotp" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="6 位验证器口令" required />
+            </label>
+            <button id="loginButton" class="button primary full" type="submit">安全登录 <span aria-hidden="true">→</span></button>
+            <p id="loginMessage" class="form-message" role="alert"></p>
+          </form>
+          <a class="department-link" href="/review/">前往独立审核部门 <span aria-hidden="true">↗</span></a>
+        </div>
+      </section>
+    </main>
+
+    <div id="portalView" class="portal hidden">
+      <aside class="sidebar" aria-label="商业运营导航">
+        <a class="wordmark sidebar-wordmark" href="/admin/">
+          <span class="wordmark-mark" aria-hidden="true">TT</span>
+          <span>Talk&amp;Talk</span>
+        </a>
+        <div class="department-chip"><span class="status-dot"></span>商业运营</div>
+        <nav class="nav-list">
+          <button class="nav-item active" data-view-target="overview" type="button"><span>01</span>经营驾驶舱</button>
+          <button class="nav-item" data-view-target="companions" type="button"><span>02</span>陪伴者与核验</button>
+          <button class="nav-item" data-view-target="orders" type="button"><span>03</span>订单与履约</button>
+          <button class="nav-item" data-view-target="support" type="button"><span>04</span>客服工单</button>
+          <button class="nav-item" data-view-target="refunds" type="button"><span>05</span>退款异常</button>
+          <button class="nav-item" data-view-target="complaints" type="button"><span>06</span>支付投诉</button>
+          <button class="nav-item" data-view-target="settlements" type="button"><span>07</span>结算与追偿</button>
+          <button class="nav-item" data-view-target="lifecycle" type="button"><span>08</span>质量与生命周期</button>
+          <button class="nav-item" data-view-target="growth" type="button"><span>09</span>推荐与触达</button>
+          <button class="nav-item" data-view-target="accounts" type="button"><span>10</span>账号与注销</button>
+          <button class="nav-item" data-view-target="audit" type="button"><span>11</span>权限与审计</button>
+        </nav>
+        <div class="sidebar-bottom">
+          <div class="operator-card">
+            <span id="operatorInitials" class="operator-avatar">运</span>
+            <div><strong id="operatorName">运营人员</strong><small id="operatorRole">admin</small></div>
+          </div>
+          <button id="controlledModeButton" class="mode-button" type="button" aria-pressed="false">
+            <span class="mode-indicator"></span>
+            <span><strong>只读模式</strong><small>受控操作已锁定</small></span>
+          </button>
+          <a class="sidebar-link" href="/review/">独立审核部门 <span aria-hidden="true">↗</span></a>
+          <button id="logoutButton" class="sidebar-link button-link" type="button">退出运营会话 <span aria-hidden="true">↗</span></button>
+        </div>
+      </aside>
+
+      <main class="portal-main">
+        <header class="portal-header">
+          <div>
+            <p id="pageEyebrow" class="eyebrow">OPERATING TRUTH</p>
+            <h1 id="pageTitle">经营驾驶舱</h1>
+            <p id="pageDescription" class="page-description">代码就绪不等于业务可放行；这里汇总当前环境的真实运行门禁。</p>
+          </div>
+          <div class="header-actions">
+            <div class="session-chip"><span>会话</span><strong id="sessionCountdown">—</strong></div>
+            <span id="lastUpdated" class="last-updated">尚未加载</span>
+            <button id="refreshButton" class="button quiet" type="button">刷新当前页</button>
+          </div>
+        </header>
+
+        <div id="globalError" class="error-trace hidden" role="alert"></div>
+
+        <section id="overviewView" class="view-panel">
+          <div class="metric-strip" aria-label="经营关键指标">
+            <article class="metric-card dark"><span>运行门禁</span><strong id="metricReadiness">—</strong><small id="metricReadinessNote">等待服务端结果</small></article>
+            <article class="metric-card"><span>请求订单</span><strong id="metricRequested">—</strong><small>当前漏斗时间范围</small></article>
+            <article class="metric-card"><span>实收金额</span><strong id="metricCollected">—</strong><small>扣除成功退款后</small></article>
+            <article class="metric-card"><span>复购客户率</span><strong id="metricRepeat">—</strong><small>按已付费客户口径</small></article>
+          </div>
+          <div class="overview-grid">
+            <article class="panel span-two">
+              <div class="panel-heading"><div><p class="eyebrow">CONVERSION</p><h2>服务漏斗</h2></div><span id="funnelRange" class="panel-meta">—</span></div>
+              <div id="funnelStages" class="funnel-stages empty-slot">正在读取权威订单事实…</div>
+            </article>
+            <article class="panel">
+              <div class="panel-heading"><div><p class="eyebrow">RELEASE GATES</p><h2>运行阻断项</h2></div></div>
+              <div id="readinessList" class="stack-list empty-slot">正在检查退款、客服、审核、通知与语音门禁…</div>
+            </article>
+            <article class="panel">
+              <div class="panel-heading"><div><p class="eyebrow">BOUNDARIES</p><h2>当前权限边界</h2></div></div>
+              <div id="capabilityList" class="stack-list empty-slot">正在验证管理员会话…</div>
+            </article>
+          </div>
+        </section>
+
+        <section id="companionsView" class="view-panel hidden">
+          <div class="toolbar">
+            <label><span>商业状态</span><select id="companionStatusFilter"><option value="">全部</option><option value="pendingReview">待复核</option><option value="verified">已核验</option><option value="suspended">已暂停</option></select></label>
+            <p>商业档案核验与公开发布是两个动作；提交者不能复核自己的档案。</p>
+          </div>
+          <div id="companionList" class="data-list"></div>
+          <div id="companionPagination" class="pagination"></div>
+          <article id="identityVerificationPanel" class="panel">
+            <div class="panel-heading"><div><p class="eyebrow">KYC FOUR-EYES</p><h2>实名变更复核</h2></div><select id="identityVerificationStatusFilter" aria-label="实名变更复核状态"><option value="pending">待复核</option><option value="approved">已批准</option><option value="rejected">已拒绝</option></select></div>
+            <div class="section-callout"><strong>提交不等于生效</strong><span>实名核验或撤销必须由另一名授权人员复核；批准后才更新真实状态，撤销批准还会按规则下架公开陪伴者。</span></div>
+            <div id="identityVerificationList" class="compact-list"></div>
+            <div id="identityVerificationPagination" class="pagination"></div>
+          </article>
+        </section>
+
+        <section id="ordersView" class="view-panel hidden">
+          <form id="orderFilterForm" class="toolbar filter-toolbar">
+            <label><span>状态</span><select id="orderStatusFilter"><option value="">全部</option><option value="pending">待确认/待支付</option><option value="paid">已支付</option><option value="inService">服务中</option><option value="completed">已完成</option><option value="cancelled">已取消</option><option value="refunded">已退款</option></select></label>
+            <label class="grow"><span>订单、用户或陪伴者</span><input id="orderKeyword" maxlength="120" placeholder="输入名称或不完整编号" /></label>
+            <button class="button quiet" type="submit">查询</button>
+          </form>
+          <div id="orderList" class="data-list"></div>
+          <div id="orderPagination" class="pagination"></div>
+        </section>
+
+        <section id="supportView" class="view-panel hidden">
+          <div class="toolbar">
+            <label><span>工单状态</span><select id="supportStatusFilter"><option value="">全部</option><option value="open">待认领</option><option value="inProgress">处理中</option><option value="resolved">已解决</option><option value="closed">已关闭</option></select></label>
+            <p>仅当前受理人可解决工单；安全类和超时工单始终置顶。</p>
+          </div>
+          <div class="split-panels">
+            <article class="panel">
+              <div class="panel-heading"><div><p class="eyebrow">ASSIGNED CASES</p><h2>已分配工单</h2></div></div>
+              <div id="supportList" class="data-list"></div>
+              <div id="supportPagination" class="pagination"></div>
+            </article>
+            <article id="supportClaimablePanel" class="panel">
+              <div class="panel-heading"><div><p class="eyebrow">CLAIMABLE CASES</p><h2>待认领工单</h2></div></div>
+              <div id="supportClaimableList" class="data-list"></div>
+              <div id="supportClaimablePagination" class="pagination"></div>
+            </article>
+          </div>
+          <article class="panel">
+            <div class="panel-heading">
+              <div><p class="eyebrow">FULFILLMENT REVIEW</p><h2>履约与出席争议</h2></div>
+              <select id="attendanceDisputeStatusFilter" aria-label="履约争议状态"><option value="">全部</option><option value="evidenceCollection">补充材料</option><option value="counterpartyResponse">等待对方回应</option><option value="review">待裁决</option><option value="decided">申诉期</option><option value="appealed">申诉复核</option><option value="final">已终局</option></select>
+            </div>
+            <div class="section-callout"><strong>不录音，渠道事件优先</strong><span>TRTC 签名回调用于确认进退房与断线重连；客户端上报只能辅助。首轮裁决与申诉复核必须由不同人员完成，退款状态以支付渠道事实为准。</span></div>
+            <div id="attendanceDisputeList" class="data-list"></div>
+            <div id="attendanceDisputePagination" class="pagination"></div>
+          </article>
+        </section>
+
+        <section id="refundsView" class="view-panel hidden">
+          <div class="section-callout danger-callout"><strong>以微信渠道状态为准</strong><span>“已受理”不是“退款成功”。失败、长时间 pending/processing 与对账异常都会留在此队列。</span></div>
+          <div class="toolbar">
+            <label><span>队列状态</span><select id="refundStatusFilter"><option value="">全部</option><option value="pendingReview">待审核</option><option value="pending">渠道待受理</option><option value="processing">渠道处理中</option><option value="failed">失败待处理</option></select></label>
+            <p>仅展示需要人工介入、对账陈旧或 SLA 超时的退款；切换筛选会从第 1 页重新读取。</p>
+          </div>
+          <div id="refundList" class="data-list"></div>
+          <div id="refundPagination" class="pagination"></div>
+          <article id="paymentReconciliationPanel" class="panel">
+            <div class="panel-heading">
+              <div><p class="eyebrow">WECHAT T+1 RECONCILIATION</p><h2>微信日账单对账</h2></div>
+              <span id="paymentReconciliationReadiness" class="panel-meta">尚未读取门禁</span>
+            </div>
+            <div class="section-callout danger-callout"><strong>无账单不等于已核对</strong><span>每日四类账单必须分别形成不可变运行记录。只有下载 hash 已验证、账实核对完成且异常关闭，才能作为当天对账证据；微信返回无账单时仍须核对本地是否有交易活动。</span></div>
+            <details class="subpanel" open>
+              <summary>超过 API 90 天的商户平台账单导入</summary>
+              <div class="section-callout"><strong>仅接受官方单日导出</strong><span>商户平台可查 5 年且可合并最多 31 天，但本系统为保持逐日不可变证据，只接受一个上海自然日。合并文件会因日期范围不一致而拒绝。原文仅在本次上传请求内解析，页面和数据库都不回显。</span></div>
+              <div class="toolbar">
+                <label><span>单日账单日期</span><input id="merchantBillImportDate" type="date" /></label>
+                <label><span>账单类型</span><select id="merchantBillImportKind"><option value="tradeAll">交易账单</option><option value="fundBasic">基本账户资金账单</option><option value="fundOperation">运营账户资金账单</option><option value="fundFees">手续费账户资金账单</option></select></label>
+                <label class="grow"><span>受控证据引用</span><input id="merchantBillEvidenceReference" maxlength="160" placeholder="finance:wechat-bills/2026-04-01/trade" autocomplete="off" /></label>
+                <label><span>官方 CSV（最大 20 MiB）</span><input id="merchantBillImportFile" type="file" accept=".csv,text/csv,text/plain" /></label>
+                <button id="merchantBillImportButton" class="button quiet" type="button">计算 SHA 并提交复核</button>
+                <label><span>审批状态</span><select id="merchantBillImportStatus"><option value="pending">待第二人复核</option><option value="approved">已批准</option><option value="rejected">已拒绝</option><option value="">全部</option></select></label>
+              </div>
+              <div id="merchantBillImportList" class="compact-list"></div>
+              <div id="merchantBillImportPagination" class="pagination"></div>
+            </details>
+            <details class="subpanel" open>
+              <summary>微信现金台账账户与账单日分类</summary>
+              <div class="section-callout"><strong>本地事实先入账，分类后生效</strong><span>支付/退款回调只追加不可变 provider/source/金额事实。财务提交账户与预计账单日，另一人批准后才填充分类；任何人都不能覆盖渠道参考、方向或金额。</span></div>
+              <div id="cashLedgerClassificationList" class="compact-list"></div>
+              <div id="cashLedgerClassificationPagination" class="pagination"></div>
+            </details>
+            <div class="toolbar">
+              <label><span>账单日期（上海时区）</span><input id="paymentReconciliationCreateDate" type="date" /></label>
+              <button id="paymentReconciliationCreateButton" class="button quiet" type="button">为日期建立四类对账</button>
+              <label><span>运行状态</span><select id="paymentReconciliationRunStatusFilter"><option value="">全部</option><option value="pending">待处理</option><option value="processing">处理中</option><option value="failed">失败</option><option value="reconciled">已完成账实核对</option><option value="noStatement">微信无账单</option></select></label>
+              <label><span>运行日期</span><input id="paymentReconciliationRunDateFilter" type="date" /></label>
+            </div>
+            <div id="paymentReconciliationRunList" class="data-list"></div>
+            <div id="paymentReconciliationRunPagination" class="pagination"></div>
+            <div class="panel-heading">
+              <div><p class="eyebrow">RECONCILIATION ISSUES</p><h2>账实差异与例外</h2></div>
+            </div>
+            <div class="toolbar">
+              <label><span>异常状态</span><select id="paymentReconciliationIssueStatusFilter"><option value="open">待处理</option><option value="investigating">调查中</option><option value="resolved">已解决</option><option value="acceptedException">有证据接受例外</option><option value="">全部</option></select></label>
+              <label><span>异常类型</span><select id="paymentReconciliationIssueKindFilter"><option value="">全部</option><option value="providerStatementMissingWithLocalActivity">微信无账单但本地有活动</option><option value="providerPaymentMissingLocally">微信支付本地缺失</option><option value="localPaymentMissingProviderBill">本地支付交易账单缺失</option><option value="paymentAmountMismatch">支付金额不一致</option><option value="paymentTransactionIdMismatch">微信交易号不一致</option><option value="providerPaidLocalUnsettled">微信成功本地未入账</option><option value="localPaymentSuccessProviderNotPaid">本地支付成功但微信未支付</option><option value="providerRefundMissingLocally">微信退款本地缺失</option><option value="localRefundMissingProviderBill">本地退款交易账单缺失</option><option value="refundAmountMismatch">退款金额不一致</option><option value="refundProviderIdMismatch">微信退款号不一致</option><option value="refundProviderIdMissingLocally">本地缺少微信退款号</option><option value="refundProviderTimeMismatch">退款渠道时间冲突</option><option value="providerRefundedLocalUnsettled">微信退款成功但本地未入账</option><option value="providerFundReferenceMissingLocally">资金流水本地缺失</option><option value="providerFundBusinessTypeUnreviewed">资金业务类型未纳入规则</option><option value="providerFundBusinessBindingMismatch">资金业务绑定不一致</option><option value="providerFundAccountMismatch">资金账户类型不一致</option><option value="providerFundDirectionMismatch">资金收支方向不一致</option><option value="providerFundAmountMismatch">资金金额不一致</option><option value="localCashLedgerMissingProviderFundBill">已分类本地现金台账在资金账单缺失</option></select></label>
+            </div>
+            <div id="paymentReconciliationIssueList" class="data-list"></div>
+            <div id="paymentReconciliationIssuePagination" class="pagination"></div>
+          </article>
+        </section>
+
+        <section id="complaintsView" class="view-panel hidden">
+          <div class="section-callout danger-callout"><strong>微信支付消费者投诉 2.0</strong><span>次日结束前首次回复、第三日结束前完结；回复或完结只提交到微信权威状态机，未知结果必须先同步，不能人工改写成功。</span></div>
+          <div class="toolbar">
+            <label><span>状态</span><select id="paymentDisputeStatusFilter"><option value="">全部</option><option value="pendingSync">待同步</option><option value="open">待处理</option><option value="processing">处理中</option><option value="resolved">已完结</option><option value="syncFailed">同步失败</option></select></label>
+            <label><span>SLA</span><select id="paymentDisputeSlaFilter"><option value="">全部</option><option value="overdue">已超时</option><option value="dueSoon">6 小时内到期</option></select></label>
+            <p>投诉详情、回复与证据元数据按岗位最小可见；财务仅处理资金阻断和权威同步。</p>
+          </div>
+          <div id="paymentDisputeList" class="data-list"></div>
+          <div id="paymentDisputePagination" class="pagination"></div>
+        </section>
+
+        <section id="settlementsView" class="view-panel hidden">
+          <div class="split-panels">
+            <article class="panel">
+              <div class="panel-heading"><div><p class="eyebrow">PAYOUT LEDGER</p><h2>收益结算</h2></div><select id="earningStatusFilter" aria-label="收益状态"><option value="">全部</option><option value="pending">待成熟</option><option value="available">可结算</option><option value="held">冻结/复核</option><option value="paid">已支付</option></select></div>
+              <div id="earningList" class="compact-list"></div>
+              <div id="earningPagination" class="pagination"></div>
+            </article>
+            <article class="panel">
+              <div class="panel-heading"><div><p class="eyebrow">RECOVERY</p><h2>退款后追偿</h2></div><select id="recoveryStatusFilter" aria-label="追偿状态"><option value="">全部</option><option value="due">待追偿</option><option value="pendingVerification">待复核</option><option value="recovered">已追回</option></select></div>
+              <div id="recoveryList" class="compact-list"></div>
+              <div id="recoveryPagination" class="pagination"></div>
+            </article>
+            <article class="panel">
+              <div class="panel-heading"><div><p class="eyebrow">INVOICE REQUESTS</p><h2>发票申请</h2></div><select id="invoiceStatusFilter" aria-label="发票申请状态"><option value="">全部</option><option value="submitted">已提交</option><option value="inReview">复核中</option><option value="issued">已开具</option><option value="voided">已作废</option><option value="rejected">已拒绝</option><option value="cancelled">用户已取消</option></select></div>
+              <div class="section-callout"><strong>状态不等于票据</strong><span>“已开具”和“已作废”都必须引用授权开票系统中的外部证据；作废前先完成真实红冲/作废，本后台不生成票据、下载链接或伪造事实。</span></div>
+              <div id="invoiceList" class="compact-list"></div>
+              <div id="invoicePagination" class="pagination"></div>
+            </article>
+          </div>
+        </section>
+
+        <section id="lifecycleView" class="view-panel hidden">
+          <div class="section-callout"><strong>陪伴者质量闭环</strong><span>培训、定期复审、事件、处罚、申诉、语音介绍与提现请求均来自真实生命周期接口；接口不可用时本页失败关闭。</span></div>
+          <div class="lifecycle-grid">
+            <article class="panel"><div class="panel-heading"><div><p class="eyebrow">TRAINING</p><h2>培训资质</h2></div></div><div id="trainingList" class="compact-list"></div><div id="trainingPagination" class="pagination"></div></article>
+            <article class="panel"><div class="panel-heading"><div><p class="eyebrow">PERIODIC REVIEW</p><h2>商业资质复审到期</h2></div></div><div id="reviewDueList" class="compact-list"></div><div id="reviewDuePagination" class="pagination"></div></article>
+            <article class="panel"><div class="panel-heading"><div><p class="eyebrow">ACCOUNT ACTIONS</p><h2>当前账号处置</h2></div></div><div id="accountActionList" class="compact-list"></div><div id="accountActionPagination" class="pagination"></div></article>
+            <article class="panel"><div class="panel-heading"><div><p class="eyebrow">INCIDENTS</p><h2>履约与安全事件</h2></div></div><div id="incidentList" class="compact-list"></div><div id="incidentPagination" class="pagination"></div></article>
+            <article class="panel"><div class="panel-heading"><div><p class="eyebrow">WITHDRAWALS</p><h2>提现请求</h2></div></div><div id="withdrawalList" class="compact-list"></div><div id="withdrawalPagination" class="pagination"></div></article>
+            <article id="companionAppealsPanel" class="panel">
+              <div class="panel-heading"><div><p class="eyebrow">APPEALS</p><h2>陪伴者申诉</h2></div><select id="companionAppealStatusFilter" aria-label="陪伴者申诉状态"><option value="pending">待独立复核</option><option value="upheld">维持处置</option><option value="overturned">撤销处置</option><option value="dismissed">已关闭</option></select></div>
+              <div id="companionAppealList" class="compact-list"></div>
+              <div id="companionAppealPagination" class="pagination"></div>
+            </article>
+            <article class="panel"><div class="panel-heading"><div><p class="eyebrow">VOICE INTRO</p><h2>语音介绍待审</h2></div></div><div id="voiceIntroList" class="compact-list"></div><div id="voiceIntroPagination" class="pagination"></div></article>
+          </div>
+        </section>
+
+        <section id="growthView" class="view-panel hidden">
+          <div class="section-callout"><strong>推荐与触达治理</strong><span>推荐策略变更和可约提醒恢复均为受控操作。指标与 readiness 读取失败时保持未知，不得据此宣称渠道或商业门禁已通过。</span></div>
+          <div class="lifecycle-grid">
+            <article class="panel">
+              <div class="panel-heading"><div><p class="eyebrow">RECOMMENDATION METRICS</p><h2>推荐效果事实</h2></div><button id="recommendationMetricsRefresh" class="button quiet small" type="button">重新读取</button></div>
+              <form id="recommendationMetricsForm" class="inline-filters">
+                <input id="recommendationMetricsFrom" type="datetime-local" aria-label="推荐指标开始时间" />
+                <input id="recommendationMetricsTo" type="datetime-local" aria-label="推荐指标结束时间" />
+                <button class="button quiet" type="submit">查询最多 90 天</button>
+              </form>
+              <div id="recommendationMetricsList" class="compact-list"></div>
+            </article>
+            <article class="panel">
+              <div class="panel-heading"><div><p class="eyebrow">POLICY CONTROL</p><h2>单陪伴者推荐策略</h2></div></div>
+              <form id="recommendationPolicyForm" class="inline-filters">
+                <input id="recommendationPolicyCompanionId" maxlength="191" required placeholder="陪伴者 ID" aria-label="陪伴者 ID" />
+                <select id="recommendationPolicyPlacement" aria-label="推荐位置"><option value="discoverHome">发现首页</option><option value="communityRelated">社区相关</option><option value="orderFollowup">订单后续</option></select>
+                <select id="recommendationPolicyStatus" aria-label="策略状态"><option value="active">启用</option><option value="paused">暂停</option></select>
+                <input id="recommendationPolicyBoost" type="number" min="-1000" max="1000" value="0" aria-label="加权基点" placeholder="加权基点" />
+                <input id="recommendationPolicyDailyCap" type="number" min="1" max="10000" aria-label="每日曝光上限" placeholder="每日上限（留空为不限）" />
+                <input id="recommendationPolicyStartsAt" type="datetime-local" aria-label="策略开始时间" />
+                <input id="recommendationPolicyEndsAt" type="datetime-local" aria-label="策略结束时间" />
+                <button id="recommendationPolicySubmit" class="button primary" type="submit">进入受控变更</button>
+              </form>
+              <div id="recommendationPolicyResult" class="empty-state">尚未提交策略变更。</div>
+            </article>
+            <article class="panel">
+              <div class="panel-heading"><div><p class="eyebrow">REMINDER READINESS</p><h2>可约提醒正式就绪度</h2></div><button id="availabilityReminderReadinessRefresh" class="button quiet small" type="button">重新读取</button></div>
+              <div id="availabilityReminderReadiness" class="compact-list"></div>
+            </article>
+            <article class="panel">
+              <div class="panel-heading"><div><p class="eyebrow">CONTROLLED RETRY</p><h2>提醒失败恢复入口</h2></div></div>
+              <div class="section-callout danger-callout"><strong>禁止猜测重发</strong><span>仅对服务端判定可安全重试的失败阶段执行；渠道结果不确定（uncertain）必须人工核对，不能从这里自动重发。</span></div>
+              <form id="availabilityReminderRetryForm" class="inline-filters">
+                <select id="availabilityReminderRetryStage" aria-label="失败阶段"><option value="fanout-jobs">展开任务</option><option value="preparation-candidates">准备候选</option><option value="reservation-handoffs">授权预留交接</option><option value="delivery-attempts">发送尝试</option></select>
+                <input id="availabilityReminderRetryId" maxlength="191" required placeholder="失败记录 ID" aria-label="失败记录 ID" />
+                <button class="button danger" type="submit">进入受控重试</button>
+              </form>
+              <div id="availabilityReminderRetryResult" class="empty-state">先从日志或故障记录取得准确 ID；汇总数字不能代替资源主键。</div>
+            </article>
+            <article class="panel">
+              <div class="panel-heading"><div><p class="eyebrow">TERMINAL RECONCILIATION</p><h2>提醒终态人工核对</h2></div></div>
+              <div class="section-callout danger-callout"><strong>终态不是重发入口</strong><span>调用前失败、渠道明确拒绝和渠道结果不确定只能按服务端保留的真实终态核销。尤其 uncertain 必须先在微信侧核对并保留证据；此操作只记录人工结论，automaticResend 始终为 false。</span></div>
+              <form id="availabilityReminderTerminalForm" class="inline-filters">
+                <input id="availabilityReminderTerminalId" maxlength="191" required placeholder="发送尝试 ID" aria-label="终态发送尝试 ID" />
+                <select id="availabilityReminderResolutionCode" aria-label="终态核对结论"><option value="failedBeforeSendReviewed">调用渠道前失败已核对</option><option value="providerRejectedReviewed">渠道明确拒绝已核对</option><option value="uncertainProviderStateReconciled">渠道不确定状态已与微信核对</option></select>
+                <input id="availabilityReminderTerminalEvidenceRef" maxlength="300" placeholder="证据引用（uncertain 必填）" aria-label="终态核对证据引用" />
+                <input id="availabilityReminderTerminalNote" maxlength="500" placeholder="核对说明（uncertain 至少 8 字）" aria-label="终态核对说明" />
+                <button class="button danger" type="submit">记录人工终态</button>
+              </form>
+              <div id="availabilityReminderTerminalResult" class="empty-state">结论代码必须与服务端保留的终态匹配；不一致会失败关闭。</div>
+            </article>
+          </div>
+        </section>
+
+        <section id="accountsView" class="view-panel hidden">
+          <div class="account-layout">
+            <article id="accountAppealsPanel" class="panel">
+              <div class="panel-heading"><div><p class="eyebrow">ACCOUNT APPEALS</p><h2>普通用户账号申诉</h2></div><select id="accountAppealStatusFilter" aria-label="账号申诉状态"><option value="pending">待独立复核</option><option value="upheld">维持处置</option><option value="overturned">撤销处置</option><option value="dismissed">已关闭</option></select></div>
+              <div class="section-callout"><strong>独立复核</strong><span>原处置人员不能认领、被分派或裁决；待处理案件须先认领，再由当前受理人提交可向用户展示的结论。</span></div>
+              <div id="accountAppealList" class="compact-list"></div>
+              <div id="accountAppealPagination" class="pagination"></div>
+            </article>
+            <article class="panel">
+              <div class="panel-heading"><div><p class="eyebrow">ACCOUNTS</p><h2>账号状态与实名</h2></div></div>
+              <form id="userFilterForm" class="inline-filters">
+                <select id="userRoleFilter" aria-label="角色"><option value="">全部角色</option><option value="user">用户</option><option value="companion">陪伴者</option><option value="admin">管理员</option></select>
+                <select id="userStatusFilter" aria-label="账号状态"><option value="">全部状态</option><option value="active">正常</option><option value="restricted">受限</option><option value="banned">封禁</option></select>
+                <input id="userKeyword" maxlength="120" placeholder="名称、脱敏手机号或编号" aria-label="账号关键字" />
+                <button class="button quiet" type="submit">查询</button>
+              </form>
+              <div id="userList" class="compact-list"></div>
+              <div id="userPagination" class="pagination"></div>
+            </article>
+            <article id="customerAdultEligibilityPanel" class="panel">
+              <div class="panel-heading">
+                <div><p class="eyebrow">CUSTOMER ADULT ELIGIBILITY</p><h2>用户成年资格独立复核</h2></div>
+                <select id="customerAdultEligibilityStatusFilter" aria-label="用户成年资格状态"><option value="pending">待复核</option><option value="adult">已核验成年</option><option value="ineligible">不满足资格</option></select>
+              </div>
+              <div class="section-callout danger-callout"><strong>资料年龄不等于服务资格</strong><span>这里只复核受控流程签发的不透明引用，不接收或回显身份证号、证件照片。提交者不能复核自己的记录；只有服务端记录为 adult 且有效期覆盖服务结束时间时，才允许新下单、支付、改期或进入语音。</span></div>
+              <div id="customerAdultEligibilityList" class="compact-list"></div>
+              <div id="customerAdultEligibilityPagination" class="pagination"></div>
+            </article>
+            <article class="panel">
+              <div class="panel-heading"><div><p class="eyebrow">DELETION</p><h2>注销结算</h2></div><select id="deletionStatusFilter" aria-label="注销状态"><option value="">处理中</option><option value="pending">待开始</option><option value="processing">结算中</option></select></div>
+              <div id="deletionList" class="compact-list"></div>
+              <div id="deletionPagination" class="pagination"></div>
+            </article>
+            <article id="legalHoldPanel" class="panel">
+              <div class="panel-heading"><div><p class="eyebrow">LEGAL HOLD</p><h2>法定留存保全</h2></div></div>
+              <div class="section-callout danger-callout"><strong>外部法律政策 + 双人复核</strong><span>保全申请会立即阻断到期处置；释放申请在第二位管理员批准前仍保持阻断。这里只填写受控原因和外部依据引用，不得粘贴法律文件、身份信息或案件原文。</span></div>
+              <form id="legalHoldFilterForm" class="inline-filters">
+                <select id="legalHoldStateFilter" aria-label="法务保全状态"><option value="">全部保全状态</option><option value="none">未保全</option><option value="placementPending">待批准保全</option><option value="active">保全中</option><option value="releasePending">待批准释放</option><option value="released">已释放</option></select>
+                <select id="legalHoldExpiryStateFilter" aria-label="到期处置状态"><option value="">全部到期状态</option><option value="pending">待到期处置</option><option value="partiallyErased">已部分处置</option><option value="processed">已完成处置</option></select>
+                <select id="legalHoldCategoryFilter" aria-label="留存分类"><option value="">全部留存分类</option><option value="identity_authentication_profile">身份与认证资料</option><option value="preferences_behavior_notifications">偏好、行为与通知</option><option value="public_user_content">公开用户内容</option><option value="transactions_tax_invoices">交易、税务与发票</option><option value="support_disputes_safety">客服、争议与安全</option><option value="consent_rights_account_governance">同意、权利与账号治理</option><option value="deletion_audit_evidence">注销审计证据</option></select>
+                <button class="button quiet" type="submit">查询</button>
+              </form>
+              <div id="legalHoldPolicyState" class="section-callout"><strong>正在读取政策门禁</strong><span>未确认政策前不开放任何保全操作。</span></div>
+              <div id="legalHoldList" class="compact-list"></div>
+              <div id="legalHoldPagination" class="pagination"></div>
+              <div id="legalHoldHistoryPanel" class="hidden">
+                <div class="panel-heading"><div><p class="eyebrow">ACTION HISTORY</p><h3 id="legalHoldHistoryTitle">保全操作历史</h3></div><button id="legalHoldHistoryClose" class="button small quiet" type="button">关闭历史</button></div>
+                <div id="legalHoldHistoryList" class="compact-list"></div>
+                <div id="legalHoldHistoryPagination" class="pagination"></div>
+              </div>
+            </article>
+            <article class="panel">
+              <div class="panel-heading"><div><p class="eyebrow">DATA RIGHTS</p><h2>数据权利请求</h2></div><select id="dataRightsStatusFilter" aria-label="数据权利请求状态"><option value="">全部</option><option value="submitted">已提交</option><option value="inReview">复核中</option><option value="needsInformation">待补充</option><option value="completed">已完成</option><option value="rejected">已拒绝</option></select></div>
+              <div id="dataRightsList" class="compact-list"></div>
+              <div id="dataRightsPagination" class="pagination"></div>
+            </article>
+            <article id="dataRightsClaimablePanel" class="panel">
+              <div class="panel-heading"><div><p class="eyebrow">CLAIMABLE DATA RIGHTS</p><h2>待认领数据权利摘要</h2></div><select id="dataRightsClaimableStatusFilter" aria-label="待认领数据权利状态"><option value="">活动请求</option><option value="submitted">已提交</option><option value="inReview">复核中</option><option value="needsInformation">待补充</option></select></div>
+              <div class="section-callout"><strong>认领前最小可见</strong><span>这里只显示类型、状态和时间；描述、用户与补件内容仅在并发安全认领成功后开放。</span></div>
+              <div id="dataRightsClaimableList" class="compact-list"></div>
+              <div id="dataRightsClaimablePagination" class="pagination"></div>
+            </article>
+          </div>
+        </section>
+
+        <section id="auditView" class="view-panel hidden">
+          <div class="audit-layout">
+            <article class="panel permission-panel">
+              <p class="eyebrow">LEAST PRIVILEGE</p>
+              <h2>权限可见性</h2>
+              <p>当前会话按岗位能力最小授权，未授权模块不会显示或发起请求。内容审核必须在独立部门工作台完成；本后台不能读取或提交审核判断。</p>
+              <div id="permissionDetails" class="permission-details"></div>
+              <a class="button quiet" href="/review/">打开独立审核部门 ↗</a>
+            </article>
+            <article id="staffOffboardingPanel" class="panel">
+              <div class="panel-heading">
+                <div><p class="eyebrow">WORKFORCE ACCESS</p><h2>商业后台员工停权</h2></div>
+              </div>
+              <div class="section-callout danger-callout"><strong>停权不可自动恢复</strong><span>仅 admin 可执行；禁止自停与停掉最后一名 active admin。存在未结工单、退款、投诉、履约复核、数据权利、发票或提现任务时必须选择 active admin 接任。内容审核员属于独立 ReviewStaff 身份域，不在本列表。</span></div>
+              <form id="staffCredentialFilterForm" class="inline-filters">
+                <input id="staffCredentialKeywordFilter" maxlength="120" placeholder="姓名或后台账号" aria-label="搜索商业后台员工" />
+                <select id="staffCredentialStatusFilter" aria-label="商业后台员工状态"><option value="active">在职可用</option><option value="suspended">已停权</option><option value="">全部状态</option></select>
+                <select id="staffCredentialRoleFilter" aria-label="商业后台员工角色"><option value="">全部角色</option><option value="admin">admin</option><option value="support">support</option><option value="finance">finance</option><option value="supply">supply</option><option value="operations">operations</option><option value="moderator">moderator</option></select>
+                <button class="button quiet" type="submit">筛选员工</button>
+              </form>
+              <div id="staffCredentialList" class="compact-list"></div>
+              <div id="staffCredentialPagination" class="pagination"></div>
+            </article>
+            <article class="panel">
+              <div class="panel-heading"><div><p class="eyebrow">AUDIT TRAIL</p><h2>运营审计</h2></div></div>
+              <form id="auditFilterForm" class="inline-filters">
+                <input id="auditActionFilter" maxlength="120" placeholder="动作，例如 refund" aria-label="审计动作" />
+                <input id="auditResourceFilter" maxlength="120" placeholder="资源，例如 order" aria-label="资源类型" />
+                <button class="button quiet" type="submit">筛选</button>
+              </form>
+              <div id="auditList" class="compact-list"></div>
+              <div id="auditPagination" class="pagination"></div>
+            </article>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="actionDialog" class="action-dialog">
+      <form id="actionForm" method="dialog">
+        <div class="dialog-kicker" id="actionRisk">受控操作</div>
+        <h2 id="actionTitle">确认操作</h2>
+        <p id="actionDescription" class="muted"></p>
+        <dl class="action-context">
+          <div><dt>目标</dt><dd id="actionResource">—</dd></div>
+          <div><dt>操作编号</dt><dd id="actionOperationId">—</dd></div>
+        </dl>
+        <div id="actionFields" class="dialog-fields"></div>
+        <label>
+          <span>操作理由</span>
+          <textarea id="actionReason" minlength="3" maxlength="500" placeholder="说明事实、依据和预期结果；不得粘贴密码、令牌或完整证件号码。" required></textarea>
+        </label>
+        <label>
+          <span>二次确认</span>
+          <input id="actionConfirmation" autocomplete="off" placeholder="输入确认码" required />
+          <small id="actionConfirmationHelp"></small>
+        </label>
+        <p id="actionMessage" class="form-message" role="alert"></p>
+        <div class="dialog-actions">
+          <button id="actionCancelButton" class="button quiet" type="button">取消</button>
+          <button id="actionSubmitButton" class="button danger" type="submit">确认执行</button>
+        </div>
+      </form>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
   </body>
 </html>

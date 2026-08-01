@@ -8,24 +8,36 @@
   </view>
   <view class="card report-receipts">
     <view class="section-title">我的社区举报回执</view>
-    <view class="report-receipts-copy">这里只显示最近 50 条提交时间与收讫信息；不会显示帖子、作者、案件、审核结论或处理时限。</view>
-    <view wx:if="{{reportReceiptsError}}" class="report-receipts-empty">{{reportReceiptsError}}</view>
+    <view class="report-receipts-copy">这里只显示提交时间与收讫信息；不会显示帖子、作者、案件、审核结论或处理时限。记录按页读取，可继续加载历史回执。</view>
+    <view wx:if="{{reportReceiptsError}}" class="report-receipts-empty" aria-live="polite">
+      <view>{{reportReceiptsError}}</view>
+      <button class="state-retry" bindtap="retryReportReceipts" aria-label="重新读取社区举报回执">重新读取回执</button>
+    </view>
     <view wx:elif="{{!reportReceipts.length}}" class="report-receipts-empty">还没有社区举报回执。</view>
     <view wx:else class="report-receipt-list">
       <view wx:for="{{reportReceipts}}" wx:key="id" class="report-receipt-item">
         <text class="report-receipt-status">已收讫</text><text class="report-receipt-time">{{item.submittedAtText}}</text>
       </view>
+      <button wx:if="{{receiptPage < receiptTotalPages}}" class="state-retry" loading="{{loadingMoreReceipts}}" disabled="{{loadingMoreReceipts}}" bindtap="loadMoreReportReceipts">加载更多回执（已显示 {{reportReceipts.length}} / {{receiptTotal}}）</button>
     </view>
   </view>
-  <view wx:if="{{recommendations.length}}" class="related-section">
+  <view wx:if="{{recommendationsState === 'error'}}" class="empty related-section" aria-live="polite">
+    <view>{{recommendationsError}}</view>
+    <button class="state-retry" bindtap="retryRecommendations" aria-label="重新读取相关陪伴者">重新读取相关陪伴者</button>
+  </view>
+  <view wx:elif="{{recommendationsState === 'empty'}}" class="empty related-section">当前没有可展示的相关陪伴者；这不会影响广场内容。</view>
+  <view wx:elif="{{recommendationsState === 'available'}}" class="related-section">
     <view class="section-title">相关陪伴者</view>
-    <view id="community-recommendation-{{item.impressionId}}" class="card recommendation-card" wx:for="{{recommendations}}" wx:key="impressionId" bindtap="openRecommendedCompanion" data-id="{{item.id}}" data-impression-id="{{item.impressionId}}" data-theme-id="{{item.topicIds[0]}}">
+    <view id="community-recommendation-{{item.impressionId}}" class="card recommendation-card" wx:for="{{recommendations}}" wx:key="impressionId" bindtap="openRecommendedCompanion" data-id="{{item.id}}" data-impression-id="{{item.impressionId}}" data-theme-id="{{item.topicIds[0]}}" aria-role="button" aria-label="查看推荐陪伴者：{{item.name}}" tabindex="0">
       <view class="recommendation-row"><view><view class="author">{{item.name}} · {{item.role}}</view><view class="muted">{{item.catalogPriceText}} · {{item.catalogDetailText}} · ★ {{item.rating}}</view><view class="muted">{{item.nextAvailableText}}</view></view><text class="go">查看</text></view>
       <view class="recommendation-reason">{{item.reasonText || '为你推荐'}}</view>
     </view>
   </view>
   <view wx:if="{{loading}}" class="empty">正在加载…</view>
-  <view wx:elif="{{error}}" class="empty">{{error}}</view>
+  <view wx:elif="{{error}}" class="empty">
+    <view>{{error}}</view>
+    <button class="state-retry" bindtap="load" aria-label="重新加载广场">重新加载广场</button>
+  </view>
   <view wx:elif="{{!posts.length}}" class="empty">广场还很安静，发第一条内容吧。</view>
   <view class="card" wx:for="{{posts}}" wx:key="id">
     <view class="row"><text class="author">{{item.authorName}}</text><text class="muted">{{item.kind === 'femaleRequest' ? '需求' : '自荐'}}</text></view>
@@ -36,4 +48,5 @@
       <button class="report" loading="{{reportingPostId === item.id}}" bindtap="reportPost" data-id="{{item.id}}">举报</button>
     </view>
   </view>
+  <button wx:if="{{postPage < postTotalPages}}" class="state-retry" loading="{{loadingMorePosts}}" disabled="{{loadingMorePosts}}" bindtap="loadMorePosts">加载更多广场内容（已显示 {{posts.length}} / {{postTotal}}）</button>
 </view>

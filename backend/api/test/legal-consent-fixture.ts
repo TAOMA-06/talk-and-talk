@@ -4,9 +4,9 @@ export async function grantCurrentLegalConsent(prisma: PrismaService, userId: st
   return prisma.legalConsentReceipt.create({
     data: {
       userId,
-      version: "2.0-2026-07-20",
-      privacyVersion: "2.0-2026-07-20",
-      termsVersion: "2.0-2026-07-20",
+      version: "2.2-2026-08-01",
+      privacyVersion: "2.2-2026-08-01",
+      termsVersion: "2.2-2026-08-01",
       privacyAccepted: true,
       termsAccepted: true,
       adultConfirmed: true,

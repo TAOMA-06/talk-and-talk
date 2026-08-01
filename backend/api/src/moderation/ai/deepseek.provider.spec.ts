@@ -1,69 +1,29 @@
-import { ConfigService } from "@nestjs/config";
-
 import { DeepSeekAIProvider } from "./deepseek.provider";
 
-describe("DeepSeekAIProvider", () => {
-  const config = {
-    get: jest.fn((key: string, fallback?: unknown) => ({
-      DEEPSEEK_API_KEY: "test-key",
-      DEEPSEEK_URL: "https://moderation.example",
-      DEEPSEEK_MODEL: "review-model-v1"
-    } as Record<string, unknown>)[key] ?? fallback)
-  } as unknown as ConfigService;
-  const metrics = { recordAiFailure: jest.fn() } as any;
-  let provider: DeepSeekAIProvider;
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-    provider = new DeepSeekAIProvider(config, metrics);
-  });
-
+describe("DeepSeekAIProvider privacy boundary", () => {
   afterEach(() => {
     jest.restoreAllMocks();
   });
 
-  it("accepts only a complete, bounded classifier response", async () => {
-    jest.spyOn(global, "fetch").mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        choices: [{ message: { content: JSON.stringify({
-          score: 0.7,
-          reasons: ["疑似隐私索取"],
-          categories: ["privacy"]
-        }) } }]
-      })
-    } as Response);
+  it.each([
+    "今天有点难过，想找人聊聊",
+    "我最近在吃抗抑郁药",
+    "我不想活了",
+    "这是我的手机号 13800138000",
+    "我的名字是小林",
+    "普通问候"
+  ])("never transmits user-authored text to the generic DeepSeek service: %s", async (text) => {
+    const fetchSpy = jest.spyOn(global, "fetch");
+    const provider = new DeepSeekAIProvider();
 
-    await expect(provider.moderate("请发我地址")).resolves.toEqual({
-      score: 0.7,
-      reasons: ["疑似隐私索取"],
-      categories: ["privacy"],
-      provider: "deepseek",
-      providerVersion: "review-model-v1",
-      available: true
-    });
-    expect(metrics.recordAiFailure).not.toHaveBeenCalled();
-  });
-
-  it("marks malformed or out-of-range model output unavailable instead of defaulting safe", async () => {
-    jest.spyOn(global, "fetch").mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        choices: [{ message: { content: JSON.stringify({
-          score: 1.5,
-          reasons: [],
-          categories: ["invented-category"]
-        }) } }]
-      })
-    } as Response);
-
-    await expect(provider.moderate("普通内容")).resolves.toEqual({
+    await expect(provider.moderate(text)).resolves.toEqual({
       score: 0.05,
       reasons: [],
       categories: [],
       provider: "deepseek",
-      available: false
+      available: false,
+      skippedForPrivacy: true
     });
-    expect(metrics.recordAiFailure).toHaveBeenCalledTimes(1);
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

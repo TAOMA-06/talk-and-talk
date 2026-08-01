@@ -47,15 +47,18 @@ describe("CommunityService", () => {
   it("lists only the caller's private report receipt ids and submission times", async () => {
     const createdAt = new Date("2026-07-21T01:00:00.000Z");
     prisma.communityPostReport.findMany.mockResolvedValue([{ id: "receipt-1", createdAt }]);
+    prisma.communityPostReport.count.mockResolvedValue(1);
 
     await expect(service.listMyReportReceipts("reporter-1")).resolves.toEqual({
-      items: [{ id: "receipt-1", submittedAt: createdAt.toISOString(), status: "received" }]
+      items: [{ id: "receipt-1", submittedAt: createdAt.toISOString(), status: "received" }],
+      pagination: { page: 1, pageSize: 20, total: 1, totalPages: 1 }
     });
     expect(prisma.communityPostReport.findMany).toHaveBeenCalledWith({
       where: { reporterUserId: "reporter-1" },
       select: { id: true, createdAt: true },
-      orderBy: { createdAt: "desc" },
-      take: 50
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      skip: 0,
+      take: 20
     });
   });
 

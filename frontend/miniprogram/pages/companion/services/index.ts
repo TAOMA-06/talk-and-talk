@@ -16,6 +16,8 @@ type DisplayOffering = OwnServiceOffering & {
 
 const DURATION_OPTIONS = [30, 60, 90, 120, 150, 180, 210, 240];
 const MAX_TOPIC_COUNT = 6;
+const SERVICE_OFFERING_PAGE_SIZE = 20;
+const MAX_SERVICE_OFFERINGS = 50;
 
 function formatCny(priceCents: number): string {
   const yuan = priceCents / 100;
@@ -55,6 +57,7 @@ function errorMessage(error: unknown, fallback: string): string {
     SERVICE_OFFERING_CONTENT_REQUIRES_REVISION: "服务标题或介绍未通过公开内容审核，请修改后再保存。",
     INVALID_SERVICE_OFFERING_DURATION: "服务时长需为 30 至 240 分钟之间的半小时档位。",
     INVALID_SERVICE_OFFERING_PRICE: "价格应在 ¥1.00 至 ¥20,000.00 之间。",
+    SERVICE_OFFERING_LIMIT_REACHED: "每位陪伴者最多保留 50 项服务，请编辑或复用现有商品。",
     SERVICE_OFFERING_NOT_FOUND: "该服务商品已不存在或不属于当前账号，请刷新后重试。"
   };
   return (apiError.code && messages[apiError.code]) || apiError.message || fallback;
@@ -66,7 +69,14 @@ Page({
     accessState: "loading" as AccessState,
     loadError: "",
     offerings: [] as DisplayOffering[],
+    offeringPage: 1,
+    offeringTotalPages: 1,
+    offeringTotal: 0,
+    offeringsLoadingMore: false,
+    offeringsLoadMoreError: "",
     topicChoices: [] as TopicChoice[],
+    topicsState: "loading" as "loading" | "available" | "empty" | "error",
+    topicsError: "",
     durationOptions: DURATION_OPTIONS,
     editorVisible: false,
     editingId: "",
@@ -86,17 +96,26 @@ Page({
   onShow() { void this.load(); },
   onPullDownRefresh() { void this.load(true); },
   async load(stopRefresh = false) {
-    this.setData({ loading: true, accessState: "loading", loadError: "" });
+    this.setData({ loading: true, accessState: "loading", loadError: "", topicsState: "loading", topicsError: "" });
     try {
       await ensureSession();
       const [catalog, topics] = await Promise.all([
-        api.ownServiceOfferings(),
-        api.recommendationTopics().catch(() => ({ items: [] as RecommendationTopic[] }))
+        api.ownServiceOfferings({ page: 1, pageSize: SERVICE_OFFERING_PAGE_SIZE }),
+        api.recommendationTopics()
+          .then((response) => ({ ...response, available: true }))
+          .catch(() => ({ items: [] as RecommendationTopic[], available: false }))
       ]);
       const availableTopics = topics.items || [];
       this.setData({
         offerings: displayOfferings(catalog.items || [], availableTopics),
+        offeringPage: catalog.pagination.page,
+        offeringTotalPages: catalog.pagination.totalPages,
+        offeringTotal: catalog.pagination.total,
+        offeringsLoadingMore: false,
+        offeringsLoadMoreError: "",
         topicChoices: topicChoices(availableTopics, this.data.formTopicIds),
+        topicsState: topics.available ? (availableTopics.length ? "available" : "empty") : "error",
+        topicsError: topics.available ? "" : "服务主题暂时无法读取；这不代表平台没有主题，保存时不会擅自清除已有主题。",
         loading: false,
         accessState: "ready"
       });
@@ -113,8 +132,59 @@ Page({
     }
   },
   retry() { void this.load(); },
+  async loadMoreOfferings() {
+    if (this.data.offeringsLoadingMore || this.data.offeringPage >= this.data.offeringTotalPages) return;
+    const page = this.data.offeringPage + 1;
+    this.setData({ offeringsLoadingMore: true, offeringsLoadMoreError: "" });
+    try {
+      const response = await api.ownServiceOfferings({ page, pageSize: SERVICE_OFFERING_PAGE_SIZE });
+      const byId = new Map<string, OwnServiceOffering>(
+        this.data.offerings.map((item) => [item.id, item])
+      );
+      (response.items || []).forEach((item) => byId.set(item.id, item));
+      this.setData({
+        offerings: displayOfferings([...byId.values()], this.data.topicChoices),
+        offeringPage: response.pagination.page,
+        offeringTotalPages: response.pagination.totalPages,
+        offeringTotal: response.pagination.total,
+        offeringsLoadMoreError: ""
+      });
+    } catch (error) {
+      this.setData({
+        offeringsLoadMoreError: errorMessage(
+          error,
+          "更多服务商品暂时无法读取；已加载商品仍保留。"
+        )
+      });
+    } finally {
+      this.setData({ offeringsLoadingMore: false });
+    }
+  },
+  async retryTopics() {
+    if (this.data.topicsState === "loading") return;
+    this.setData({ topicsState: "loading", topicsError: "" });
+    try {
+      const response = await api.recommendationTopics();
+      const topics = response.items || [];
+      this.setData({
+        topicChoices: topicChoices(topics, this.data.formTopicIds),
+        topicsState: topics.length ? "available" : "empty",
+        topicsError: ""
+      });
+    } catch {
+      this.setData({
+        topicChoices: [],
+        topicsState: "error",
+        topicsError: "服务主题暂时无法读取；这不代表平台没有主题，保存时不会擅自清除已有主题。"
+      });
+    }
+  },
   openAvailabilityWindows() { wx.navigateTo({ url: "/pages/companion/availability/index" }); },
   openCreate() {
+    if (this.data.offeringTotal >= MAX_SERVICE_OFFERINGS) {
+      wx.showToast({ title: `每位陪伴者最多保留 ${MAX_SERVICE_OFFERINGS} 项服务，请编辑现有商品`, icon: "none" });
+      return;
+    }
     const highestSortOrder = this.data.offerings.reduce((highest, item) => Math.max(highest, item.sortOrder), 0);
     this.setData({
       editorVisible: true,
@@ -255,6 +325,10 @@ Page({
     const currentIndex = this.data.offerings.findIndex((item) => item.id === id);
     const nextIndex = currentIndex + direction;
     if (this.data.reorderingId || currentIndex < 0 || nextIndex < 0 || nextIndex >= this.data.offerings.length) return;
+    if (this.data.offerings.length < this.data.offeringTotal) {
+      wx.showToast({ title: "请先加载全部服务商品，再调整整体展示顺序", icon: "none" });
+      return;
+    }
 
     const reordered = [...this.data.offerings];
     const [moved] = reordered.splice(currentIndex, 1);

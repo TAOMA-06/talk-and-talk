@@ -15,20 +15,32 @@ describe("PaymentsService", () => {
     companionAvailabilityWindow: {
       findFirst: jest.fn()
     },
+    companionCommercialProfile: {
+      findUnique: jest.fn()
+    },
     paymentTransaction: {
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       findMany: jest.fn(),
       updateMany: jest.fn(),
       create: jest.fn()
     },
     refundTransaction: {
+      count: jest.fn(),
       findUnique: jest.fn(),
       findFirst: jest.fn(),
       findMany: jest.fn(),
       update: jest.fn(),
       updateMany: jest.fn()
     },
+    cashLedgerEntry: {
+      createMany: jest.fn()
+    },
+    invoiceRequest: {
+      findFirst: jest.fn()
+    },
     supportTicket: { findUnique: jest.fn() },
+    customerAdultEligibility: { findFirst: jest.fn() },
     $queryRaw: jest.fn(),
     $transaction: jest.fn()
   } as any;
@@ -86,6 +98,7 @@ describe("PaymentsService", () => {
     scheduledAt: new Date(Date.now() + 60 * 60_000),
     companionConfirmedAt: new Date(),
     companion: {
+      ownerUserId: "companion-user-1",
       owner: {
         accountStatus: "active",
         profile: { isVerified: true }
@@ -95,6 +108,9 @@ describe("PaymentsService", () => {
     paidAt: null,
     cancelledAt: null,
     completedAt: null,
+    refundPolicyVersionSnapshot: "2026.08-v1",
+    refundRequestWindowHoursSnapshot: 72,
+    refundRequestDeadlineAt: null,
     createdAt: new Date("2026-07-09T00:00:00.000Z"),
     updatedAt: new Date("2026-07-09T00:00:00.000Z")
   };
@@ -108,6 +124,7 @@ describe("PaymentsService", () => {
     status: "initiated",
     prepayId: "mock_prepay_T100",
     transactionId: null as string | null,
+    providerPaidAt: null as Date | null,
     expiresAt: new Date(Date.now() + 10 * 60_000),
     createdAt: new Date(),
     order: { ...baseOrder }
@@ -118,6 +135,25 @@ describe("PaymentsService", () => {
     prisma.order.findUnique.mockResolvedValue(baseOrder);
     prisma.paymentTransaction.findUnique.mockResolvedValue({ orderId: "o1" });
     prisma.paymentTransaction.updateMany.mockResolvedValue({ count: 1 });
+    prisma.invoiceRequest.findFirst.mockResolvedValue(null);
+    prisma.refundTransaction.count.mockResolvedValue(0);
+    prisma.companionCommercialProfile.findUnique.mockResolvedValue({
+      status: "verified",
+      adultEligibilityVerdict: "adult",
+      adultEligibilityVerifiedAt: new Date(Date.now() - 24 * 60 * 60_000),
+      adultEligibilityValidUntil: new Date(Date.now() + 180 * 24 * 60 * 60_000)
+    });
+    prisma.customerAdultEligibility.findFirst.mockResolvedValue({
+      id: "adult-u1",
+      userId: "u1",
+      status: "adult",
+      verificationMethod: "externalProvider",
+      submittedById: "u1",
+      submittedAt: new Date(),
+      reviewedById: "supply-2",
+      verifiedAt: new Date(Date.now() - 60_000),
+      validUntil: new Date(Date.now() + 24 * 60 * 60_000)
+    });
     service = new PaymentsService(prisma, config, ordersService, wechat, notifications, audit, metrics);
   });
 
@@ -149,6 +185,26 @@ describe("PaymentsService", () => {
     expect(ensurePlatformCertificates).toHaveBeenCalledTimes(1);
   });
 
+  it("uses a deterministic createdAt plus id ordering for the latest payment", async () => {
+    prisma.order.findUnique.mockResolvedValue({ ...baseOrder, status: "paid" });
+    prisma.paymentTransaction.findFirst.mockResolvedValueOnce({
+      ...basePayment,
+      id: "payment-z",
+      status: "success",
+      providerPaidAt: new Date("2026-07-31T02:20:30.000Z")
+    });
+    jest.spyOn(service as any, "refundIfServiceWindowExpired").mockResolvedValue(undefined);
+
+    await expect(service.syncPayment("u1", "o1")).resolves.toMatchObject({
+      code: "SUCCESS",
+      data: { alreadyProcessed: true }
+    });
+    expect(prisma.paymentTransaction.findFirst).toHaveBeenCalledWith({
+      where: { orderId: "o1", status: { in: ["initiated", "success"] } },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }]
+    });
+  });
+
   it("rejects a new completed-order refund after the immutable request window closes", async () => {
     const completedAt = new Date(Date.now() - 100 * 60 * 60_000);
     const db = {
@@ -157,8 +213,9 @@ describe("PaymentsService", () => {
         ...baseOrder,
         status: "completed",
         completedAt,
-        refundRequestDeadlineAt: new Date(Date.now() - 60_000)
+        refundRequestDeadlineAt: new Date(completedAt.getTime() + 72 * 60 * 60_000)
       }) },
+      invoiceRequest: { findFirst: jest.fn().mockResolvedValue(null) },
       refundTransaction: { findFirst: jest.fn().mockResolvedValue(null) }
     };
     prisma.$transaction.mockImplementation(async (fn: any) => fn(db));
@@ -167,6 +224,54 @@ describe("PaymentsService", () => {
       code: "REFUND_REQUEST_WINDOW_CLOSED",
       status: HttpStatus.CONFLICT
     });
+  });
+
+  it("fails closed instead of reconstructing a completed refund deadline from current config", async () => {
+    const completedAt = new Date(Date.now() - 2 * 60 * 60_000);
+    const db = {
+      $queryRaw: jest.fn(),
+      order: { findUnique: jest.fn().mockResolvedValue({
+        ...baseOrder,
+        status: "completed",
+        completedAt,
+        refundPolicyVersionSnapshot: null,
+        refundRequestWindowHoursSnapshot: null,
+        refundRequestDeadlineAt: null
+      }) },
+      invoiceRequest: { findFirst: jest.fn().mockResolvedValue(null) },
+      refundTransaction: { findFirst: jest.fn().mockResolvedValue(null) }
+    };
+    prisma.$transaction.mockImplementation(async (fn: any) => fn(db));
+
+    await expect(service.requestRefund("u1", "o1", "request"))
+      .rejects.toMatchObject({
+        code: "REFUND_POLICY_SNAPSHOT_INVALID",
+        status: HttpStatus.SERVICE_UNAVAILABLE
+      });
+    expect(config.get).not.toHaveBeenCalledWith("REFUND_REQUEST_WINDOW_HOURS");
+  });
+
+  it("blocks a new refund until an issued invoice is voided or a pending request is rejected", async () => {
+    prisma.$transaction.mockImplementation(async (fn: any) => fn(prisma));
+    prisma.order.findUnique.mockResolvedValue({
+      ...baseOrder,
+      status: "paid",
+      companion: { ownerUserId: "u-companion" }
+    });
+    prisma.invoiceRequest.findFirst.mockResolvedValue({
+      id: "invoice-1",
+      status: "issued"
+    });
+
+    await expect(service.requestRefund("u1", "o1", "申请退款")).rejects.toMatchObject({
+      code: "REFUND_INVOICE_RECONCILIATION_REQUIRED",
+      status: HttpStatus.CONFLICT,
+      details: {
+        invoiceRequestId: "invoice-1",
+        invoiceStatus: "issued"
+      }
+    });
+    expect(prisma.refundTransaction.findFirst).not.toHaveBeenCalled();
   });
 
   it("does not let a customer resubmit a failed provider refund", async () => {
@@ -212,6 +317,7 @@ describe("PaymentsService", () => {
     const db = {
       $queryRaw: jest.fn().mockResolvedValue([]),
       order: { findUnique: jest.fn().mockResolvedValue(order) },
+      invoiceRequest: { findFirst: jest.fn().mockResolvedValue(null) },
       refundTransaction: {
         findFirst: jest.fn().mockResolvedValue(null),
         create: jest.fn().mockResolvedValue(refund)
@@ -254,6 +360,7 @@ describe("PaymentsService", () => {
     const db = {
       $queryRaw: jest.fn().mockResolvedValue([]),
       order: { findUnique: jest.fn().mockResolvedValue(order) },
+      invoiceRequest: { findFirst: jest.fn().mockResolvedValue(null) },
       refundTransaction: { findFirst: jest.fn().mockResolvedValue(existingRefund) },
       companionEarning: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) }
     } as any;
@@ -283,7 +390,9 @@ describe("PaymentsService", () => {
     jest.spyOn(wechat, "queryRefund").mockResolvedValueOnce({
       outRefundNo: "R-other",
       refundId: "wx-refund-other",
-      status: "SUCCESS"
+      status: "SUCCESS",
+      acceptedTime: "2026-07-31T08:00:00.000Z",
+      successTime: "2026-07-31T08:30:00.000Z"
     });
 
     await expect(service.syncRefund("u1", "o1")).rejects.toMatchObject({
@@ -313,19 +422,98 @@ describe("PaymentsService", () => {
     jest.spyOn(wechat, "queryRefund").mockResolvedValueOnce({
       outRefundNo: "R-stale",
       refundId: "wx-refund-stale",
-      status: "SUCCESS"
+      status: "SUCCESS",
+      acceptedTime: "2026-07-31T08:00:00.000Z",
+      successTime: "2026-07-31T08:30:00.000Z"
     });
     const apply = jest.spyOn(service as any, "applyRefundResult").mockResolvedValue(undefined);
 
     await expect(service.syncRefundForAdmin("admin-1", "r-stale")).resolves.toEqual(expect.objectContaining({
       refund: expect.objectContaining({ id: "r-stale", status: "success" })
     }));
-    expect(apply).toHaveBeenCalledWith("r-stale", "SUCCESS", "wx-refund-stale", true);
+    expect(apply).toHaveBeenCalledWith(
+      "r-stale",
+      "SUCCESS",
+      "wx-refund-stale",
+      "2026-07-31T08:00:00.000Z",
+      "2026-07-31T08:30:00.000Z",
+      true
+    );
     expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({
       actorId: "admin-1",
+      subjectUserIds: ["u1", "companion-user-1"],
       action: "refund.provider_sync_requested",
       resourceId: "r-stale"
     }));
+  });
+
+  it("stores the provider refund acceptance time as an exact immutable financial fact", async () => {
+    const refundUpdate = jest.fn().mockResolvedValue({});
+    prisma.refundTransaction.findUnique.mockResolvedValueOnce({ orderId: "o1" });
+    prisma.$transaction.mockImplementation(async (fn: any) => fn({
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      refundTransaction: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "r-provider-time",
+          orderId: "o1",
+          status: "processing",
+          providerRefundAcceptedAt: null,
+          providerRefundSucceededAt: null,
+          providerRefundId: null,
+          providerQueryAttempts: 0,
+          amountCents: 3_900,
+          order: { ...baseOrder, status: "paid" }
+        }),
+        update: refundUpdate
+      },
+      cashLedgerEntry: { createMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      order: { update: jest.fn().mockResolvedValue({}) }
+    }));
+    jest.spyOn(service as any, "voidEarningForRefund").mockResolvedValue(null);
+    jest.spyOn(service as any, "enqueueTransactionalNotification").mockResolvedValue(undefined);
+
+    await expect((service as any).applyRefundResult(
+      "r-provider-time",
+      "SUCCESS",
+      "wx-refund-provider-time",
+      "2026-07-31T11:05:30+08:00",
+      "2026-07-31T11:35:30+08:00"
+    )).resolves.toBeUndefined();
+
+    expect(refundUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "r-provider-time" },
+      data: expect.objectContaining({
+        status: "success",
+        providerRefundId: "wx-refund-provider-time",
+        providerRefundAcceptedAt: new Date("2026-07-31T03:05:30.000Z"),
+        providerRefundSucceededAt: new Date("2026-07-31T03:35:30.000Z")
+      })
+    }));
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actorId: "system",
+        subjectUserIds: ["u1", "companion-user-1"],
+        action: "refund.succeeded",
+        resourceId: "r-provider-time",
+        metadata: expect.objectContaining({ userId: "u1", companionId: "c1" })
+      }),
+      expect.anything()
+    );
+  });
+
+  it("fails closed when a successful provider refund has no acceptance timestamp", async () => {
+    await expect((service as any).applyRefundResult(
+      "r-provider-time",
+      "SUCCESS",
+      "wx-refund-provider-time",
+      null,
+      "2026-07-31T11:35:30+08:00"
+    )).rejects.toMatchObject({
+      code: "WECHAT_REFUND_ACCEPTED_TIME_INVALID",
+      status: HttpStatus.BAD_GATEWAY
+    });
+    expect(prisma.refundTransaction.findUnique).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
   it("recovers pending and authoritatively absent processing refunds with the same refund id", async () => {
@@ -339,7 +527,7 @@ describe("PaymentsService", () => {
         status: "processing",
         nextReconcileAt: dueAt
       }]);
-    prisma.refundTransaction.updateMany.mockResolvedValue({ count: 1 });
+    prisma.refundTransaction.updateMany.mockReset().mockResolvedValue({ count: 1 });
     prisma.refundTransaction.findUnique.mockResolvedValue({
       id: "r-processing",
       outRefundNo: "R-processing",
@@ -350,7 +538,9 @@ describe("PaymentsService", () => {
     jest.spyOn(wechat, "queryRefund").mockResolvedValueOnce({
       outRefundNo: "R-processing",
       refundId: "",
-      status: "NOTEXIST"
+      status: "NOTEXIST",
+      acceptedTime: null,
+      successTime: null
     });
     const submit = jest.spyOn(service as any, "submitRefundToWechat").mockResolvedValue({});
 
@@ -415,7 +605,9 @@ describe("PaymentsService", () => {
     jest.spyOn(wechat, "queryRefund").mockResolvedValueOnce({
       outRefundNo: "R-other",
       refundId: "wx-other",
-      status: "SUCCESS"
+      status: "SUCCESS",
+      acceptedTime: "2026-07-31T08:00:00.000Z",
+      successTime: "2026-07-31T08:30:00.000Z"
     });
 
     await expect(service.reconcileStaleRefunds(1)).resolves.toEqual({
@@ -480,6 +672,7 @@ describe("PaymentsService", () => {
     const db = {
       $queryRaw: jest.fn(),
       order: { findUnique: jest.fn().mockResolvedValue(order) },
+      invoiceRequest: { findFirst: jest.fn().mockResolvedValue(null) },
       supportTicket: { findUnique: jest.fn().mockResolvedValue({
         id: "ticket-1",
         orderId: "o1",
@@ -512,9 +705,180 @@ describe("PaymentsService", () => {
         status: "pendingReview",
         initiatedById: "admin-1",
         supportTicketId: "ticket-1",
-        exceptionReasonCode: "SUPPORT_APPROVED_AFTER_WINDOW"
+        exceptionReasonCode: "SUPPORT_APPROVED_AFTER_WINDOW",
+        reviewDueAt: expect.any(Date),
+        resolutionDueAt: expect.any(Date)
       })
     }));
+  });
+
+  it("claims an active refund under a single durable owner before financial action", async () => {
+    const createdAt = new Date(Date.now() - 60_000);
+    const reviewDueAt = new Date(Date.now() + 23 * 60 * 60_000);
+    const resolutionDueAt = new Date(Date.now() + 71 * 60 * 60_000);
+    const current = {
+      id: "refund-claim-1",
+      orderId: "o1",
+      outRefundNo: "R-CLAIM-1",
+      amountCents: 3900,
+      status: "pendingReview",
+      reason: "申请退款",
+      providerRefundId: null,
+      reviewNote: null,
+      failureReason: null,
+      providerQueryAttempts: 0,
+      nextReconcileAt: null,
+      assignedToUserId: null,
+      assignedAt: null,
+      reviewDueAt,
+      resolutionDueAt,
+      createdAt,
+      updatedAt: createdAt,
+      order: { ...baseOrder, status: "completed" }
+    };
+    const db = {
+      $queryRaw: jest.fn(),
+      refundTransaction: {
+        findUnique: jest.fn().mockResolvedValue(current),
+        update: jest.fn().mockImplementation(({ data }: any) => ({
+          ...current,
+          ...data,
+          updatedAt: new Date()
+        }))
+      }
+    } as any;
+    prisma.$transaction.mockImplementation(async (fn: any) => fn(db));
+
+    const result = await service.claimRefund("finance-1", current.id);
+
+    expect(db.refundTransaction.update).toHaveBeenCalledWith({
+      where: { id: current.id },
+      data: {
+        assignedToUserId: "finance-1",
+        assignedAt: expect.any(Date)
+      },
+      include: {
+        order: {
+          include: { companion: { select: { ownerUserId: true } } }
+        }
+      }
+    });
+    expect(result.refund).toEqual(expect.objectContaining({
+      id: current.id,
+      reviewDueAt: reviewDueAt.toISOString(),
+      resolutionDueAt: resolutionDueAt.toISOString()
+    }));
+    expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({
+      subjectUserIds: ["u1", "companion-user-1"],
+      action: "refund.claimed",
+      resourceId: current.id
+    }), db);
+  });
+
+  it("fails closed when another operator already owns the refund", async () => {
+    const db = {
+      $queryRaw: jest.fn(),
+      refundTransaction: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "refund-claim-2",
+          status: "pendingReview",
+          assignedToUserId: "finance-other",
+          assignedAt: new Date()
+        }),
+        update: jest.fn()
+      }
+    } as any;
+    prisma.$transaction.mockImplementation(async (fn: any) => fn(db));
+
+    await expect(service.claimRefund("finance-1", "refund-claim-2")).rejects.toMatchObject({
+      code: "REFUND_ALREADY_ASSIGNED",
+      status: HttpStatus.CONFLICT
+    });
+    expect(db.refundTransaction.update).not.toHaveBeenCalled();
+  });
+
+  it("surfaces the current owner and overdue SLA stage in the refund queue", async () => {
+    const createdAt = new Date(Date.now() - 4 * 24 * 60 * 60_000);
+    prisma.refundTransaction.findMany.mockResolvedValue([{
+      id: "refund-overdue-1",
+      orderId: "o1",
+      outRefundNo: "R-OVERDUE-1",
+      amountCents: 3900,
+      status: "pendingReview",
+      reason: "申请退款",
+      providerRefundId: null,
+      reviewNote: null,
+      failureReason: null,
+      providerQueryAttempts: 0,
+      nextReconcileAt: null,
+      assignedToUserId: "finance-1",
+      assignedAt: new Date(Date.now() - 3 * 24 * 60 * 60_000),
+      assignedTo: { id: "finance-1", profile: { displayName: "财务一号" } },
+      reviewDueAt: new Date(Date.now() - 3 * 24 * 60 * 60_000),
+      resolutionDueAt: new Date(Date.now() - 60_000),
+      createdAt,
+      updatedAt: new Date(),
+      order: { ...baseOrder, status: "completed" },
+      payment: { outTradeNo: "T100" }
+    }]);
+    prisma.refundTransaction.count.mockResolvedValue(51);
+
+    const result = await service.listRefundsAwaitingReview(2, 25, "pendingReview");
+
+    expect(result.items[0]).toEqual(expect.objectContaining({
+      assignedToUserId: "finance-1",
+      assignedTo: { id: "finance-1", displayName: "财务一号" },
+      sla: expect.objectContaining({
+        overdue: true,
+        overdueStage: "resolution"
+      })
+    }));
+    expect(result.pagination).toEqual({ page: 2, pageSize: 25, total: 51, totalPages: 3 });
+    expect(prisma.refundTransaction.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        AND: expect.arrayContaining([expect.objectContaining({ status: "pendingReview" })])
+      }),
+      skip: 25,
+      take: 25,
+      orderBy: expect.arrayContaining([{ id: "asc" }])
+    }));
+    expect(prisma.refundTransaction.count).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        AND: expect.arrayContaining([expect.objectContaining({ status: "pendingReview" })])
+      })
+    });
+  });
+
+  it("rejects a support refund when the locked ticket is assigned to another operator", async () => {
+    const db = {
+      $queryRaw: jest.fn(),
+      order: { findUnique: jest.fn().mockResolvedValue({ ...baseOrder, status: "completed" }) },
+      invoiceRequest: { findFirst: jest.fn().mockResolvedValue(null) },
+      supportTicket: { findUnique: jest.fn().mockResolvedValue({
+        id: "ticket-1",
+        orderId: "o1",
+        userId: "u1",
+        status: "inProgress",
+        assignedToUserId: "support-2"
+      }) },
+      refundTransaction: {
+        findFirst: jest.fn(),
+        create: jest.fn()
+      }
+    } as any;
+    prisma.$transaction.mockImplementation(async (fn: any) => fn(db));
+
+    await expect(service.requestRefund(
+      "u1",
+      "o1",
+      "履约争议复核后同意退款",
+      { actorId: "support-1", requestId: "ticket-1", reasonCode: "SUPPORT_APPROVED_AFTER_WINDOW" }
+    )).rejects.toMatchObject({
+      code: "SUPPORT_TICKET_ASSIGNEE_REQUIRED",
+      status: HttpStatus.FORBIDDEN
+    });
+    expect(db.refundTransaction.findFirst).not.toHaveBeenCalled();
+    expect(db.refundTransaction.create).not.toHaveBeenCalled();
   });
 
   it("requires a different administrator to review a staff-initiated refund", async () => {
@@ -525,6 +889,7 @@ describe("PaymentsService", () => {
           id: "refund-support-1",
           status: "pendingReview",
           initiatedById: "admin-1",
+          assignedToUserId: "admin-1",
           order: { id: "o1" }
         })
       }
@@ -533,6 +898,28 @@ describe("PaymentsService", () => {
 
     await expect(service.approveRefund("admin-1", "refund-support-1"))
       .rejects.toMatchObject({ code: "REFUND_SECOND_REVIEW_REQUIRED", status: HttpStatus.FORBIDDEN });
+  });
+
+  it("does not let finance overturn a final attendance refund decision", async () => {
+    const db = {
+      $queryRaw: jest.fn(),
+      refundTransaction: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "refund-attendance-1",
+          status: "pendingReview",
+          initiatedById: "support-1",
+          assignedToUserId: "finance-2",
+          exceptionReasonCode: "ATTENDANCE_DISPUTE_DECISION",
+          order: { id: "o1", userId: "u1" }
+        }),
+        update: jest.fn()
+      }
+    } as any;
+    prisma.$transaction.mockImplementation(async (fn: any) => fn(db));
+
+    await expect(service.rejectRefund("finance-2", "refund-attendance-1", "不同意案件结论"))
+      .rejects.toMatchObject({ code: "ATTENDANCE_REFUND_DECISION_FINAL", status: HttpStatus.CONFLICT });
+    expect(db.refundTransaction.update).not.toHaveBeenCalled();
   });
 
   it("refuses the mock payment callback whenever the active provider is real", async () => {
@@ -578,6 +965,7 @@ describe("PaymentsService", () => {
   });
 
   it("fulfills mock notify: paying -> paid and activates conversation once", async () => {
+    const paymentUpdate = jest.fn().mockResolvedValue({});
     prisma.$transaction.mockImplementation(async (fn: any) => {
       const payment = {
         ...basePayment,
@@ -588,7 +976,7 @@ describe("PaymentsService", () => {
         $queryRaw: jest.fn().mockResolvedValue([]),
         paymentTransaction: {
           findUnique: jest.fn().mockResolvedValue(payment),
-          update: jest.fn().mockResolvedValue({})
+          update: paymentUpdate
         },
         conversation: {
           findUnique: jest.fn().mockResolvedValue(null),
@@ -600,7 +988,8 @@ describe("PaymentsService", () => {
         },
         order: {
           update: jest.fn().mockResolvedValue({})
-        }
+        },
+        cashLedgerEntry: { createMany: jest.fn().mockResolvedValue({ count: 1 }) }
       };
       return fn(db);
     });
@@ -613,6 +1002,7 @@ describe("PaymentsService", () => {
         out_trade_no: "T100",
         transaction_id: "wx_txn_1",
         trade_state: "SUCCESS",
+        success_time: "2026-07-31T10:20:30+08:00",
         amount: { total: 3900, currency: "CNY" }
       })
     );
@@ -621,11 +1011,21 @@ describe("PaymentsService", () => {
     expect(result.data.alreadyProcessed).toBe(false);
     expect(result.data.orderStatus).toBe("paid");
     expect(result.data.conversationCreated).toBe(true);
+    expect(paymentUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "p1" },
+      data: expect.objectContaining({
+        status: "success",
+        transactionId: "wx_txn_1",
+        providerPaidAt: new Date("2026-07-31T02:20:30.000Z")
+      })
+    }));
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({
-        actorId: "u1",
+        actorId: "system",
+        subjectUserIds: ["u1", "companion-user-1"],
         action: "payment.fulfilled",
-        resourceId: "o1"
+        resourceId: "o1",
+        metadata: expect.objectContaining({ userId: "u1", companionId: "c1" })
       }),
       expect.anything()
     );
@@ -636,6 +1036,24 @@ describe("PaymentsService", () => {
       "订单已支付，平台内沟通已开启。",
       { orderId: "o1", status: "paid" }
     );
+  });
+
+  it("fails closed when a successful provider payment has no immutable provider timestamp", async () => {
+    await expect((service as any).fulfillPayment({
+      appId: "wx-mini-app",
+      mchId: "1900000000",
+      outTradeNo: "T100",
+      transactionId: "wx_txn_1",
+      tradeState: "SUCCESS",
+      successTime: null,
+      amountCents: 3_900,
+      currency: "CNY",
+      raw: {}
+    })).rejects.toMatchObject({
+      code: "WECHAT_PAYMENT_SUCCESS_TIME_INVALID",
+      status: HttpStatus.BAD_GATEWAY
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
   it("is idempotent on duplicate notify", async () => {
@@ -658,7 +1076,8 @@ describe("PaymentsService", () => {
           update: jest.fn()
         },
         message: { create: jest.fn() },
-        order: { update: jest.fn() }
+        order: { update: jest.fn() },
+        cashLedgerEntry: { createMany: jest.fn().mockResolvedValue({ count: 0 }) }
       };
       return fn(db);
     });
@@ -759,6 +1178,8 @@ describe("PaymentsService", () => {
   it("rejects a transaction id that conflicts with the local payment binding", async () => {
     prisma.$transaction.mockImplementation(async (fn: any) => fn({
       $queryRaw: jest.fn().mockResolvedValue([]),
+      customerAdultEligibility: prisma.customerAdultEligibility,
+      companionCommercialProfile: prisma.companionCommercialProfile,
       paymentTransaction: {
         findUnique: jest.fn()
           .mockResolvedValueOnce({ ...basePayment, transactionId: "wx_original_txn" })
@@ -838,6 +1259,8 @@ describe("PaymentsService", () => {
     prisma.authIdentity.findFirst.mockResolvedValue({ providerId: "openid-1" });
     prisma.$transaction.mockImplementation(async (fn: any) => fn({
       $queryRaw: jest.fn().mockResolvedValue([]),
+      customerAdultEligibility: prisma.customerAdultEligibility,
+      companionCommercialProfile: prisma.companionCommercialProfile,
       paymentTransaction: {
         findFirst: jest.fn().mockResolvedValue(null),
         create: jest.fn().mockResolvedValue({ id: "p2", outTradeNo: "T200", status: "initiated" })
@@ -855,10 +1278,42 @@ describe("PaymentsService", () => {
     expect(result.payment.wechatAppParams).toBeUndefined();
   });
 
+  it("does not create or reuse a payable prepay while adult verification is pending", async () => {
+    const createPayment = jest.fn();
+    prisma.customerAdultEligibility.findFirst.mockResolvedValue({
+      id: "adult-pending",
+      userId: "u1",
+      status: "pending",
+      verificationMethod: "externalProvider",
+      submittedById: "u1",
+      submittedAt: new Date(),
+      reviewedById: null,
+      verifiedAt: null,
+      validUntil: null
+    });
+    prisma.$transaction.mockImplementation(async (fn: any) => fn({
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      customerAdultEligibility: prisma.customerAdultEligibility,
+      companionCommercialProfile: prisma.companionCommercialProfile,
+      paymentTransaction: { findFirst: jest.fn(), create: createPayment },
+      order: { findUnique: jest.fn().mockResolvedValue({ ...baseOrder, status: "pending" }) }
+    }));
+    const providerCreate = jest.spyOn(wechat, "createAppPrepay");
+
+    await expect(service.prepay("u1", "o1", "app")).rejects.toMatchObject({
+      code: "CUSTOMER_ADULT_ELIGIBILITY_PENDING",
+      status: HttpStatus.CONFLICT
+    });
+    expect(createPayment).not.toHaveBeenCalled();
+    expect(providerCreate).not.toHaveBeenCalled();
+  });
+
   it("creates Native Pay parameters for a web checkout", async () => {
     const pendingOrder = { ...baseOrder, status: "pending" };
     prisma.$transaction.mockImplementation(async (fn: any) => fn({
       $queryRaw: jest.fn().mockResolvedValue([]),
+      customerAdultEligibility: prisma.customerAdultEligibility,
+      companionCommercialProfile: prisma.companionCommercialProfile,
       paymentTransaction: {
         findFirst: jest.fn().mockResolvedValue(null),
         create: jest.fn().mockResolvedValue({ id: "p-native", outTradeNo: "T-native", status: "initiated" })
@@ -888,6 +1343,8 @@ describe("PaymentsService", () => {
     const createPayment = jest.fn();
     prisma.$transaction.mockImplementation(async (fn: any) => fn({
       $queryRaw: jest.fn().mockResolvedValue([]),
+      customerAdultEligibility: prisma.customerAdultEligibility,
+      companionCommercialProfile: prisma.companionCommercialProfile,
       paymentTransaction: {
         findFirst: jest.fn().mockResolvedValue(null),
         create: createPayment
@@ -925,6 +1382,8 @@ describe("PaymentsService", () => {
     });
     prisma.$transaction.mockImplementationOnce(async (fn: any) => fn({
       $queryRaw: jest.fn().mockResolvedValue([]),
+      customerAdultEligibility: prisma.customerAdultEligibility,
+      companionCommercialProfile: prisma.companionCommercialProfile,
       paymentTransaction: {
         findFirst: jest.fn().mockResolvedValue(null),
         create: createLocal
@@ -959,6 +1418,8 @@ describe("PaymentsService", () => {
     const createSpy = jest.spyOn(wechat, "createMiniProgramPrepay");
     prisma.$transaction.mockImplementation(async (fn: any) => fn({
       $queryRaw: jest.fn().mockResolvedValue([]),
+      customerAdultEligibility: prisma.customerAdultEligibility,
+      companionCommercialProfile: prisma.companionCommercialProfile,
       paymentTransaction: {
         findFirst: jest.fn().mockResolvedValue({
           ...basePayment,
@@ -989,6 +1450,8 @@ describe("PaymentsService", () => {
       transactionCount += 1;
       return fn({
       $queryRaw: jest.fn().mockResolvedValue([]),
+      customerAdultEligibility: prisma.customerAdultEligibility,
+      companionCommercialProfile: prisma.companionCommercialProfile,
       paymentTransaction: {
         findFirst: jest.fn().mockResolvedValue(transactionCount === 1 ? {
             ...basePayment,
@@ -1034,6 +1497,7 @@ describe("PaymentsService", () => {
         tradeState: "SUCCESS",
         amountCents: 3900,
         currency: "CNY",
+        successTime: "2026-07-31T08:30:00.000Z",
         raw: {}
       })
       .mockResolvedValueOnce({
@@ -1044,6 +1508,7 @@ describe("PaymentsService", () => {
         tradeState: "NOTEXIST",
         amountCents: 0,
         currency: "",
+        successTime: null,
         raw: {}
       });
     const fulfill = jest.spyOn(service as any, "fulfillPayment").mockResolvedValue({ data: { orderId: "o-paid" } });
@@ -1076,6 +1541,7 @@ describe("PaymentsService", () => {
       tradeState: "REFUND",
       amountCents: 3900,
       currency: "CNY",
+      successTime: null,
       raw: {}
     });
     const close = jest.spyOn(wechat, "closePayment");
@@ -1095,8 +1561,11 @@ describe("PaymentsService", () => {
       $queryRaw: jest.fn()
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
         .mockResolvedValueOnce([{ id: "o-conflict" }])
         .mockResolvedValueOnce([]),
+      customerAdultEligibility: prisma.customerAdultEligibility,
+      companionCommercialProfile: prisma.companionCommercialProfile,
       order: {
         findUnique: jest.fn()
           .mockResolvedValueOnce({ ...baseOrder, status: "pending" })
@@ -1135,8 +1604,11 @@ describe("PaymentsService", () => {
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
         .mockResolvedValueOnce([{ id: "o-conflict" }])
         .mockResolvedValueOnce([]),
+      customerAdultEligibility: prisma.customerAdultEligibility,
+      companionCommercialProfile: prisma.companionCommercialProfile,
       companionAvailabilityWindow: {
         findFirst: jest.fn().mockResolvedValue({
           id: "window-1", companionId: "c1", startsAt: structuredOrder.availabilityWindowStartsAtSnapshot,
@@ -1163,6 +1635,8 @@ describe("PaymentsService", () => {
     const createSpy = jest.spyOn(wechat, "createAppPrepay");
     prisma.$transaction.mockImplementation(async (fn: any) => fn({
       $queryRaw: jest.fn().mockResolvedValue([]),
+      customerAdultEligibility: prisma.customerAdultEligibility,
+      companionCommercialProfile: prisma.companionCommercialProfile,
       order: {
         findUnique: jest.fn().mockResolvedValue({
           ...baseOrder,

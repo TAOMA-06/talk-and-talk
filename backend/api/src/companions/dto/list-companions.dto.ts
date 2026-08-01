@@ -35,6 +35,25 @@ export class ListCompanionsQueryDto {
   @IsString()
   tag?: string;
 
+  /** Exact, customer-selected language from the public profile. */
+  @IsOptional()
+  @Transform(({ value }) => typeof value === "string" ? value.trim().replace(/\s+/g, " ") : value)
+  @IsString()
+  @MinLength(1)
+  @MaxLength(40)
+  language?: string;
+
+  /**
+   * Exact customer-selected specialty / interaction style from the public
+   * profile. This never inspects private applications, review notes or KYC.
+   */
+  @IsOptional()
+  @Transform(({ value }) => typeof value === "string" ? value.trim().replace(/\s+/g, " ") : value)
+  @IsString()
+  @MinLength(1)
+  @MaxLength(40)
+  specialty?: string;
+
   /**
    * A short, explicitly submitted public-catalog keyword. It is normalized at
    * the edge and is never persisted as a user preference or behavior signal.

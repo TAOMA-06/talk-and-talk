@@ -1,6 +1,37 @@
 .profile { text-align: center; }
 .avatar { display: flex; width: 120rpx; height: 120rpx; margin: 0 auto 18rpx; align-items: center; justify-content: center; border-radius: 50%; background: #f5dce2; color: #a43f5c; font-size: 38rpx; font-weight: 700; }
 .bio { margin: 20rpx 0; text-align: left; line-height: 1.7; }
+.public-profile-section { margin-top: 24rpx; padding: 24rpx; border: 1rpx solid #eadfe2; border-radius: 20rpx; background: #fffdfb; text-align: left; }
+.public-profile-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20rpx; }
+.public-profile-kicker { color: #a84661; font-size: 20rpx; font-weight: 800; letter-spacing: 3rpx; }
+.public-profile-title { margin-top: 6rpx; color: #463239; font-size: 31rpx; font-weight: 800; }
+.public-profile-safe { flex: 0 0 auto; padding: 7rpx 10rpx; border-radius: 8rpx; background: #f1f5f7; color: #617581; font-size: 19rpx; }
+.public-profile-metrics { display: flex; gap: 12rpx; margin-top: 20rpx; }
+.public-profile-metric { flex: 1; min-width: 0; padding: 16rpx; border-radius: 12rpx; background: #f7f1ef; }
+.public-profile-metric-value { color: #5f3d49; font-size: 25rpx; font-weight: 800; }
+.public-profile-metric-label { margin-top: 5rpx; color: #987b84; font-size: 20rpx; }
+.public-profile-group { margin-top: 20rpx; }
+.public-profile-label { color: #604851; font-size: 23rpx; font-weight: 800; }
+.public-profile-chips { display: flex; flex-wrap: wrap; gap: 10rpx; margin-top: 10rpx; }
+.public-profile-chip { padding: 7rpx 13rpx; border-radius: 999rpx; background: #edf4f7; color: #496574; font-size: 22rpx; }
+.public-profile-chip-accent { background: #f8e8ed; color: #8d4057; }
+.public-profile-copy, .public-profile-empty { margin-top: 8rpx; color: #715c63; font-size: 23rpx; line-height: 1.65; }
+.public-profile-empty { color: #9a858c; }
+.boundary-list { margin-top: 9rpx; }
+.boundary-item { display: flex; gap: 9rpx; margin-top: 6rpx; color: #67545b; font-size: 23rpx; line-height: 1.55; }
+.boundary-marker { color: #4f7b68; font-weight: 800; }
+.public-status-grid { display: flex; gap: 12rpx; margin-top: 22rpx; }
+.public-status-card { flex: 1; min-width: 0; padding: 16rpx; border-left: 5rpx solid #a77a45; background: #fbf6ed; }
+.public-status-card.is-current { border-left-color: #4f7b68; background: #f0f7f3; }
+.public-status-title { color: #5d474e; font-size: 23rpx; font-weight: 800; }
+.public-status-detail { margin-top: 7rpx; color: #7e6a70; font-size: 20rpx; line-height: 1.55; }
+.voice-intro-card { display: flex; gap: 14rpx; margin-top: 16rpx; padding: 16rpx; border: 1rpx solid #e6dadd; border-radius: 12rpx; background: #f8f5f5; }
+.voice-intro-card.is-approved { border-color: #cddce5; background: #f2f7fa; }
+.voice-intro-icon { display: flex; width: 46rpx; height: 46rpx; flex: 0 0 46rpx; align-items: center; justify-content: center; border-radius: 50%; background: #e8dce0; color: #805566; font-size: 20rpx; font-weight: 800; }
+.voice-intro-card.is-approved .voice-intro-icon { background: #d9e9f1; color: #496b7d; }
+.voice-intro-copy { min-width: 0; flex: 1; }
+.voice-intro-title { color: #554047; font-size: 23rpx; font-weight: 800; }
+.voice-intro-note { margin-top: 5rpx; color: #806e74; font-size: 20rpx; line-height: 1.5; }
 .trust-section { margin-top: 24rpx; padding: 18rpx 0 2rpx; border-top: 1rpx solid #eadce0; text-align: left; }
 .trust-heading { display: flex; justify-content: space-between; gap: 16rpx; color: #704a58; font-size: 24rpx; font-weight: 700; letter-spacing: 2rpx; }
 .trust-heading text:last-child { color: #ab8c96; font-size: 21rpx; letter-spacing: 1rpx; }
@@ -17,6 +48,15 @@
 .favorite-toggle::after { border: 0; }
 .favorite-toggle-saved { color: #315d7c; }
 .favorite-privacy { margin-top: 7rpx; color: #668096; font-size: 22rpx; line-height: 1.55; }
+.recommendation-control { margin-top: 14rpx; padding: 15rpx 18rpx 14rpx; border: 1rpx solid #e2d5c5; border-left: 7rpx solid #9a7145; background: #fcf8f1; text-align: left; }
+.recommendation-control-excluded { border-color: #d7d9dc; border-left-color: #71767d; background: #f5f6f7; }
+.recommendation-control-unavailable { border-color: #e1d6d8; border-left-color: #977a82; background: #faf7f8; }
+.recommendation-toggle { width: 100%; min-height: auto; margin: 0; padding: 0; background: transparent; color: #765431; font-size: 26rpx; font-weight: 700; line-height: 1.55; text-align: left; }
+.recommendation-control-excluded .recommendation-toggle { color: #555d65; }
+.recommendation-toggle::after { border: 0; }
+.recommendation-privacy { margin-top: 7rpx; color: #7d6a54; font-size: 22rpx; line-height: 1.55; }
+.recommendation-control-excluded .recommendation-privacy { color: #737a81; }
+.recommendation-unavailable-title { color: #755e65; font-size: 25rpx; font-weight: 700; }
 .rebooking-notice { margin-top: 22rpx; padding: 16rpx 18rpx; border-left: 6rpx solid #55748f; background: #f3f7fa; text-align: left; }
 .rebooking-notice-heading { display: flex; justify-content: space-between; gap: 16rpx; color: #405e78; font-size: 24rpx; font-weight: 700; letter-spacing: 2rpx; }
 .rebooking-notice-heading text:last-child { color: #738da3; font-size: 21rpx; letter-spacing: 1rpx; }
@@ -36,7 +76,20 @@
 .service-meta { margin-top: 8rpx; color: #92707a; font-size: 24rpx; }
 .service-description { margin-top: 10rpx; color: #654b52; font-size: 24rpx; line-height: 1.55; }
 .service-state { margin-top: 18rpx; color: #8d7078; font-size: 25rpx; line-height: 1.5; }
+.service-catalog-pagination { margin-top: 16rpx; color: #927880; font-size: 22rpx; text-align: center; }
+.service-catalog-pagination-error { margin-top: 12rpx; color: #a53c55; font-size: 23rpx; line-height: 1.5; text-align: center; }
+.service-catalog-load-more { width: 100%; margin: 14rpx 0 0; border: 1rpx solid #e1c8cf; background: #fff; color: #9b3f59; font-size: 24rpx; }
+.service-catalog-load-more::after { border: 0; }
 .booking-summary { margin-top: 18rpx; color: #7a4857; font-size: 25rpx; }
+.service-intent-section { margin-top: 22rpx; padding: 24rpx; border: 1rpx solid #ecdce0; border-radius: 18rpx; background: #fffdfb; text-align: left; }
+.service-intent-note { margin-top: 12rpx; color: #876f76; font-size: 23rpx; line-height: 1.55; }
+.service-intent-list { margin-top: 14rpx; }
+.service-intent-option { display: flex; align-items: flex-start; gap: 16rpx; margin-top: 10rpx; padding: 17rpx 16rpx; border: 2rpx solid #eadde0; border-radius: 14rpx; background: #fff; }
+.service-intent-option.is-selected { border-color: #b94a68; background: #fff1f4; }
+.service-intent-copy { min-width: 0; flex: 1; }
+.service-intent-title { color: #4d353c; font-size: 26rpx; font-weight: 700; }
+.service-intent-description { margin-top: 5rpx; color: #806a71; font-size: 22rpx; line-height: 1.5; }
+.booking-intent-summary { padding-left: 16rpx; border-left: 4rpx solid #805d87; }
 .availability-section { margin-top: 22rpx; padding: 24rpx; border: 1rpx solid #f1dfe3; border-radius: 18rpx; background: #fffdfb; text-align: left; }
 .availability-heading { display: flex; align-items: baseline; justify-content: space-between; color: #4d2e37; font-size: 30rpx; font-weight: 700; }
 .availability-timezone { color: #a98790; font-size: 22rpx; font-weight: 400; }
@@ -58,3 +111,28 @@ button { margin-top: 28rpx; }
 .row { display: flex; justify-content: space-between; }
 .rating { color: #b94a68; }
 .review { margin-top: 14rpx; color: #584147; line-height: 1.6; }
+.booking-overlay { position: fixed; z-index: 50; inset: 0; display: flex; box-sizing: border-box; align-items: flex-end; padding: 28rpx; background: rgba(45, 32, 35, 0.58); }
+.booking-confirmation { box-sizing: border-box; width: 100%; max-height: 92vh; overflow-y: auto; padding: 34rpx 28rpx calc(30rpx + env(safe-area-inset-bottom)); border-radius: 30rpx 30rpx 18rpx 18rpx; background: #fffdfc; text-align: left; box-shadow: 0 -18rpx 50rpx rgba(48, 28, 34, 0.18); }
+.confirmation-kicker { color: #a84661; font-size: 21rpx; font-weight: 800; letter-spacing: 3rpx; }
+.confirmation-title { margin: 9rpx 0 24rpx; color: #402c32; font-size: 38rpx; font-weight: 800; }
+.confirmation-row { display: flex; justify-content: space-between; gap: 24rpx; padding: 14rpx 0; border-bottom: 1rpx solid #f0e4e7; color: #715760; font-size: 24rpx; line-height: 1.55; }
+.confirmation-row text:first-child { flex: 0 0 118rpx; color: #997b84; }
+.confirmation-row text:last-child { flex: 1; color: #4d353c; font-weight: 600; text-align: right; }
+.confirmation-row.total text:last-child { color: #b34462; font-size: 31rpx; font-weight: 800; }
+.confirmation-note { margin-top: 20rpx; padding: 18rpx; border-radius: 14rpx; background: #f5f0ed; color: #755f58; font-size: 22rpx; line-height: 1.65; }
+.confirmation-check { width: 100%; margin-top: 14rpx; padding: 18rpx; border: 2rpx solid #e7d7db; border-radius: 14rpx; background: #fff; color: #70565e; font-size: 23rpx; line-height: 1.5; text-align: left; }
+.confirmation-check.checked { border-color: #b94a68; background: #fff1f4; color: #823a50; }
+.confirmation-actions { display: flex; gap: 16rpx; margin-top: 24rpx; }
+.confirmation-cancel, .confirmation-submit { flex: 1; margin: 0; border-radius: 14rpx; font-size: 26rpx; }
+.confirmation-cancel { border: 1rpx solid #ddc5cb; background: #fff; color: #815364; }
+.confirmation-submit { background: #b94a68; color: #fff; }
+.confirmation-submit[disabled] { background: #d9c5ca; color: #fff; }
+.confirmation-check::after, .confirmation-cancel::after, .confirmation-submit::after { border: 0; }
+.favorite-state { padding: 14rpx; background: #f4f2f3; color: #705e64; font-size: 23rpx; line-height: 1.6; }
+.favorite-state-error { border-left: 5rpx solid #b65a6e; background: #fff5f6; color: #8d4858; }
+.favorite-state-retry { width: 100%; margin: 12rpx 0 0; border: 1rpx solid #d6b9c1; background: #fff; color: #8c4056; font-size: 23rpx; }
+.favorite-state-retry::after { border: 0; }
+.emergency-entry { display: flex; align-items: center; justify-content: space-between; gap: 18rpx; margin-bottom: 20rpx; padding: 22rpx 24rpx; border: 2rpx solid #dfb5ac; border-radius: 20rpx; background: #fff7f2; }
+.emergency-title { color: #853e43; font-size: 25rpx; font-weight: 800; }
+.emergency-copy { margin-top: 6rpx; color: #8a6762; font-size: 21rpx; line-height: 1.5; }
+.emergency-arrow { color: #9f4b55; font-size: 42rpx; }

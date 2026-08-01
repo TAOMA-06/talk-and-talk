@@ -14,7 +14,7 @@ import { RecommendationsService } from "./recommendations.service";
 
 @Controller("admin/recommendations")
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles("admin")
+@Roles("operations", "admin")
 export class AdminRecommendationsController {
   constructor(
     private readonly recommendations: RecommendationsService,
@@ -33,9 +33,10 @@ export class AdminRecommendationsController {
     @Param("placement") placement: string,
     @Body() dto: UpdateRecommendationPolicyDto
   ) {
-    const policy = await this.recommendations.updatePolicy(companionId, placement, dto);
+    const { policy, subjectUserId } = await this.recommendations.updatePolicy(companionId, placement, dto);
     await this.audit.record({
       actorId: user.id,
+      subjectUserIds: subjectUserId ? [subjectUserId] : [],
       action: "recommendation.policy.update",
       resourceType: "companionRecommendationPolicy",
       resourceId: policy.id,

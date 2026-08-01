@@ -34,7 +34,9 @@ export class MockMediaStorageProvider implements MediaStorageProvider {
     return `mock://media-read/${encodeURIComponent(input.storageKey)}`;
   }
 
-  async delete(_input: MediaAssetReference): Promise<void> {}
+  async delete(_input: MediaAssetReference): Promise<"deleted"> {
+    return "deleted";
+  }
 }
 
 @Injectable()

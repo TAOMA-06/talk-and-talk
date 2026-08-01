@@ -1,4 +1,6 @@
-import { IsDateString, IsInt, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, MinLength } from "class-validator";
+import { IsDateString, IsIn, IsInt, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, MinLength } from "class-validator";
+
+import { SERVICE_INTENT_CODES, ServiceIntentCode } from "../../common/service-intent-policy";
 
 export class CreateOrderDto {
   @IsString()
@@ -28,6 +30,10 @@ export class CreateOrderDto {
 
   @IsDateString()
   scheduledAt!: string;
+
+  @IsOptional()
+  @IsIn(SERVICE_INTENT_CODES)
+  serviceIntent?: ServiceIntentCode;
 
   @IsOptional()
   @IsUUID()

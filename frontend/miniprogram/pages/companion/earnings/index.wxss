@@ -1,0 +1,30 @@
+.hero { padding: 34rpx 30rpx; border-radius: 28rpx; background: linear-gradient(135deg, #fff, #eaf8ef); box-shadow: 0 10rpx 28rpx rgba(49, 96, 65, 0.08); }
+.eyebrow { color: #34734a; font-size: 24rpx; font-weight: 700; }
+.hero-title { margin-top: 10rpx; color: #234f32; font-size: 40rpx; font-weight: 700; }
+.hero-copy { margin-top: 14rpx; color: #5e7b68; font-size: 25rpx; line-height: 1.6; }
+.source { margin-top: 18rpx; color: #7e9887; font-size: 22rpx; line-height: 1.5; }
+.blocked { margin-top: 18rpx; padding: 18rpx; border-radius: 16rpx; background: #ffeadf; color: #8c4526; font-size: 24rpx; line-height: 1.55; }
+.link { color: #a43f5c; font-weight: 700; }
+.inline-error { margin-top: 20rpx; padding: 18rpx; border-radius: 16rpx; background: #fff0f0; color: #a43f3f; font-size: 24rpx; }
+.section-title { margin: 34rpx 4rpx 16rpx; font-size: 30rpx; font-weight: 700; }
+.empty-card { color: #7b8e80; font-size: 24rpx; line-height: 1.6; }
+.earning-card { display: flex; align-items: flex-start; gap: 16rpx; padding: 24rpx; border: 2rpx solid transparent; }
+.earning-card.selected { border-color: #75b189; background: #fbfffc; }
+.check { width: 36rpx; color: #4f8d63; font-size: 31rpx; font-weight: 700; text-align: center; }
+.earning-main { flex: 1; min-width: 0; }
+.earning-head, .withdrawal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16rpx; }
+.amount { color: #245737; font-size: 32rpx; font-weight: 700; }
+.status { flex: none; padding: 7rpx 12rpx; border-radius: 999rpx; background: #edf4ef; color: #4d7359; font-size: 21rpx; }
+.status-held, .status-card-rejected .status { background: #ffeadf; color: #974b2b; }
+.status-paid, .status-card-paid .status { background: #e4f4ea; color: #2d7547; }
+.meta, .fee, .recipient { margin-top: 10rpx; color: #829287; font-size: 22rpx; line-height: 1.5; word-break: break-all; }
+.hold, .rejection { margin-top: 14rpx; padding: 14rpx; border-radius: 12rpx; background: #fff2df; color: #8d5f21; font-size: 22rpx; line-height: 1.5; }
+.selection-bar { position: sticky; z-index: 5; bottom: 18rpx; display: flex; align-items: center; justify-content: space-between; gap: 20rpx; margin-top: 18rpx; padding: 20rpx 22rpx; border-radius: 22rpx; background: rgba(255, 255, 255, 0.96); box-shadow: 0 8rpx 28rpx rgba(55, 85, 65, 0.14); }
+.selection-label { color: #78907e; font-size: 22rpx; }
+.selection-value { margin-top: 5rpx; color: #245737; font-size: 30rpx; font-weight: 700; }
+.request-button { margin: 0; min-width: 220rpx; }
+.withdrawal-card { padding: 26rpx; }
+.next-step { margin-top: 18rpx; padding: 16rpx; border-radius: 14rpx; background: #f4f7f4; color: #526a59; font-size: 24rpx; line-height: 1.55; }
+.secondary-button { margin-top: 18rpx; background: #eef5f0; color: #3b7650; }
+.empty-title { margin-bottom: 14rpx; color: #4b353a; font-size: 34rpx; font-weight: 700; }
+.retry { margin-top: 28rpx; }

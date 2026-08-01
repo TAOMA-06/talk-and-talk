@@ -126,12 +126,11 @@ Conversations, messages, and moderation cases persist in Postgres.
 
 ## Moderation pipeline
 
-Chat send (`POST /conversations/:id/messages`) and `POST /moderation/check` share the same pipeline:
+Chat send (`POST /conversations/:id/messages`) uses the following privacy-bounded pipeline; the legacy standalone `POST /moderation/check` has moved to the independent review department:
 
 1. **RuleEngine** — private contact, offline meetup, transfers, privacy asks, ads, harassment (with normalization for spaces / `vx` / `加v` / 谐音).
-2. If rule result is `block` + `high` risk → **skip AI**.
-3. Otherwise call the configured **DeepSeek-compatible text review provider**. Development/staging can fall back to rules; production requires credentials and fails closed: chat/community become pending human review, while non-durable public-profile writes return retryable `503 CONTENT_MODERATION_UNAVAILABLE`.
-4. Merge scores with `max(rule, ai)`; `usedAI` is true only when AI returns successfully.
-5. Non-`allow` decisions create `ModerationCase` plus `ModerationEvidence` and `ModerationActionLog(action: created)`.
+2. Explicit private-contact, payment, fraud and other high-risk rules block locally; `selfHarm` and immediate-danger categories retain `critical` priority and the crisis-resource route.
+3. The current provider boundary refuses every user-authored payload. No text, context, account/order identifier or moderation-case identifier is sent to DeepSeek or another external generative-AI service.
+4. Rule matches that require review create `ModerationCase` plus `ModerationEvidence` and `ModerationActionLog(action: created)` for the independent human-review department.
 
-User-facing `safetyMessage` text stays generic (no rule IDs or raw AI dumps). Development and staging may start without an API key and use rules only; production refuses to start without real moderation credentials.
+User-facing `safetyMessage` text stays generic. `EXTERNAL_AI_USER_CONTENT_ENABLED=false` is an explicit production startup and deployment gate, and stale `DEEPSEEK_API_KEY` configuration is rejected. A future external provider requires a new versioned privacy notice and applicable PIA/DPA, region, retention and no-training approval evidence; code cannot replace qualified legal review.

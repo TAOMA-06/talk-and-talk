@@ -1,6 +1,7 @@
 declare const wx: any;
 declare function App(options: any): any;
 declare function Page(options: any): any;
+declare function getApp(): any;
 
 interface MiniProgramPageInstance {
   setData(data: Record<string, unknown>): void;

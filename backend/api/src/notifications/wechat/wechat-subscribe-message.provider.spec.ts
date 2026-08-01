@@ -15,6 +15,7 @@ describe("WeChatSubscribeMessageProvider", () => {
       WECHAT_SUBSCRIBE_TEMPLATES: [{
         key: "availabilityReminder",
         templateId: "tmpl-reminder",
+        page: "pages/profile/index",
         data: { thing1: "{{title}}", thing2: "{{body}}" }
       }],
       WECHAT_MINIPROGRAM_APP_ID: "wx-test-app",
@@ -81,6 +82,48 @@ describe("WeChatSubscribeMessageProvider", () => {
       remoteState: "accepted",
       providerMessageId: "12345"
     });
+  });
+
+  it("routes an availability reminder to its exact companion through an allowlisted page", async () => {
+    const fetchMock = jest.spyOn(global, "fetch")
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "access-token", expires_in: 7200 })
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ errcode: 0 })
+      } as Response);
+    const provider = new WeChatSubscribeMessageProvider(config(), prisma());
+
+    await provider.send({ ...input, data: { companionId: "companion-42", route: "pages/evil/index" } });
+
+    const request = fetchMock.mock.calls[1][1] as RequestInit;
+    expect(JSON.parse(String(request.body))).toEqual(expect.objectContaining({
+      page: "pages/companion/detail?id=companion-42"
+    }));
+  });
+
+  it("ignores arbitrary or malformed page hints and retains the configured safe fallback", async () => {
+    const fetchMock = jest.spyOn(global, "fetch")
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ access_token: "access-token", expires_in: 7200 })
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ errcode: 0 })
+      } as Response);
+    const provider = new WeChatSubscribeMessageProvider(config(), prisma());
+
+    await provider.send({ ...input, data: { route: "pages/evil/index", companionId: "../unsafe" } });
+
+    const request = fetchMock.mock.calls[1][1] as RequestInit;
+    expect(JSON.parse(String(request.body))).toEqual(expect.objectContaining({
+      page: "pages/profile/index"
+    }));
   });
 
   it("marks a post-token network failure as unknown instead of retryable", async () => {

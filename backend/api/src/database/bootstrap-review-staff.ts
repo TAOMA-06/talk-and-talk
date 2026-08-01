@@ -49,7 +49,6 @@ async function main(): Promise<void> {
         data: {
           displayName,
           role,
-          status: "active",
           passwordHash,
           totpSecretCiphertext,
           failedAttempts: 0,

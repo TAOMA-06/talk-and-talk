@@ -1,5 +1,18 @@
 .voice-page { min-height: 100vh; box-sizing: border-box; padding: 48rpx 30rpx; background: linear-gradient(160deg, #fff8f8 0%, #f8e9ed 100%); }
 .voice-native-node { position: fixed; left: -200rpx; top: -200rpx; width: 1rpx; height: 1rpx; opacity: 0; pointer-events: none; }
+.preflight-card { box-sizing: border-box; padding: 42rpx 32rpx; border: 1rpx solid #f0d9df; border-radius: 30rpx; background: rgba(255, 255, 255, 0.97); box-shadow: 0 18rpx 46rpx rgba(111, 51, 69, 0.1); }
+.preflight-title { margin-top: 12rpx; color: #4a343b; font-size: 40rpx; font-weight: 800; }
+.preflight-copy { margin-top: 14rpx; color: #80666f; font-size: 24rpx; line-height: 1.7; }
+.device-status { margin-top: 26rpx; padding: 10rpx 20rpx; border-radius: 16rpx; background: #f7f3f4; }
+.device-status-row { display: flex; justify-content: space-between; gap: 20rpx; padding: 13rpx 0; border-bottom: 1rpx solid #e9dfe2; color: #715b62; font-size: 23rpx; }
+.device-status-row:last-child { border-bottom: 0; }
+.device-status-row text:last-child { text-align: right; }
+.preflight-check { width: 100%; margin-top: 16rpx; padding: 19rpx; border: 2rpx solid #e5d4d9; border-radius: 14rpx; background: #fff; color: #735962; font-size: 23rpx; line-height: 1.55; text-align: left; }
+.preflight-check.checked { border-color: #b94a68; background: #fff0f3; color: #873a51; }
+.trtc-boundary { margin-top: 14rpx; padding: 16rpx 18rpx; border-radius: 14rpx; background: #f7f3f4; color: #745d65; font-size: 22rpx; line-height: 1.65; }
+.disclosure-link { margin-top: 8rpx; padding: 0; background: transparent; color: #914158; font-size: 22rpx; line-height: 60rpx; text-decoration: underline; }
+.enter-button { width: 100%; margin-top: 24rpx; }
+.preflight-back { width: 100%; margin-top: 12rpx; }
 .voice-card { min-height: 760rpx; box-sizing: border-box; padding: 56rpx 36rpx; border: 1rpx solid #f0d9df; border-radius: 32rpx; background: rgba(255, 255, 255, 0.96); text-align: center; box-shadow: 0 20rpx 48rpx rgba(111, 51, 69, 0.12); }
 .eyebrow { color: #a34a63; font-size: 24rpx; font-weight: 700; letter-spacing: 3rpx; }
 .participant-avatar { display: flex; align-items: center; justify-content: center; width: 150rpx; height: 150rpx; margin: 50rpx auto 22rpx; border-radius: 50%; background: #f6dce3; color: #9b3f58; font-size: 42rpx; font-weight: 700; }
@@ -10,11 +23,20 @@
 .state-error { background: #fff0ee; color: #a34a45; }
 .state-ended { background: #f2f0f1; color: #75666b; }
 .service-end { margin-top: 20rpx; color: #8a6972; font-size: 24rpx; }
+.remaining-time, .network-status { display: flex; justify-content: space-between; gap: 20rpx; margin-top: 14rpx; padding: 16rpx 18rpx; border-radius: 14rpx; background: #f6f1f2; color: #705a61; font-size: 23rpx; }
+.remaining-time text:last-child { color: #a33f5b; font-size: 28rpx; font-weight: 800; }
+.network-good { color: #34745b !important; }
+.network-warning { color: #916b36 !important; }
+.network-error { color: #a43f4c !important; }
 .boundary { margin-top: 48rpx; padding-top: 30rpx; border-top: 1rpx solid #f0e2e5; color: #856871; font-size: 23rpx; line-height: 1.7; text-align: left; }
 .voice-actions { display: flex; gap: 20rpx; margin-top: 58rpx; }
 .primary, .secondary, .danger { flex: 1; margin-top: 58rpx; border-radius: 16rpx; font-size: 27rpx; line-height: 88rpx; }
 .voice-actions .secondary, .voice-actions .danger { margin-top: 0; }
+.safety-actions { display: flex; gap: 18rpx; margin-top: 18rpx; }
+.safety-report, .support-link { flex: 1; margin: 0; border-radius: 14rpx; font-size: 23rpx; line-height: 76rpx; }
+.safety-report { background: #913d51; color: #fff; }
+.support-link { border: 1rpx solid #ddc5cb; background: #fff; color: #88475a; }
 .primary { background: #b94a68; color: #fff; }
 .secondary { border: 1rpx solid #e3c5cc; background: #fff7f8; color: #914158; }
 .danger { background: #a84458; color: #fff; }
-.primary::after, .secondary::after, .danger::after { border: 0; }
+.primary::after, .secondary::after, .danger::after, .preflight-check::after, .safety-report::after, .support-link::after, .disclosure-link::after { border: 0; }

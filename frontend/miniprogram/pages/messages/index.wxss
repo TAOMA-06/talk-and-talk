@@ -1,4 +1,12 @@
+.message-hero { margin-bottom: 18rpx; padding: 28rpx; border-radius: 26rpx; background: linear-gradient(135deg, #fff0f3, #edf5f7); }
+.hero-title { color: #49343a; font-size: 36rpx; font-weight: 800; }
+.hero-copy { margin-top: 9rpx; color: #79636a; font-size: 23rpx; line-height: 1.6; }
+.quick-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10rpx; margin-top: 20rpx; }
+.quick-action { padding: 14rpx 8rpx; border-radius: 14rpx; background: rgba(255, 255, 255, 0.88); text-align: center; }
+.quick-value { color: #9f405b; font-size: 26rpx; font-weight: 800; }
+.quick-label { margin-top: 5rpx; color: #846f76; font-size: 19rpx; }
 .safety { margin-bottom: 20rpx; padding: 16rpx; border-radius: 14rpx; background: #fce8ed; color: #9b3d58; font-size: 25rpx; }
+.partial-warning { margin-bottom: 16rpx; padding: 14rpx; border-left: 5rpx solid #b07b49; background: #fff8ed; color: #806548; font-size: 21rpx; line-height: 1.55; }
 .row { display: flex; justify-content: space-between; gap: 16rpx; }
 .conversation-name { display: flex; min-width: 0; align-items: center; gap: 10rpx; }
 .name { font-weight: 700; }
@@ -7,3 +15,11 @@
 .conversation-blocked { background: #f5e7df; color: #8a593d; }
 .conversation-unavailable { background: #f1ece7; color: #806d5f; }
 .preview { margin-top: 14rpx; overflow: hidden; color: #584147; white-space: nowrap; text-overflow: ellipsis; }
+.conversation-footer { display: flex; justify-content: space-between; gap: 16rpx; margin-top: 13rpx; font-size: 21rpx; }
+.unread-badge { padding: 3rpx 10rpx; border-radius: 999rpx; background: #b94a68; color: #fff; }
+.read-state { color: #a18c92; }
+.open-chat { color: #955169; }
+.retry-button { width: 100%; margin-top: 18rpx; border: 1rpx solid #ddc8ce; background: #fff; color: #8f5062; font-size: 23rpx; }
+.retry-button::after { border: 0; }
+.conversation-pagination { margin: 18rpx 0 8rpx; text-align: center; }
+.load-more-error { margin-top: 10rpx; color: #9b4b48; font-size: 21rpx; line-height: 1.5; }

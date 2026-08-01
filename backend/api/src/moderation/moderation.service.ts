@@ -84,6 +84,24 @@ export class ModerationService {
     }
 
     const ai = await this.aiProvider.moderate(text, context);
+    if (ai.skippedForPrivacy) {
+      // Privacy refusal is an intentional local-only route, not an outage. The
+      // local engine has already run, including its critical self-harm and
+      // violence priorities. Never retry this user text against an external
+      // provider or relabel the refusal as a user violation.
+      return {
+        decision: rule.decision,
+        riskLevel: rule.riskLevel,
+        priority: rule.priority,
+        score: rule.score,
+        reasons: rule.reasons,
+        matchedRules: rule.matchedRules,
+        categories: rule.categories,
+        policyVersion: rule.policyVersion,
+        provider: "rule-engine",
+        usedAI: false
+      };
+    }
     if (!ai.available) {
       if (this.config.get<string>("APP_ENV", "development") === "production") {
         // Profile-like writes do not have a durable pending-draft workflow. A
@@ -151,7 +169,7 @@ export class ModerationService {
   }
 
   isAIConfigured(): boolean {
-    return Boolean(this.config.get<string>("DEEPSEEK_API_KEY")?.trim());
+    return false;
   }
 }
 

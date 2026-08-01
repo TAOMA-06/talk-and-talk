@@ -1,7 +1,8 @@
 import { api, ApiError, ensureSession } from "../../utils/api";
+import { handleCustomerAdultEligibilityError } from "../../utils/adult-eligibility-recovery";
 import { CatalogDisplay, withCatalogDisplays } from "../../utils/catalog";
 import {
-  CompanionAvailabilityCandidate, Order, OrderExperienceFeedbackTag, OrderRescheduleRequest, OrderTimelineEvent, RecommendedCompanion
+  CompanionAvailabilityCandidate, Order, OrderExperienceFeedbackTag, OrderRescheduleRequest, OrderTimelineEvent, RecommendedCompanion, SupportTicket
 } from "../../utils/models";
 import { ensurePrivacyAuthorization } from "../../utils/privacy";
 import { flushRecommendationEvents, queueRecommendationEvent, trackRecommendationCardViews } from "../../utils/recommendations";
@@ -87,6 +88,9 @@ type DisplayOrder = Order & {
   canRebook: boolean;
   rebookDescription: string;
   rebookActionText: string;
+  canFindReplacement: boolean;
+  replacementDescription: string;
+  replacementActionText: string;
   amountText: string;
   statusText: string;
   statusExplanation: string;
@@ -121,6 +125,7 @@ type DisplayOrder = Order & {
 type DisplayRecommendation = CatalogDisplay<RecommendedCompanion>;
 
 type OrderViewerRole = "customer" | "companion";
+type ResourceState = "loading" | "available" | "empty" | "error";
 
 type DisplayTimelineItem = {
   id: string;
@@ -163,6 +168,24 @@ type DisplaySupportTicket = {
   orderFacts: DisplayOrderSupportFact[];
   canAddOrderFact: boolean;
 };
+
+function displaySupportTicket(ticket: SupportTicket): DisplaySupportTicket {
+  return {
+    ...ticket,
+    orderFacts: (ticket.orderFacts || []).map((fact) => ({
+      ...fact,
+      createdAtText: formatDateTime(fact.createdAt)
+    })),
+    canAddOrderFact: Boolean(
+      ticket.orderId
+      && ["orderIssue", "refund"].includes(ticket.category)
+      && ["open", "inProgress"].includes(ticket.status)
+      && (ticket.orderFacts || []).length < 10
+    ),
+    statusText: ({ open: "待受理", inProgress: "处理中", resolved: "已处理", closed: "已关闭" } as Record<string, string>)[ticket.status] || ticket.status,
+    updatedAtText: formatDateTime(ticket.updatedAt)
+  };
+}
 
 type RefundPresentation = {
   statusText: string;
@@ -583,16 +606,23 @@ function experienceFeedbackDraftPatch(order: DisplayOrder, draft: Partial<Experi
 
 function rebookingDisplayPatch(order: Order, viewerRole: OrderViewerRole): Pick<DisplayOrder,
   "canRebook" | "rebookDescription" | "rebookActionText"
+  | "canFindReplacement" | "replacementDescription" | "replacementActionText"
 > {
   const serviceOfferingId = typeof order.serviceOfferingId === "string" ? order.serviceOfferingId.trim() : "";
   const serviceTitle = order.serviceOfferingSnapshot?.title?.trim() || "这项服务";
   const canRebook = viewerRole === "customer" && order.status === "completed" && Boolean(serviceOfferingId);
+  const canFindReplacement = viewerRole === "customer" && order.status === "cancelled";
   return {
     canRebook,
     rebookDescription: canRebook
       ? `将带入上次的「${serviceTitle}」，再从当前可约时段中重新选择；价格、服务范围和时长以本页为准。`
       : "",
-    rebookActionText: "回到实时可约日历"
+    rebookActionText: "回到实时可约日历",
+    canFindReplacement,
+    replacementDescription: canFindReplacement
+      ? `如果你仍需要「${serviceTitle}」，可带入本单的主题、服务方式和 ${order.durationMinutes} 分钟需求，重新查看当前可约人选。旧订单、支付和预约时段不会转移。`
+      : "",
+    replacementActionText: "按原需求重新匹配"
   };
 }
 
@@ -1057,6 +1087,31 @@ async function confirmPaymentWithBackend(orderId: string): Promise<boolean> {
 Page({
   data: {
     orders: [] as DisplayOrder[], serviceOrders: [] as DisplayOrder[], supportTickets: [] as DisplaySupportTicket[], followupRecommendations: [] as DisplayRecommendation[],
+    ordersState: "loading" as ResourceState,
+    ordersError: "",
+    customerOrderView: "active" as "active" | "history",
+    customerOrderPage: 1,
+    customerOrderTotalPages: 1,
+    customerOrderTotal: 0,
+    customerOrdersLoadingMore: false,
+    customerOrdersLoadMoreError: "",
+    serviceOrdersState: "loading" as ResourceState,
+    serviceOrdersError: "",
+    serviceOrderView: "active" as "active" | "history",
+    serviceOrderPage: 1,
+    serviceOrderTotalPages: 1,
+    serviceOrderTotal: 0,
+    serviceOrdersLoadingMore: false,
+    serviceOrdersLoadMoreError: "",
+    supportTicketsState: "loading" as ResourceState,
+    supportTicketsError: "",
+    supportTicketPage: 1,
+    supportTicketTotalPages: 1,
+    supportTicketTotal: 0,
+    supportTicketsLoadingMore: false,
+    supportTicketsLoadMoreError: "",
+    recommendationsState: "loading" as ResourceState,
+    recommendationsError: "",
     loading: true, error: "", payingId: "", confirmingGuidelinesId: "", submittingSupportFactId: ""
   },
   stopRecommendationTracking: null as (() => void) | null,
@@ -1076,46 +1131,250 @@ Page({
   onPullDownRefresh() { void this.load(true); },
   async load(stopRefresh = false) {
     this.stopTracking();
-    this.setData({ loading: true, error: "" });
+    this.setData({
+      loading: true,
+      error: "",
+      ordersState: "loading",
+      ordersError: "",
+      serviceOrdersState: "loading",
+      serviceOrdersError: "",
+      supportTicketsState: "loading",
+      supportTicketsError: "",
+      recommendationsState: "loading",
+      recommendationsError: ""
+    });
     try {
       await ensureSession();
-      const [customer, service, support] = await Promise.all([
-        api.orders(),
-        api.serviceOrders().catch(() => ({ items: [] as Order[] })),
-        api.supportTickets().catch(() => ({ items: [] }))
+      await Promise.all([
+        this.loadCustomerOrders(),
+        this.loadServiceOrders(),
+        this.loadSupportTickets()
       ]);
-      const latestCompleted = (customer.items || []).find((order) => order.status === "completed");
-      const recommendations = latestCompleted
-        ? await api.recommendedCompanions({
-            placement: "orderFollowup",
-            themeId: latestCompleted.themeId,
-            pageSize: 4
-          }).catch(() => ({ items: [] as RecommendedCompanion[] }))
-        : { items: [] as RecommendedCompanion[] };
-      this.setData({
-        orders: (customer.items || []).map((order) => displayOrder(order, "customer")),
-        serviceOrders: (service.items || []).map((order) => displayOrder(order, "companion")),
-        supportTickets: (support.items || []).map((ticket) => ({
-          ...ticket,
-          orderFacts: (ticket.orderFacts || []).map((fact) => ({
-            ...fact,
-            createdAtText: formatDateTime(fact.createdAt)
-          })),
-          canAddOrderFact: Boolean(
-            ticket.orderId
-            && ["orderIssue", "refund"].includes(ticket.category)
-            && ["open", "inProgress"].includes(ticket.status)
-            && (ticket.orderFacts || []).length < 10
-          ),
-          statusText: ({ open: "待受理", inProgress: "处理中", resolved: "已处理", closed: "已关闭" } as Record<string, string>)[ticket.status] || ticket.status,
-          updatedAtText: formatDateTime(ticket.updatedAt)
-        })),
-        followupRecommendations: withCatalogDisplays(recommendations.items || []),
-        loading: false
-      });
+      this.setData({ loading: false });
       setTimeout(() => this.startTracking(), 0);
-    } catch (error) { this.setData({ loading: false, error: (error as Error).message || "加载订单失败" }); }
+    } catch (error) {
+      const message = (error as Error).message || "订单中心暂时无法加载";
+      this.setData({
+        loading: false,
+        error: message,
+        orders: [],
+        serviceOrders: [],
+        supportTickets: [],
+        followupRecommendations: [],
+        ordersState: "error",
+        ordersError: message,
+        serviceOrdersState: "error",
+        serviceOrdersError: "登录状态尚未确认，无法读取陪伴者订单。",
+        supportTicketsState: "error",
+        supportTicketsError: "登录状态尚未确认，无法读取客服案件。",
+        recommendationsState: "error",
+        recommendationsError: "登录状态尚未确认，无法读取订单后推荐。"
+      });
+    }
     finally { if (stopRefresh) wx.stopPullDownRefresh(); }
+  },
+  async loadCustomerOrders() {
+    this.setData({ orders: [], ordersState: "loading", ordersError: "" });
+    try {
+      const response = await api.orders({ page: 1, pageSize: 10, view: this.data.customerOrderView });
+      const items = response.items || [];
+      this.setData({
+        orders: items.map((order) => displayOrder(order, "customer")),
+        ordersState: items.length ? "available" : "empty",
+        ordersError: "",
+        customerOrderPage: response.pagination?.page || 1,
+        customerOrderTotalPages: response.pagination?.totalPages || 1,
+        customerOrderTotal: response.pagination?.total || items.length,
+        customerOrdersLoadMoreError: ""
+      });
+      await this.loadFollowupRecommendations(items);
+    } catch {
+      this.setData({
+        orders: [],
+        ordersState: "error",
+        ordersError: "我的预约暂时无法读取。这不代表没有订单，请重新读取后再操作。",
+        followupRecommendations: [],
+        recommendationsState: "error",
+        recommendationsError: "需先成功读取我的预约，才能核对订单后推荐。"
+      });
+    }
+  },
+  async changeCustomerOrderView(event: any) {
+    const view = event.currentTarget?.dataset?.view === "history" ? "history" : "active";
+    if (view === this.data.customerOrderView || this.data.ordersState === "loading") return;
+    this.setData({ customerOrderView: view });
+    await this.loadCustomerOrders();
+  },
+  async loadMoreCustomerOrders() {
+    if (this.data.customerOrdersLoadingMore || this.data.customerOrderPage >= this.data.customerOrderTotalPages) return;
+    const page = this.data.customerOrderPage + 1;
+    this.setData({ customerOrdersLoadingMore: true, customerOrdersLoadMoreError: "" });
+    try {
+      const response = await api.orders({ page, pageSize: 10, view: this.data.customerOrderView });
+      const incoming = (response.items || []).map((order) => displayOrder(order, "customer"));
+      const byId = new Map((this.data.orders as DisplayOrder[]).map((order) => [order.id, order]));
+      incoming.forEach((order) => byId.set(order.id, order));
+      this.setData({
+        orders: [...byId.values()],
+        ordersState: byId.size ? "available" : "empty",
+        customerOrderPage: response.pagination?.page || page,
+        customerOrderTotalPages: response.pagination?.totalPages || page,
+        customerOrderTotal: response.pagination?.total || byId.size,
+        customerOrdersLoadMoreError: ""
+      });
+    } catch (error) {
+      this.setData({ customerOrdersLoadMoreError: (error as Error).message || "更多预约暂时无法读取；已加载订单仍保留。" });
+    } finally {
+      this.setData({ customerOrdersLoadingMore: false });
+    }
+  },
+  async loadFollowupRecommendations(customerOrders?: Order[]) {
+    const source = customerOrders || (this.data.orders as DisplayOrder[]);
+    const latestCompleted = source.find((order) => order.status === "completed");
+    if (!latestCompleted) {
+      this.setData({
+        followupRecommendations: [],
+        recommendationsState: "empty",
+        recommendationsError: ""
+      });
+      return;
+    }
+    this.setData({ followupRecommendations: [], recommendationsState: "loading", recommendationsError: "" });
+    try {
+      const response = await api.recommendedCompanions({
+        placement: "orderFollowup",
+        themeId: latestCompleted.themeId,
+        pageSize: 4
+      });
+      const items = withCatalogDisplays(response.items || []);
+      this.setData({
+        followupRecommendations: items,
+        recommendationsState: items.length ? "available" : "empty",
+        recommendationsError: ""
+      });
+    } catch {
+      this.setData({
+        followupRecommendations: [],
+        recommendationsState: "error",
+        recommendationsError: "订单后推荐暂时无法读取；这不会影响订单、售后或客服状态。"
+      });
+    }
+  },
+  async loadServiceOrders() {
+    this.setData({ serviceOrders: [], serviceOrdersState: "loading", serviceOrdersError: "" });
+    try {
+      const response = await api.serviceOrders({ page: 1, pageSize: 10, view: this.data.serviceOrderView });
+      const items = response.items || [];
+      this.setData({
+        serviceOrders: items.map((order) => displayOrder(order, "companion")),
+        serviceOrdersState: items.length ? "available" : "empty",
+        serviceOrdersError: "",
+        serviceOrderPage: response.pagination?.page || 1,
+        serviceOrderTotalPages: response.pagination?.totalPages || 1,
+        serviceOrderTotal: response.pagination?.total || items.length,
+        serviceOrdersLoadMoreError: ""
+      });
+    } catch {
+      this.setData({
+        serviceOrders: [],
+        serviceOrdersState: "error",
+        serviceOrdersError: "陪伴者待处理订单暂时无法读取。这不代表当前没有待确认或履约订单。"
+      });
+    }
+  },
+  async changeServiceOrderView(event: any) {
+    const view = event.currentTarget?.dataset?.view === "history" ? "history" : "active";
+    if (view === this.data.serviceOrderView || this.data.serviceOrdersState === "loading") return;
+    this.setData({ serviceOrderView: view });
+    await this.loadServiceOrders();
+  },
+  async loadMoreServiceOrders() {
+    if (this.data.serviceOrdersLoadingMore || this.data.serviceOrderPage >= this.data.serviceOrderTotalPages) return;
+    const page = this.data.serviceOrderPage + 1;
+    this.setData({ serviceOrdersLoadingMore: true, serviceOrdersLoadMoreError: "" });
+    try {
+      const response = await api.serviceOrders({ page, pageSize: 10, view: this.data.serviceOrderView });
+      const incoming = (response.items || []).map((order) => displayOrder(order, "companion"));
+      const byId = new Map((this.data.serviceOrders as DisplayOrder[]).map((order) => [order.id, order]));
+      incoming.forEach((order) => byId.set(order.id, order));
+      this.setData({
+        serviceOrders: [...byId.values()],
+        serviceOrdersState: byId.size ? "available" : "empty",
+        serviceOrderPage: response.pagination?.page || page,
+        serviceOrderTotalPages: response.pagination?.totalPages || page,
+        serviceOrderTotal: response.pagination?.total || byId.size,
+        serviceOrdersLoadMoreError: ""
+      });
+    } catch (error) {
+      this.setData({ serviceOrdersLoadMoreError: (error as Error).message || "更多陪伴者订单暂时无法读取；已加载订单仍保留。" });
+    } finally {
+      this.setData({ serviceOrdersLoadingMore: false });
+    }
+  },
+  async loadSupportTickets() {
+    this.setData({ supportTickets: [], supportTicketsState: "loading", supportTicketsError: "" });
+    try {
+      const response = await api.supportTickets({ page: 1, pageSize: 10 });
+      const items = (response.items || []).map(displaySupportTicket);
+      this.setData({
+        supportTickets: items,
+        supportTicketsState: items.length ? "available" : "empty",
+        supportTicketsError: "",
+        supportTicketPage: response.pagination?.page || 1,
+        supportTicketTotalPages: response.pagination?.totalPages || 1,
+        supportTicketTotal: response.pagination?.total || items.length,
+        supportTicketsLoadMoreError: ""
+      });
+    } catch {
+      this.setData({
+        supportTickets: [],
+        supportTicketsState: "error",
+        supportTicketsError: "客服案件暂时无法读取。这不代表案件不存在或已经关闭。"
+      });
+    }
+  },
+  async loadMoreSupportTickets() {
+    if (this.data.supportTicketsLoadingMore || this.data.supportTicketPage >= this.data.supportTicketTotalPages) return;
+    const page = this.data.supportTicketPage + 1;
+    this.setData({ supportTicketsLoadingMore: true, supportTicketsLoadMoreError: "" });
+    try {
+      const response = await api.supportTickets({ page, pageSize: 10 });
+      const incoming = (response.items || []).map(displaySupportTicket);
+      const byId = new Map((this.data.supportTickets as DisplaySupportTicket[]).map((ticket) => [ticket.id, ticket]));
+      incoming.forEach((ticket) => byId.set(ticket.id, ticket));
+      this.setData({
+        supportTickets: [...byId.values()],
+        supportTicketsState: byId.size ? "available" : "empty",
+        supportTicketPage: response.pagination?.page || page,
+        supportTicketTotalPages: response.pagination?.totalPages || page,
+        supportTicketTotal: response.pagination?.total || byId.size,
+        supportTicketsLoadMoreError: ""
+      });
+    } catch (error) {
+      this.setData({ supportTicketsLoadMoreError: (error as Error).message || "更多客服案件暂时无法读取；已加载进度仍保留。" });
+    } finally {
+      this.setData({ supportTicketsLoadingMore: false });
+    }
+  },
+  async retryCustomerOrders() {
+    if (this.data.ordersState === "loading") return;
+    await this.loadCustomerOrders();
+    this.stopTracking();
+    setTimeout(() => this.startTracking(), 0);
+  },
+  async retryServiceOrders() {
+    if (this.data.serviceOrdersState === "loading") return;
+    await this.loadServiceOrders();
+  },
+  async retrySupportTickets() {
+    if (this.data.supportTicketsState === "loading") return;
+    await this.loadSupportTickets();
+  },
+  async retryRecommendations() {
+    if (this.data.recommendationsState === "loading" || this.data.ordersState !== "available") return;
+    await this.loadFollowupRecommendations(this.data.orders as DisplayOrder[]);
+    this.stopTracking();
+    setTimeout(() => this.startTracking(), 0);
   },
   startTracking() {
     if (!this.data.followupRecommendations.length) return;
@@ -1203,6 +1462,13 @@ Page({
         timelineError: "订单进度暂时无法加载，请稍后重试。"
       });
     }
+  },
+  async retryTimeline(event: any) {
+    const id = String(event.currentTarget.dataset.id || "");
+    const context = this.orderContext(id);
+    if (!context || context.order.timelineState === "loading") return;
+    this.patchOrder(id, { timelineOpen: false });
+    await this.toggleTimeline(event);
   },
   async toggleReschedule(event: any) {
     const id = String(event.currentTarget.dataset.id || "");
@@ -1395,6 +1661,10 @@ Page({
       wx.showToast({ title: "改期提议已发送", icon: "success" });
     } catch (error) {
       const apiError = error as ApiError;
+      if (await handleCustomerAdultEligibilityError(
+        apiError,
+        viewerRole === "customer" ? "currentUser" : "otherParticipant"
+      )) return;
       const staleAvailabilityCodes = ["COMPANION_SLOT_UNAVAILABLE", "AVAILABILITY_WINDOW_UNAVAILABLE", "AVAILABILITY_SLOT_INVALID"];
       if (apiError.code === "RESCHEDULE_REQUEST_PENDING" || staleAvailabilityCodes.includes(apiError.code || "")) {
         wx.showToast({ title: rescheduleFailureMessage(apiError), icon: "none" });
@@ -1437,6 +1707,10 @@ Page({
       await this.toggleTimeline({ currentTarget: { dataset: { id } } });
     } catch (error) {
       const apiError = error as ApiError;
+      if (await handleCustomerAdultEligibilityError(
+        apiError,
+        context.viewerRole === "customer" ? "currentUser" : "otherParticipant"
+      )) return;
       const message = rescheduleResponseFailureMessage(apiError);
       const refreshCodes = [
         "RESCHEDULE_REQUEST_EXPIRED",
@@ -1500,7 +1774,11 @@ Page({
           : { title: "支付结果确认中，请稍后刷新订单", icon: "none", duration: 3000 });
       }
       await this.load();
-    } catch (error) { wx.showToast({ title: (error as Error).message || "支付失败", icon: "none" }); }
+    } catch (error) {
+      if (!await handleCustomerAdultEligibilityError(error)) {
+        wx.showToast({ title: (error as Error).message || "支付失败", icon: "none" });
+      }
+    }
     finally { this.setData({ payingId: "" }); }
   },
   async cancel(event: any) {
@@ -1773,6 +2051,29 @@ Page({
     }
     wx.navigateTo({ url: `/pages/chat/index?id=${encodeURIComponent(conversationId)}` });
   },
+  openOrderDetail(event: any) {
+    const id = String(event.currentTarget.dataset.id || "");
+    if (!id) return;
+    wx.navigateTo({ url: `/pages/order/detail?id=${encodeURIComponent(id)}` });
+  },
+  openAttendanceDispute(event: any) {
+    const orderId = String(event.currentTarget.dataset.id || "");
+    const disputeId = String(event.currentTarget.dataset.disputeId || "");
+    if (!orderId && !disputeId) return;
+    const query = disputeId
+      ? `id=${encodeURIComponent(disputeId)}`
+      : `orderId=${encodeURIComponent(orderId)}`;
+    wx.navigateTo({ url: `/pages/order/dispute?${query}` });
+  },
+  openAftercare(event: any) {
+    const id = String(event.currentTarget.dataset.id || "");
+    const context = this.orderContext(id);
+    if (!context || context.viewerRole !== "customer" || !["completed", "refunded"].includes(context.order.status)) {
+      wx.showToast({ title: "服务后页面暂未开放", icon: "none" });
+      return;
+    }
+    wx.navigateTo({ url: `/pages/order/aftercare?orderId=${encodeURIComponent(id)}` });
+  },
   openVoiceRoom(event: any) {
     const id = String(event.currentTarget.dataset.id || "");
     const context = this.orderContext(id);
@@ -1888,22 +2189,7 @@ Page({
     });
   },
   review(event: any) {
-    const orderId = event.currentTarget.dataset.id;
-    wx.showActionSheet({
-      itemList: ["5 星 · 非常满意", "4 星 · 满意", "3 星 · 一般", "2 星 · 不满意", "1 星 · 很不满意"],
-      success: (ratingResult: any) => {
-        const rating = 5 - Number(ratingResult.tapIndex);
-        wx.showModal({
-          title: `${rating} 星评价`, editable: true, placeholderText: "写下真实的服务感受", success: async (contentResult: any) => {
-            if (!contentResult.confirm) return;
-            try {
-              await api.createReview({ orderId, rating, content: contentResult.content?.trim() || "本次服务体验良好" });
-              wx.showToast({ title: "评价已提交", icon: "success" });
-            } catch (error) { wx.showToast({ title: (error as Error).message || "评价失败", icon: "none" }); }
-          }
-        });
-      }
-    });
+    this.openAftercare(event);
   },
   rebook(event: any) {
     const id = String(event.currentTarget.dataset.id || "");
@@ -1924,6 +2210,34 @@ Page({
       "rebook=1"
     ].filter(Boolean).join("&");
     wx.navigateTo({ url: `/pages/companion/detail?${params}` });
+  },
+  findReplacement(event: any) {
+    const id = String(event.currentTarget.dataset.id || "");
+    const context = this.orderContext(id);
+    if (!context || context.viewerRole !== "customer" || !context.order.canFindReplacement) {
+      wx.showToast({ title: "当前订单暂不能发起重新匹配", icon: "none" });
+      return;
+    }
+    const order = context.order;
+    const deliveryMode = order.serviceOfferingSnapshot?.deliveryMode;
+    const scheduledAtMs = Date.parse(order.scheduledAt || "");
+    const availableWithinDays = Number.isFinite(scheduledAtMs)
+      && scheduledAtMs <= Date.now() + 3 * 24 * 60 * 60_000
+      ? 3
+      : undefined;
+    getApp().globalData.discoveryIntent = {
+      topicId: order.themeId || undefined,
+      deliveryMode: deliveryMode === "text" || deliveryMode === "voice" ? deliveryMode : undefined,
+      availableWithinDays,
+      sortBy: "soonestAvailable",
+      recovery: {
+        sourceOrderId: order.id,
+        durationMinutes: order.durationMinutes,
+        serviceTitle: order.serviceOfferingSnapshot?.title?.trim() || "原订单服务",
+        scheduledAt: order.scheduledAt || null
+      }
+    };
+    wx.switchTab({ url: "/pages/discover/index" });
   },
   openRecommendedCompanion(event: any) {
     const { id, impressionId, themeId } = event.currentTarget.dataset;

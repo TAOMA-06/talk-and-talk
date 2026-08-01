@@ -98,6 +98,7 @@ export class ChatRestrictionService {
     } as any);
     await this.audit.record({
       actorId: input.actorId ?? "system",
+      subjectUserIds: [input.userId],
       action: "moderation.chat_restriction_created",
       resourceType: "chat_restriction",
       resourceId: restriction.id,
@@ -153,15 +154,14 @@ export class ChatRestrictionService {
           note: "30 天内已累计三次人工确认违规，需审核员决定是否采用既有全局账号处置。"
         }
       });
-      await db.auditLog.create({
-        data: {
-          actorId,
-          action: "moderation.manual_escalation_required",
-          resourceType: "moderation_case",
-          resourceId: caseId,
-          metadata: { userId, confirmations, windowDays: 30 }
-        }
-      });
+      await this.audit.record({
+        actorId,
+        subjectUserIds: [userId],
+        action: "moderation.manual_escalation_required",
+        resourceType: "moderation_case",
+        resourceId: caseId,
+        metadata: { userId, confirmations, windowDays: 30 }
+      }, db);
     };
     if (database === this.prisma) {
       await this.prisma.$transaction(async (tx) => escalate(tx as any));
@@ -173,13 +173,21 @@ export class ChatRestrictionService {
 
   async liftForCase(caseId: string, actorId: string, note?: string, database: any = this.prisma) {
     const now = new Date();
+    const restrictedSubject = await database.chatRestriction.findFirst({
+      where: { caseId, liftedAt: null, endsAt: { gt: now } },
+      select: { userId: true }
+    } as any);
     const result = await database.chatRestriction.updateMany({
       where: { caseId, liftedAt: null, endsAt: { gt: now } },
       data: { liftedAt: now, liftedByUserId: actorId }
     } as any);
     if (result.count) {
+      if (!restrictedSubject?.userId) {
+        throw new Error("Lifted chat restriction is missing its subject user");
+      }
       await this.audit.record({
         actorId,
+        subjectUserIds: [restrictedSubject.userId],
         action: "moderation.chat_restriction_lifted",
         resourceType: "moderation_case",
         resourceId: caseId,

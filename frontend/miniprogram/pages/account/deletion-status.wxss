@@ -1,0 +1,80 @@
+.unavailable-page {
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: 112rpx 40rpx 56rpx;
+  background: #fffafa;
+  color: #2d2527;
+  text-align: center;
+}
+
+.status-mark {
+  width: 104rpx;
+  height: 104rpx;
+  margin: 0 auto 36rpx;
+  border-radius: 52rpx;
+  background: #f4e6e9;
+  color: #9e405b;
+  font-size: 58rpx;
+  line-height: 104rpx;
+  font-weight: 600;
+}
+
+.title {
+  font-size: 44rpx;
+  line-height: 1.25;
+  font-weight: 650;
+}
+
+.message {
+  margin-top: 24rpx;
+  color: #65575b;
+  font-size: 30rpx;
+  line-height: 1.7;
+}
+
+.privacy-card {
+  margin: 56rpx 0 48rpx;
+  padding: 32rpx;
+  border: 1rpx solid #eadfe2;
+  border-radius: 24rpx;
+  background: #ffffff;
+  text-align: left;
+}
+
+.privacy-title {
+  font-size: 28rpx;
+  font-weight: 600;
+}
+
+.privacy-copy {
+  margin-top: 14rpx;
+  color: #76686c;
+  font-size: 26rpx;
+  line-height: 1.65;
+}
+
+.primary-button,
+.secondary-button {
+  width: 100%;
+  height: 92rpx;
+  margin-top: 20rpx;
+  border-radius: 46rpx;
+  font-size: 30rpx;
+  line-height: 92rpx;
+}
+
+.primary-button {
+  background: #a3435d;
+  color: #ffffff;
+}
+
+.secondary-button {
+  border: 1rpx solid #dfd2d6;
+  background: #ffffff;
+  color: #514448;
+}
+
+.primary-button::after,
+.secondary-button::after {
+  border: 0;
+}

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from "@nestjs/common";
 
 import { AuthenticatedUser } from "../auth/auth.service";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
@@ -9,6 +9,8 @@ import { CreateOrderDto } from "./dto/create-order.dto";
 import { CreateOrderExperienceFeedbackDto } from "./dto/create-order-experience-feedback.dto";
 import { CreateOrderRescheduleRequestDto } from "./dto/create-order-reschedule-request.dto";
 import { CreateRefundDto } from "./dto/create-refund.dto";
+import { ListOrderTimelineDto } from "./dto/list-order-timeline.dto";
+import { ListOrdersDto } from "./dto/list-orders.dto";
 import { PrepayDto } from "./dto/prepay.dto";
 import { OrdersService } from "./orders.service";
 
@@ -33,14 +35,14 @@ export class OrdersController {
 
   @Get()
   @UseGuards(JwtAuthGuard)
-  list(@CurrentUser() user: AuthenticatedUser) {
-    return this.ordersService.list(user.id);
+  list(@CurrentUser() user: AuthenticatedUser, @Query() query: ListOrdersDto) {
+    return this.ordersService.list(user.id, query);
   }
 
   @Get("service")
   @UseGuards(JwtAuthGuard)
-  listService(@CurrentUser() user: AuthenticatedUser) {
-    return this.ordersService.listForCompanion(user.id);
+  listService(@CurrentUser() user: AuthenticatedUser, @Query() query: ListOrdersDto) {
+    return this.ordersService.listForCompanion(user.id, query);
   }
 
   @Get("service/today")
@@ -51,8 +53,12 @@ export class OrdersController {
 
   @Get(":id/timeline")
   @UseGuards(JwtAuthGuard)
-  timeline(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
-    return this.ordersService.timeline(user.id, id);
+  timeline(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id") id: string,
+    @Query() query: ListOrderTimelineDto
+  ) {
+    return this.ordersService.timeline(user.id, id, query);
   }
 
   @Post(":id/voice-room/access")

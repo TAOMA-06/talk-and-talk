@@ -4,11 +4,13 @@ import { randomUUID } from "node:crypto";
 
 import { AuditService } from "../common/audit/audit.service";
 import { AppException } from "../common/errors/app.exception";
+import { assertCurrentCompanionCommercialEligibility } from "../commercial/companion-commercial-eligibility";
 import { MetricsService } from "../metrics/metrics.service";
 import { PrismaService } from "../database/prisma.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { OrdersService } from "../orders/orders.service";
 import { VoiceRoomControlService } from "../voice/voice-room-control.service";
+import { assertCurrentCustomerAdultEligibility } from "../users/customer-adult-eligibility.service";
 import {
   WECHAT_PAY_PROVIDER,
   WeChatNotifyPayload,
@@ -31,7 +33,7 @@ type FulfillPaymentTxResult = {
 type RefundExceptionContext = {
   actorId: string;
   requestId: string;
-  reasonCode: "ACCOUNT_DELETION_SETTLEMENT" | "SUPPORT_APPROVED_AFTER_WINDOW";
+  reasonCode: "ACCOUNT_DELETION_SETTLEMENT" | "SUPPORT_APPROVED_AFTER_WINDOW" | "ATTENDANCE_DISPUTE_DECISION";
 };
 
 const MIN_PREPAY_LEAD_MS = 5 * 60 * 1000;
@@ -51,6 +53,9 @@ const REFUND_QUERY_BACKOFF_MS = [
   2 * 60 * 60 * 1000,
   6 * 60 * 60 * 1000
 ] as const;
+const ORDER_AUDIT_RELATIONS = {
+  companion: { select: { ownerUserId: true } }
+} as const;
 
 @Injectable()
 export class PaymentsService implements OnModuleInit {
@@ -123,12 +128,29 @@ export class PaymentsService implements OnModuleInit {
       });
 
       this.assertOrderCanPrepay(order, userId);
+      await db.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${order.userId} FOR UPDATE`;
+      const eligibilityCheckedAt = new Date();
+      const scheduledServiceEnd = new Date(
+        order.scheduledAt.getTime() + order.durationMinutes * 60_000
+      );
+      await assertCurrentCustomerAdultEligibility(
+        db,
+        order.userId,
+        eligibilityCheckedAt,
+        scheduledServiceEnd
+      );
+      await assertCurrentCompanionCommercialEligibility(
+        db,
+        order.companionId,
+        eligibilityCheckedAt,
+        scheduledServiceEnd
+      );
       this.ordersService.assertVoiceOrderFeatureEnabled(order);
       await this.assertCompanionSlotAvailable(db, order, remotelyClosedPayments);
 
       const existing = await db.paymentTransaction.findFirst({
         where: { orderId, status: "initiated" },
-        orderBy: { createdAt: "desc" }
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }]
       });
       if (existing) {
         const expiresAt = existing.expiresAt instanceof Date
@@ -371,14 +393,17 @@ export class PaymentsService implements OnModuleInit {
     }
 
     const amountCents = body.amountCents ?? payment.amountCents;
+    const successTime = new Date().toISOString();
     const raw = JSON.stringify({
       out_trade_no: payment.outTradeNo,
       transaction_id: body.transactionId ?? `mock_txn_${payment.outTradeNo}`,
       trade_state: "SUCCESS",
+      success_time: successTime,
       amount: { total: amountCents },
       outTradeNo: payment.outTradeNo,
       transactionId: body.transactionId ?? `mock_txn_${payment.outTradeNo}`,
       tradeState: "SUCCESS",
+      successTime,
       amountCents
     });
 
@@ -388,6 +413,7 @@ export class PaymentsService implements OnModuleInit {
       outTradeNo: payment.outTradeNo,
       transactionId: body.transactionId ?? `mock_txn_${payment.outTradeNo}`,
       tradeState: "SUCCESS",
+      successTime,
       amountCents,
       currency: "CNY",
       raw: JSON.parse(raw)
@@ -403,12 +429,12 @@ export class PaymentsService implements OnModuleInit {
     }
     const payment: any = await this.prisma.paymentTransaction.findFirst({
       where: { orderId, status: { in: ["initiated", "success"] } },
-      orderBy: { createdAt: "desc" }
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }]
     } as any);
     if (!payment) {
       throw new AppException("PAYMENT_NOT_FOUND", "Payment not found", HttpStatus.NOT_FOUND);
     }
-    if (payment.status === "success") {
+    if (payment.status === "success" && payment.providerPaidAt) {
       await this.refundIfServiceWindowExpired(orderId);
       return {
         code: "SUCCESS" as const,
@@ -477,6 +503,21 @@ export class PaymentsService implements OnModuleInit {
     });
   }
 
+  async requestAttendanceDisputeRefund(actorId: string, disputeId: string, reason: string) {
+    const dispute: any = await this.prisma.attendanceDispute.findUnique({
+      where: { id: disputeId },
+      include: { order: { select: { userId: true } } }
+    } as any);
+    if (!dispute) {
+      throw new AppException("ATTENDANCE_CASE_NOT_FOUND", "Attendance case not found", HttpStatus.NOT_FOUND);
+    }
+    return this.requestRefund(dispute.order.userId, dispute.orderId, reason, {
+      actorId,
+      requestId: disputeId,
+      reasonCode: "ATTENDANCE_DISPUTE_DECISION"
+    });
+  }
+
   async requestRefund(
     userId: string,
     orderId: string,
@@ -493,6 +534,27 @@ export class PaymentsService implements OnModuleInit {
       if (!order || order.userId !== userId) {
         throw new AppException("ORDER_NOT_FOUND", "Order not found", HttpStatus.NOT_FOUND);
       }
+      const blockingInvoice = await db.invoiceRequest.findFirst({
+        where: {
+          orderId,
+          status: { in: ["submitted", "inReview", "issued"] }
+        },
+        select: { id: true, status: true },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }]
+      });
+      if (blockingInvoice) {
+        throw new AppException(
+          "REFUND_INVOICE_RECONCILIATION_REQUIRED",
+          blockingInvoice.status === "submitted"
+            ? "Cancel the submitted invoice request before starting a refund"
+            : "The invoice request must be rejected or the issued invoice must be voided before a refund can start",
+          HttpStatus.CONFLICT,
+          {
+            invoiceRequestId: blockingInvoice.id,
+            invoiceStatus: blockingInvoice.status
+          }
+        );
+      }
       let supportTicket: any = null;
       if (exceptionContext?.reasonCode === "SUPPORT_APPROVED_AFTER_WINDOW") {
         await db.$queryRaw`SELECT "id" FROM "SupportTicket" WHERE "id" = ${exceptionContext.requestId} FOR UPDATE`;
@@ -507,6 +569,26 @@ export class PaymentsService implements OnModuleInit {
           throw new AppException(
             "SUPPORT_TICKET_ASSIGNEE_REQUIRED",
             "The active assignee of this order-linked ticket must initiate the refund",
+            HttpStatus.FORBIDDEN
+          );
+        }
+      }
+      let attendanceDispute: any = null;
+      if (exceptionContext?.reasonCode === "ATTENDANCE_DISPUTE_DECISION") {
+        await db.$queryRaw`SELECT "id" FROM "AttendanceDispute" WHERE "id" = ${exceptionContext.requestId} FOR UPDATE`;
+        attendanceDispute = await db.attendanceDispute.findUnique({ where: { id: exceptionContext.requestId } });
+        const authorizedFinalReviewer = attendanceDispute?.appealReviewedByUserId
+          ?? attendanceDispute?.decidedByUserId;
+        if (
+          !attendanceDispute
+          || attendanceDispute.orderId !== orderId
+          || attendanceDispute.status !== "final"
+          || attendanceDispute.finalDecision !== "fullRefund"
+          || authorizedFinalReviewer !== exceptionContext.actorId
+        ) {
+          throw new AppException(
+            "ATTENDANCE_FINAL_REFUND_DECISION_REQUIRED",
+            "A final, authorized attendance decision is required before starting a refund",
             HttpStatus.FORBIDDEN
           );
         }
@@ -536,19 +618,21 @@ export class PaymentsService implements OnModuleInit {
       if (!["paid", "inService", "completed"].includes(order.status)) {
         throw new AppException("ORDER_INVALID_STATE", "Order is not eligible for refund", HttpStatus.CONFLICT);
       }
-      if (order.status === "completed" && !exceptionContext) {
-        const refundWindowHours = this.config.get<number>("REFUND_REQUEST_WINDOW_HOURS") ?? 72;
-        const deadline = order.refundRequestDeadlineAt ?? (
-          order.completedAt
-            ? new Date(order.completedAt.getTime() + refundWindowHours * 60 * 60_000)
-            : null
-        );
-        if (!deadline || deadline.getTime() <= Date.now()) {
+      if (order.status === "completed") {
+        const refundPolicy = this.requireCompletedOrderRefundPolicySnapshot(order);
+        const deadline = refundPolicy.deadline;
+        // An authorized exception may bypass only the elapsed window. It may
+        // never bypass a missing or inconsistent immutable policy snapshot.
+        if (!exceptionContext && deadline.getTime() <= Date.now()) {
           throw new AppException(
             "REFUND_REQUEST_WINDOW_CLOSED",
             "The self-service refund request window has closed; contact support for a dispute review",
             HttpStatus.CONFLICT,
-            { refundRequestDeadlineAt: deadline?.toISOString() ?? null }
+            {
+              refundRequestDeadlineAt: deadline.toISOString(),
+              refundPolicyVersion: refundPolicy.version,
+              refundRequestWindowHours: refundPolicy.hours
+            }
           );
         }
       }
@@ -561,8 +645,11 @@ export class PaymentsService implements OnModuleInit {
       }
       await db.$queryRaw`SELECT "id" FROM "PaymentTransaction" WHERE "id" = ${payment.id} FOR UPDATE`;
 
-      const needsReview = exceptionContext?.reasonCode === "SUPPORT_APPROVED_AFTER_WINDOW" ||
+      const needsReview = Boolean(exceptionContext) ||
         order.status === "inService" || order.status === "completed";
+      const requestedAt = new Date();
+      const reviewSlaHours = this.config.get<number>("REFUND_REVIEW_SLA_HOURS") ?? 24;
+      const resolutionSlaHours = this.config.get<number>("REFUND_RESOLUTION_SLA_HOURS") ?? 72;
       const refund = await db.refundTransaction.create({
         data: {
           orderId,
@@ -573,7 +660,13 @@ export class PaymentsService implements OnModuleInit {
           reason: reason?.trim() || null,
           initiatedById: exceptionContext?.actorId ?? userId,
           supportTicketId: supportTicket?.id ?? null,
-          exceptionReasonCode: exceptionContext?.reasonCode ?? null
+          exceptionReasonCode: exceptionContext?.reasonCode ?? null,
+          reviewDueAt: needsReview
+            ? new Date(requestedAt.getTime() + reviewSlaHours * 60 * 60_000)
+            : null,
+          resolutionDueAt: new Date(
+            requestedAt.getTime() + resolutionSlaHours * 60 * 60_000
+          )
         }
       });
       await this.holdEarningForRefund(db, orderId);
@@ -585,6 +678,7 @@ export class PaymentsService implements OnModuleInit {
       });
       await this.audit.record({
         actorId: exceptionContext?.actorId ?? userId,
+        subjectUserIds: this.orderAuditSubjectUserIds(order),
         action: "refund.requested",
         resourceType: "refund",
         resourceId: refund.id,
@@ -593,6 +687,7 @@ export class PaymentsService implements OnModuleInit {
           amountCents: order.amountCents,
           needsReview,
           requestedForUserId: userId,
+          companionId: order.companionId,
           exceptionReasonCode: exceptionContext?.reasonCode ?? null,
           supportTicketId: supportTicket?.id ?? null
         }
@@ -611,11 +706,13 @@ export class PaymentsService implements OnModuleInit {
       if (exceptionContext?.reasonCode === "ACCOUNT_DELETION_SETTLEMENT") {
         await this.audit.record({
           actorId: exceptionContext.actorId,
+          subjectUserIds: this.orderAuditSubjectUserIds(order),
           action: "account.deletion_refund_initiated",
           resourceType: "accountDeletionRequest",
           resourceId: exceptionContext.requestId,
           metadata: {
             userId,
+            companionId: order.companionId,
             orderId,
             refundId: refund.id,
             amountCents: order.amountCents,
@@ -626,10 +723,33 @@ export class PaymentsService implements OnModuleInit {
       if (exceptionContext?.reasonCode === "SUPPORT_APPROVED_AFTER_WINDOW") {
         await this.audit.record({
           actorId: exceptionContext.actorId,
+          subjectUserIds: this.orderAuditSubjectUserIds(order),
           action: "support.refund_initiated",
           resourceType: "supportTicket",
           resourceId: exceptionContext.requestId,
-          metadata: { userId, orderId, refundId: refund.id, amountCents: order.amountCents }
+          metadata: {
+            userId,
+            companionId: order.companionId,
+            orderId,
+            refundId: refund.id,
+            amountCents: order.amountCents
+          }
+        }, db);
+      }
+      if (exceptionContext?.reasonCode === "ATTENDANCE_DISPUTE_DECISION") {
+        await this.audit.record({
+          actorId: exceptionContext.actorId,
+          subjectUserIds: this.orderAuditSubjectUserIds(order),
+          action: "attendance.refund_requested",
+          resourceType: "attendanceDispute",
+          resourceId: exceptionContext.requestId,
+          metadata: {
+            userId,
+            companionId: order.companionId,
+            orderId,
+            refundId: refund.id,
+            amountCents: order.amountCents
+          }
         }, db);
       }
       return { order, refund, created: true };
@@ -662,7 +782,7 @@ export class PaymentsService implements OnModuleInit {
       await db.$queryRaw`SELECT "id" FROM "RefundTransaction" WHERE "id" = ${refundId} FOR UPDATE`;
       const refund = await db.refundTransaction.findUnique({
         where: { id: refundId },
-        include: { order: true }
+        include: { order: { include: ORDER_AUDIT_RELATIONS } }
       });
       if (!refund) throw new AppException("REFUND_NOT_FOUND", "Refund not found", HttpStatus.NOT_FOUND);
 
@@ -674,6 +794,7 @@ export class PaymentsService implements OnModuleInit {
             HttpStatus.FORBIDDEN
           );
         }
+        this.assertRefundAssignee(refund, actorId);
         const updated = await db.refundTransaction.update({
           where: { id: refundId },
           data: {
@@ -682,13 +803,18 @@ export class PaymentsService implements OnModuleInit {
             reviewedAt: new Date(),
             reviewNote: note?.trim() || null
           },
-          include: { order: true }
+          include: { order: { include: ORDER_AUDIT_RELATIONS } }
         });
         await this.audit.record({
           actorId,
+          subjectUserIds: this.orderAuditSubjectUserIds(updated.order),
           action: "refund.approved",
           resourceType: "refund",
-          resourceId: refundId
+          resourceId: refundId,
+          metadata: {
+            userId: updated.order.userId,
+            companionId: updated.order.companionId
+          }
         }, db);
         return { refund: updated, newlyApproved: true, shouldSubmit: true };
       }
@@ -714,21 +840,91 @@ export class PaymentsService implements OnModuleInit {
     };
   }
 
-  async listRefundsAwaitingReview() {
-    const now = Date.now();
-    const items: any[] = await this.prisma.refundTransaction.findMany({
-      where: {
-        OR: [
-          { status: { in: ["pendingReview", "failed"] } },
-          { status: "pending", updatedAt: { lt: new Date(now - 15 * 60_000) } },
-          { status: "processing", nextReconcileAt: { lt: new Date(now - 15 * 60_000) } },
-          { status: "processing", createdAt: { lt: new Date(now - 24 * 60 * 60_000) } }
-        ]
-      },
-      include: { order: true, payment: true },
-      orderBy: { createdAt: "asc" },
-      take: 200
-    } as any);
+  async claimRefund(actorId: string, refundId: string) {
+    const refund = await this.prisma.$transaction(async (tx) => {
+      const db = tx as any;
+      await db.$queryRaw`SELECT "id" FROM "RefundTransaction" WHERE "id" = ${refundId} FOR UPDATE`;
+      const current = await db.refundTransaction.findUnique({
+        where: { id: refundId },
+        include: { order: { include: ORDER_AUDIT_RELATIONS } }
+      });
+      if (!current) {
+        throw new AppException("REFUND_NOT_FOUND", "Refund not found", HttpStatus.NOT_FOUND);
+      }
+      if (!["pendingReview", "pending", "processing", "failed"].includes(current.status)) {
+        throw new AppException(
+          "REFUND_INVALID_STATE",
+          "Only an active refund can be claimed",
+          HttpStatus.CONFLICT
+        );
+      }
+      if (current.assignedToUserId && current.assignedToUserId !== actorId) {
+        throw new AppException(
+          "REFUND_ALREADY_ASSIGNED",
+          "Refund is already assigned to another operator",
+          HttpStatus.CONFLICT,
+          { assignedAt: current.assignedAt?.toISOString?.() ?? null }
+        );
+      }
+      if (current.assignedToUserId === actorId) return current;
+      const assignedAt = new Date();
+      const updated = await db.refundTransaction.update({
+        where: { id: refundId },
+        data: { assignedToUserId: actorId, assignedAt },
+        include: { order: { include: ORDER_AUDIT_RELATIONS } }
+      });
+      await this.audit.record({
+        actorId,
+        subjectUserIds: this.orderAuditSubjectUserIds(updated.order),
+        action: "refund.claimed",
+        resourceType: "refund",
+        resourceId: refundId,
+        metadata: {
+          userId: updated.order.userId,
+          companionId: updated.order.companionId,
+          status: current.status,
+          reviewDueAt: current.reviewDueAt?.toISOString?.() ?? null,
+          resolutionDueAt: current.resolutionDueAt?.toISOString?.() ?? null
+        }
+      }, db);
+      return updated;
+    }, { maxWait: 5_000, timeout: 10_000 });
+    return { refund: this.refundDto(refund), order: this.ordersService.toDto(refund.order) };
+  }
+
+  async listRefundsAwaitingReview(
+    page = 1,
+    pageSize = 50,
+    status?: "pendingReview" | "pending" | "processing" | "failed"
+  ) {
+    const now = new Date();
+    const actionableWhere = {
+      OR: [
+        { status: { in: ["pendingReview", "failed"] } },
+        { status: "pending", updatedAt: { lt: new Date(now.getTime() - 15 * 60_000) } },
+        { status: "processing", nextReconcileAt: { lt: new Date(now.getTime() - 15 * 60_000) } },
+        { status: "processing", createdAt: { lt: new Date(now.getTime() - 24 * 60 * 60_000) } },
+        {
+          status: { in: ["pendingReview", "pending", "processing", "failed"] },
+          resolutionDueAt: { lte: now }
+        }
+      ]
+    };
+    const where = status ? { AND: [actionableWhere, { status }] } : actionableWhere;
+    const [items, total]: [any[], number] = await Promise.all([
+      this.prisma.refundTransaction.findMany({
+        where,
+        include: {
+          order: true,
+          payment: true,
+          assignedTo: { include: { profile: true } }
+        },
+        orderBy: [{ reviewDueAt: "asc" }, { resolutionDueAt: "asc" }, { createdAt: "asc" }, { id: "asc" }],
+        skip: (page - 1) * pageSize,
+        take: pageSize
+      } as any),
+      this.prisma.refundTransaction.count({ where } as any)
+    ]);
     return {
       items: items.map((item) => ({
         ...this.refundDto(item),
@@ -738,8 +934,21 @@ export class PaymentsService implements OnModuleInit {
         paymentOutTradeNo: item.payment.outTradeNo,
         initiatedById: item.initiatedById ?? null,
         supportTicketId: item.supportTicketId ?? null,
-        exceptionReasonCode: item.exceptionReasonCode ?? null
-      }))
+        exceptionReasonCode: item.exceptionReasonCode ?? null,
+        assignedToUserId: item.assignedToUserId ?? null,
+        assignedAt: item.assignedAt?.toISOString?.() ?? null,
+        assignedTo: item.assignedTo ? {
+          id: item.assignedTo.id,
+          displayName: item.assignedTo.profile?.displayName ?? null
+        } : null,
+        sla: this.refundSlaDto(item, now)
+      })),
+      pagination: {
+        page,
+        pageSize,
+        total,
+        totalPages: Math.ceil(total / pageSize)
+      }
     };
   }
 
@@ -749,11 +958,18 @@ export class PaymentsService implements OnModuleInit {
       await db.$queryRaw`SELECT "id" FROM "RefundTransaction" WHERE "id" = ${refundId} FOR UPDATE`;
       const current = await db.refundTransaction.findUnique({
         where: { id: refundId },
-        include: { order: true }
+        include: { order: { include: ORDER_AUDIT_RELATIONS } }
       });
       if (!current) throw new AppException("REFUND_NOT_FOUND", "Refund not found", HttpStatus.NOT_FOUND);
       if (current.status !== "pendingReview") {
         throw new AppException("REFUND_INVALID_STATE", "Refund is not awaiting review", HttpStatus.CONFLICT);
+      }
+      if (current.exceptionReasonCode === "ATTENDANCE_DISPUTE_DECISION") {
+        throw new AppException(
+          "ATTENDANCE_REFUND_DECISION_FINAL",
+          "A finance reviewer may verify and submit a final attendance refund, but cannot overturn the final case decision",
+          HttpStatus.CONFLICT
+        );
       }
       if (current.initiatedById && current.initiatedById === actorId) {
         throw new AppException(
@@ -762,6 +978,7 @@ export class PaymentsService implements OnModuleInit {
           HttpStatus.FORBIDDEN
         );
       }
+      this.assertRefundAssignee(current, actorId);
       const rejected = await db.refundTransaction.update({
         where: { id: refundId },
         data: {
@@ -773,10 +990,15 @@ export class PaymentsService implements OnModuleInit {
       });
       await this.audit.record({
         actorId,
+        subjectUserIds: this.orderAuditSubjectUserIds(current.order),
         action: "refund.rejected",
         resourceType: "refund",
         resourceId: refundId,
-        metadata: { note: note?.trim() || null }
+        metadata: {
+          userId: current.order.userId,
+          companionId: current.order.companionId,
+          note: note?.trim() || null
+        }
       }, db);
       await this.enqueueTransactionalNotification(db, {
         userId: current.order.userId,
@@ -798,12 +1020,13 @@ export class PaymentsService implements OnModuleInit {
       await db.$queryRaw`SELECT "id" FROM "RefundTransaction" WHERE "id" = ${refundId} FOR UPDATE`;
       const current = await db.refundTransaction.findUnique({
         where: { id: refundId },
-        include: { order: true }
+        include: { order: { include: ORDER_AUDIT_RELATIONS } }
       });
       if (!current) throw new AppException("REFUND_NOT_FOUND", "Refund not found", HttpStatus.NOT_FOUND);
       if (current.status !== "failed") {
         throw new AppException("REFUND_INVALID_STATE", "Only a failed refund can be retried", HttpStatus.CONFLICT);
       }
+      this.assertRefundAssignee(current, actorId);
       const updated = await db.refundTransaction.update({
         where: { id: refundId },
         data: {
@@ -811,15 +1034,20 @@ export class PaymentsService implements OnModuleInit {
           failureReason: null,
           reviewNote: note?.trim() || current.reviewNote
         },
-        include: { order: true }
+        include: { order: { include: ORDER_AUDIT_RELATIONS } }
       });
       await this.holdEarningForRefund(db, current.orderId);
       await this.audit.record({
         actorId,
+        subjectUserIds: this.orderAuditSubjectUserIds(updated.order),
         action: "refund.retry_requested",
         resourceType: "refund",
         resourceId: refundId,
-        metadata: { note: note?.trim() || null }
+        metadata: {
+          userId: updated.order.userId,
+          companionId: updated.order.companionId,
+          note: note?.trim() || null
+        }
       }, db);
       return updated;
     }, { maxWait: 5_000, timeout: 10_000 });
@@ -828,13 +1056,18 @@ export class PaymentsService implements OnModuleInit {
 
   async syncRefund(userId: string, orderId: string) {
     const refund: any = await this.prisma.refundTransaction.findFirst({
-      where: { orderId, order: { userId } }, orderBy: { createdAt: "desc" }
+      where: { orderId, order: { userId } },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }]
     } as any);
     if (!refund) throw new AppException("REFUND_NOT_FOUND", "Refund not found", HttpStatus.NOT_FOUND);
-    if (["processing", "pending"].includes(refund.status)) {
+    if (["processing", "pending"].includes(refund.status)
+      || (refund.status === "success"
+        && (!refund.providerRefundAcceptedAt || !refund.providerRefundSucceededAt))) {
       const result = await this.wechat.queryRefund(refund.outRefundNo);
       this.assertRefundQueryBinding(refund, result.outRefundNo);
-      await this.applyQueriedRefundResult(refund, result.status, result.refundId);
+      await this.applyQueriedRefundResult(
+        refund, result.status, result.refundId, result.acceptedTime, result.successTime
+      );
     }
     const current: any = await this.prisma.refundTransaction.findUnique({ where: { id: refund.id }, include: { order: true } } as any);
     return { refund: this.refundDto(current), order: this.ordersService.toDto(current.order) };
@@ -843,7 +1076,7 @@ export class PaymentsService implements OnModuleInit {
   async syncRefundForAdmin(actorId: string, refundId: string) {
     const refund: any = await this.prisma.refundTransaction.findUnique({
       where: { id: refundId },
-      include: { order: true }
+      include: { order: { include: ORDER_AUDIT_RELATIONS } }
     } as any);
     if (!refund) throw new AppException("REFUND_NOT_FOUND", "Refund not found", HttpStatus.NOT_FOUND);
     if (!["pending", "processing", "failed", "success"].includes(refund.status)) {
@@ -853,17 +1086,27 @@ export class PaymentsService implements OnModuleInit {
         HttpStatus.CONFLICT
       );
     }
-    if (refund.status !== "success") {
+    if (refund.status !== "success"
+      || !refund.providerRefundAcceptedAt
+      || !refund.providerRefundSucceededAt) {
       await this.audit.record({
         actorId,
+        subjectUserIds: this.orderAuditSubjectUserIds(refund.order),
         action: "refund.provider_sync_requested",
         resourceType: "refund",
         resourceId: refundId,
-        metadata: { previousStatus: refund.status, outRefundNo: refund.outRefundNo }
+        metadata: {
+          userId: refund.order.userId,
+          companionId: refund.order.companionId,
+          previousStatus: refund.status,
+          outRefundNo: refund.outRefundNo
+        }
       });
       const result = await this.wechat.queryRefund(refund.outRefundNo);
       this.assertRefundQueryBinding(refund, result.outRefundNo);
-      await this.applyQueriedRefundResult(refund, result.status, result.refundId);
+      await this.applyQueriedRefundResult(
+        refund, result.status, result.refundId, result.acceptedTime, result.successTime
+      );
     }
     const current: any = await this.prisma.refundTransaction.findUnique({
       where: { id: refund.id },
@@ -955,7 +1198,13 @@ export class PaymentsService implements OnModuleInit {
         reconciliationStage = "binding";
         this.assertRefundQueryBinding(claimed, result.outRefundNo);
         reconciliationStage = "apply";
-        const applied = await this.applyQueriedRefundResult(claimed, result.status, result.refundId);
+        const applied = await this.applyQueriedRefundResult(
+          claimed,
+          result.status,
+          result.refundId,
+          result.acceptedTime,
+          result.successTime
+        );
         if (applied.resubmitted) submissions += 1;
       } catch (error) {
         failures += 1;
@@ -1082,7 +1331,9 @@ export class PaymentsService implements OnModuleInit {
         HttpStatus.BAD_REQUEST
       );
     }
-    await this.applyRefundResult(refund.id, payload.status, payload.refundId);
+    await this.applyRefundResult(
+      refund.id, payload.status, payload.refundId, payload.acceptedTime, payload.successTime
+    );
     return { code: "SUCCESS", message: "成功" };
   }
 
@@ -1103,6 +1354,10 @@ export class PaymentsService implements OnModuleInit {
       );
     }
 
+    const providerPaidAt = this.parseProviderFinancialTime(
+      payload.successTime,
+      "WECHAT_PAYMENT_SUCCESS_TIME_INVALID"
+    );
     const paymentRef = await this.prisma.paymentTransaction.findUnique({
       where: { outTradeNo: payload.outTradeNo },
       select: { orderId: true }
@@ -1119,7 +1374,7 @@ export class PaymentsService implements OnModuleInit {
       await db.$queryRaw`SELECT "id" FROM "PaymentTransaction" WHERE "outTradeNo" = ${payload.outTradeNo} FOR UPDATE`;
       const payment = await db.paymentTransaction.findUnique({
         where: { outTradeNo: payload.outTradeNo },
-        include: { order: true }
+        include: { order: { include: ORDER_AUDIT_RELATIONS } }
       });
 
       if (!payment) {
@@ -1179,6 +1434,32 @@ export class PaymentsService implements OnModuleInit {
 
       // Idempotent: already fulfilled
       if (payment.status === "success") {
+        if (!payment.providerPaidAt) {
+          await db.paymentTransaction.update({
+            where: { id: payment.id },
+            data: { providerPaidAt }
+          });
+        }
+        await db.cashLedgerEntry.createMany({
+          data: [{
+            id: randomUUID(),
+            provider: "wechat",
+            accountType: "UNCLASSIFIED",
+            bookedAt: payment.providerPaidAt ?? providerPaidAt,
+            expectedStatementDate: null,
+            businessName: "交易收款",
+            businessType: "PAYMENT",
+            direction: "收入",
+            grossCents: payment.amountCents,
+            feeCents: 0,
+            netCents: payment.amountCents,
+            providerReference: payment.transactionId ?? payload.transactionId,
+            sourceResourceType: "paymentTransaction",
+            sourceResourceId: payment.id,
+            evidenceReference: `provider:wechat:payment:${payment.transactionId ?? payload.transactionId}`
+          }],
+          skipDuplicates: true
+        });
         return {
           alreadyProcessed: true,
           orderId: order.id,
@@ -1214,8 +1495,29 @@ export class PaymentsService implements OnModuleInit {
           status: "success",
           transactionId: payload.transactionId,
           notifyPayload: payload.raw,
-          paidAt
+          paidAt,
+          providerPaidAt
         }
+      });
+      await db.cashLedgerEntry.createMany({
+        data: [{
+          id: randomUUID(),
+          provider: "wechat",
+          accountType: "UNCLASSIFIED",
+          bookedAt: providerPaidAt,
+          expectedStatementDate: null,
+          businessName: "交易收款",
+          businessType: "PAYMENT",
+          direction: "收入",
+          grossCents: payment.amountCents,
+          feeCents: 0,
+          netCents: payment.amountCents,
+          providerReference: payload.transactionId,
+          sourceResourceType: "paymentTransaction",
+          sourceResourceId: payment.id,
+          evidenceReference: `provider:wechat:payment:${payload.transactionId}`
+        }],
+        skipDuplicates: true
       });
 
       let conversation = await db.conversation.findUnique({
@@ -1278,11 +1580,14 @@ export class PaymentsService implements OnModuleInit {
         templateKey: "paymentSuccess"
       });
       await this.audit.record({
-        actorId: order.userId,
+        actorId: "system",
+        subjectUserIds: this.orderAuditSubjectUserIds(order),
         action: "payment.fulfilled",
         resourceType: "order",
         resourceId: order.id,
         metadata: {
+          userId: order.userId,
+          companionId: order.companionId,
           paymentId: payment.id,
           amountCents: order.amountCents,
           outTradeNo: payload.outTradeNo
@@ -1422,7 +1727,7 @@ export class PaymentsService implements OnModuleInit {
         include: {
           payments: {
             where: { status: { in: ["initiated", "success"] } },
-            orderBy: { createdAt: "desc" }
+            orderBy: [{ createdAt: "desc" }, { id: "desc" }]
           }
         }
       });
@@ -1799,6 +2104,22 @@ export class PaymentsService implements OnModuleInit {
     }
   }
 
+  private parseProviderFinancialTime(value: string | null | undefined, code: string): Date {
+    const normalized = String(value ?? "").trim();
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(normalized)) {
+      throw new AppException(
+        code,
+        "WeChat success response is missing an authoritative provider timestamp",
+        HttpStatus.BAD_GATEWAY
+      );
+    }
+    const parsed = new Date(normalized);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new AppException(code, "WeChat returned an invalid provider timestamp", HttpStatus.BAD_GATEWAY);
+    }
+    return parsed;
+  }
+
   private async findMiniProgramOpenId(userId: string): Promise<string> {
     const identity = await this.prisma.authIdentity.findFirst({
       where: { userId, provider: "wechatMiniProgram" },
@@ -1845,7 +2166,9 @@ export class PaymentsService implements OnModuleInit {
         reason: refund.reason || "用户申请退款", refundAmountCents: refund.amountCents,
         totalAmountCents: refund.order.amountCents, notifyUrl: this.buildRefundNotifyUrl()
       });
-      await this.applyRefundResult(refundId, result.status, result.refundId);
+      await this.applyRefundResult(
+        refundId, result.status, result.refundId, result.acceptedTime, result.successTime
+      );
     } catch (error) {
       await this.prisma.refundTransaction.updateMany({
         where: { id: refundId, status: "processing" },
@@ -1864,10 +2187,28 @@ export class PaymentsService implements OnModuleInit {
     refundId: string,
     providerStatus: string,
     providerRefundId: string,
+    providerAcceptedTime: string | null,
+    providerSuccessTime: string | null,
     fromQuery = false
   ) {
     const success = providerStatus === "SUCCESS";
     const failed = ["CLOSED", "ABNORMAL"].includes(providerStatus);
+    const providerRefundAcceptedAt = success
+      ? this.parseProviderFinancialTime(providerAcceptedTime, "WECHAT_REFUND_ACCEPTED_TIME_INVALID")
+      : providerAcceptedTime
+        ? this.parseProviderFinancialTime(providerAcceptedTime, "WECHAT_REFUND_ACCEPTED_TIME_INVALID")
+        : null;
+    const providerRefundSucceededAt = success
+      ? this.parseProviderFinancialTime(providerSuccessTime, "WECHAT_REFUND_SUCCESS_TIME_INVALID")
+      : null;
+    if (providerRefundAcceptedAt && providerRefundSucceededAt
+      && providerRefundSucceededAt.getTime() < providerRefundAcceptedAt.getTime()) {
+      throw new AppException(
+        "WECHAT_REFUND_SUCCESS_TIME_INVALID",
+        "WeChat refund success time precedes the provider acceptance time",
+        HttpStatus.BAD_GATEWAY
+      );
+    }
     const refundRef: any = await this.prisma.refundTransaction.findUnique({
       where: { id: refundId },
       select: { orderId: true }
@@ -1882,10 +2223,49 @@ export class PaymentsService implements OnModuleInit {
       await db.$queryRaw`SELECT "id" FROM "RefundTransaction" WHERE "id" = ${refundId} FOR UPDATE`;
       const current = await db.refundTransaction.findUnique({
         where: { id: refundId },
-        include: { order: true }
+        include: { order: { include: ORDER_AUDIT_RELATIONS } }
       });
       if (!current) return null;
       if (current.status === "success") {
+        if ((!current.providerRefundAcceptedAt && providerRefundAcceptedAt)
+          || (!current.providerRefundSucceededAt && providerRefundSucceededAt)) {
+          await db.refundTransaction.update({
+            where: { id: refundId },
+            data: {
+              ...(!current.providerRefundAcceptedAt && providerRefundAcceptedAt
+                ? { providerRefundAcceptedAt }
+                : {}),
+              ...(!current.providerRefundSucceededAt && providerRefundSucceededAt
+                ? { providerRefundSucceededAt }
+                : {})
+            }
+          });
+        }
+        const acceptedAt = current.providerRefundAcceptedAt ?? providerRefundAcceptedAt;
+        const succeededAt = current.providerRefundSucceededAt ?? providerRefundSucceededAt;
+        if (acceptedAt && succeededAt) {
+          const reference = providerRefundId || current.providerRefundId || current.outRefundNo;
+          await db.cashLedgerEntry.createMany({
+            data: [{
+              id: randomUUID(),
+              provider: "wechat",
+              accountType: "UNCLASSIFIED",
+              bookedAt: succeededAt,
+              expectedStatementDate: null,
+              businessName: "退款支出",
+              businessType: "REFUND",
+              direction: "支出",
+              grossCents: current.amountCents,
+              feeCents: 0,
+              netCents: current.amountCents,
+              providerReference: reference,
+              sourceResourceType: "refundTransaction",
+              sourceResourceId: current.id,
+              evidenceReference: `provider:wechat:refund:${reference}`
+            }],
+            skipDuplicates: true
+          });
+        }
         return { refund: current, becameSuccess: false };
       }
       if (!success && ["rejected", "pendingReview"].includes(current.status)) {
@@ -1897,6 +2277,8 @@ export class PaymentsService implements OnModuleInit {
         data: {
           status: success ? "success" : failed ? "failed" : "processing",
           providerRefundId: providerRefundId || current.providerRefundId || null,
+          ...(providerRefundAcceptedAt ? { providerRefundAcceptedAt } : {}),
+          ...(success ? { providerRefundSucceededAt } : {}),
           providerQueryAttempts,
           nextReconcileAt: success || failed ? null : this.nextRefundQueryAt(providerQueryAttempts),
           failureReason: success
@@ -1905,9 +2287,29 @@ export class PaymentsService implements OnModuleInit {
               ? `Provider reported ${providerStatus}`
               : null
         },
-        include: { order: true }
+        include: { order: { include: ORDER_AUDIT_RELATIONS } }
       });
       if (success) {
+        await db.cashLedgerEntry.createMany({
+          data: [{
+            id: randomUUID(),
+            provider: "wechat",
+            accountType: "UNCLASSIFIED",
+            bookedAt: providerRefundSucceededAt,
+            expectedStatementDate: null,
+            businessName: "退款支出",
+            businessType: "REFUND",
+            direction: "支出",
+            grossCents: current.amountCents,
+            feeCents: 0,
+            netCents: current.amountCents,
+            providerReference: providerRefundId || current.providerRefundId || current.outRefundNo,
+            sourceResourceType: "refundTransaction",
+            sourceResourceId: current.id,
+            evidenceReference: `provider:wechat:refund:${providerRefundId || current.providerRefundId || current.outRefundNo}`
+          }],
+          skipDuplicates: true
+        });
         await db.order.update({
           where: { id: current.orderId },
           data: { status: "refunded" }
@@ -1923,11 +2325,14 @@ export class PaymentsService implements OnModuleInit {
           templateKey: "supportUpdate"
         });
         await this.audit.record({
-          actorId: current.order.userId,
+          actorId: "system",
+          subjectUserIds: this.orderAuditSubjectUserIds(current.order),
           action: "refund.succeeded",
           resourceType: "refund",
           resourceId: refundId,
           metadata: {
+            userId: current.order.userId,
+            companionId: current.order.companionId,
             orderId: current.orderId,
             amountCents: current.amountCents,
             recoveryId: recovery?.id ?? null,
@@ -1948,10 +2353,19 @@ export class PaymentsService implements OnModuleInit {
       updatedAt?: Date;
     },
     providerStatus: string,
-    providerRefundId: string
+    providerRefundId: string,
+    providerAcceptedTime: string | null,
+    providerSuccessTime: string | null
   ): Promise<{ resubmitted: boolean }> {
     if (providerStatus !== "NOTEXIST") {
-      await this.applyRefundResult(refund.id, providerStatus, providerRefundId, true);
+      await this.applyRefundResult(
+        refund.id,
+        providerStatus,
+        providerRefundId,
+        providerAcceptedTime,
+        providerSuccessTime,
+        true
+      );
       return { resubmitted: false };
     }
 
@@ -2008,10 +2422,88 @@ export class PaymentsService implements OnModuleInit {
       id: refund.id, orderId: refund.orderId, outRefundNo: refund.outRefundNo,
       amountCents: refund.amountCents, status: refund.status, reason: refund.reason,
       providerRefundId: refund.providerRefundId, reviewNote: refund.reviewNote,
+      providerRefundAcceptedAt: refund.providerRefundAcceptedAt?.toISOString?.() ?? null,
+      providerRefundSucceededAt: refund.providerRefundSucceededAt?.toISOString?.() ?? null,
       failureReason: refund.failureReason,
       providerQueryAttempts: Number(refund.providerQueryAttempts ?? 0),
       nextReconcileAt: refund.nextReconcileAt?.toISOString?.() ?? null,
+      reviewDueAt: refund.reviewDueAt?.toISOString?.() ?? null,
+      resolutionDueAt: refund.resolutionDueAt?.toISOString?.() ?? null,
       createdAt: refund.createdAt.toISOString(), updatedAt: refund.updatedAt.toISOString()
+    };
+  }
+
+  private orderAuditSubjectUserIds(order: {
+    userId: string;
+    companion?: { ownerUserId?: string | null } | null;
+  }): string[] {
+    return [...new Set([
+      order.userId,
+      order.companion?.ownerUserId ?? null
+    ].filter((value): value is string => typeof value === "string" && value.length > 0))];
+  }
+
+  private requireCompletedOrderRefundPolicySnapshot(order: any): {
+    version: string;
+    hours: number;
+    deadline: Date;
+  } {
+    const version = typeof order.refundPolicyVersionSnapshot === "string"
+      ? order.refundPolicyVersionSnapshot.trim()
+      : "";
+    const hours = order.refundRequestWindowHoursSnapshot;
+    const completedAt = order.completedAt instanceof Date ? order.completedAt : null;
+    const deadline = order.refundRequestDeadlineAt instanceof Date
+      ? order.refundRequestDeadlineAt
+      : null;
+    const expectedDeadline = completedAt && Number.isInteger(hours)
+      ? completedAt.getTime() + hours * 60 * 60_000
+      : Number.NaN;
+    if (
+      !/^[A-Za-z0-9][A-Za-z0-9._-]{2,63}$/.test(version)
+      || !Number.isInteger(hours)
+      || hours < 1
+      || hours > 720
+      || !completedAt
+      || !deadline
+      || deadline.getTime() !== expectedDeadline
+    ) {
+      throw new AppException(
+        "REFUND_POLICY_SNAPSHOT_INVALID",
+        "The order refund policy snapshot is unavailable; contact support before any refund decision",
+        HttpStatus.SERVICE_UNAVAILABLE,
+        { orderId: order.id, supportReviewRequired: true }
+      );
+    }
+    return { version, hours, deadline };
+  }
+
+  private assertRefundAssignee(refund: any, actorId: string): void {
+    if (refund.assignedToUserId !== actorId) {
+      throw new AppException(
+        "REFUND_ASSIGNEE_REQUIRED",
+        "Claim this refund before taking a financial decision",
+        HttpStatus.FORBIDDEN,
+        {
+          assigned: Boolean(refund.assignedToUserId),
+          assignedAt: refund.assignedAt?.toISOString?.() ?? null
+        }
+      );
+    }
+  }
+
+  private refundSlaDto(refund: any, now: Date) {
+    const reviewDueAt = refund.reviewDueAt instanceof Date ? refund.reviewDueAt : null;
+    const resolutionDueAt = refund.resolutionDueAt instanceof Date ? refund.resolutionDueAt : null;
+    const reviewOverdue = refund.status === "pendingReview"
+      && Boolean(reviewDueAt && reviewDueAt.getTime() <= now.getTime());
+    const resolutionOverdue = ["pendingReview", "pending", "processing", "failed"].includes(refund.status)
+      && Boolean(resolutionDueAt && resolutionDueAt.getTime() <= now.getTime());
+    return {
+      reviewDueAt: reviewDueAt?.toISOString() ?? null,
+      resolutionDueAt: resolutionDueAt?.toISOString() ?? null,
+      overdue: reviewOverdue || resolutionOverdue,
+      overdueStage: resolutionOverdue ? "resolution" : reviewOverdue ? "review" : null
     };
   }
 

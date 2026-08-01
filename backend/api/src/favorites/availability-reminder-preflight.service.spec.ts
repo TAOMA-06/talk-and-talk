@@ -52,6 +52,10 @@ describe("AvailabilityReminderPreflightService", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    prisma.$queryRaw.mockImplementation(async (strings: TemplateStringsArray) => {
+      const sql = Array.from(strings).join("");
+      return sql.includes('SELECT TRUE AS "available"') ? [{ available: true }] : [];
+    });
     prisma.availabilityReminderCandidate.findUnique.mockResolvedValue(candidate());
     prisma.companionFavorite.findFirst.mockResolvedValue(favorite());
     prisma.weChatSubscriptionGrant.findFirst.mockResolvedValue({ id: "grant-1" });
@@ -115,20 +119,7 @@ describe("AvailabilityReminderPreflightService", () => {
       },
       select: { id: true, startsAt: true, endsAt: true, capacity: true }
     });
-    expect(prisma.order.findMany).toHaveBeenCalledWith({
-      where: {
-        companionId: "companion-1",
-        scheduledAt: { lt: new Date("2026-07-21T09:00:00.000Z") },
-        status: { in: ["pending", "paying", "paid", "inService", "completed"] }
-      },
-      select: {
-        status: true,
-        scheduledAt: true,
-        durationMinutes: true,
-        companionConfirmedAt: true,
-        paymentReservationExpiresAt: true
-      }
-    });
+    expect(prisma.order.findMany).not.toHaveBeenCalled();
     expect(prisma.availabilityReminderCandidate.update).toHaveBeenCalledWith({
       where: { id: "candidate-1" },
       data: {
@@ -143,7 +134,9 @@ describe("AvailabilityReminderPreflightService", () => {
         preflightedAt: true
       }
     });
-    expect(prisma.$queryRaw).toHaveBeenCalledTimes(4);
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(5);
+    expect(Array.from(prisma.$queryRaw.mock.calls[4][0] as string[]).join(""))
+      .toContain('reservation."scheduledAt" + make_interval');
   });
 
   it("skips when the bookmark, preference, or live public profile is no longer eligible", async () => {
@@ -191,13 +184,10 @@ describe("AvailabilityReminderPreflightService", () => {
   });
 
   it("skips when a current structured window has no remaining bookable capacity", async () => {
-    prisma.order.findMany.mockResolvedValue([{
-      status: "paid",
-      scheduledAt: new Date("2026-07-21T08:00:00.000Z"),
-      durationMinutes: 60,
-      companionConfirmedAt: new Date("2026-07-21T07:10:00.000Z"),
-      paymentReservationExpiresAt: null
-    }]);
+    prisma.$queryRaw.mockImplementation(async (strings: TemplateStringsArray) => {
+      const sql = Array.from(strings).join("");
+      return sql.includes('SELECT TRUE AS "available"') ? [] : [];
+    });
 
     await expect(service.evaluate("candidate-1", NOW)).resolves.toEqual(expect.objectContaining({
       decision: "skipped",
@@ -257,7 +247,7 @@ describe("AvailabilityReminderPreflightService", () => {
     expect(prisma.companionFavorite.findFirst).toHaveBeenCalled();
     expect(prisma.weChatSubscriptionGrant.findFirst).toHaveBeenCalled();
     expect(prisma.companionAvailabilityWindow.findFirst).toHaveBeenCalled();
-    expect(prisma.order.findMany).toHaveBeenCalled();
+    expect(prisma.order.findMany).not.toHaveBeenCalled();
     expect(prisma.availabilityReminderCandidate.update).not.toHaveBeenCalled();
   });
 
@@ -274,8 +264,8 @@ describe("AvailabilityReminderPreflightService", () => {
       }));
 
     expect(prisma.$transaction).not.toHaveBeenCalled();
-    expect(prisma.$queryRaw).toHaveBeenCalledTimes(4);
-    expect(prisma.$queryRaw.mock.calls.map((call: any[]) => (call[0] as TemplateStringsArray).join(""))).toEqual([
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(5);
+    expect(prisma.$queryRaw.mock.calls.slice(0, 4).map((call: any[]) => (call[0] as TemplateStringsArray).join(""))).toEqual([
       expect.stringContaining('FROM "AvailabilityReminderCandidate"'),
       expect.stringContaining('FROM "CompanionFavorite"'),
       expect.stringContaining('FROM "WeChatSubscriptionGrant"'),

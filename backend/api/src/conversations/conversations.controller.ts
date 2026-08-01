@@ -4,11 +4,13 @@ import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { AuthenticatedUser } from "../auth/auth.service";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { ConversationsService } from "./conversations.service";
+import { ListConversationsDto } from "./dto/list-conversations.dto";
 import { ListMessagesQueryDto } from "./dto/list-messages.dto";
 import { ReserveMediaUploadDto } from "./dto/reserve-media-upload.dto";
 import { SendMessageDto } from "./dto/send-message.dto";
 import { SetConversationBlockDto } from "./dto/set-conversation-block.dto";
 import { SetConversationNotificationPreferenceDto } from "./dto/set-conversation-notification-preference.dto";
+import { SetFutureBookingBoundaryDto } from "./dto/set-future-booking-boundary.dto";
 
 @Controller("conversations")
 export class ConversationsController {
@@ -27,8 +29,14 @@ export class ConversationsController {
 
   @Get()
   @UseGuards(JwtAuthGuard)
-  list(@CurrentUser() user: AuthenticatedUser) {
-    return this.conversationsService.list(user.id);
+  list(@CurrentUser() user: AuthenticatedUser, @Query() query: ListConversationsDto) {
+    return this.conversationsService.list(user.id, query);
+  }
+
+  @Get("summary")
+  @UseGuards(JwtAuthGuard)
+  summary(@CurrentUser() user: AuthenticatedUser) {
+    return this.conversationsService.summary(user.id);
   }
 
   @Put(":id/notification-preference")
@@ -49,6 +57,16 @@ export class ConversationsController {
     @Body() dto: SetConversationBlockDto
   ) {
     return this.conversationsService.setConversationBlocked(user.id, id, dto);
+  }
+
+  @Put(":id/future-booking-boundary")
+  @UseGuards(JwtAuthGuard)
+  setFutureBookingBoundary(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id") id: string,
+    @Body() dto: SetFutureBookingBoundaryDto
+  ) {
+    return this.conversationsService.setFutureBookingBoundary(user.id, id, dto);
   }
 
   @Get(":id/messages")

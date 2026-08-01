@@ -8,11 +8,20 @@
     </view>
     <button class="message-notification-action" loading="{{messageNotificationUpdating}}" bindtap="toggleMessageNotifications">{{messageNotificationsMuted ? '恢复提醒' : '静音本会话'}}</button>
   </view>
+  <view wx:if="{{hasConversation && viewerCanManageFutureBookingBoundary}}" class="future-booking-setting">
+    <view class="future-booking-copy">
+      <view class="future-booking-title">此客户的未来预约</view>
+      <view wx:if="{{futureBookingsDeclinedByYou}}" class="future-booking-description">你的私密设置已生效：只停止此客户向你发起新订单及在推荐中看到你。客户不会收到原因或被处罚，现有订单与聊天不变。</view>
+      <view wx:else class="future-booking-description">当前允许未来新预约。这不是拉黑、举报或取消订单；你可以单独停止此客户之后的新交易。</view>
+    </view>
+    <button class="future-booking-action" loading="{{futureBookingBoundaryUpdating}}" bindtap="toggleFutureBookingBoundary">{{futureBookingsDeclinedByYou ? '恢复未来预约' : '停止未来新预约'}}</button>
+  </view>
   <view class="safety-exit">
     <view class="safety-exit-title">感到不适或不安全？</view>
     <view class="safety-exit-copy">可以先停止回复、离开会话或查看安全说明。出现即时危险时，请联系当地紧急服务或身边可信的人；Talk&amp;Talk 不提供报警或紧急救援。</view>
     <view class="safety-exit-copy">需要举报具体内容可长按消息；举报会话仍需你自己填写原因后提交。</view>
     <view class="safety-exit-actions">
+      <button class="safety-exit-action safety-exit-emergency" bindtap="openEmergencyHelp">紧急帮助与拨号</button>
       <button class="safety-exit-action" bindtap="openSafetyCenter">安全与支持</button>
       <button class="safety-exit-action" bindtap="leaveConversation">离开会话</button>
       <button wx:if="{{hasConversation}}" class="safety-exit-action safety-exit-report" bindtap="report">举报会话</button>
@@ -25,7 +34,10 @@
     <button size="mini" bindtap="appeal">申请复核</button>
   </view>
   <view wx:if="{{loading}}" class="empty">正在加载…</view>
-  <view wx:elif="{{error}}" class="empty">{{error}}</view>
+  <view wx:elif="{{error}}" class="empty initial-load-error">
+    <view>{{error}}</view>
+    <button size="mini" bindtap="retryInitial">重新加载消息</button>
+  </view>
   <view wx:elif="{{conversationBlockedByYou}}" class="conversation-boundary">
     <view class="conversation-boundary-title">你已为自己拉黑本会话</view>
     <view class="conversation-boundary-copy">消息记录暂不展示，双方不能继续在这里收发消息。拉黑不取消订单，也不代表举报、客服、退款或安全处置已经完成；需要时仍可使用上方入口。</view>
@@ -47,18 +59,19 @@
       <view class="bubble" bindlongpress="reportMessage" data-message-id="{{item.id}}">
         <view wx:if="{{item.content}}" class="message-content">{{item.content}}</view>
         <view wx:for="{{item.attachments}}" wx:for-item="attachment" wx:key="id" class="attachment">
-          <image wx:if="{{attachment.kind === 'image' && attachment.url}}" class="attachment-image" mode="widthFix" src="{{attachment.url}}" bindtap="previewImage" data-url="{{attachment.url}}" />
+          <image wx:if="{{attachment.kind === 'image' && attachment.url}}" class="attachment-image" mode="widthFix" src="{{attachment.url}}" bindtap="previewImage" data-url="{{attachment.url}}" aria-role="button" aria-label="预览聊天图片" tabindex="0" />
           <button wx:elif="{{attachment.kind === 'audio' && attachment.url}}" class="audio-play" size="mini" bindtap="playAudio" data-url="{{attachment.url}}">播放语音</button>
           <view wx:else class="attachment-placeholder">{{attachment.kind === 'image' ? '图片' : '语音'}}{{attachment.status === 'expired' ? '已过期' : '审核中，暂不展示'}}</view>
         </view>
       </view>
+      <button wx:if="{{item.type === 'safety'}}" class="message-emergency-help" bindtap="openMessageEmergencyHelp">查看紧急帮助</button>
       <view wx:if="{{item.moderationStatus === 'queued' || item.moderationStatus === 'pendingReview'}}" class="delivery-status">审核中，仅自己可见</view>
       <view wx:elif="{{item.moderationStatus === 'blocked'}}" class="delivery-status blocked">未送达</view>
       <view wx:elif="{{item.moderationStatus === 'removed'}}" class="delivery-status blocked">内容已移除</view>
     </view>
     <view wx:if="{{syncing}}" class="sync-status">正在同步新消息…</view>
   </view>
-  <view wx:if="{{messageInteractionAvailable}}" class="composer">
+  <view wx:if="{{hasLoadedInitial && messageInteractionAvailable}}" class="composer">
     <input value="{{draft}}" bindinput="setDraft" maxlength="2000" placeholder="输入消息…" confirm-type="send" bindconfirm="send" disabled="{{restrictionEndsAt !== ''}}" />
     <button wx:if="{{mediaEnabled}}" class="media" disabled="{{sending || mediaUploading || restrictionEndsAt}}" bindtap="chooseImage">图片</button>
     <button wx:if="{{mediaEnabled}}" class="media {{recording ? 'recording' : ''}}" disabled="{{sending || mediaUploading || restrictionEndsAt}}" bindtap="toggleRecord">{{recording ? '结束' : '语音'}}</button>

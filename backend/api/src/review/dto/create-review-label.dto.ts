@@ -1,5 +1,7 @@
 import { IsIn, IsOptional, IsString, MaxLength, MinLength } from "class-validator";
 
+import { IsSafeOperationalText } from "../../common/validation/sensitive-free-text";
+
 const DECISIONS = ["allow", "warn", "block", "review"] as const;
 const SOURCES = ["chat", "community", "report", "profile"] as const;
 
@@ -17,6 +19,7 @@ export class CreateReviewLabelDto {
 
   @IsOptional()
   @IsString()
+  @IsSafeOperationalText()
   @MaxLength(1000)
   note?: string;
 

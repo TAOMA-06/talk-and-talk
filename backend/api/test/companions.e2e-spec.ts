@@ -11,6 +11,7 @@ import { buildCorsOptions } from "../src/config/cors";
 import { PrismaService } from "../src/database/prisma.service";
 import { seedDatabase } from "../src/database/seed";
 import { grantCurrentLegalConsent } from "./legal-consent-fixture";
+import { issueSessionBoundAccessToken } from "./session-token-fixture";
 
 describe("Companions and me (e2e)", () => {
   let app: INestApplication;
@@ -92,10 +93,7 @@ describe("Companions and me (e2e)", () => {
     });
     if (role === "user") await grantCurrentLegalConsent(prisma, user.id);
 
-    const token = jwt.sign(
-      { sub: user.id, role },
-      { secret: "e2e-access-secret", expiresIn: "15m" }
-    );
+    const token = await issueSessionBoundAccessToken(prisma, jwt, user);
     return { user, token };
   }
 
@@ -225,10 +223,7 @@ describe("Companions and me (e2e)", () => {
     const owner = await prisma.user.findUnique({ where: { id: companion!.ownerUserId! } });
     expect(owner).not.toBeNull();
     await grantCurrentLegalConsent(prisma, owner!.id);
-    const token = jwt.sign(
-      { sub: owner!.id, role: owner!.role },
-      { secret: "e2e-access-secret", expiresIn: "15m" }
-    );
+    const token = await issueSessionBoundAccessToken(prisma, jwt, owner!);
 
     await request(app.getHttpServer())
       .get("/api/v1/companions/me/service-offerings")
@@ -304,10 +299,7 @@ describe("Companions and me (e2e)", () => {
     const owner = await prisma.user.findUnique({ where: { id: companion!.ownerUserId! } });
     expect(owner).not.toBeNull();
     await grantCurrentLegalConsent(prisma, owner!.id);
-    const token = jwt.sign(
-      { sub: owner!.id, role: owner!.role },
-      { secret: "e2e-access-secret", expiresIn: "15m" }
-    );
+    const token = await issueSessionBoundAccessToken(prisma, jwt, owner!);
 
     await request(app.getHttpServer())
       .get("/api/v1/companions/me/availability-windows")
@@ -374,7 +366,7 @@ describe("Companions and me (e2e)", () => {
   it("allows admins to create, edit, publish and unpublish companions", async () => {
     const { token } = await createUser("admin");
     const { token: reviewerToken } = await createUser("admin");
-    const { user: owner } = await createUser("user");
+    const { user: owner, token: ownerToken } = await createUser("user");
 
     await request(app.getHttpServer())
       .patch(`/api/v1/admin/users/${owner.id}/verification`)
@@ -418,6 +410,21 @@ describe("Companions and me (e2e)", () => {
         expect(body.data.pricePerHalfHour).toBe(35);
         expect(body.data.tags).toEqual(expect.arrayContaining(["测试", "情绪倾听"]));
       });
+
+    for (const attempt of [
+      { moduleCode: "service-boundaries", answers: ["B", "C", "A"] },
+      { moduleCode: "safety-escalation", answers: ["C", "B", "C"] },
+      { moduleCode: "privacy-refresh", answers: ["B", "C", "C"] }
+    ]) {
+      await request(app.getHttpServer())
+        .post("/api/v1/commercial/companion/training/attempts")
+        .set("Authorization", `Bearer ${ownerToken}`)
+        .send({ ...attempt, moduleVersion: "2026.1" })
+        .expect(201)
+        .expect(({ body }) => {
+          expect(body.data).toEqual(expect.objectContaining({ score: 100, passed: true }));
+        });
+    }
 
     await request(app.getHttpServer())
       .post("/api/v1/admin/commercial/companions/c-admin/profile-submissions")

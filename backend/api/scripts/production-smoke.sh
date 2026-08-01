@@ -39,24 +39,17 @@ assert data["status"] == "active", data
 print("real WeChat Pay provider active")
 PY
 
-echo "==> Real content moderation provider"
+echo "==> Local-only user-content moderation privacy boundary"
 MODERATION_STATUS=$(curl -fsS "$API/moderation/status")
 python3 - "$MODERATION_STATUS" <<'PY'
 import json, sys
 data = json.loads(sys.argv[1])["data"]
 assert data["status"] == "active", data
-assert data["aiConfigured"] is True, data
-PY
-MODERATION_CHECK=$(curl -fsS \
-  -X POST "$API/moderation/check" \
-  -H "Authorization: Bearer $PRODUCTION_ADMIN_ACCESS_TOKEN" \
-  -H 'Content-Type: application/json' \
-  -d '{"text":"生产发布审核提供方连通性检查，不包含用户数据。","source":"profile"}')
-python3 - "$MODERATION_CHECK" <<'PY'
-import json, sys
-data = json.loads(sys.argv[1])["data"]["moderation"]
-assert data["usedAI"] is True, data
-print("production content moderation provider responded with a valid schema")
+assert data["aiConfigured"] is False, data
+assert data["externalProvider"] is None, data
+assert data["externalUserContentTransmission"] is False, data
+assert data["sensitiveContentProcessing"] == "local-rules-and-human-review", data
+print("user-authored content remains on local rules and authorized human review")
 PY
 
 echo "==> Commercial operational readiness"

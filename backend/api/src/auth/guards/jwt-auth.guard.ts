@@ -5,14 +5,25 @@ import { AuthGuard } from "@nestjs/passport";
 
 import { AppException } from "../../common/errors/app.exception";
 import { PrismaService } from "../../database/prisma.service";
+import { AuthIdentityTombstoneService } from "../auth-identity-tombstone.service";
 import { SKIP_LEGAL_CONSENT_KEY } from "../decorators/skip-legal-consent.decorator";
+import { isStaffUserRole } from "../staff-roles";
+
+export function isAcceptedLegalConsentSource(source: string | null | undefined): boolean {
+  return source === "wechatMiniProgram" || source === "web";
+}
+
+export function isStaffRole(role: string | null | undefined): boolean {
+  return isStaffUserRole(role);
+}
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard("jwt") {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
-    private readonly reflector: Reflector
+    private readonly reflector: Reflector,
+    private readonly authTombstones: AuthIdentityTombstoneService
   ) {
     super();
   }
@@ -40,13 +51,25 @@ export class JwtAuthGuard extends AuthGuard("jwt") {
       throw new AppException("UNAUTHORIZED", "User no longer exists", HttpStatus.UNAUTHORIZED);
     }
     request.user!.role = currentUser.role;
+    const deletionState = await this.authTombstones.findUserBlockingStateTx(
+      this.prisma as any,
+      userId,
+      new Date()
+    );
+    if (deletionState) {
+      throw new AppException(
+        "UNAUTHORIZED",
+        "Session is unavailable while account deletion is processing",
+        HttpStatus.UNAUTHORIZED
+      );
+    }
     if (!skipConsent && currentUser.accountStatus === "banned") {
       throw new AppException("ACCOUNT_BANNED", "Account has been banned", HttpStatus.FORBIDDEN);
     }
     if (
       !skipConsent &&
       currentUser.accountStatus !== "active" &&
-      (currentUser.role === "admin" || currentUser.role === "moderator")
+      isStaffRole(currentUser.role)
     ) {
       // A restricted consumer may inspect existing records, but a suspended
       // staff credential must not retain read access to user, moderation or
@@ -64,7 +87,7 @@ export class JwtAuthGuard extends AuthGuard("jwt") {
     if (skipConsent) {
       return true;
     }
-    if (currentUser.role === "admin" || currentUser.role === "moderator") {
+    if (isStaffRole(currentUser.role)) {
       return true;
     }
 
@@ -79,7 +102,7 @@ export class JwtAuthGuard extends AuthGuard("jwt") {
       receipt?.privacyAccepted === true &&
       receipt?.termsAccepted === true &&
       receipt?.adultConfirmed === true &&
-      receipt?.source === "wechatMiniProgram" &&
+      isAcceptedLegalConsentSource(receipt?.source) &&
       receipt?.privacyVersion === version &&
       receipt?.termsVersion === version &&
       receipt?.privacyUrl === privacyUrl &&

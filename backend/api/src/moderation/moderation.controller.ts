@@ -1,5 +1,4 @@
-import { Body, Controller, Get, HttpStatus, Post, UseGuards } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
+import { Body, Controller, Get, HttpStatus, Param, Post, Query, UseGuards } from "@nestjs/common";
 
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
@@ -9,8 +8,10 @@ import { RolesGuard } from "../auth/guards/roles.guard";
 import { PrismaService } from "../database/prisma.service";
 import { AppException } from "../common/errors/app.exception";
 import { CheckModerationDto } from "./dto/check-moderation.dto";
+import { AddReportFollowUpDto } from "./dto/add-report-follow-up.dto";
 import { CreateAppealDto } from "./dto/create-appeal.dto";
 import { CreateReportDto } from "./dto/create-report.dto";
+import { ListPersonalModerationDto, ListReporterCasesDto } from "./dto/list-personal-moderation.dto";
 import { ModerationCaseService } from "./moderation-case.service";
 import { ModerationService } from "./moderation.service";
 
@@ -19,17 +20,18 @@ export class ModerationController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly moderation: ModerationService,
-    private readonly moderationCases: ModerationCaseService,
-    private readonly config: ConfigService
+    private readonly moderationCases: ModerationCaseService
   ) {}
 
   @Get("status")
   status() {
-    const apiKey = this.config.get<string>("DEEPSEEK_API_KEY")?.trim();
     return {
       module: "moderation",
       status: "active",
-      aiConfigured: Boolean(apiKey)
+      aiConfigured: false,
+      externalProvider: null,
+      externalUserContentTransmission: false,
+      sensitiveContentProcessing: "local-rules-and-human-review"
     };
   }
 
@@ -71,27 +73,17 @@ export class ModerationController {
       throw new AppException("REPORTED_MESSAGE_NOT_FOUND", "Reported message was not found", HttpStatus.NOT_FOUND);
     }
     const contextMessages = conversation
-      ? await this.prisma.message.findMany({
-          where: {
-            conversationId: conversation.id,
-            AND: [{
-              OR: [
-                { moderationStatus: "published", visibility: "participants" },
-                { senderId: user.id }
-              ]
-            }]
-          },
-          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-          take: 10,
-          select: { content: true }
-        } as any)
+      ? await this.reportContextMessages(conversation.id, user.id, reportedMessage)
       : [];
     // Context is derived server-side. The legacy recentContext field is kept in
     // the DTO for compatibility but is intentionally never trusted as evidence.
-    const content = [reason, ...contextMessages.reverse().map((message: any) => message.content)]
-      .filter(Boolean)
-      .join("\n")
-      .slice(0, 2000);
+    const content = [
+      `举报原因：${reason.slice(0, 500)}`,
+      ...contextMessages.map((message: any) => {
+        const label = reportedMessage?.id === message.id ? "[被举报消息]" : "[会话上下文]";
+        return `${label} ${String(message.content || "").slice(0, 120)}`;
+      })
+    ].filter(Boolean).join("\n").slice(0, 2000);
     const targetId = conversation?.id ?? (dto.targetId?.trim() || null);
     const subjectUserId = reportedMessage?.senderId ?? this.otherParticipantId(conversation, user.id);
 
@@ -120,6 +112,31 @@ export class ModerationController {
     };
   }
 
+  @Get("reports/me")
+  @UseGuards(JwtAuthGuard)
+  reports(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: ListReporterCasesDto = new ListReporterCasesDto()
+  ) {
+    return this.moderationCases.listReporterCases(user.id, query);
+  }
+
+  @Get("reports/:id")
+  @UseGuards(JwtAuthGuard)
+  reportDetail(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
+    return this.moderationCases.getReporterCase(user.id, id);
+  }
+
+  @Post("reports/:id/follow-ups")
+  @UseGuards(JwtAuthGuard)
+  addReportFollowUp(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id") id: string,
+    @Body() dto: AddReportFollowUpDto
+  ) {
+    return this.moderationCases.addReporterFollowUp(user.id, id, dto.statement);
+  }
+
   @Post("appeals")
   @UseGuards(JwtAuthGuard)
   async appeal(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateAppealDto) {
@@ -133,9 +150,30 @@ export class ModerationController {
         id: appeal.id,
         caseId: appeal.caseId,
         status: appeal.status,
+        appealDeadlineAt: appeal.appealDeadlineAt.toISOString(),
+        reviewDueAt: appeal.reviewDueAt.toISOString(),
+        policyVersion: appeal.policyVersion,
         createdAt: appeal.createdAt.toISOString()
       }
     };
+  }
+
+  @Get("appeals/me")
+  @UseGuards(JwtAuthGuard)
+  appeals(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: ListPersonalModerationDto
+  ) {
+    return this.moderationCases.listAppealsForUser(user.id, query);
+  }
+
+  @Get("appeals/eligible")
+  @UseGuards(JwtAuthGuard)
+  appealableCases(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: ListPersonalModerationDto
+  ) {
+    return this.moderationCases.listAppealableCasesForUser(user.id, query);
   }
 
   @Get("cases")
@@ -207,6 +245,62 @@ export class ModerationController {
 
   private canViewConversation(conversation: any, userId: string) {
     return conversation.userId === userId || conversation.companion?.ownerUserId === userId;
+  }
+
+  private async reportContextMessages(conversationId: string, reporterId: string, reportedMessage: any | null) {
+    const visibleToReporter = {
+      OR: [
+        { moderationStatus: "published", visibility: "participants" },
+        { senderId: reporterId }
+      ]
+    };
+    if (!reportedMessage) {
+      const latest = await this.prisma.message.findMany({
+        where: { conversationId, AND: [visibleToReporter] },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: 9,
+        select: { id: true, content: true, createdAt: true }
+      } as any) as any[];
+      return latest.reverse();
+    }
+
+    const [before, after] = await Promise.all([
+      this.prisma.message.findMany({
+        where: {
+          conversationId,
+          AND: [
+            visibleToReporter,
+            {
+              OR: [
+                { createdAt: { lt: reportedMessage.createdAt } },
+                { createdAt: reportedMessage.createdAt, id: { lt: reportedMessage.id } }
+              ]
+            }
+          ]
+        },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: 4,
+        select: { id: true, content: true, createdAt: true }
+      } as any),
+      this.prisma.message.findMany({
+        where: {
+          conversationId,
+          AND: [
+            visibleToReporter,
+            {
+              OR: [
+                { createdAt: { gt: reportedMessage.createdAt } },
+                { createdAt: reportedMessage.createdAt, id: { gt: reportedMessage.id } }
+              ]
+            }
+          ]
+        },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        take: 4,
+        select: { id: true, content: true, createdAt: true }
+      } as any)
+    ]) as [any[], any[]];
+    return [...before.reverse(), reportedMessage, ...after];
   }
 
   private otherParticipantId(conversation: any | null, userId: string): string | null {

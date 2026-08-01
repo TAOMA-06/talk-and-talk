@@ -1,10 +1,19 @@
-import { HttpStatus, Injectable } from "@nestjs/common";
+import { HttpStatus, Injectable, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 
 import { AuditService } from "../common/audit/audit.service";
 import { AppException } from "../common/errors/app.exception";
 import { PrismaService } from "../database/prisma.service";
+import { AvailabilityReminderFanoutService } from "../favorites/availability-reminder-fanout.service";
+import { AvailabilityReminderReservationService } from "../favorites/availability-reminder-reservation.service";
+import { evaluateDataRetentionLegalHoldPolicy } from "../legal/data-retention-legal-hold.service";
+import {
+  notificationDeliveryIntervalSeconds,
+  notificationDeliveryReadinessSlaSeconds
+} from "../notifications/notification-delivery.policy";
 import { WECHAT_PREPAY_TTL_MS } from "../payments/wechat/wechat-pay.provider";
+import { evaluateWeChatReconciliationGate } from "../payments/wechat-reconciliation-gate";
+import { PaymentDisputesService } from "../payments/payment-disputes.service";
 
 type ListEarningsQuery = { page?: number; pageSize?: number; status?: string };
 type CommercialProfileInput = {
@@ -15,30 +24,229 @@ type CommercialProfileInput = {
   serviceAgreementVersion: string;
   serviceAgreementEvidenceRef: string;
 };
+export type CommercialReadinessBlockers = {
+  orderIntakeDisabled: number;
+  payoutClaimsDisabled: number;
+  paymentDisputeIntakeDisabled: number;
+  refundPolicyUnapproved: number;
+  refundPolicySnapshotGaps: number;
+  wechatDailyBillReconciliationDisabled: number;
+  wechatDailyBillReconciliationIncomplete: number;
+  wechatDailyBillOpenIssues: number;
+  wechatDailyBillPendingApprovals: number;
+  wechatDailyBillProviderTimeUnknown: number;
+  wechatCashLedgerUnclassified: number;
+  failedRefunds: number;
+  staleRefunds: number;
+  overdueSupport: number;
+  overdueAccountDeletions: number;
+  accountDeletionExecutionFailed: number;
+  accountDeletionExecutionExpiredLeases: number;
+  accountDeletionExecutionBacklogSlaBreached: number;
+  accountDeletionPendingErasure: number;
+  accountDeletionRetentionApprovalBacklog: number;
+  accountDeletionRetentionPolicyUnapproved: number;
+  dataRetentionLegalHoldPolicyUnapproved: number;
+  dataRetentionLegalHoldPendingActions: number;
+  accountDeletionAuthTombstoneCoverageGaps: number;
+  accountDeletionAuthTombstoneUnknownKeys: number;
+  overdueRetainedExpiryBacklog: number;
+  retainedExpiryFailures: number;
+  overdueUserAccountAppeals: number;
+  overdueCompanionAccountAppeals: number;
+  overduePaymentDisputes: number;
+  paymentDisputeSyncFailures: number;
+  notificationDeliveryDisabledWithPending: number;
+  notificationDeliveryOverduePending: number;
+  failedNotifications: number;
+  staleNotificationLeases: number;
+  availabilityReminderFanoutFailed: number;
+  availabilityReminderFanoutExpiredLeases: number;
+  availabilityReminderFanoutBacklogSlaBreached: number;
+  availabilityReminderFanoutRunnerDisabledWithDueBacklog: number;
+  availabilityReminderPreparationFailures: number;
+  availabilityReminderReservationFailures: number;
+  availabilityReminderDeliveryFailures: number;
+  availabilityReminderPreparationExpiredLeases: number;
+  availabilityReminderReservationExpiredLeases: number;
+  availabilityReminderDeliveryClaimExpiredLeases: number;
+  availabilityReminderAttemptExpiredLeases: number;
+  availabilityReminderPipelineBacklogSlaBreached: number;
+  availabilityReminderPreparationRunnerDisabledWithDueBacklog: number;
+  availabilityReminderDeliveryRunnerDisabledWithDueBacklog: number;
+  availabilityReminderTerminalUnresolved: number;
+  pendingCommercialProfiles: number;
+  unresolvedRecoveries: number;
+  stalePayoutClaims: number;
+  moderationProviderUnavailable: number;
+  criticalModeration: number;
+  overdueModeration: number;
+  mediaDeletionBacklog: number;
+  stalePrepays: number;
+  expiredOrderRequests: number;
+  expiredPaymentReservations: number;
+  expiredPaidServiceWindows: number;
+  staleInService: number;
+  voiceRoomControlDisabled: number;
+  voiceEmergencyStopActive: number;
+  voiceTerminationBacklog: number;
+  voiceEmergencyDrainPending: number;
+};
+export type CommercialReadinessResult = {
+  status: "attentionRequired" | "clear";
+  checkedAt: string;
+  blockers: CommercialReadinessBlockers;
+  voice: {
+    enabled: boolean;
+    roomControlEnabled: boolean;
+    emergencyStopEnabled: boolean;
+    terminationBacklog: number;
+    emergencyDrainPending: number;
+  };
+  notificationDelivery: {
+    enabled: boolean;
+    intervalSeconds: number;
+    slaSeconds: number;
+    pendingTotal: number;
+    duePending: number;
+    overduePending: number;
+    oldestDueAt: string | null;
+    oldestDueAgeSeconds: number | null;
+    processing: number;
+    expiredProcessing: number;
+    unreadFailed: number;
+  };
+  availabilityReminder: Awaited<
+    ReturnType<AvailabilityReminderFanoutService["operationalReadiness"]>
+  > & {
+    status: "attentionRequired" | "processing" | "clear";
+    pipeline: Awaited<ReturnType<AvailabilityReminderReservationService["operationalReadiness"]>>;
+  };
+  dailyBillReconciliation: {
+    dueDate: string;
+    configuredStartDate: string | null;
+    coverageStartDate: string | null;
+    providerCatchupStartDate: string | null;
+    enabled: boolean;
+    approved: boolean;
+    requiredDates: number;
+    completedRuns: number;
+    requiredRuns: number;
+    missingOrIncompleteRuns: number;
+    unresolvedIssues: number;
+    pendingApprovals: number;
+    pendingBillImportApprovals: number;
+    unknownProviderPaymentTimes: number;
+    unknownProviderRefundTimes: number;
+    unclassifiedCashLedgerEntries: number;
+  };
+  retentionExpiry: {
+    overdueBacklog: number;
+    failures: number;
+    earliestOverdueAt: string | null;
+    earliestRetryAt: string | null;
+    latestErrorCode: string | null;
+  };
+  accountDeletionExecution: {
+    dueBacklog: number;
+    processing: number;
+    failed: number;
+    expiredLeases: number;
+    oldestDueAt: string | null;
+    oldestDueAgeSeconds: number | null;
+    backlogSlaSeconds: number;
+    backlogSlaBreached: boolean;
+  };
+  accountDeletionAuthTombstones: {
+    coverageGaps: number;
+    unknownKeyBacklog: number;
+    expiredCleanupBacklog: number;
+    configuredKeyIds: string[];
+  };
+  staleInServiceOrders: Array<{ id: string; scheduledAt: string }>;
+  staleInServiceSampleLimit: number;
+  staleInServiceSampleTruncated: boolean;
+};
 const EARNING_STATUSES = ["pending", "available", "held", "paid", "void"] as const;
 const ACTIVE_REFUND_STATUSES = ["pendingReview", "pending", "processing", "failed"] as const;
+const STALE_IN_SERVICE_SAMPLE_LIMIT = 100;
+const ACCOUNT_DELETION_EXECUTION_BACKLOG_SLA_MS = 5 * 60_000;
+const REQUIRED_COMPANION_TRAINING = [
+  { moduleCode: "service-boundaries", moduleVersion: "2026.1" },
+  { moduleCode: "safety-escalation", moduleVersion: "2026.1" },
+  { moduleCode: "privacy-refresh", moduleVersion: "2026.1" }
+] as const;
 
 @Injectable()
 export class CommercialService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
-    private readonly audit: AuditService
+    private readonly audit: AuditService,
+    @Optional() private readonly paymentDisputes?: PaymentDisputesService,
+    @Optional() private readonly availabilityReminderFanout?: AvailabilityReminderFanoutService,
+    @Optional() private readonly availabilityReminderReservations?: AvailabilityReminderReservationService
   ) {}
 
-  async listForCompanion(userId: string) {
+  async listForCompanion(userId: string, query: ListEarningsQuery = {}) {
+    const page = Number.isSafeInteger(query.page) && (query.page ?? 0) > 0 ? query.page! : 1;
+    const pageSize = Number.isSafeInteger(query.pageSize) && (query.pageSize ?? 0) > 0
+      ? Math.min(100, query.pageSize!)
+      : 20;
+    if (query.status && !EARNING_STATUSES.includes(query.status as typeof EARNING_STATUSES[number])) {
+      throw new AppException("EARNING_STATUS_INVALID", "Unknown earning status", HttpStatus.BAD_REQUEST);
+    }
     const companion = await this.prisma.companionProfile.findUnique({
       where: { ownerUserId: userId },
       select: { id: true }
     } as any);
-    if (!companion) return { items: [] };
-    const earnings = await this.prisma.companionEarning.findMany({
-      where: { companionId: companion.id },
-      include: { order: true },
-      orderBy: { createdAt: "desc" },
-      take: 100
-    } as any);
-    return { items: earnings.map((earning: any) => this.toDto(earning, false)) };
+    if (!companion) {
+      return {
+        items: [],
+        pagination: { page, pageSize, total: 0, totalPages: 0 },
+        summary: this.emptyEarningsSummary()
+      };
+    }
+    const where = {
+      companionId: companion.id,
+      ...(query.status ? { status: query.status } : {})
+    };
+    const [earnings, total, summaryGroups] = await Promise.all([
+      this.prisma.companionEarning.findMany({
+        where,
+        include: { order: true },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        skip: (page - 1) * pageSize,
+        take: pageSize
+      } as any),
+      this.prisma.companionEarning.count({ where } as any),
+      this.prisma.companionEarning.groupBy({
+        by: ["status"],
+        where: { companionId: companion.id },
+        _count: { _all: true },
+        _sum: { payableCents: true }
+      } as any)
+    ]);
+    const summary = this.emptyEarningsSummary();
+    for (const group of summaryGroups as any[]) {
+      const status = String(group.status);
+      if (status in summary.byStatus) {
+        summary.byStatus[status as keyof typeof summary.byStatus] = {
+          count: Number(group._count?._all ?? 0),
+          payableCents: Number(group._sum?.payableCents ?? 0)
+        };
+      }
+    }
+    summary.availableCents = summary.byStatus.available.payableCents;
+    summary.pendingOrHeldCents =
+      summary.byStatus.pending.payableCents + summary.byStatus.held.payableCents;
+    summary.paidCents = summary.byStatus.paid.payableCents;
+    summary.totalCount = Object.values(summary.byStatus).reduce((sum, item) => sum + item.count, 0);
+    return {
+      items: earnings.map((earning: any) => this.toDto(earning, false)),
+      pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
+      summary
+    };
   }
 
   async listAdmin(query: ListEarningsQuery = {}) {
@@ -57,7 +265,7 @@ export class CommercialService {
           order: true,
           companion: { select: { id: true, name: true, ownerUserId: true } }
         },
-        orderBy: [{ availableAt: "asc" }, { createdAt: "asc" }],
+        orderBy: [{ availableAt: "asc" }, { createdAt: "asc" }, { id: "asc" }],
         skip: (page - 1) * pageSize,
         take: pageSize
       } as any),
@@ -69,28 +277,227 @@ export class CommercialService {
     };
   }
 
-  async listCommercialProfiles(status?: string) {
+  async listCommercialProfiles(status?: string, page = 1, pageSize = 50) {
     if (status && !["pendingReview", "verified", "suspended"].includes(status)) {
       throw new AppException("COMMERCIAL_PROFILE_STATUS_INVALID", "Unknown commercial profile status", HttpStatus.BAD_REQUEST);
     }
-    const items = await this.prisma.companionCommercialProfile.findMany({
-      where: status ? { status } : {},
-      include: { companion: { select: { id: true, name: true, ownerUserId: true, isPublished: true } } },
-      orderBy: { updatedAt: "asc" },
-      take: 200
-    } as any);
-    return { items: items.map((item: any) => this.commercialProfileDto(item)) };
+    const safePage = Math.max(1, Math.floor(page) || 1);
+    const safePageSize = Math.min(100, Math.max(1, Math.floor(pageSize) || 50));
+    const where = status ? { status } : {};
+    const [items, total] = await Promise.all([
+      this.prisma.companionCommercialProfile.findMany({
+        where,
+        include: { companion: { select: { id: true, name: true, ownerUserId: true, isPublished: true } } },
+        orderBy: [{ updatedAt: "asc" }, { companionId: "asc" }],
+        skip: (safePage - 1) * safePageSize,
+        take: safePageSize
+      } as any),
+      this.prisma.companionCommercialProfile.count({ where } as any)
+    ]);
+    return {
+      items: items.map((item: any) => this.commercialProfileDto(item)),
+      pagination: {
+        page: safePage,
+        pageSize: safePageSize,
+        total,
+        totalPages: Math.ceil(total / safePageSize)
+      }
+    };
   }
 
-  async operationalReadiness() {
+  async operationalReadiness(): Promise<CommercialReadinessResult> {
     const now = new Date();
+    const notificationDeliveryEnabled =
+      this.config.get<boolean>("NOTIFICATION_DELIVERY_ENABLED", false) === true;
+    const notificationDeliveryInterval = notificationDeliveryIntervalSeconds(this.config);
+    const notificationDeliverySla = notificationDeliveryReadinessSlaSeconds(this.config);
+    const notificationDeliveryOverdueCutoff = new Date(
+      now.getTime() - notificationDeliverySla * 1_000
+    );
+    if (!this.availabilityReminderFanout || !this.availabilityReminderReservations) {
+      throw new Error("Availability reminder operational readiness providers are unavailable");
+    }
+    const [availabilityReminderFanout, availabilityReminderPipeline] = await Promise.all([
+      this.availabilityReminderFanout.operationalReadiness(now),
+      this.availabilityReminderReservations.operationalReadiness(now)
+    ]);
+    const optionalPrisma = this.prisma as any;
+    const commercialMode =
+      this.config.get<string>("COMMERCIAL_RELEASE_MODE", "internal") === "commercial";
+    const refundPolicyVersion = String(
+      this.config.get<string>("REFUND_POLICY_VERSION", "") || ""
+    ).trim();
+    const refundPolicyApproved =
+      this.config.get<boolean>("REFUND_POLICY_APPROVED", false) === true;
+    const refundPolicyApprovalReference = String(
+      this.config.get<string>("REFUND_POLICY_APPROVAL_REFERENCE", "") || ""
+    ).trim();
+    const refundPolicyConfigurationApproved = !commercialMode || (
+      refundPolicyApproved
+      && /^[A-Za-z0-9][A-Za-z0-9._-]{2,63}$/.test(refundPolicyVersion)
+      && refundPolicyApprovalReference.length > 0
+    );
+    const refundPolicySnapshotGapsPromise = this.prisma.$queryRaw<Array<{ count: number }>>`
+      SELECT COUNT(*)::INTEGER AS count
+      FROM "Order"
+      WHERE "refundPolicyVersionSnapshot" IS NULL
+        OR "refundPolicyVersionSnapshot" !~ '^[A-Za-z0-9][A-Za-z0-9._-]{2,63}$'
+        OR "refundRequestWindowHoursSnapshot" IS NULL
+        OR "refundRequestWindowHoursSnapshot" NOT BETWEEN 1 AND 720
+        OR (
+          "completedAt" IS NOT NULL
+          AND "refundRequestDeadlineAt" IS DISTINCT FROM (
+            "completedAt" + make_interval(hours => "refundRequestWindowHoursSnapshot")
+          )
+        )
+    `;
+    const [
+      notificationPendingTotal,
+      notificationDuePending,
+      notificationOverduePending,
+      notificationOldestDue,
+      notificationProcessing
+    ] = await Promise.all([
+      this.prisma.notificationDelivery.count({ where: { status: "pending" } } as any),
+      this.prisma.notificationDelivery.count({
+        where: { status: "pending", nextAttemptAt: { lte: now } }
+      } as any),
+      this.prisma.notificationDelivery.count({
+        where: { status: "pending", nextAttemptAt: { lte: notificationDeliveryOverdueCutoff } }
+      } as any),
+      typeof optionalPrisma.notificationDelivery?.findFirst === "function"
+        ? optionalPrisma.notificationDelivery.findFirst({
+            where: { status: "pending", nextAttemptAt: { lte: now } },
+            select: { nextAttemptAt: true },
+            orderBy: [{ nextAttemptAt: "asc" }, { id: "asc" }]
+          })
+        : Promise.resolve(null),
+      this.prisma.notificationDelivery.count({ where: { status: "processing" } } as any)
+    ]);
     const trtcEnabled = this.config.get<boolean>("TRTC_ENABLED", false) === true;
     const trtcRoomControlEnabled = this.config.get<boolean>("TRTC_ROOM_CONTROL_ENABLED", false) === true;
     const trtcEmergencyStopEnabled = this.config.get<boolean>("TRTC_EMERGENCY_STOP_ENABLED", false) === true;
+    const accountDeletionRetentionPolicyApproved =
+      this.config.get<boolean>("ACCOUNT_DELETION_RETENTION_POLICY_APPROVED", false) === true;
+    const accountDeletionRetentionPolicyApprovalReference = String(
+      this.config.get<string>("ACCOUNT_DELETION_RETENTION_POLICY_APPROVAL_REFERENCE", "") || ""
+    ).trim();
+    const dataRetentionLegalHoldPolicy = evaluateDataRetentionLegalHoldPolicy(this.config);
+    let configuredTombstoneKeyIds: string[] = [];
+    try {
+      const parsed = JSON.parse(
+        this.config.get<string>("AUTH_IDENTITY_TOMBSTONE_HMAC_KEYS", "{}") || "{}"
+      );
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        configuredTombstoneKeyIds = Object.keys(parsed).sort();
+      }
+    } catch {
+      configuredTombstoneKeyIds = [];
+    }
+    const tombstoneReadiness = typeof optionalPrisma.authIdentityTombstone?.count === "function"
+      ? await Promise.all([
+          this.prisma.$queryRaw<Array<{ count: number }>>`
+            SELECT COUNT(*)::INTEGER AS count
+            FROM "AccountDeletionRequest" request
+            WHERE request."status"::TEXT IN ('processing', 'completed')
+              AND (
+                NOT EXISTS (
+                  SELECT 1 FROM "AuthIdentityTombstone" tombstone
+                  WHERE tombstone."deletionRequestId" = request."id"
+                )
+                OR EXISTS (
+                  SELECT 1 FROM "AuthIdentity" identity
+                  WHERE identity."userId" = request."userId"
+                    AND NOT EXISTS (
+                      SELECT 1 FROM "AuthIdentityTombstone" tombstone
+                      WHERE tombstone."deletionRequestId" = request."id"
+                        AND tombstone."sourceAuthIdentityId" = identity."id"
+                        AND tombstone."provider" = identity."provider"
+                    )
+                )
+              )
+          `,
+          optionalPrisma.authIdentityTombstone.count({
+            where: {
+              keyId: configuredTombstoneKeyIds.length
+                ? { notIn: configuredTombstoneKeyIds }
+                : { not: "" },
+              OR: [
+                { deletionRequest: { status: "processing" } },
+                {
+                  deletionRequest: { status: "completed" },
+                  OR: [{ expiresAt: null }, { expiresAt: { gt: now } }]
+                }
+              ]
+            }
+          }),
+          optionalPrisma.authIdentityTombstone.count({
+            where: {
+              expiresAt: { lte: now },
+              deletionRequest: { status: "completed" }
+            }
+          })
+        ])
+      : [[{ count: 0 }], 0, 0] as const;
+    const accountDeletionAuthTombstoneCoverageGaps = Number(tombstoneReadiness[0][0]?.count ?? 0);
+    const accountDeletionAuthTombstoneUnknownKeys = Number(tombstoneReadiness[1] ?? 0);
+    const accountDeletionAuthTombstoneExpiredCleanupBacklog = Number(tombstoneReadiness[2] ?? 0);
+    const dailyBillGate = await evaluateWeChatReconciliationGate(
+      this.prisma as any,
+      this.config,
+      now
+    );
+    const dailyBillConfigured = dailyBillGate.configurationReady;
+    const retentionExpiryDueWhere = {
+      disposition: { in: ["pendingErasure", "retainedRestricted"] },
+      expiryProcessedAt: null,
+      retentionEndsAt: { lte: now },
+      // A pending placement is already a preservation barrier. A pending
+      // release deliberately leaves the active hold in force.
+      legalHolds: { none: { releasedAt: null } },
+      legalHoldActions: { none: { action: "placement", status: "pending" } }
+    };
+    const accountDeletionExecutionDueWhere = {
+      status: "processing",
+      OR: [
+        {
+          executionStatus: { in: ["queued", "retryScheduled"] },
+          OR: [
+            { executionNextAttemptAt: null },
+            { executionNextAttemptAt: { lte: now } }
+          ]
+        },
+        {
+          executionStatus: "processing",
+          OR: [
+            { executionLeaseExpiresAt: null },
+            { executionLeaseExpiresAt: { lte: now } }
+          ]
+        }
+      ]
+    };
     const [
       failedRefunds,
       staleRefunds,
       overdueSupport,
+      overdueAccountDeletions,
+      accountDeletionExecutionDueBacklog,
+      accountDeletionExecutionProcessing,
+      accountDeletionExecutionFailed,
+      accountDeletionExecutionExpiredLeases,
+      accountDeletionExecutionOldestDue,
+      accountDeletionPendingErasure,
+      accountDeletionRetentionApprovalBacklog,
+      dataRetentionLegalHoldPendingActions,
+      overdueRetainedExpiryBacklog,
+      retainedExpiryFailures,
+      earliestOverdueRetention,
+      earliestRetentionRetry,
+      latestRetentionFailure,
+      overdueUserAccountAppeals,
+      overdueCompanionAccountAppeals,
+      overduePaymentDisputes,
+      paymentDisputeSyncFailures,
       failedNotifications,
       staleNotificationLeases,
       pendingCommercialProfiles,
@@ -104,6 +511,7 @@ export class CommercialService {
       expiredOrderRequests,
       expiredPaymentReservations,
       expiredPaidServiceWindows,
+      staleInServiceCount,
       staleInService,
       voiceTerminationBacklog,
       voiceEmergencyDrainPending
@@ -112,6 +520,14 @@ export class CommercialService {
       this.prisma.refundTransaction.count({
         where: {
           OR: [
+            {
+              status: "pendingReview",
+              reviewDueAt: { lt: now }
+            },
+            {
+              status: { in: ["pendingReview", "pending", "processing", "failed"] },
+              resolutionDueAt: { lt: now }
+            },
             { status: "pending", updatedAt: { lt: new Date(now.getTime() - 15 * 60_000) } },
             {
               status: "processing",
@@ -127,6 +543,126 @@ export class CommercialService {
       this.prisma.supportTicket.count({
         where: { status: { in: ["open", "inProgress"] }, dueAt: { lt: now } }
       } as any),
+      this.prisma.accountDeletionRequest.count({
+        where: { status: { in: ["pending", "processing"] }, dueAt: { lt: now } }
+      } as any),
+      this.prisma.accountDeletionRequest.count({
+        where: accountDeletionExecutionDueWhere
+      } as any),
+      this.prisma.accountDeletionRequest.count({
+        where: { status: "processing", executionStatus: "processing" }
+      } as any),
+      this.prisma.accountDeletionRequest.count({
+        where: { status: "processing", executionStatus: "failed" }
+      } as any),
+      this.prisma.accountDeletionRequest.count({
+        where: {
+          status: "processing",
+          executionStatus: "processing",
+          OR: [
+            { executionLeaseExpiresAt: null },
+            { executionLeaseExpiresAt: { lte: now } }
+          ]
+        }
+      } as any),
+      this.prisma.$queryRaw<Array<{ dueAt: Date }>>`
+        SELECT CASE
+          WHEN request."executionStatus" = 'processing'
+            THEN COALESCE(request."executionLeaseExpiresAt", request."updatedAt")
+          ELSE COALESCE(request."executionNextAttemptAt", request."approvedAt", request."updatedAt")
+        END AS "dueAt"
+        FROM "AccountDeletionRequest" request
+        WHERE request."status" = 'processing'
+          AND (
+            (
+              request."executionStatus" IN ('queued', 'retryScheduled')
+              AND (
+                request."executionNextAttemptAt" IS NULL
+                OR request."executionNextAttemptAt" <= ${now}
+              )
+            )
+            OR (
+              request."executionStatus" = 'processing'
+              AND (
+                request."executionLeaseExpiresAt" IS NULL
+                OR request."executionLeaseExpiresAt" <= ${now}
+              )
+            )
+          )
+        ORDER BY "dueAt" ASC, request."id" ASC
+        LIMIT 1
+      `,
+      this.prisma.accountDataRetentionRecord.count({
+        where: { disposition: "pendingErasure" }
+      } as any),
+      this.prisma.accountDataRetentionRecord.count({
+        where: { policyApprovalStatus: "pendingLegalApproval" }
+      } as any),
+      this.prisma.accountDataRetentionLegalHoldAction.count({
+        where: { status: "pending" }
+      } as any),
+      this.prisma.accountDataRetentionRecord.count({
+        where: retentionExpiryDueWhere
+      } as any),
+      this.prisma.accountDataRetentionRecord.count({
+        where: {
+          ...retentionExpiryDueWhere,
+          expiryLastErrorCode: { not: null }
+        }
+      } as any),
+      (this.prisma as any).accountDataRetentionRecord.findFirst
+        ? (this.prisma as any).accountDataRetentionRecord.findFirst({
+            where: {
+              ...retentionExpiryDueWhere
+            },
+            orderBy: [{ retentionEndsAt: "asc" }, { id: "asc" }],
+            select: { retentionEndsAt: true }
+          })
+        : Promise.resolve(null),
+      (this.prisma as any).accountDataRetentionRecord.findFirst
+        ? (this.prisma as any).accountDataRetentionRecord.findFirst({
+            where: {
+              ...retentionExpiryDueWhere,
+              expiryNextAttemptAt: { not: null }
+            },
+            orderBy: [{ expiryNextAttemptAt: "asc" }, { id: "asc" }],
+            select: { expiryNextAttemptAt: true }
+          })
+        : Promise.resolve(null),
+      (this.prisma as any).accountDataRetentionRecord.findFirst
+        ? (this.prisma as any).accountDataRetentionRecord.findFirst({
+            where: {
+              ...retentionExpiryDueWhere,
+              expiryLastErrorCode: { not: null }
+            },
+            orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+            select: { expiryLastErrorCode: true }
+          })
+        : Promise.resolve(null),
+      this.prisma.userAccountAppeal.count({
+        where: { status: "pending", reviewDueAt: { lt: now } }
+      } as any),
+      this.prisma.companionAccountAppeal.count({
+        where: { status: "pending", reviewDueAt: { lt: now } }
+      } as any),
+      (this.prisma as any).paymentDispute.count({
+        where: {
+          status: { in: ["pendingSync", "open", "processing", "syncFailed"] },
+          OR: [
+            { resolutionDueAt: { lt: now } },
+            { firstRespondedAt: null, firstResponseDueAt: { lt: now } }
+          ]
+        }
+      }),
+      (this.prisma as any).paymentDispute.count({
+        where: {
+          OR: [
+            { status: "syncFailed" },
+            { completionStatus: "outcomeUnknown" },
+            { replies: { some: { status: "outcomeUnknown" } } }
+          ]
+        }
+      }),
       // A failed WeChat push remains operationally actionable until the durable
       // in-app notification is read. Reading the in-app copy closes the user
       // communication gap without pretending the provider delivery succeeded.
@@ -134,7 +670,10 @@ export class CommercialService {
         where: { status: "failed", notification: { readAt: null } }
       } as any),
       this.prisma.notificationDelivery.count({
-        where: { status: "processing", leaseExpiresAt: { lte: now } }
+        where: {
+          status: "processing",
+          OR: [{ leaseExpiresAt: null }, { leaseExpiresAt: { lte: now } }]
+        }
       } as any),
       this.prisma.companionCommercialProfile.count({ where: { status: "pendingReview" } } as any),
       this.prisma.companionRecovery.count({ where: { status: { in: ["due", "pendingVerification"] } } } as any),
@@ -199,13 +738,19 @@ export class CommercialService {
         WHERE "status" = 'paid'
           AND "scheduledAt" + "durationMinutes" * INTERVAL '1 minute' + INTERVAL '10 minutes' < NOW()
       `,
+      this.prisma.$queryRaw<Array<{ count: number }>>`
+        SELECT COUNT(*)::int AS "count"
+        FROM "Order"
+        WHERE "status" = 'inService'
+          AND "scheduledAt" + "durationMinutes" * INTERVAL '1 minute' + INTERVAL '30 minutes' < NOW()
+      `,
       this.prisma.$queryRaw<Array<{ id: string; scheduledAt: Date }>>`
         SELECT "id", "scheduledAt"
         FROM "Order"
         WHERE "status" = 'inService'
           AND "scheduledAt" + "durationMinutes" * INTERVAL '1 minute' + INTERVAL '30 minutes' < NOW()
-        ORDER BY "scheduledAt" ASC
-        LIMIT 100
+        ORDER BY "scheduledAt" ASC, "id" ASC
+        LIMIT ${STALE_IN_SERVICE_SAMPLE_LIMIT}
       `,
       trtcEnabled
         ? this.prisma.voiceSession.count({
@@ -223,14 +768,89 @@ export class CommercialService {
         ? this.prisma.voiceSession.count({ where: { terminationCompletedAt: null } } as any)
         : Promise.resolve(0)
     ]);
-    const blockers = {
+    const refundPolicySnapshotGaps = Number(
+      (await refundPolicySnapshotGapsPromise)[0]?.count ?? 0
+    );
+    const accountDeletionExecutionOldestDueAt = accountDeletionExecutionOldestDue[0]?.dueAt ?? null;
+    const accountDeletionExecutionOldestDueAgeSeconds = accountDeletionExecutionOldestDueAt
+      ? Math.max(0, Math.floor(
+          (now.getTime() - accountDeletionExecutionOldestDueAt.getTime()) / 1_000
+        ))
+      : null;
+    const accountDeletionExecutionBacklogSlaBreached =
+      accountDeletionExecutionOldestDueAgeSeconds !== null
+      && accountDeletionExecutionOldestDueAgeSeconds * 1_000
+        > ACCOUNT_DELETION_EXECUTION_BACKLOG_SLA_MS;
+    const blockers: CommercialReadinessBlockers = {
       orderIntakeDisabled: this.config.get<boolean>("ORDER_INTAKE_ENABLED", true) ? 0 : 1,
       payoutClaimsDisabled: this.config.get<boolean>("PAYOUT_CLAIMS_ENABLED", true) ? 0 : 1,
+      paymentDisputeIntakeDisabled: this.config.get<boolean>("WECHAT_PAY_COMPLAINTS_ENABLED", false) ? 0 : 1,
+      refundPolicyUnapproved: refundPolicyConfigurationApproved ? 0 : 1,
+      refundPolicySnapshotGaps,
+      wechatDailyBillReconciliationDisabled: dailyBillConfigured ? 0 : 1,
+      wechatDailyBillReconciliationIncomplete:
+        dailyBillConfigured ? dailyBillGate.missingOrIncompleteRuns : 0,
+      wechatDailyBillOpenIssues: dailyBillConfigured ? dailyBillGate.unresolvedIssues : 0,
+      wechatDailyBillPendingApprovals: dailyBillConfigured
+        ? dailyBillGate.pendingApprovals + dailyBillGate.pendingBillImportApprovals
+        : 0,
+      wechatDailyBillProviderTimeUnknown: dailyBillConfigured
+        ? dailyBillGate.unknownProviderPaymentTimes + dailyBillGate.unknownProviderRefundTimes
+        : 0,
+      wechatCashLedgerUnclassified: dailyBillConfigured
+        ? dailyBillGate.unclassifiedCashLedgerEntries
+        : 0,
       failedRefunds,
       staleRefunds,
       overdueSupport,
+      overdueAccountDeletions,
+      accountDeletionExecutionFailed,
+      accountDeletionExecutionExpiredLeases,
+      accountDeletionExecutionBacklogSlaBreached:
+        accountDeletionExecutionBacklogSlaBreached ? 1 : 0,
+      accountDeletionPendingErasure,
+      accountDeletionRetentionApprovalBacklog,
+      accountDeletionRetentionPolicyUnapproved:
+        accountDeletionRetentionPolicyApproved && accountDeletionRetentionPolicyApprovalReference ? 0 : 1,
+      dataRetentionLegalHoldPolicyUnapproved: dataRetentionLegalHoldPolicy.ready ? 0 : 1,
+      dataRetentionLegalHoldPendingActions,
+      accountDeletionAuthTombstoneCoverageGaps,
+      accountDeletionAuthTombstoneUnknownKeys,
+      overdueRetainedExpiryBacklog,
+      retainedExpiryFailures,
+      overdueUserAccountAppeals,
+      overdueCompanionAccountAppeals,
+      overduePaymentDisputes,
+      paymentDisputeSyncFailures,
+      notificationDeliveryDisabledWithPending:
+        notificationDeliveryEnabled ? 0 : notificationPendingTotal,
+      notificationDeliveryOverduePending: notificationOverduePending,
       failedNotifications,
       staleNotificationLeases,
+      availabilityReminderFanoutFailed: availabilityReminderFanout.backlog.failed,
+      availabilityReminderFanoutExpiredLeases: availabilityReminderFanout.backlog.expiredLeases,
+      availabilityReminderFanoutBacklogSlaBreached:
+        availabilityReminderFanout.backlog.backlogSlaBreached ? 1 : 0,
+      availabilityReminderFanoutRunnerDisabledWithDueBacklog:
+        availabilityReminderFanout.backlog.runnerDisabledWithDueBacklog ? 1 : 0,
+      availabilityReminderPreparationFailures: availabilityReminderPipeline.failedPreparation,
+      availabilityReminderReservationFailures: availabilityReminderPipeline.failedReservation,
+      availabilityReminderDeliveryFailures: availabilityReminderPipeline.failedDelivery,
+      availabilityReminderPreparationExpiredLeases:
+        availabilityReminderPipeline.expiredPreparationLeases,
+      availabilityReminderReservationExpiredLeases:
+        availabilityReminderPipeline.expiredReservationLeases,
+      availabilityReminderDeliveryClaimExpiredLeases:
+        availabilityReminderPipeline.expiredDeliveryClaimLeases,
+      availabilityReminderAttemptExpiredLeases: availabilityReminderPipeline.expiredAttemptLeases,
+      availabilityReminderPipelineBacklogSlaBreached:
+        availabilityReminderPipeline.backlogSlaBreached ? 1 : 0,
+      availabilityReminderPreparationRunnerDisabledWithDueBacklog:
+        availabilityReminderPipeline.preparationRunnerDisabledWithDueBacklog ? 1 : 0,
+      availabilityReminderDeliveryRunnerDisabledWithDueBacklog:
+        availabilityReminderPipeline.deliveryRunnerDisabledWithDueBacklog ? 1 : 0,
+      availabilityReminderTerminalUnresolved:
+        availabilityReminderPipeline.terminalAttempts.unresolved,
       pendingCommercialProfiles,
       unresolvedRecoveries,
       stalePayoutClaims,
@@ -242,7 +862,7 @@ export class CommercialService {
       expiredOrderRequests,
       expiredPaymentReservations,
       expiredPaidServiceWindows: Number(expiredPaidServiceWindows[0]?.count ?? 0),
-      staleInService: staleInService.length,
+      staleInService: Number(staleInServiceCount[0]?.count ?? 0),
       voiceRoomControlDisabled: trtcEnabled && !trtcRoomControlEnabled ? 1 : 0,
       voiceEmergencyStopActive: trtcEmergencyStopEnabled ? 1 : 0,
       voiceTerminationBacklog,
@@ -259,10 +879,82 @@ export class CommercialService {
         terminationBacklog: voiceTerminationBacklog,
         emergencyDrainPending: voiceEmergencyDrainPending
       },
+      notificationDelivery: {
+        enabled: notificationDeliveryEnabled,
+        intervalSeconds: notificationDeliveryInterval,
+        slaSeconds: notificationDeliverySla,
+        pendingTotal: notificationPendingTotal,
+        duePending: notificationDuePending,
+        overduePending: notificationOverduePending,
+        oldestDueAt: notificationOldestDue?.nextAttemptAt?.toISOString?.() ?? null,
+        oldestDueAgeSeconds: notificationOldestDue?.nextAttemptAt
+          ? Math.max(0, Math.floor(
+              (now.getTime() - notificationOldestDue.nextAttemptAt.getTime()) / 1_000
+            ))
+          : null,
+        processing: notificationProcessing,
+        expiredProcessing: staleNotificationLeases,
+        unreadFailed: failedNotifications
+      },
+      availabilityReminder: {
+        ...availabilityReminderFanout,
+        status: availabilityReminderFanout.status === "attentionRequired"
+          || availabilityReminderPipeline.status === "attentionRequired"
+          ? "attentionRequired"
+          : availabilityReminderFanout.status === "processing"
+            || availabilityReminderPipeline.status === "processing"
+            ? "processing"
+            : "clear",
+        pipeline: availabilityReminderPipeline
+      },
+      dailyBillReconciliation: {
+        dueDate: dailyBillGate.dueDate,
+        configuredStartDate: dailyBillGate.configuredStartDate,
+        coverageStartDate: dailyBillGate.coverageStartDate,
+        providerCatchupStartDate: dailyBillGate.providerCatchupStartDate,
+        enabled: dailyBillGate.enabled,
+        approved: dailyBillGate.approved,
+        requiredDates: dailyBillGate.requiredDates,
+        completedRuns: dailyBillGate.completedRuns,
+        requiredRuns: dailyBillGate.requiredRuns,
+        missingOrIncompleteRuns: dailyBillGate.missingOrIncompleteRuns,
+        unresolvedIssues: dailyBillGate.unresolvedIssues,
+        pendingApprovals: dailyBillGate.pendingApprovals,
+        pendingBillImportApprovals: dailyBillGate.pendingBillImportApprovals,
+        unknownProviderPaymentTimes: dailyBillGate.unknownProviderPaymentTimes,
+        unknownProviderRefundTimes: dailyBillGate.unknownProviderRefundTimes,
+        unclassifiedCashLedgerEntries: dailyBillGate.unclassifiedCashLedgerEntries
+      },
+      retentionExpiry: {
+        overdueBacklog: overdueRetainedExpiryBacklog,
+        failures: retainedExpiryFailures,
+        earliestOverdueAt: earliestOverdueRetention?.retentionEndsAt?.toISOString?.() ?? null,
+        earliestRetryAt: earliestRetentionRetry?.expiryNextAttemptAt?.toISOString?.() ?? null,
+        latestErrorCode: latestRetentionFailure?.expiryLastErrorCode ?? null
+      },
+      accountDeletionExecution: {
+        dueBacklog: accountDeletionExecutionDueBacklog,
+        processing: accountDeletionExecutionProcessing,
+        failed: accountDeletionExecutionFailed,
+        expiredLeases: accountDeletionExecutionExpiredLeases,
+        oldestDueAt: accountDeletionExecutionOldestDueAt?.toISOString?.() ?? null,
+        oldestDueAgeSeconds: accountDeletionExecutionOldestDueAgeSeconds,
+        backlogSlaSeconds: ACCOUNT_DELETION_EXECUTION_BACKLOG_SLA_MS / 1_000,
+        backlogSlaBreached: accountDeletionExecutionBacklogSlaBreached
+      },
+      accountDeletionAuthTombstones: {
+        coverageGaps: accountDeletionAuthTombstoneCoverageGaps,
+        unknownKeyBacklog: accountDeletionAuthTombstoneUnknownKeys,
+        expiredCleanupBacklog: accountDeletionAuthTombstoneExpiredCleanupBacklog,
+        configuredKeyIds: configuredTombstoneKeyIds
+      },
       staleInServiceOrders: staleInService.map((order) => ({
         id: order.id,
         scheduledAt: order.scheduledAt.toISOString()
-      }))
+      })),
+      staleInServiceSampleLimit: STALE_IN_SERVICE_SAMPLE_LIMIT,
+      staleInServiceSampleTruncated:
+        Number(staleInServiceCount[0]?.count ?? 0) > staleInService.length
     };
   }
 
@@ -303,6 +995,11 @@ export class CommercialService {
           submittedById: actorId,
           verifiedAt: null,
           verifiedById: null,
+          nextReviewDueAt: null,
+          adultEligibilityVerdict: "pending",
+          adultEligibilityVerifiedAt: null,
+          adultEligibilityValidUntil: null,
+          adultEligibilityEvidenceRef: null,
           suspendedAt: null,
           suspendedById: null,
           suspendedReason: null
@@ -313,10 +1010,12 @@ export class CommercialService {
       }
       await this.audit.record({
         actorId,
+        subjectUserIds: companion.ownerUserId ? [companion.ownerUserId] : [],
         action: "commercial.companion_profile_submitted",
         resourceType: "companionCommercialProfile",
         resourceId: companionId,
         metadata: {
+          companionId,
           settlementRecipientMasked: normalized.settlementRecipientMasked,
           serviceAgreementVersion: normalized.serviceAgreementVersion,
           unpublishedForReview: companion.isPublished
@@ -356,16 +1055,73 @@ export class CommercialService {
           HttpStatus.CONFLICT
         );
       }
+      if (
+        !Number.isInteger(companion.owner.profile.age)
+        || companion.owner.profile.age < 18
+      ) {
+        throw new AppException(
+          "COMPANION_ADULT_ELIGIBILITY_REQUIRED",
+          "The identity-reviewed companion owner must have an adult eligibility result",
+          HttpStatus.CONFLICT
+        );
+      }
+      const now = new Date();
+      const trainingRecords = await db.companionTrainingRecord.findMany({
+        where: {
+          companionId,
+          status: "passed",
+          OR: [{ expiresAt: null }, { expiresAt: { gt: now } }]
+        },
+        select: { moduleCode: true, moduleVersion: true, expiresAt: true }
+      });
+      const currentTraining = new Set(
+        trainingRecords.map((record: any) => `${record.moduleCode}:${record.moduleVersion}`)
+      );
+      const missingTraining = REQUIRED_COMPANION_TRAINING.filter(
+        (required) => !currentTraining.has(`${required.moduleCode}:${required.moduleVersion}`)
+      );
+      if (missingTraining.length) {
+        throw new AppException(
+          "COMPANION_TRAINING_REQUIRED",
+          "Every required companion training module must be current before commercial verification",
+          HttpStatus.CONFLICT,
+          { missingModuleCodes: missingTraining.map((item) => item.moduleCode) }
+        );
+      }
+      const trainingExpiryTimes = trainingRecords
+        .map((record: any) => record.expiresAt?.getTime?.())
+        .filter((value: unknown): value is number => typeof value === "number" && Number.isFinite(value));
+      const annualReviewDueAt = new Date(now.getTime() + 365 * 24 * 60 * 60_000);
+      const nextReviewDueAt = trainingExpiryTimes.length
+        ? new Date(Math.min(annualReviewDueAt.getTime(), ...trainingExpiryTimes))
+        : annualReviewDueAt;
       const updated = await db.companionCommercialProfile.update({
         where: { companionId },
-        data: { status: "verified", verifiedAt: new Date(), verifiedById: actorId }
+        data: {
+          status: "verified",
+          verifiedAt: now,
+          verifiedById: actorId,
+          nextReviewDueAt,
+          adultEligibilityVerdict: "adult",
+          adultEligibilityVerifiedAt: now,
+          adultEligibilityValidUntil: nextReviewDueAt,
+          adultEligibilityEvidenceRef: profile.identityEvidenceRef
+        }
       });
       await this.audit.record({
         actorId,
+        subjectUserIds: companion.ownerUserId ? [companion.ownerUserId] : [],
         action: "commercial.companion_profile_verified",
         resourceType: "companionCommercialProfile",
         resourceId: companionId,
-        metadata: { submittedById: profile.submittedById }
+        metadata: {
+          companionId,
+          submittedById: profile.submittedById,
+          adultEligibilityVerdict: "adult",
+          adultEligibilityValidUntil: nextReviewDueAt.toISOString(),
+          requiredTrainingVersions: REQUIRED_COMPANION_TRAINING,
+          nextReviewDueAt: nextReviewDueAt.toISOString()
+        }
       }, db);
       return updated;
     });
@@ -377,6 +1133,10 @@ export class CommercialService {
     const result = await this.prisma.$transaction(async (tx) => {
       const db = tx as any;
       await db.$queryRaw`SELECT "id" FROM "CompanionProfile" WHERE "id" = ${companionId} FOR UPDATE`;
+      const companion = await db.companionProfile.findUnique({
+        where: { id: companionId },
+        select: { ownerUserId: true }
+      });
       const profile = await db.companionCommercialProfile.findUnique({ where: { companionId } });
       if (!profile) throw new AppException("COMMERCIAL_PROFILE_NOT_FOUND", "Commercial profile not found", HttpStatus.NOT_FOUND);
       const updated = await db.companionCommercialProfile.update({
@@ -391,10 +1151,11 @@ export class CommercialService {
       await db.companionProfile.updateMany({ where: { id: companionId }, data: { isPublished: false } });
       await this.audit.record({
         actorId,
+        subjectUserIds: companion?.ownerUserId ? [companion.ownerUserId] : [],
         action: "commercial.companion_profile_suspended",
         resourceType: "companionCommercialProfile",
         resourceId: companionId,
-        metadata: { reason: normalizedReason }
+        metadata: { companionId, reason: normalizedReason }
       }, db);
       return updated;
     });
@@ -415,6 +1176,21 @@ export class CommercialService {
         HttpStatus.SERVICE_UNAVAILABLE
       );
     }
+    const providerGate = await this.livePayoutComplaintState(earningId);
+    if (providerGate.state !== "clear") {
+      await this.prisma.companionEarning.updateMany({
+        where: { id: earningId, status: { in: ["pending", "available", "held"] } },
+        data: {
+          status: "held",
+          holdReason: providerGate.state === "active"
+            ? "payment_dispute_live"
+            : "payment_dispute_provider_outcome_unknown"
+        }
+      } as any);
+      this.throwPayoutHold(providerGate.state === "active"
+        ? "payment_dispute_live"
+        : "payment_dispute_provider_outcome_unknown");
+    }
     const result = await this.prisma.$transaction(async (tx) => {
       const db = tx as any;
       const earning = await this.lockPayoutEarning(db, earningId);
@@ -430,6 +1206,9 @@ export class CommercialService {
         !earning.settlementRecipientMaskedSnapshot ||
         !earning.taxProfileRefSnapshot ||
         !earning.identityEvidenceRefSnapshot ||
+        earning.order?.adultEligibilityVerdictSnapshot !== "adult" ||
+        !earning.order?.adultEligibilityVerifiedAtSnapshot ||
+        !earning.order?.adultEligibilityValidUntilSnapshot ||
         !earning.serviceAgreementVersionSnapshot ||
         !earning.serviceAgreementEvidenceRefSnapshot
       ) {
@@ -443,6 +1222,13 @@ export class CommercialService {
         throw new AppException(
           "EARNING_COMMERCIAL_PROFILE_NOT_VERIFIED",
           "The companion commercial profile must remain verified at payout time",
+          HttpStatus.CONFLICT
+        );
+      }
+      if (!this.isCurrentAdultEligibility(earning.companion?.commercialProfile)) {
+        throw new AppException(
+          "EARNING_ADULT_ELIGIBILITY_EXPIRED",
+          "The companion adult eligibility must remain current at payout time",
           HttpStatus.CONFLICT
         );
       }
@@ -473,6 +1259,9 @@ export class CommercialService {
       });
       await this.audit.record({
         actorId,
+        subjectUserIds: earning.companion?.ownerUserId
+          ? [earning.companion.ownerUserId]
+          : [],
         action: "commercial.earning_payout_claimed",
         resourceType: "companionEarning",
         resourceId: earning.id,
@@ -531,11 +1320,15 @@ export class CommercialService {
       });
       await this.audit.record({
         actorId,
+        subjectUserIds: earning.companion?.ownerUserId
+          ? [earning.companion.ownerUserId]
+          : [],
         action: "commercial.earning_payout_claim_cancelled",
         resourceType: "companionEarning",
         resourceId: earning.id,
         metadata: {
           orderId: earning.orderId,
+          companionId: earning.companionId,
           originalClaimantId: earning.payoutSubmittedById,
           reason: evidence.reason.trim(),
           noTransferEvidenceReference: evidence.noTransferEvidenceReference.trim(),
@@ -558,6 +1351,10 @@ export class CommercialService {
     if (!reference) {
       throw new AppException("EARNING_REFERENCE_REQUIRED", "A manual payout reference is required", HttpStatus.BAD_REQUEST);
     }
+    // A transfer has already been attempted by the time this endpoint is
+    // called. Even when provider complaint verification is unavailable, keep
+    // the claim and evidence durable and move into outcome-unknown recovery.
+    const providerGate = await this.livePayoutComplaintState(earningId);
     const result = await this.prisma.$transaction(async (tx) => {
       const db = tx as any;
       const earning = await this.lockPayoutEarning(db, earningId);
@@ -600,8 +1397,88 @@ export class CommercialService {
           HttpStatus.CONFLICT
         );
       }
+      if (providerGate.state !== "clear") {
+        const holdReason = providerGate.state === "active"
+          ? "payment_dispute_transfer_outcome_unknown"
+          : "payment_dispute_provider_outcome_unknown";
+        const held = await db.companionEarning.update({
+          where: { id: earning.id },
+          data: {
+            status: "held",
+            holdReason,
+            payoutSubmittedAt: earning.payoutSubmittedAt ?? new Date(),
+            paidReference: reference,
+            paidAmountCents: evidence.paidAmountCents,
+            paidRecipientRef: evidence.paidRecipientRef.trim(),
+            payoutEvidenceDigest: evidence.payoutEvidenceDigest.toLowerCase()
+          },
+          include: {
+            order: true,
+            companion: { select: { id: true, name: true, ownerUserId: true, commercialProfile: true } }
+          }
+        });
+        await this.persistPayoutOutcomeUnknownRecoveries(db, earning, providerGate.disputeIds);
+        await this.audit.record({
+          actorId,
+          subjectUserIds: earning.companion?.ownerUserId
+            ? [earning.companion.ownerUserId]
+            : [],
+          action: "commercial.earning_payout_evidence_held_outcome_unknown",
+          resourceType: "companionEarning",
+          resourceId: earning.id,
+          metadata: {
+            orderId: earning.orderId,
+            companionId: earning.companionId,
+            paidReference: reference,
+            payoutEvidenceDigest: evidence.payoutEvidenceDigest.toLowerCase(),
+            providerGate: providerGate.state,
+            disputeIds: providerGate.disputeIds,
+            paidConfirmed: false
+          }
+        }, db);
+        return { holdReason, earning: held };
+      }
       const holdReason = await this.payoutHoldReason(db, earning.orderId);
       if (holdReason) {
+        if (holdReason === "payment_dispute_live") {
+          const disputeIds = await this.activePaymentDisputeIds(db, earning.orderId);
+          const outcomeUnknownReason = "payment_dispute_transfer_outcome_unknown";
+          const held = await db.companionEarning.update({
+            where: { id: earning.id },
+            data: {
+              status: "held",
+              holdReason: outcomeUnknownReason,
+              payoutSubmittedAt: earning.payoutSubmittedAt ?? new Date(),
+              paidReference: reference,
+              paidAmountCents: evidence.paidAmountCents,
+              paidRecipientRef: evidence.paidRecipientRef.trim(),
+              payoutEvidenceDigest: evidence.payoutEvidenceDigest.toLowerCase()
+            },
+            include: {
+              order: true,
+              companion: { select: { id: true, name: true, ownerUserId: true, commercialProfile: true } }
+            }
+          });
+          await this.persistPayoutOutcomeUnknownRecoveries(db, earning, disputeIds);
+          await this.audit.record({
+            actorId,
+            subjectUserIds: earning.companion?.ownerUserId
+              ? [earning.companion.ownerUserId]
+              : [],
+            action: "commercial.earning_payout_evidence_held_for_concurrent_dispute",
+            resourceType: "companionEarning",
+            resourceId: earning.id,
+            metadata: {
+              orderId: earning.orderId,
+              companionId: earning.companionId,
+              paidReference: reference,
+              payoutEvidenceDigest: evidence.payoutEvidenceDigest.toLowerCase(),
+              disputeIds,
+              paidConfirmed: false
+            }
+          }, db);
+          return { holdReason: outcomeUnknownReason, earning: held };
+        }
         const held = await db.companionEarning.update({
           where: { id: earning.id },
           data: { status: "held", holdReason },
@@ -624,6 +1501,9 @@ export class CommercialService {
       });
       await this.audit.record({
         actorId,
+        subjectUserIds: earning.companion?.ownerUserId
+          ? [earning.companion.ownerUserId]
+          : [],
         action: "commercial.earning_payout_evidence_recorded",
         resourceType: "companionEarning",
         resourceId: earning.id,
@@ -645,6 +1525,7 @@ export class CommercialService {
   }
 
   async verifyPayout(actorId: string, earningId: string) {
+    const providerGate = await this.livePayoutComplaintState(earningId);
     const result = await this.prisma.$transaction(async (tx) => {
       const db = tx as any;
       const earning = await this.lockPayoutEarning(db, earningId);
@@ -676,8 +1557,68 @@ export class CommercialService {
           HttpStatus.FORBIDDEN
         );
       }
+      if (providerGate.state !== "clear") {
+        const holdReason = providerGate.state === "active"
+          ? "payment_dispute_transfer_outcome_unknown"
+          : "payment_dispute_provider_outcome_unknown";
+        const held = await db.companionEarning.update({
+          where: { id: earning.id },
+          data: { status: "held", holdReason },
+          include: {
+            order: true,
+            companion: { select: { id: true, name: true, ownerUserId: true, commercialProfile: true } }
+          }
+        });
+        await this.persistPayoutOutcomeUnknownRecoveries(db, earning, providerGate.disputeIds);
+        await this.audit.record({
+          actorId,
+          subjectUserIds: earning.companion?.ownerUserId
+            ? [earning.companion.ownerUserId]
+            : [],
+          action: "commercial.earning_payout_verification_blocked_outcome_unknown",
+          resourceType: "companionEarning",
+          resourceId: earning.id,
+          metadata: {
+            orderId: earning.orderId,
+            companionId: earning.companionId,
+            providerGate: providerGate.state,
+            disputeIds: providerGate.disputeIds,
+            paidConfirmed: false
+          }
+        }, db);
+        return { holdReason, earning: held };
+      }
       const holdReason = await this.payoutHoldReason(db, earning.orderId);
       if (holdReason) {
+        if (holdReason === "payment_dispute_live") {
+          const disputeIds = await this.activePaymentDisputeIds(db, earning.orderId);
+          const outcomeUnknownReason = "payment_dispute_transfer_outcome_unknown";
+          const held = await db.companionEarning.update({
+            where: { id: earning.id },
+            data: { status: "held", holdReason: outcomeUnknownReason },
+            include: {
+              order: true,
+              companion: { select: { id: true, name: true, ownerUserId: true, commercialProfile: true } }
+            }
+          });
+          await this.persistPayoutOutcomeUnknownRecoveries(db, earning, disputeIds);
+          await this.audit.record({
+            actorId,
+            subjectUserIds: earning.companion?.ownerUserId
+              ? [earning.companion.ownerUserId]
+              : [],
+            action: "commercial.earning_payout_verification_blocked_by_concurrent_dispute",
+            resourceType: "companionEarning",
+            resourceId: earning.id,
+            metadata: {
+              orderId: earning.orderId,
+              companionId: earning.companionId,
+              disputeIds,
+              paidConfirmed: false
+            }
+          }, db);
+          return { holdReason: outcomeUnknownReason, earning: held };
+        }
         const held = await db.companionEarning.update({
           where: { id: earning.id },
           data: { status: "held", holdReason },
@@ -692,6 +1633,9 @@ export class CommercialService {
       });
       await this.audit.record({
         actorId,
+        subjectUserIds: earning.companion?.ownerUserId
+          ? [earning.companion.ownerUserId]
+          : [],
         action: "commercial.earning_payout_verified",
         resourceType: "companionEarning",
         resourceId: earning.id,
@@ -709,20 +1653,49 @@ export class CommercialService {
     return this.toDto(result.earning, true);
   }
 
-  async listRecoveries(status?: string) {
+  async listRecoveries(query: { status?: string; page?: number; pageSize?: number } = {}) {
+    const { status } = query;
     if (status && !["due", "pendingVerification", "recovered"].includes(status)) {
       throw new AppException("RECOVERY_STATUS_INVALID", "Unknown recovery status", HttpStatus.BAD_REQUEST);
     }
-    const items = await this.prisma.companionRecovery.findMany({
-      where: status ? { status } : {},
-      include: {
-        companion: { select: { id: true, name: true, ownerUserId: true } },
-        refund: { include: { order: true } }
-      },
-      orderBy: { createdAt: "asc" },
-      take: 200
-    } as any);
-    return { items: items.map((item: any) => this.recoveryDto(item)) };
+    const page = Number.isSafeInteger(query.page) && (query.page ?? 0) > 0 ? query.page! : 1;
+    const pageSize = Number.isSafeInteger(query.pageSize) && (query.pageSize ?? 0) > 0
+      ? Math.min(100, query.pageSize!)
+      : 50;
+    const where = status ? { status } : {};
+    const [items, total] = await Promise.all([
+      this.prisma.companionRecovery.findMany({
+        where,
+        include: {
+          companion: { select: { id: true, name: true, ownerUserId: true } },
+          refund: { include: { order: true } }
+        },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        skip: (page - 1) * pageSize,
+        take: pageSize
+      } as any),
+      this.prisma.companionRecovery.count({ where } as any)
+    ]);
+    return {
+      items: items.map((item: any) => this.recoveryDto(item)),
+      pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) }
+    };
+  }
+
+  private emptyEarningsSummary() {
+    return {
+      totalCount: 0,
+      availableCents: 0,
+      pendingOrHeldCents: 0,
+      paidCents: 0,
+      byStatus: {
+        pending: { count: 0, payableCents: 0 },
+        available: { count: 0, payableCents: 0 },
+        held: { count: 0, payableCents: 0 },
+        paid: { count: 0, payableCents: 0 },
+        void: { count: 0, payableCents: 0 }
+      }
+    };
   }
 
   async recordRecoveryEvidence(actorId: string, recoveryId: string, evidenceReference: string) {
@@ -730,7 +1703,10 @@ export class CommercialService {
     const result = await this.prisma.$transaction(async (tx) => {
       const db = tx as any;
       await db.$queryRaw`SELECT "id" FROM "CompanionRecovery" WHERE "id" = ${recoveryId} FOR UPDATE`;
-      const recovery = await db.companionRecovery.findUnique({ where: { id: recoveryId } });
+      const recovery = await db.companionRecovery.findUnique({
+        where: { id: recoveryId },
+        include: { companion: { select: { ownerUserId: true } } }
+      });
       if (!recovery) throw new AppException("RECOVERY_NOT_FOUND", "Companion recovery not found", HttpStatus.NOT_FOUND);
       if (recovery.status !== "due") {
         throw new AppException("RECOVERY_INVALID_STATE", "Only a due recovery can receive evidence", HttpStatus.CONFLICT);
@@ -753,10 +1729,17 @@ export class CommercialService {
       });
       await this.audit.record({
         actorId,
+        subjectUserIds: recovery.companion?.ownerUserId
+          ? [recovery.companion.ownerUserId]
+          : [],
         action: "commercial.recovery_evidence_recorded",
         resourceType: "companionRecovery",
         resourceId: recoveryId,
-        metadata: { amountCents: recovery.amountCents, evidenceReference: reference }
+        metadata: {
+          companionId: recovery.companionId,
+          amountCents: recovery.amountCents,
+          evidenceReference: reference
+        }
       }, db);
       return updated;
     });
@@ -767,7 +1750,10 @@ export class CommercialService {
     const result = await this.prisma.$transaction(async (tx) => {
       const db = tx as any;
       await db.$queryRaw`SELECT "id" FROM "CompanionRecovery" WHERE "id" = ${recoveryId} FOR UPDATE`;
-      const recovery = await db.companionRecovery.findUnique({ where: { id: recoveryId } });
+      const recovery = await db.companionRecovery.findUnique({
+        where: { id: recoveryId },
+        include: { companion: { select: { ownerUserId: true } } }
+      });
       if (!recovery) throw new AppException("RECOVERY_NOT_FOUND", "Companion recovery not found", HttpStatus.NOT_FOUND);
       if (recovery.status !== "pendingVerification" || !recovery.evidenceReference || !recovery.evidenceSubmittedById) {
         throw new AppException("RECOVERY_INVALID_STATE", "Recovery evidence is not awaiting verification", HttpStatus.CONFLICT);
@@ -785,10 +1771,14 @@ export class CommercialService {
       });
       await this.audit.record({
         actorId,
+        subjectUserIds: recovery.companion?.ownerUserId
+          ? [recovery.companion.ownerUserId]
+          : [],
         action: "commercial.recovery_verified",
         resourceType: "companionRecovery",
         resourceId: recoveryId,
         metadata: {
+          companionId: recovery.companionId,
           amountCents: recovery.amountCents,
           evidenceReference: recovery.evidenceReference,
           evidenceSubmittedById: recovery.evidenceSubmittedById
@@ -805,6 +1795,31 @@ export class CommercialService {
       data: { status: "held", holdReason: reason }
     } as any);
     return updated.count;
+  }
+
+  async reconcileOrderEarning(orderId: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const db = tx as any;
+      await db.$queryRaw`SELECT "id" FROM "Order" WHERE "id" = ${orderId} FOR UPDATE`;
+      const earning = await db.companionEarning.findUnique({ where: { orderId } });
+      if (!earning || !["pending", "available", "held"].includes(earning.status)) return null;
+      await db.$queryRaw`SELECT "id" FROM "CompanionEarning" WHERE "id" = ${earning.id} FOR UPDATE`;
+      const holdReason = await this.payoutHoldReason(db, orderId);
+      if (holdReason) {
+        return db.companionEarning.update({
+          where: { id: earning.id },
+          data: { status: "held", holdReason }
+        });
+      }
+      if (earning.payoutSubmittedAt && earning.payoutSubmittedById) return earning;
+      return db.companionEarning.update({
+        where: { id: earning.id },
+        data: {
+          status: earning.availableAt.getTime() <= Date.now() ? "available" : "pending",
+          holdReason: null
+        }
+      });
+    });
   }
 
   /**
@@ -876,13 +1891,17 @@ export class CommercialService {
     // racing a newly opened dispute or refund request.
     const pointer = await db.companionEarning.findUnique({
       where: { id: earningId },
-      select: { orderId: true }
+      select: { orderId: true, companionId: true }
     });
     if (!pointer) {
       throw new AppException("EARNING_NOT_FOUND", "Companion earning not found", HttpStatus.NOT_FOUND);
     }
     await db.$queryRaw`SELECT "id" FROM "Order" WHERE "id" = ${pointer.orderId} FOR UPDATE`;
     await db.$queryRaw`SELECT "id" FROM "CompanionEarning" WHERE "id" = ${earningId} FOR UPDATE`;
+    // All commercial-profile mutations lock CompanionProfile. Taking that
+    // lock before the final read serializes payout with suspension/review, so
+    // a profile cannot be suspended concurrently after eligibility was read.
+    await db.$queryRaw`SELECT "id" FROM "CompanionProfile" WHERE "id" = ${pointer.companionId} FOR UPDATE`;
     const earning = await db.companionEarning.findUnique({
       where: { id: earningId },
       include: {
@@ -896,10 +1915,103 @@ export class CommercialService {
     return earning;
   }
 
+  private async livePayoutComplaintState(earningId: string): Promise<{
+    state: "clear" | "active" | "outcomeUnknown";
+    disputeIds: string[];
+  }> {
+    if (!this.paymentDisputes) {
+      return this.config.get<string>("APP_ENV", "test") === "production"
+        ? { state: "outcomeUnknown", disputeIds: [] }
+        : { state: "clear", disputeIds: [] };
+    }
+    const pointer = await this.prisma.companionEarning.findUnique({
+      where: { id: earningId },
+      select: { orderId: true }
+    } as any);
+    if (!pointer) {
+      throw new AppException("EARNING_NOT_FOUND", "Companion earning not found", HttpStatus.NOT_FOUND);
+    }
+    try {
+      const result = await this.paymentDisputes.refreshActiveForOrder(pointer.orderId);
+      return result.active
+        ? { state: "active", disputeIds: result.disputeIds }
+        : { state: "clear", disputeIds: [] };
+    } catch {
+      return { state: "outcomeUnknown", disputeIds: [] };
+    }
+  }
+
+  private async persistPayoutOutcomeUnknownRecoveries(
+    db: any,
+    earning: any,
+    disputeIds: string[]
+  ) {
+    if (disputeIds.length) {
+      for (const disputeId of disputeIds) {
+        await db.companionRecovery.upsert({
+          where: { disputeId_earningId: { disputeId, earningId: earning.id } },
+          create: {
+            disputeId,
+            earningId: earning.id,
+            companionId: earning.companionId,
+            amountCents: earning.paidAmountCents ?? earning.payableCents,
+            reason: "payoutStateUncertain"
+          },
+          update: {}
+        });
+      }
+      return;
+    }
+    const existing = await db.companionRecovery.findFirst({
+      where: {
+        earningId: earning.id,
+        disputeId: null,
+        refundId: null,
+        reason: "payoutStateUncertain",
+        status: { in: ["due", "pendingVerification"] }
+      },
+      select: { id: true }
+    });
+    if (!existing) {
+      await db.companionRecovery.create({
+        data: {
+          earningId: earning.id,
+          companionId: earning.companionId,
+          amountCents: earning.paidAmountCents ?? earning.payableCents,
+          reason: "payoutStateUncertain"
+        }
+      });
+    }
+  }
+
+  private async activePaymentDisputeIds(db: any, orderId: string): Promise<string[]> {
+    if (!db.paymentDispute?.findMany) return [];
+    const disputes = await db.paymentDispute.findMany({
+      where: {
+        status: { in: ["pendingSync", "open", "processing", "syncFailed"] },
+        OR: [
+          { orderId },
+          { complaintOrders: { some: { orderId } } }
+        ]
+      },
+      select: { id: true },
+      orderBy: { id: "asc" }
+    });
+    return disputes.map((dispute: any) => dispute.id);
+  }
+
   private async payoutHoldReason(db: any, orderId: string): Promise<string | null> {
     const order = await db.order.findUnique({
       where: { id: orderId },
-      select: { completedAt: true, refundRequestDeadlineAt: true }
+      select: {
+        completedAt: true,
+        refundRequestDeadlineAt: true,
+        refundPolicyVersionSnapshot: true,
+        refundRequestWindowHoursSnapshot: true,
+        adultEligibilityVerdictSnapshot: true,
+        adultEligibilityVerifiedAtSnapshot: true,
+        adultEligibilityValidUntilSnapshot: true
+      }
     });
     const earningRef = await db.companionEarning.findUnique({
       where: { orderId },
@@ -917,6 +2029,24 @@ export class CommercialService {
       where: { orderId, status: { in: ["open", "inProgress"] } },
       select: { id: true }
     });
+    const unresolvedAttendance = db.attendanceDispute?.findFirst
+      ? await db.attendanceDispute.findFirst({
+          where: { orderId, status: { not: "final" } },
+          select: { id: true }
+        })
+      : null;
+    const activePaymentDispute = db.paymentDispute?.findFirst
+      ? await db.paymentDispute.findFirst({
+          where: {
+            status: { in: ["pendingSync", "open", "processing", "syncFailed"] },
+            OR: [
+              { orderId },
+              { complaintOrders: { some: { orderId } } }
+            ]
+          },
+          select: { id: true }
+        })
+      : null;
     const activeRefund = await db.refundTransaction.findFirst({
       where: { orderId, status: { in: ACTIVE_REFUND_STATUSES } },
       select: { id: true, status: true }
@@ -930,7 +2060,11 @@ export class CommercialService {
     const commercialProfile = earningRef && db.companionCommercialProfile?.findUnique
       ? await db.companionCommercialProfile.findUnique({
           where: { companionId: earningRef.companionId },
-          select: { status: true }
+          select: {
+            status: true,
+            adultEligibilityVerdict: true,
+            adultEligibilityValidUntil: true
+          }
         })
       : null;
     if (recovery) return "companion_recovery_due";
@@ -940,23 +2074,70 @@ export class CommercialService {
         !earningRef.settlementRecipientMaskedSnapshot ||
         !earningRef.taxProfileRefSnapshot ||
         !earningRef.identityEvidenceRefSnapshot ||
+        order?.adultEligibilityVerdictSnapshot !== "adult" ||
+        !order?.adultEligibilityVerifiedAtSnapshot ||
+        !order?.adultEligibilityValidUntilSnapshot ||
         !earningRef.serviceAgreementVersionSnapshot ||
         !earningRef.serviceAgreementEvidenceRefSnapshot)
     ) {
       return "commercial_profile_snapshot_missing";
     }
     if (earningRef && commercialProfile?.status !== "verified") return "commercial_profile_not_verified";
+    if (earningRef && !this.isCurrentAdultEligibility(commercialProfile)) {
+      return "companion_adult_eligibility_not_current";
+    }
+    if (unresolvedAttendance) return "attendance_dispute";
+    if (activePaymentDispute) return "payment_dispute_live";
     if (unresolved) return "unresolved_support_ticket";
     if (activeRefund?.status === "failed") return "refund_attention_required";
     if (activeRefund) return "refund_in_progress";
-    const refundWindowHours = this.config.get<number>("REFUND_REQUEST_WINDOW_HOURS") ?? 72;
-    const refundDeadline = order?.refundRequestDeadlineAt ?? (
-      order?.completedAt ? new Date(order.completedAt.getTime() + refundWindowHours * 60 * 60_000) : null
-    );
-    return refundDeadline && refundDeadline.getTime() > Date.now() ? "refund_window_open" : null;
+    if (!this.validCompletedOrderRefundPolicySnapshot(order)) {
+      return "refund_policy_snapshot_missing";
+    }
+    return order.refundRequestDeadlineAt.getTime() > Date.now() ? "refund_window_open" : null;
+  }
+
+  private validCompletedOrderRefundPolicySnapshot(order: any): boolean {
+    const version = typeof order?.refundPolicyVersionSnapshot === "string"
+      ? order.refundPolicyVersionSnapshot.trim()
+      : "";
+    const hours = order?.refundRequestWindowHoursSnapshot;
+    const completedAt = order?.completedAt instanceof Date ? order.completedAt : null;
+    const deadline = order?.refundRequestDeadlineAt instanceof Date
+      ? order.refundRequestDeadlineAt
+      : null;
+    return /^[A-Za-z0-9][A-Za-z0-9._-]{2,63}$/.test(version)
+      && Number.isInteger(hours)
+      && hours >= 1
+      && hours <= 720
+      && Boolean(completedAt)
+      && Boolean(deadline)
+      && deadline!.getTime() === completedAt!.getTime() + hours * 60 * 60_000;
   }
 
   private throwPayoutHold(holdReason: string | null) {
+    if (holdReason === "payment_dispute_live") {
+      throw new AppException(
+        "EARNING_HELD_FOR_PAYMENT_DISPUTE",
+        "This earning is held while an active provider payment complaint is investigated",
+        HttpStatus.CONFLICT
+      );
+    }
+    if (holdReason === "payment_dispute_transfer_outcome_unknown"
+      || holdReason === "payment_dispute_provider_outcome_unknown") {
+      throw new AppException(
+        "EARNING_PAYOUT_OUTCOME_UNKNOWN",
+        "Payout evidence was retained, but the earning cannot be marked paid until complaint and transfer outcomes are reconciled",
+        HttpStatus.CONFLICT
+      );
+    }
+    if (holdReason === "attendance_dispute") {
+      throw new AppException(
+        "EARNING_HELD_FOR_ATTENDANCE_DISPUTE",
+        "This earning is held while an attendance dispute is unresolved",
+        HttpStatus.CONFLICT
+      );
+    }
     if (holdReason === "unresolved_support_ticket") {
       throw new AppException(
         "EARNING_HELD_FOR_SUPPORT",
@@ -992,6 +2173,13 @@ export class CommercialService {
         HttpStatus.CONFLICT
       );
     }
+    if (holdReason === "refund_policy_snapshot_missing") {
+      throw new AppException(
+        "EARNING_REFUND_POLICY_SNAPSHOT_INVALID",
+        "A valid immutable refund policy snapshot and deadline are required before payout",
+        HttpStatus.CONFLICT
+      );
+    }
     if (holdReason === "commercial_profile_snapshot_missing") {
       throw new AppException(
         "EARNING_SETTLEMENT_SNAPSHOT_MISSING",
@@ -1003,6 +2191,13 @@ export class CommercialService {
       throw new AppException(
         "EARNING_COMMERCIAL_PROFILE_NOT_VERIFIED",
         "The companion commercial profile must remain verified at payout time",
+        HttpStatus.CONFLICT
+      );
+    }
+    if (holdReason === "companion_adult_eligibility_not_current") {
+      throw new AppException(
+        "EARNING_ADULT_ELIGIBILITY_EXPIRED",
+        "The companion adult eligibility must remain current at payout time",
         HttpStatus.CONFLICT
       );
     }
@@ -1090,12 +2285,25 @@ export class CommercialService {
       submittedById: profile.submittedById,
       verifiedAt: profile.verifiedAt?.toISOString?.() ?? null,
       verifiedById: profile.verifiedById ?? null,
+      adultEligibility: {
+        verdict: profile.adultEligibilityVerdict ?? "pending",
+        verifiedAt: profile.adultEligibilityVerifiedAt?.toISOString?.() ?? null,
+        validUntil: profile.adultEligibilityValidUntil?.toISOString?.() ?? null,
+        evidenceAvailable: Boolean(profile.adultEligibilityEvidenceRef)
+      },
       suspendedAt: profile.suspendedAt?.toISOString?.() ?? null,
       suspendedById: profile.suspendedById ?? null,
       suspendedReason: profile.suspendedReason ?? null,
+      nextReviewDueAt: profile.nextReviewDueAt?.toISOString?.() ?? null,
       companion: profile.companion ?? null,
       createdAt: profile.createdAt?.toISOString?.() ?? null,
       updatedAt: profile.updatedAt?.toISOString?.() ?? null
     };
+  }
+
+  private isCurrentAdultEligibility(profile: any): boolean {
+    return profile?.adultEligibilityVerdict === "adult"
+      && profile.adultEligibilityValidUntil instanceof Date
+      && profile.adultEligibilityValidUntil.getTime() > Date.now();
   }
 }

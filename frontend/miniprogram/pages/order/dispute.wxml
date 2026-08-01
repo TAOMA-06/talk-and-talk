@@ -1,0 +1,104 @@
+<view class="page dispute-page">
+  <view wx:if="{{loading}}" class="empty">正在核对订单、出席记录与案件状态…</view>
+  <view wx:elif="{{error}}" class="empty">
+    <view>{{error}}</view>
+    <button class="retry" bindtap="load" aria-label="重新加载履约争议">重新加载</button>
+  </view>
+  <block wx:else>
+    <view class="policy-card">
+      <view class="eyebrow">付费预约履约规则</view>
+      <view class="policy-title">先核对可信事实，再由双方答辩</view>
+      <view wx:if="{{policyState === 'loading'}}" class="policy-copy" aria-live="polite">正在读取当前规则与期限…</view>
+      <view wx:elif="{{policyState === 'error'}}" class="policy-error" aria-live="polite">
+        <view>{{policyError}}</view>
+        <button class="retry" bindtap="retryPolicy" aria-label="重新读取履约争议规则">重新读取规则</button>
+      </view>
+      <block wx:else>
+        <view class="policy-copy">预约后请至少等待 {{policy.waitMinutes}} 分钟，并在预约服务结束后 {{policy.caseWindowDays}} 天内提交。腾讯 TRTC 签名回调属于可信元数据；客户端上报只作辅助，不能单独裁决。</view>
+        <view wx:if="{{!dispute && eligibility}}" class="policy-copy">本订单提交截止：{{eligibilityDeadlineText}}（北京时间）。{{eligibility.eligible ? '当前可提交。' : eligibility.reason}}</view>
+        <view wx:elif="{{!dispute && eligibilityState === 'error'}}" class="policy-error">订单提交资格暂时无法核对；这不代表仍在期限内，新建入口已关闭。请返回订单详情刷新。</view>
+        <view class="policy-copy">证据不足或相互冲突时转人工复核。平台默认不录音，也不保存 IP、设备指纹等敏感终端信息。</view>
+      </block>
+    </view>
+
+    <view wx:if="{{!dispute}}" class="card">
+      <view class="section-title">提交结构化问题</view>
+      <view class="hint">提交后会冻结本单结算，并为另一方保留答辩期限。安全紧急情况请同时联系当地紧急服务。</view>
+      <radio-group bindchange="chooseIssue" aria-label="选择履约问题类型">
+        <label class="issue" wx:for="{{issues}}" wx:key="value">
+          <radio value="{{item.value}}" checked="{{issue === item.value}}" color="#B94A68" />
+          <view><view class="issue-label">{{item.label}}</view><view class="issue-help">{{item.help}}</view></view>
+        </label>
+      </radio-group>
+      <textarea class="statement" value="{{statement}}" bindinput="inputStatement" maxlength="2000" placeholder="可选：只写时间、履约和技术事实；不要填写身份证、手机号、银行卡或密码" aria-label="履约事实陈述" />
+      <button class="primary" loading="{{action === 'create'}}" disabled="{{policyState !== 'available' || !eligibility || !eligibility.eligible}}" bindtap="createCase" aria-label="提交履约争议并冻结结算">{{policyState !== 'available' || eligibilityState !== 'available' ? '规则或资格待核对，暂不能提交' : eligibility && eligibility.eligible ? '提交案件' : '当前不在提交窗口'}}</button>
+    </view>
+
+    <block wx:else>
+      <view class="card status-card">
+        <view class="status-row"><text class="status">{{view.statusText}}</text><text>{{view.issueText}}</text></view>
+        <view class="hint">你以{{view.viewerRoleText}}身份查看 · 规则版本 {{dispute.policyVersion}} · {{dispute.timezone}}</view>
+        <view class="deadline"><text>事实补充截止</text><text>{{view.evidenceDueText}}</text></view>
+        <view class="deadline"><text>对方答辩截止</text><text>{{view.responseDueText}}</text></view>
+        <view wx:if="{{dispute.deadlines.appealDeadlineAt}}" class="deadline"><text>申诉截止</text><text>{{view.appealDueText}}</text></view>
+        <view wx:if="{{dispute.deadlines.appealResponseDueAt}}" class="deadline"><text>申诉答辩截止</text><text>{{view.appealResponseDueText}}</text></view>
+      </view>
+
+      <view class="card">
+        <view class="section-title">平台出席摘要</view>
+        <view wx:if="{{dispute.attendanceSummary.providerEvidenceAvailable}}" class="trusted">已收到验签的腾讯 TRTC 出席元数据</view>
+        <view wx:else class="warning">暂无供应商可信事件；客户端记录不会被单独用于裁决</view>
+        <view class="participant-grid">
+          <view class="participant">
+            <view class="participant-title">客户</view>
+            <view>首次进入 {{view.customer.firstJoinedText}}</view>
+            <view>最后离开 {{view.customer.lastLeftText}}</view>
+            <view>进入 {{view.customer.joinCount}} · 重连 {{view.customer.reconnectCount}} · 离开 {{view.customer.leaveCount}}</view>
+          </view>
+          <view class="participant">
+            <view class="participant-title">陪伴者</view>
+            <view>首次进入 {{view.companion.firstJoinedText}}</view>
+            <view>最后离开 {{view.companion.lastLeftText}}</view>
+            <view>进入 {{view.companion.joinCount}} · 重连 {{view.companion.reconnectCount}} · 离开 {{view.companion.leaveCount}}</view>
+          </view>
+        </view>
+      </view>
+
+      <view class="card">
+        <view class="section-title">双方陈述</view>
+        <view wx:if="{{view.statements.length}}" class="statement-item" wx:for="{{view.statements}}" wx:key="id">
+          <view class="statement-meta"><text>{{item.roleText}} · {{item.kindText}}</text><text>{{item.timeText}}</text></view>
+          <view class="statement-copy">{{item.statement}}</view>
+          <view wx:if="{{item.evidenceAttachments.length}}" class="evidence-list">
+            <button wx:for="{{item.evidenceAttachments}}" wx:for-item="attachment" wx:key="id" class="evidence-chip" size="mini" data-id="{{attachment.id}}" bindtap="openBoundEvidence">{{attachment.kind === 'image' ? '查看图片证据' : '播放音频证据'}}</button>
+          </view>
+        </view>
+        <view wx:else class="hint">暂未提交文字陈述。平台仍会保留订单与供应商出席摘要。</view>
+        <textarea wx:if="{{view.canAddEvidence || view.canRespond || view.canAppeal || view.canAppealRespond}}" class="statement" value="{{statement}}" bindinput="inputStatement" maxlength="2000" placeholder="填写时间、履约或技术事实，不要提交敏感身份/支付信息" aria-label="案件陈述或申诉理由" />
+        <view wx:if="{{view.canAddEvidence || view.canRespond || view.canAppeal || view.canAppealRespond}}" class="evidence-panel">
+          <view class="evidence-toolbar">
+            <button size="mini" disabled="{{evidenceUploading || evidenceDrafts.length >= 3}}" bindtap="addEvidenceImage">添加图片</button>
+            <button size="mini" disabled="{{evidenceUploading || evidenceDrafts.length >= 3}}" bindtap="addEvidenceAudio">添加音频</button>
+            <button wx:if="{{evidenceDrafts.length}}" size="mini" disabled="{{evidenceUploading}}" bindtap="refreshEvidence">刷新审核</button>
+          </view>
+          <view wx:for="{{evidenceDrafts}}" wx:key="assetId" class="evidence-draft">
+            <text>{{item.kind === 'image' ? '图片' : '音频'}} · {{item.statusText}}</text>
+            <button size="mini" data-id="{{item.assetId}}" bindtap="removeEvidence">移除</button>
+          </view>
+          <view class="hint">最多 3 个受控附件。上传后先校验文件摘要并安全审核；只有通过审核的附件会随本次陈述提交，并仅向案件双方和有权限的经办人员开放。</view>
+        </view>
+        <button wx:if="{{view.canAddEvidence || view.canRespond || view.canAppealRespond}}" class="secondary" loading="{{action === 'statement'}}" bindtap="submitStatement">提交陈述</button>
+        <button wx:if="{{view.canCompleteEvidence}}" class="primary" loading="{{action === 'complete'}}" bindtap="completeEvidence">事实已补充完，等待对方答辩</button>
+        <button wx:if="{{view.canAppeal}}" class="primary" loading="{{action === 'appeal'}}" bindtap="appeal">提交申诉，转独立复核</button>
+      </view>
+
+      <view wx:if="{{dispute.decision || dispute.finalDecision}}" class="card decision-card">
+        <view class="section-title">处理决定</view>
+        <view wx:if="{{dispute.decision}}" class="decision">初审：{{dispute.decision.outcome === 'fullRefund' ? '建议全额退款' : '不退款'}} · {{dispute.decision.reason}}</view>
+        <view wx:if="{{dispute.finalDecision}}" class="decision">终局：{{dispute.finalDecision.outcome === 'fullRefund' ? '全额退款' : '不退款'}} · {{dispute.finalDecision.reason}}</view>
+        <view class="refund-state">退款交易：{{view.refundText}}</view>
+        <view class="hint">只有退款交易状态为 success 才表示供应商确认退款成功；案件决定本身不代表到账。</view>
+      </view>
+    </block>
+  </block>
+</view>

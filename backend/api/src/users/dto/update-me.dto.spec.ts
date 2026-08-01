@@ -12,6 +12,14 @@ describe("UpdateMeDto", () => {
     expect(errors).toHaveLength(0);
   });
 
+  it("accepts null as an explicit clear without inventing an undisclosed gender value", async () => {
+    const dto = plainToInstance(UpdateMeDto, { gender: null });
+
+    await expect(validate(dto)).resolves.toHaveLength(0);
+    expect(dto.gender).toBeNull();
+    expect(USER_GENDERS).toEqual(["female", "male"]);
+  });
+
   it.each(["other", "undisclosed", "", "FEMALE", 1])("rejects unsupported gender %p", async (gender) => {
     const errors = await validate(plainToInstance(UpdateMeDto, { gender }));
 

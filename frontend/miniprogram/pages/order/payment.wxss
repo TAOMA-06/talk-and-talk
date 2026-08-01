@@ -1,0 +1,26 @@
+.payment-page { padding-bottom: 64rpx; }
+.payment-state { padding: 44rpx 30rpx; border-radius: 28rpx; background: #fff1f4; text-align: center; }
+.state-success { background: #edf8f3; }
+.state-error, .state-cancelled { background: #fff4f1; }
+.state-pending, .state-processing { background: #fff8e9; }
+.state-symbol { display: flex; width: 74rpx; height: 74rpx; margin: 0 auto; align-items: center; justify-content: center; border-radius: 50%; background: #fff; color: #a6435d; font-size: 40rpx; font-weight: 800; box-shadow: 0 8rpx 20rpx rgba(83, 47, 57, 0.08); }
+.state-success .state-symbol { color: #34735a; }
+.state-title { margin-top: 18rpx; color: #48343a; font-size: 38rpx; font-weight: 800; }
+.state-message { margin-top: 12rpx; color: #755d64; font-size: 24rpx; line-height: 1.65; }
+.order-summary { margin-top: 22rpx; }
+.summary-title { margin-bottom: 14rpx; color: #49343a; font-size: 31rpx; font-weight: 800; }
+.summary-row { display: flex; justify-content: space-between; gap: 24rpx; padding: 14rpx 0; border-bottom: 1rpx solid #f0e5e7; color: #765e65; font-size: 24rpx; line-height: 1.55; }
+.summary-row text:first-child { flex: 0 0 120rpx; color: #9b838a; }
+.summary-row text:last-child { flex: 1; text-align: right; }
+.summary-row.total text:last-child { color: #b74665; font-size: 32rpx; font-weight: 800; }
+.rules-title { color: #49343a; font-size: 29rpx; font-weight: 800; }
+.rule { margin-top: 13rpx; color: #775f66; font-size: 23rpx; line-height: 1.65; }
+.policy-rule { color: #614b53; font-weight: 600; }
+.policy-version { margin-top: 16rpx; padding: 15rpx 17rpx; border-radius: 12rpx; background: #f8f3f4; color: #765f67; font-size: 21rpx; line-height: 1.65; }
+.policy-link { width: 100%; margin-top: 14rpx; border: 1rpx solid #ddc8ce; background: #fff; color: #8a4358; font-size: 23rpx; }
+.terms-check { width: 100%; margin-top: 22rpx; padding: 18rpx; border: 2rpx solid #e5d5d9; background: #fff; color: #745862; font-size: 23rpx; text-align: left; }
+.terms-check.checked { border-color: #b94a68; background: #fff1f4; color: #853a51; }
+.pay-button, .full-button { width: 100%; margin-top: 18rpx; font-size: 27rpx; }
+.support-button { border: 1rpx solid #ddc8ce; background: #fff; color: #8a4358; }
+.authority-note { margin-top: 28rpx; padding: 0 16rpx; color: #947e85; font-size: 21rpx; line-height: 1.65; text-align: center; }
+.terms-check::after, .support-button::after, .policy-link::after { border: 0; }

@@ -1,0 +1,34 @@
+.adult-page { padding-bottom: 64rpx; }
+.hero { padding: 34rpx 30rpx; border-radius: 28rpx; background: linear-gradient(145deg, #fff0f3, #f1f6f5); }
+.eyebrow { color: #a3435d; font-size: 18rpx; font-weight: 800; letter-spacing: 3rpx; }
+.hero-title { margin-top: 10rpx; color: #473239; font-size: 38rpx; font-weight: 900; }
+.hero-copy, .section-copy { margin-top: 10rpx; color: #7c666d; font-size: 22rpx; line-height: 1.7; }
+.card { margin-top: 20rpx; padding: 26rpx; border-radius: 22rpx; background: #fff; box-shadow: 0 8rpx 24rpx rgba(79, 46, 55, 0.05); }
+.state-card { color: #735d64; font-size: 23rpx; line-height: 1.6; }
+.error-card { background: #fff5f5; color: #923e51; }
+.status-card { border: 1rpx solid #eadfe2; }
+.status-success { border-color: #bed8ca; background: #f6fbf8; }
+.status-pending { border-color: #d9caa8; background: #fffaf0; }
+.status-warning { border-color: #e4bbc3; background: #fff7f7; }
+.status-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 18rpx; }
+.section-title { color: #4e383f; font-size: 29rpx; font-weight: 850; }
+.status-pill { flex: 0 0 auto; padding: 7rpx 12rpx; border-radius: 10rpx; background: rgba(122, 87, 97, 0.09); color: #77515d; font-size: 20rpx; font-weight: 750; }
+.fact-row { display: flex; justify-content: space-between; gap: 24rpx; margin-top: 18rpx; color: #745e65; font-size: 21rpx; line-height: 1.5; }
+.fact-row text:first-child { flex: 0 0 auto; color: #9b858c; }
+.fact-row text:last-child { text-align: right; word-break: break-all; }
+.review-reason, .boundary-note { margin-top: 18rpx; padding: 15rpx; border-radius: 13rpx; background: rgba(255, 255, 255, 0.72); color: #6e555d; font-size: 21rpx; line-height: 1.65; }
+.warning-note { color: #8b4352; }
+.boundary-list { margin-top: 15rpx; color: #735d64; font-size: 22rpx; line-height: 1.85; }
+.form { margin-top: 18rpx; }
+.picker-field, .form-input { box-sizing: border-box; width: 100%; margin-top: 14rpx; border: 1rpx solid #dfd0d4; border-radius: 13rpx; background: #fff; color: #5c454c; font-size: 23rpx; }
+.picker-field { display: flex; justify-content: space-between; padding: 18rpx; }
+.form-input { height: 80rpx; padding: 0 18rpx; }
+.method-help { margin-top: 9rpx; color: #8d767e; font-size: 20rpx; line-height: 1.55; }
+.confirmation-row { display: flex; gap: 13rpx; margin-top: 18rpx; color: #6f575f; font-size: 21rpx; line-height: 1.65; }
+.confirmation-row checkbox { flex: 0 0 auto; }
+.full-button { width: 100%; margin-top: 18rpx; font-size: 24rpx; }
+.primary-button { background: #a3435d; color: #fff; }
+.secondary-button { border: 1rpx solid #ddc8ce; background: #fff; color: #88475a; }
+.text-button { margin: 11rpx auto 0; background: transparent; color: #846b73; font-size: 22rpx; }
+.rights-card { border: 1rpx solid #e5d8dc; }
+.primary-button::after, .secondary-button::after, .text-button::after { border: 0; }

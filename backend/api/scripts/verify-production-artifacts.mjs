@@ -12,8 +12,11 @@ const productionCompose = await readFile(
 const mainSource = await readFile("src/main.ts", "utf8");
 const reviewHtml = await readFile("public/review/index.html", "utf8");
 const reviewScript = await readFile("public/review/assets/app.js", "utf8");
-const legacyAdminHtml = await readFile("public/admin/index.html", "utf8");
+const adminHtml = await readFile("public/admin/index.html", "utf8");
+const adminScript = await readFile("public/admin/assets/app.js", "utf8");
 const adminModule = await readFile("src/admin/admin.module.ts", "utf8");
+const productionEnvExample = await readFile(".env.production.example", "utf8");
+const deploymentPreflight = await readFile("scripts/deployment-preflight.mjs", "utf8");
 
 const expectedPackageScripts = {
   start: "node dist/src/main.js",
@@ -93,23 +96,106 @@ const artifacts = [
   "dist/src/main.js",
   "dist/src/database/seed.js",
   "dist/src/database/bootstrap-staff.js",
-  "dist/src/database/bootstrap-review-staff.js"
+  "dist/src/database/bootstrap-review-staff.js",
+  "dist/config/transactional-template-manifest.js"
 ];
 
 if (!mainSource.includes('scriptSrc: ["\'self\'"]')) {
   throw new Error("Review workbench must allow only same-origin scripts");
 }
-if (!reviewScript.includes('/api/v1/review/auth/login') || reviewHtml.includes('/auth/staff/login')) {
+if (
+  !reviewScript.includes('/api/v1/review/auth/login')
+  || reviewHtml.includes('/auth/staff/login')
+  || reviewScript.includes('/auth/staff/login')
+) {
   throw new Error("Review workbench must use the separate review password + TOTP login endpoint");
 }
-if (legacyAdminHtml.includes('/auth/staff/login') || legacyAdminHtml.includes('/admin/moderation')) {
-  throw new Error("Legacy /admin page must not retain a user-role review entrypoint");
+if (
+  !adminScript.includes('/auth/staff/login')
+  || adminScript.includes('/review/auth/login')
+  || adminHtml.includes('/admin/moderation')
+) {
+  throw new Error("Commercial admin must use staff login and must not retain a user-role review entrypoint");
+}
+if (
+  !mainSource.includes('router.get("/admin/"')
+  || !mainSource.includes('join(publicRoot, "admin", "index.html")')
+  || !mainSource.includes('router.get("/review/"')
+  || !mainSource.includes('join(publicRoot, "review", "index.html")')
+) {
+  throw new Error("/admin and /review must remain separate same-origin static applications");
+}
+for (const requiredAdminContract of [
+  "/admin/commercial/readiness",
+  "/admin/commercial/funnel",
+  "/admin/operations/orders",
+  "/admin/operations/support/orders",
+  "/admin/commercial/support/claimable",
+  "/admin/commercial/support/tickets/${encodeURIComponent(item.id)}/claim",
+  "/payments/refunds/review-queue",
+  "/admin/commercial/companion-lifecycle/review-due",
+  "/admin/commercial/companion-lifecycle/companions/${encodeURIComponent(companionId)}/voice-intro-read",
+  "/admin/users/${encodeURIComponent(item.ownerUserId)}/verification",
+  "/admin/identity-verification-requests?status=",
+  "/admin/identity-verification-requests/${encodeURIComponent(item.id)}/${decision}",
+  "/admin/account-governance/data-rights",
+  "/admin/account-governance/data-rights/claimable",
+  "/admin/account-governance/data-rights/${encodeURIComponent(item.id)}/claim",
+  "/admin/account-governance/invoice-requests",
+  "/admin/account-deletions"
+]) {
+  if (!adminScript.includes(requiredAdminContract)) {
+    throw new Error(`Commercial admin must retain real API contract: ${requiredAdminContract}`);
+  }
+}
+for (const [blockerKey, blockerLabel] of [
+  ["overdueUserAccountAppeals", "普通用户账号申诉复核超时"],
+  ["overdueCompanionAccountAppeals", "陪伴者账号申诉复核超时"],
+  ["accountDeletionRetentionPolicyUnapproved", "账号注销保留政策未获外部法律批准"]
+]) {
+  if (!adminScript.includes(blockerKey) || !adminScript.includes(blockerLabel)) {
+    throw new Error(`Commercial readiness workbench must label blocker: ${blockerKey}`);
+  }
 }
 if (adminModule.includes("AdminModerationController")) {
   throw new Error("AdminModule must not register the review department controller");
 }
+for (const retentionApprovalConfig of [
+  "ACCOUNT_DELETION_RETENTION_POLICY_APPROVED",
+  "ACCOUNT_DELETION_RETENTION_POLICY_APPROVAL_REFERENCE",
+  "AUTH_IDENTITY_TOMBSTONE_HMAC_KEYS",
+  "AUTH_IDENTITY_TOMBSTONE_ACTIVE_KEY_ID",
+  "AUTH_IDENTITY_REREGISTRATION_POLICY"
+]) {
+  if (!productionEnvExample.includes(`${retentionApprovalConfig}=`)) {
+    throw new Error(`Production environment template must document: ${retentionApprovalConfig}`);
+  }
+  if (!deploymentPreflight.includes(retentionApprovalConfig)) {
+    throw new Error(`Deployment preflight must validate: ${retentionApprovalConfig}`);
+  }
+}
+if (!/^ACCOUNT_DELETION_RETENTION_POLICY_APPROVED=false$/m.test(productionEnvExample)) {
+  throw new Error("Production environment template must default retention-policy approval to explicit No-Go");
+}
+for (const voiceEvidenceConfig of [
+  "COMPANION_VOICE_EVIDENCE_VIEWER_URL",
+  "COMPANION_VOICE_EVIDENCE_SIGNING_SECRET",
+  "COMPANION_VOICE_EVIDENCE_URL_TTL_SECONDS",
+  "TRTC_CALLBACK_SIGNING_KEY"
+]) {
+  if (!productionEnvExample.includes(`${voiceEvidenceConfig}=`)) {
+    throw new Error(`Production environment template must document: ${voiceEvidenceConfig}`);
+  }
+  if (!deploymentPreflight.includes(voiceEvidenceConfig)) {
+    throw new Error(`Deployment preflight must validate: ${voiceEvidenceConfig}`);
+  }
+}
 
 const staticAssets = [
+  "config/transactional-template-manifest.js",
+  "public/admin/index.html",
+  "public/admin/assets/app.js",
+  "public/admin/assets/styles.css",
   "public/review/index.html",
   "public/review/assets/app.js",
   "public/review/assets/styles.css",
@@ -120,6 +206,27 @@ const staticAssets = [
 for (const staticAsset of staticAssets) {
   await access(staticAsset);
   await access(`dist/${staticAsset}`);
+  const [sourceBytes, builtBytes] = await Promise.all([
+    readFile(staticAsset),
+    readFile(`dist/${staticAsset}`)
+  ]);
+  if (!sourceBytes.equals(builtBytes)) {
+    throw new Error(`Built static asset does not match source: ${staticAsset}`);
+  }
+}
+
+for (const script of [
+  "public/admin/assets/app.js",
+  "public/review/assets/app.js",
+  "dist/public/admin/assets/app.js",
+  "dist/public/review/assets/app.js"
+]) {
+  const syntaxCheck = spawnSync(process.execPath, ["--check", script], {
+    stdio: "inherit"
+  });
+  if (syntaxCheck.status !== 0) {
+    throw new Error(`Static application failed syntax validation: ${script}`);
+  }
 }
 
 for (const artifact of artifacts) {
@@ -131,6 +238,15 @@ for (const artifact of artifacts) {
   if (syntaxCheck.status !== 0) {
     throw new Error(`Production artifact failed syntax validation: ${artifact}`);
   }
+}
+
+const configurationLoad = spawnSync(
+  process.execPath,
+  ["-e", "require('./dist/src/config/configuration.js')"],
+  { stdio: "inherit" }
+);
+if (configurationLoad.status !== 0) {
+  throw new Error("Compiled configuration and its runtime manifest must load from dist");
 }
 
 console.log("Production entrypoints and compiled artifacts are valid.");

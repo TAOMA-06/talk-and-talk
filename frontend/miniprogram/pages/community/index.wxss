@@ -21,3 +21,5 @@
 .recommendation-row { display: flex; align-items: center; justify-content: space-between; gap: 20rpx; }
 .recommendation-reason { margin-top: 10rpx; color: #a36519; font-size: 23rpx; }
 .go { color: #b94a68; font-size: 26rpx; }
+.state-retry { width: 100%; margin: 14rpx 0 0; border: 1rpx solid #d8c2c9; background: #fff; color: #93435a; font-size: 24rpx; }
+.state-retry::after { border: 0; }

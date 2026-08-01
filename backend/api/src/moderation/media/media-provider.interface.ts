@@ -20,6 +20,8 @@ export type MediaAssetReference = {
   durationMs?: number | null;
 };
 
+export type MediaStorageDeleteResult = "deleted" | "notFound";
+
 export type MediaAnalysisResult = {
   available: boolean;
   score: number;
@@ -36,7 +38,12 @@ export interface MediaStorageProvider {
   createUploadInstruction(input: MediaAssetReference): Promise<MediaUploadInstruction | null>;
   verifyUpload(input: MediaAssetReference): Promise<boolean>;
   createReadUrl(input: MediaAssetReference): Promise<string | null>;
-  delete(input: MediaAssetReference): Promise<void>;
+  /**
+   * Delete must be idempotent. A provider-side missing object is a successful
+   * terminal outcome so a worker can safely retry after crashing between the
+   * network call and its database finalize step.
+   */
+  delete(input: MediaAssetReference): Promise<MediaStorageDeleteResult>;
 }
 
 export interface MediaAnalysisProvider {

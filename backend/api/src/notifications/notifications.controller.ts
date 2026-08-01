@@ -39,6 +39,12 @@ export class NotificationsController {
     return this.subscriptions.listTemplates(requested);
   }
 
+  @Get("channels/availability-reminder")
+  @UseGuards(JwtAuthGuard)
+  availabilityReminderChannel() {
+    return this.subscriptions.availabilityReminderChannel();
+  }
+
   @Post("subscription-grants")
   @UseGuards(JwtAuthGuard)
   subscriptionGrant(

@@ -1,6 +1,20 @@
 import { validateEnvironment } from "./configuration";
+import transactionalTemplateManifest = require("../../config/transactional-template-manifest.js");
 
 describe("validateEnvironment", () => {
+  const legalHoldReasonCatalog = JSON.stringify([{
+    code: "LITIGATION_NOTICE",
+    actions: ["placement", "release"],
+    categories: [
+      "identity_authentication_profile",
+      "preferences_behavior_notifications",
+      "public_user_content",
+      "transactions_tax_invoices",
+      "support_disputes_safety",
+      "consent_rights_account_governance",
+      "deletion_audit_evidence"
+    ]
+  }]);
   const productionEnv = {
     NODE_ENV: "production",
     APP_ENV: "production",
@@ -14,9 +28,12 @@ describe("validateEnvironment", () => {
     METRICS_TOKEN: "m".repeat(32),
     STAFF_TOTP_ENCRYPTION_KEY: "t".repeat(32),
     REVIEW_TOTP_ENCRYPTION_KEY: "r".repeat(32),
-    DEEPSEEK_API_KEY: "deepseek-production-key-1234567890",
-    DEEPSEEK_URL: "https://api.deepseek.com",
-    DEEPSEEK_MODEL: "deepseek-chat",
+    AUTH_IDENTITY_TOMBSTONE_HMAC_KEYS: JSON.stringify({
+      "prod-v1": Buffer.from("auth-tombstone-test-key-material-0001", "utf8").toString("base64")
+    }),
+    AUTH_IDENTITY_TOMBSTONE_ACTIVE_KEY_ID: "prod-v1",
+    AUTH_IDENTITY_REREGISTRATION_POLICY: "after_tombstone_expiry",
+    EXTERNAL_AI_USER_CONTENT_ENABLED: "false",
     SMS_PROVIDER: "none",
     WECHAT_MINIPROGRAM_APP_ID: "wx1234567890abcdef",
     WECHAT_MINIPROGRAM_APP_SECRET: "0123456789abcdef0123456789abcdef",
@@ -29,7 +46,12 @@ describe("validateEnvironment", () => {
     COMMERCIAL_RELEASE_MODE: "commercial",
     PLATFORM_FEE_BPS: "1200",
     COMPANION_SETTLEMENT_HOLD_HOURS: "96",
+    REFUND_POLICY_VERSION: "2026.08-v1",
+    REFUND_POLICY_APPROVED: "true",
+    REFUND_POLICY_APPROVAL_REFERENCE: "legal:refund-policy-2026-08",
     REFUND_REQUEST_WINDOW_HOURS: "72",
+    REFUND_REVIEW_SLA_HOURS: "24",
+    REFUND_RESOLUTION_SLA_HOURS: "72",
     ORDER_RESPONSE_WINDOW_MINUTES: "10",
     ORDER_CHAT_PRE_SERVICE_WINDOW_MINUTES: "15",
     ORDER_CHAT_POST_SERVICE_WINDOW_MINUTES: "15",
@@ -45,21 +67,49 @@ describe("validateEnvironment", () => {
     PAYOUT_CLAIMS_ENABLED: "true",
     SUPPORT_RESPONSE_HOURS: "24",
     SUPPORT_MAX_OPEN_PER_USER: "5",
+    SUPPORT_PUBLIC_SERVICE_HOURS: "每天 09:00-21:00（北京时间）",
+    SUPPORT_PUBLIC_STATUS_URL: "https://status.talkandtalk.example",
+    DATA_EXPORT_DELIVERY_BASE_URL: "https://vault.talkandtalk.example",
+    DATA_EXPORT_DELIVERY_API_KEY: "v".repeat(32),
+    DATA_EXPORT_DELIVERY_TIMEOUT_MS: "10000",
+    DATA_EXPORT_MAX_BYTES: String(50 * 1024 * 1024),
+    COMPANION_APPEAL_SUBMISSION_DAYS: "30",
+    COMPANION_APPEAL_RESPONSE_HOURS: "72",
     NOTIFICATION_DELIVERY_ENABLED: "true",
     WECHAT_SUBSCRIBE_MESSAGES_ENABLED: "true",
-    WECHAT_SUBSCRIBE_TEMPLATES_JSON: JSON.stringify([
-      "newOrder", "orderConfirmed", "orderRejected", "orderResponseExpired", "paymentSuccess",
-      "serviceStarted", "serviceCompleted", "orderCancelled", "reservationExpired", "rescheduleRequested", "rescheduleAccepted", "rescheduleRejected", "rescheduleExpired", "rescheduleCancelled", "supportUpdate", "messageReceived"
-    ].map((key) => ({ key, templateId: `TEMPLATE_${key}_123456`, page: "pages/orders/index", data: { thing1: "{{title}}" } }))),
-    LEGAL_CONSENT_VERSION: "2.0-2026-07-20",
+    WECHAT_SUBSCRIBE_TEMPLATES_JSON: JSON.stringify(transactionalTemplateManifest.map(({ key, defaultPage }) => ({
+      key,
+      templateId: `TEMPLATE_${key}_123456`,
+      page: defaultPage,
+      data: { thing1: "{{title}}" }
+    }))),
+    LEGAL_CONSENT_VERSION: "2.2-2026-08-01",
     LEGAL_OPERATOR_NAME: "上海示例网络科技有限公司",
     LEGAL_CONTACT_EMAIL: "privacy@example.com",
     LEGAL_CONTACT_PHONE: "021-12345678",
     LEGAL_COMPLAINT_CHANNEL: "小程序内客服工单",
-    LEGAL_CONSENT_EFFECTIVE_DATE: "2026-07-20",
+    LEGAL_CONSENT_EFFECTIVE_DATE: "2026-08-01",
     LEGAL_PLATFORM_RULES_URL: "https://api.talkandtalk.example/api/v1/legal/platform-rules",
     LEGAL_PRIVACY_RETENTION_DAYS: "1095",
-    PAYMENT_RECONCILIATION_ENABLED: "true"
+    ACCOUNT_DELETION_RETENTION_POLICY_APPROVED: "true",
+    ACCOUNT_DELETION_RETENTION_POLICY_APPROVAL_REFERENCE: "legal:retention-approval-2026",
+    ACCOUNT_DATA_RETENTION_LEGAL_HOLD_POLICY_APPROVED: "true",
+    ACCOUNT_DATA_RETENTION_LEGAL_HOLD_POLICY_VERSION: "2026.08-v1",
+    ACCOUNT_DATA_RETENTION_LEGAL_HOLD_POLICY_APPROVAL_REFERENCE:
+      "legal:retention-hold-policy-2026-08",
+    ACCOUNT_DATA_RETENTION_LEGAL_HOLD_REASON_CODES_JSON: legalHoldReasonCatalog,
+    CRISIS_RESOURCES_APPROVED: "true",
+    CRISIS_RESOURCES_APPROVAL_REFERENCE: "safety:crisis-resources-2026-08-01",
+    PAYMENT_RECONCILIATION_ENABLED: "true",
+    WECHAT_DAILY_BILL_RECONCILIATION_ENABLED: "true",
+    WECHAT_DAILY_BILL_RECONCILIATION_APPROVED: "true",
+    WECHAT_DAILY_BILL_RECONCILIATION_APPROVAL_REFERENCE: "finance:wechat-daily-bill-sop-2026-08",
+    WECHAT_DAILY_BILL_RECONCILIATION_START_DATE: "2026-07-01",
+    WECHAT_DAILY_BILL_RECONCILIATION_HOUR: "10",
+    WECHAT_DAILY_BILL_RECONCILIATION_BATCH_SIZE: "4",
+    WECHAT_PAY_COMPLAINTS_ENABLED: "true",
+    WECHAT_PAY_COMPLAINT_POLL_INTERVAL_SECONDS: "300",
+    WECHAT_PAY_COMPLAINT_BATCH_SIZE: "50"
   };
 
   it("applies defaults", () => {
@@ -70,14 +120,15 @@ describe("validateEnvironment", () => {
     expect(env.API_PREFIX).toBe("api/v1");
     expect(env.APP_VERSION).toBe("0.1.0");
     expect(env.CORS_ORIGINS).toContain("http://localhost:3000");
-    expect(env.DEEPSEEK_URL).toBe("https://api.deepseek.com");
-    expect(env.DEEPSEEK_MODEL).toBe("deepseek-chat");
+    expect(env.EXTERNAL_AI_USER_CONTENT_ENABLED).toBe(false);
     expect(env.MEDIA_FEATURE_ENABLED).toBe(false);
     expect(env.MEDIA_PROVIDER).toBe("disabled");
     expect(env.TRTC_ENABLED).toBe(false);
     expect(env.TRTC_SDK_APP_ID).toBe(0);
     expect(env.TRTC_PRIVATE_MAP_KEY_ENABLED).toBe(false);
     expect(env.TRTC_USER_SIG_TTL_SECONDS).toBe(300);
+    expect(env.TRTC_PRIVACY_DISCLOSURE_APPROVED).toBe(false);
+    expect(env.TRTC_PRIVACY_DISCLOSURE_REFERENCE).toBe("");
     expect(env.TRTC_ROOM_CONTROL_ENABLED).toBe(false);
     expect(env.TRTC_EMERGENCY_STOP_ENABLED).toBe(false);
     expect(env.TRTC_CONTROL_REGION).toBe("ap-guangzhou");
@@ -90,38 +141,130 @@ describe("validateEnvironment", () => {
     expect(env.REVIEW_TOTP_ENCRYPTION_KEY).toContain("development-review-totp-key");
     expect(env.REVIEW_JWT_ACCESS_TTL).toBe("15m");
     expect(env.REVIEW_JWT_REFRESH_TTL).toBe("8h");
+    expect(JSON.parse(env.AUTH_IDENTITY_TOMBSTONE_HMAC_KEYS)).toHaveProperty("dev-v1");
+    expect(env.AUTH_IDENTITY_TOMBSTONE_ACTIVE_KEY_ID).toBe("dev-v1");
+    expect(env.AUTH_IDENTITY_REREGISTRATION_POLICY).toBe("after_tombstone_expiry");
     expect(env.SEED_ON_STARTUP).toBe(false);
     expect(env.PAYMENT_RECONCILIATION_ENABLED).toBe(true);
     expect(env.PAYMENT_RECONCILIATION_INTERVAL_SECONDS).toBe(60);
     expect(env.PAYMENT_RECONCILIATION_BATCH_SIZE).toBe(50);
+    expect(env.WECHAT_DAILY_BILL_RECONCILIATION_ENABLED).toBe(false);
+    expect(env.WECHAT_DAILY_BILL_RECONCILIATION_APPROVED).toBe(false);
+    expect(env.WECHAT_DAILY_BILL_RECONCILIATION_APPROVAL_REFERENCE).toBe("");
+    expect(env.WECHAT_DAILY_BILL_RECONCILIATION_START_DATE).toBe("");
+    expect(env.WECHAT_DAILY_BILL_RECONCILIATION_HOUR).toBe(10);
+    expect(env.WECHAT_DAILY_BILL_RECONCILIATION_BATCH_SIZE).toBe(4);
     expect(env.ORDER_RESCHEDULE_EXPIRY_ENABLED).toBe(true);
     expect(env.ORDER_RESCHEDULE_EXPIRY_INTERVAL_SECONDS).toBe(60);
     expect(env.ORDER_RESCHEDULE_EXPIRY_BATCH_SIZE).toBe(50);
     expect(env.METRICS_TOKEN).toBe("");
-    expect(env.LEGAL_CONSENT_VERSION).toBe("2.0-2026-07-20");
-    expect(env.LEGAL_CONSENT_EFFECTIVE_DATE).toBe("2026-07-20");
+    expect(env.LEGAL_CONSENT_VERSION).toBe("2.2-2026-08-01");
+    expect(env.LEGAL_CONSENT_EFFECTIVE_DATE).toBe("2026-08-01");
     expect(env.LEGAL_PRIVACY_URL).toBe("https://api.talkandtalk.app/legal/privacy.html");
     expect(env.LEGAL_TERMS_URL).toBe("https://api.talkandtalk.app/legal/terms.html");
+    expect(env.ACCOUNT_DELETION_RETENTION_POLICY_APPROVED).toBe(false);
+    expect(env.ACCOUNT_DELETION_RETENTION_POLICY_APPROVAL_REFERENCE).toBe("");
+    expect(env.ACCOUNT_DATA_RETENTION_LEGAL_HOLD_POLICY_APPROVED).toBe(false);
+    expect(env.ACCOUNT_DATA_RETENTION_LEGAL_HOLD_POLICY_VERSION).toBe("");
+    expect(env.ACCOUNT_DATA_RETENTION_LEGAL_HOLD_POLICY_APPROVAL_REFERENCE).toBe("");
+    expect(env.ACCOUNT_DATA_RETENTION_LEGAL_HOLD_REASON_CODES_JSON).toBe("[]");
+    expect(env.CRISIS_RESOURCES_APPROVED).toBe(false);
+    expect(env.CRISIS_RESOURCES_APPROVAL_REFERENCE).toBe("");
     expect(env.COMMERCIAL_RELEASE_MODE).toBe("internal");
+    expect(env.COMPANION_VOICE_EVIDENCE_VIEWER_URL).toBe("");
+    expect(env.COMPANION_VOICE_EVIDENCE_SIGNING_SECRET).toBe("");
+    expect(env.COMPANION_VOICE_EVIDENCE_URL_TTL_SECONDS).toBe(300);
     expect(env.PLATFORM_FEE_BPS).toBe(0);
+    expect(env.REFUND_POLICY_VERSION).toBe("development-v1");
+    expect(env.REFUND_POLICY_APPROVED).toBe(false);
+    expect(env.REFUND_POLICY_APPROVAL_REFERENCE).toBe("");
     expect(env.ORDER_RESPONSE_WINDOW_MINUTES).toBe(10);
     expect(env.ORDER_CHAT_PRE_SERVICE_WINDOW_MINUTES).toBe(15);
     expect(env.ORDER_CHAT_POST_SERVICE_WINDOW_MINUTES).toBe(15);
     expect(env.ORDER_RESCHEDULE_RESPONSE_WINDOW_MINUTES).toBe(720);
     expect(env.ORDER_MAX_SCHEDULE_DAYS).toBe(30);
     expect(env.SUPPORT_MAX_OPEN_PER_USER).toBe(5);
+    expect(env.SUPPORT_PUBLIC_SERVICE_HOURS).toBe("工作日 09:00-18:00（北京时间）");
+    expect(env.SUPPORT_PUBLIC_STATUS_URL).toBe("");
+    expect(env.DATA_EXPORT_DELIVERY_BASE_URL).toBe("");
+    expect(env.DATA_EXPORT_DELIVERY_API_KEY).toBe("");
+    expect(env.DATA_EXPORT_DELIVERY_TIMEOUT_MS).toBe(10_000);
+    expect(env.DATA_EXPORT_MAX_BYTES).toBe(50 * 1024 * 1024);
+    expect(env.COMPANION_APPEAL_SUBMISSION_DAYS).toBe(30);
+    expect(env.COMPANION_APPEAL_RESPONSE_HOURS).toBe(72);
     expect(env.ORDER_INTAKE_ENABLED).toBe(true);
     expect(env.ORDER_MAX_OPEN_TOTAL).toBe(500);
     expect(env.ORDER_MAX_OPEN_PER_USER).toBe(3);
     expect(env.PAYOUT_CLAIMS_ENABLED).toBe(true);
     expect(env.REFUND_REQUEST_WINDOW_HOURS).toBe(72);
+    expect(env.REFUND_REVIEW_SLA_HOURS).toBe(24);
+    expect(env.REFUND_RESOLUTION_SLA_HOURS).toBe(72);
     expect(env.WECHAT_SUBSCRIBE_MESSAGES_ENABLED).toBe(false);
     expect(env.AVAILABILITY_REMINDER_PREPARATION_ENABLED).toBe(false);
     expect(env.AVAILABILITY_REMINDER_PREPARATION_INTERVAL_SECONDS).toBe(60);
     expect(env.AVAILABILITY_REMINDER_PREPARATION_BATCH_SIZE).toBe(20);
+    expect(env.AVAILABILITY_REMINDER_FANOUT_BATCH_SIZE).toBe(200);
+    expect(env.AVAILABILITY_REMINDER_FANOUT_BATCHES_PER_RUN).toBe(20);
+    expect(env.AVAILABILITY_REMINDER_FANOUT_LEASE_SECONDS).toBe(120);
+    expect(env.AVAILABILITY_REMINDER_FANOUT_MAX_FAILURES).toBe(8);
+    expect(env.AVAILABILITY_REMINDER_FANOUT_RETRY_BASE_SECONDS).toBe(30);
     expect(env.AVAILABILITY_REMINDER_DELIVERY_ENABLED).toBe(false);
     expect(env.AVAILABILITY_REMINDER_DELIVERY_INTERVAL_SECONDS).toBe(60);
     expect(env.AVAILABILITY_REMINDER_DELIVERY_BATCH_SIZE).toBe(20);
+  });
+
+  it("validates the login-independent support disclosure", () => {
+    const configured = validateEnvironment({
+      SUPPORT_PUBLIC_SERVICE_HOURS: "每天 09:00-21:00（北京时间）",
+      SUPPORT_PUBLIC_STATUS_URL: "https://status.talkandtalk.example"
+    });
+
+    expect(configured.SUPPORT_PUBLIC_SERVICE_HOURS).toBe("每天 09:00-21:00（北京时间）");
+    expect(configured.SUPPORT_PUBLIC_STATUS_URL).toBe("https://status.talkandtalk.example");
+    expect(() => validateEnvironment({
+      SUPPORT_PUBLIC_STATUS_URL: "http://status.talkandtalk.example"
+    })).toThrow("SUPPORT_PUBLIC_STATUS_URL");
+    expect(() => validateEnvironment({
+      SUPPORT_PUBLIC_SERVICE_HOURS: "a".repeat(121)
+    })).toThrow("SUPPORT_PUBLIC_SERVICE_HOURS");
+  });
+
+  it("validates secure data-export delivery bounds and HTTPS origin", () => {
+    const configured = validateEnvironment({
+      DATA_EXPORT_DELIVERY_BASE_URL: "https://vault.example.com/root/",
+      DATA_EXPORT_DELIVERY_API_KEY: "test-provider-key",
+      DATA_EXPORT_DELIVERY_TIMEOUT_MS: "5000",
+      DATA_EXPORT_MAX_BYTES: "1048576"
+    });
+
+    expect(configured.DATA_EXPORT_DELIVERY_BASE_URL).toBe("https://vault.example.com/root/");
+    expect(configured.DATA_EXPORT_DELIVERY_TIMEOUT_MS).toBe(5000);
+    expect(configured.DATA_EXPORT_MAX_BYTES).toBe(1048576);
+    expect(() => validateEnvironment({
+      DATA_EXPORT_DELIVERY_BASE_URL: "http://vault.example.com"
+    })).toThrow("DATA_EXPORT_DELIVERY_BASE_URL");
+    expect(() => validateEnvironment({
+      DATA_EXPORT_DELIVERY_TIMEOUT_MS: "999"
+    })).toThrow("DATA_EXPORT_DELIVERY_TIMEOUT_MS");
+    expect(() => validateEnvironment({
+      DATA_EXPORT_MAX_BYTES: "101"
+    })).toThrow("DATA_EXPORT_MAX_BYTES");
+  });
+
+  it("bounds companion appeal submission and response commitments", () => {
+    const configured = validateEnvironment({
+      COMPANION_APPEAL_SUBMISSION_DAYS: "45",
+      COMPANION_APPEAL_RESPONSE_HOURS: "48"
+    });
+
+    expect(configured.COMPANION_APPEAL_SUBMISSION_DAYS).toBe(45);
+    expect(configured.COMPANION_APPEAL_RESPONSE_HOURS).toBe(48);
+    expect(() => validateEnvironment({
+      COMPANION_APPEAL_SUBMISSION_DAYS: "0"
+    })).toThrow("COMPANION_APPEAL_SUBMISSION_DAYS");
+    expect(() => validateEnvironment({
+      COMPANION_APPEAL_RESPONSE_HOURS: "721"
+    })).toThrow("COMPANION_APPEAL_RESPONSE_HOURS");
   });
 
   it("keeps availability-reminder preparation explicitly opt-in and bounds its internal work", () => {
@@ -138,6 +281,23 @@ describe("validateEnvironment", () => {
       .toThrow("AVAILABILITY_REMINDER_PREPARATION_INTERVAL_SECONDS");
     expect(() => validateEnvironment({ AVAILABILITY_REMINDER_PREPARATION_BATCH_SIZE: "101" }))
       .toThrow("AVAILABILITY_REMINDER_PREPARATION_BATCH_SIZE");
+
+    const fanout = validateEnvironment({
+      AVAILABILITY_REMINDER_FANOUT_BATCH_SIZE: "1000",
+      AVAILABILITY_REMINDER_FANOUT_BATCHES_PER_RUN: "100",
+      AVAILABILITY_REMINDER_FANOUT_LEASE_SECONDS: "900",
+      AVAILABILITY_REMINDER_FANOUT_MAX_FAILURES: "50",
+      AVAILABILITY_REMINDER_FANOUT_RETRY_BASE_SECONDS: "900"
+    });
+    expect(fanout.AVAILABILITY_REMINDER_FANOUT_BATCH_SIZE).toBe(1000);
+    expect(fanout.AVAILABILITY_REMINDER_FANOUT_BATCHES_PER_RUN).toBe(100);
+    expect(fanout.AVAILABILITY_REMINDER_FANOUT_LEASE_SECONDS).toBe(900);
+    expect(fanout.AVAILABILITY_REMINDER_FANOUT_MAX_FAILURES).toBe(50);
+    expect(fanout.AVAILABILITY_REMINDER_FANOUT_RETRY_BASE_SECONDS).toBe(900);
+    expect(() => validateEnvironment({ AVAILABILITY_REMINDER_FANOUT_BATCH_SIZE: "1001" }))
+      .toThrow("AVAILABILITY_REMINDER_FANOUT_BATCH_SIZE");
+    expect(() => validateEnvironment({ AVAILABILITY_REMINDER_FANOUT_LEASE_SECONDS: "29" }))
+      .toThrow("AVAILABILITY_REMINDER_FANOUT_LEASE_SECONDS");
   });
 
   it("keeps availability-reminder delivery explicitly opt-in and requires its live subscribe template", () => {
@@ -207,19 +367,19 @@ describe("validateEnvironment", () => {
       .toThrow("NODE_ENV=production");
   });
 
-  it("requires a concrete HTTPS content moderation provider in production", () => {
-    expect(() => validateEnvironment({ ...productionEnv, DEEPSEEK_API_KEY: "" }))
-      .toThrow("DEEPSEEK_API_KEY");
-    expect(() => validateEnvironment({ ...productionEnv, DEEPSEEK_API_KEY: "too-short" }))
-      .toThrow("at least 24");
-    expect(() => validateEnvironment({ ...productionEnv, DEEPSEEK_URL: "" }))
-      .toThrow("DEEPSEEK_URL");
-    expect(() => validateEnvironment({ ...productionEnv, DEEPSEEK_MODEL: "" }))
-      .toThrow("DEEPSEEK_MODEL");
-    expect(() => validateEnvironment({ ...productionEnv, DEEPSEEK_API_KEY: "REPLACE_ME_WITH_PRODUCTION_KEY" }))
-      .toThrow("placeholder");
-    expect(() => validateEnvironment({ ...productionEnv, DEEPSEEK_URL: "http://moderation.internal" }))
-      .toThrow("absolute HTTPS");
+  it("keeps all user-authored content local-only and rejects stale DeepSeek credentials", () => {
+    expect(() => validateEnvironment({
+      ...productionEnv,
+      EXTERNAL_AI_USER_CONTENT_ENABLED: ""
+    })).toThrow("must be explicitly configured");
+    expect(() => validateEnvironment({
+      ...productionEnv,
+      EXTERNAL_AI_USER_CONTENT_ENABLED: "true"
+    })).toThrow("user-authored content must remain local-only");
+    expect(() => validateEnvironment({
+      ...productionEnv,
+      DEEPSEEK_API_KEY: "deepseek-production-key-1234567890"
+    })).toThrow("generic DeepSeek service is not approved");
   });
 
   it("rejects demo seed in production app env", () => {
@@ -284,10 +444,6 @@ describe("validateEnvironment", () => {
     })).toThrow("Review JWT secrets must not reuse consumer JWT secrets");
   });
 
-  it("validates URL-shaped environment values", () => {
-    expect(() => validateEnvironment({ DEEPSEEK_URL: "not-a-url" })).toThrow("DEEPSEEK_URL");
-  });
-
   it("keeps media closed by default and rejects an unregistered production media provider", () => {
     const development = validateEnvironment({ MEDIA_FEATURE_ENABLED: "true", MEDIA_PROVIDER: "mock" });
     expect(development.MEDIA_FEATURE_ENABLED).toBe(true);
@@ -304,7 +460,10 @@ describe("validateEnvironment", () => {
       TRTC_ENABLED: "true",
       TRTC_SDK_APP_ID: "1400000001",
       TRTC_SDK_SECRET_KEY: "too-short",
-      TRTC_PRIVATE_MAP_KEY_ENABLED: "true"
+      TRTC_CALLBACK_SIGNING_KEY: "CallbackKey1234567890",
+      TRTC_PRIVATE_MAP_KEY_ENABLED: "true",
+      TRTC_PRIVACY_DISCLOSURE_APPROVED: "true",
+      TRTC_PRIVACY_DISCLOSURE_REFERENCE: "legal:trtc-disclosure-2026-08"
     })).toThrow("TRTC_SDK_SECRET_KEY");
     expect(() => validateEnvironment({ TRTC_USER_SIG_TTL_SECONDS: "59" }))
       .toThrow("TRTC_USER_SIG_TTL_SECONDS");
@@ -317,8 +476,11 @@ describe("validateEnvironment", () => {
       TRTC_ENABLED: "true",
       TRTC_SDK_APP_ID: "1400000001",
       TRTC_SDK_SECRET_KEY: "trtc-test-secret-key-material",
+      TRTC_CALLBACK_SIGNING_KEY: "CallbackKey1234567890",
       TRTC_PRIVATE_MAP_KEY_ENABLED: "true",
       TRTC_USER_SIG_TTL_SECONDS: "600",
+      TRTC_PRIVACY_DISCLOSURE_APPROVED: "true",
+      TRTC_PRIVACY_DISCLOSURE_REFERENCE: "legal:trtc-disclosure-2026-08",
       TRTC_ROOM_CONTROL_ENABLED: "true",
       TRTC_CONTROL_REGION: "ap-beijing",
       TRTC_CONTROL_TIMEOUT_MS: "8000",
@@ -329,7 +491,10 @@ describe("validateEnvironment", () => {
     });
     expect(enabled.TRTC_ENABLED).toBe(true);
     expect(enabled.TRTC_SDK_APP_ID).toBe(1400000001);
+    expect(enabled.TRTC_CALLBACK_SIGNING_KEY).toBe("CallbackKey1234567890");
     expect(enabled.TRTC_USER_SIG_TTL_SECONDS).toBe(600);
+    expect(enabled.TRTC_PRIVACY_DISCLOSURE_APPROVED).toBe(true);
+    expect(enabled.TRTC_PRIVACY_DISCLOSURE_REFERENCE).toBe("legal:trtc-disclosure-2026-08");
     expect(enabled.TRTC_ROOM_CONTROL_ENABLED).toBe(true);
     expect(enabled.TRTC_EMERGENCY_STOP_ENABLED).toBe(false);
     expect(enabled.TRTC_CONTROL_REGION).toBe("ap-beijing");
@@ -339,7 +504,10 @@ describe("validateEnvironment", () => {
       TRTC_ENABLED: "true",
       TRTC_SDK_APP_ID: "1400000001",
       TRTC_SDK_SECRET_KEY: "trtc-test-secret-key-material",
+      TRTC_CALLBACK_SIGNING_KEY: "CallbackKey1234567890",
       TRTC_PRIVATE_MAP_KEY_ENABLED: "true",
+      TRTC_PRIVACY_DISCLOSURE_APPROVED: "true",
+      TRTC_PRIVACY_DISCLOSURE_REFERENCE: "legal:trtc-disclosure-2026-08",
       TRTC_ROOM_CONTROL_ENABLED: "true",
       TENCENTCLOUD_SECRET_ID: "AKID_test_voice_control",
       TENCENTCLOUD_SECRET_KEY: "tencent-cloud-control-secret-material",
@@ -356,11 +524,54 @@ describe("validateEnvironment", () => {
     expect(env.JWT_REFRESH_TTL).toBe("30d");
   });
 
+  it("accepts canonical consumer JWT TTLs at their supported boundaries", () => {
+    const minimums = validateEnvironment({
+      JWT_ACCESS_TTL: "300s",
+      JWT_REFRESH_TTL: "1h"
+    });
+    expect(minimums.JWT_ACCESS_TTL).toBe("300s");
+    expect(minimums.JWT_REFRESH_TTL).toBe("1h");
+
+    const maximums = validateEnvironment({
+      JWT_ACCESS_TTL: "60m",
+      JWT_REFRESH_TTL: "90d"
+    });
+    expect(maximums.JWT_ACCESS_TTL).toBe("60m");
+    expect(maximums.JWT_REFRESH_TTL).toBe("90d");
+
+    const trimmed = validateEnvironment({
+      JWT_ACCESS_TTL: " 15m ",
+      JWT_REFRESH_TTL: " 30d "
+    });
+    expect(trimmed.JWT_ACCESS_TTL).toBe("15m");
+    expect(trimmed.JWT_REFRESH_TTL).toBe("30d");
+  });
+
+  it("rejects malformed, unsafe, or inverted consumer JWT TTLs during startup", () => {
+    for (const value of ["0m", "01m", "15", "1.5h", "15M", "unlimited"]) {
+      expect(() => validateEnvironment({ JWT_ACCESS_TTL: value }))
+        .toThrow("JWT_ACCESS_TTL");
+    }
+    expect(() => validateEnvironment({ JWT_ACCESS_TTL: "299s" }))
+      .toThrow("between 5 minutes and 1 hour");
+    expect(() => validateEnvironment({ JWT_ACCESS_TTL: "61m" }))
+      .toThrow("between 5 minutes and 1 hour");
+    expect(() => validateEnvironment({ JWT_REFRESH_TTL: "59m" }))
+      .toThrow("between 1 hour and 90 days");
+    expect(() => validateEnvironment({ JWT_REFRESH_TTL: "91d" }))
+      .toThrow("between 1 hour and 90 days");
+    expect(() => validateEnvironment({ JWT_ACCESS_TTL: "1h", JWT_REFRESH_TTL: "1h" }))
+      .toThrow("JWT_REFRESH_TTL must be greater than JWT_ACCESS_TTL");
+  });
+
   it("requires JWT secrets in production", () => {
     expect(() =>
       validateEnvironment({
         NODE_ENV: "production",
-        CORS_ORIGINS: "https://app.example.com"
+        CORS_ORIGINS: "https://app.example.com",
+        AUTH_IDENTITY_TOMBSTONE_HMAC_KEYS: productionEnv.AUTH_IDENTITY_TOMBSTONE_HMAC_KEYS,
+        AUTH_IDENTITY_TOMBSTONE_ACTIVE_KEY_ID: productionEnv.AUTH_IDENTITY_TOMBSTONE_ACTIVE_KEY_ID,
+        AUTH_IDENTITY_REREGISTRATION_POLICY: "after_tombstone_expiry"
       })
     ).toThrow("JWT_ACCESS_SECRET");
   });
@@ -410,6 +621,93 @@ describe("validateEnvironment", () => {
       .toThrow("LEGAL_TERMS_URL");
   });
 
+  it("requires external legal approval before production account-deletion retention is enabled", () => {
+    expect(() => validateEnvironment({
+      ...productionEnv,
+      ACCOUNT_DELETION_RETENTION_POLICY_APPROVED: "false",
+      ACCOUNT_DELETION_RETENTION_POLICY_APPROVAL_REFERENCE: ""
+    })).toThrow("approved retention policy and approval reference");
+    expect(() => validateEnvironment({
+      ...productionEnv,
+      ACCOUNT_DELETION_RETENTION_POLICY_APPROVAL_REFERENCE: ""
+    })).toThrow("APPROVED=true requires");
+    expect(() => validateEnvironment({
+      ...productionEnv,
+      ACCOUNT_DELETION_RETENTION_POLICY_APPROVAL_REFERENCE: "raw secret with spaces"
+    })).toThrow("6-160 character non-secret reference");
+  });
+
+  it("keeps production legal holds blocked until a controlled policy catalog is approved", () => {
+    expect(() => validateEnvironment({
+      ...productionEnv,
+      ACCOUNT_DATA_RETENTION_LEGAL_HOLD_POLICY_APPROVED: "false"
+    })).toThrow("Production data-retention legal holds require");
+    expect(() => validateEnvironment({
+      ...productionEnv,
+      ACCOUNT_DATA_RETENTION_LEGAL_HOLD_POLICY_APPROVAL_REFERENCE: ""
+    })).toThrow("APPROVED=true requires");
+    expect(() => validateEnvironment({
+      ...productionEnv,
+      ACCOUNT_DATA_RETENTION_LEGAL_HOLD_REASON_CODES_JSON: "[]"
+    })).toThrow("non-empty reason catalog");
+    expect(() => validateEnvironment({
+      ...productionEnv,
+      ACCOUNT_DATA_RETENTION_LEGAL_HOLD_REASON_CODES_JSON: "not-json"
+    })).toThrow("must be valid JSON");
+  });
+
+  it("keeps crisis-resource commercial release fail closed until approval is recorded", () => {
+    expect(() => validateEnvironment({
+      ...productionEnv,
+      CRISIS_RESOURCES_APPROVED: "false",
+      CRISIS_RESOURCES_APPROVAL_REFERENCE: ""
+    })).toThrow("approved crisis resources");
+    expect(() => validateEnvironment({
+      ...productionEnv,
+      CRISIS_RESOURCES_APPROVAL_REFERENCE: ""
+    })).toThrow("APPROVED=true requires CRISIS_RESOURCES_APPROVAL_REFERENCE");
+    expect(() => validateEnvironment({
+      ...productionEnv,
+      CRISIS_RESOURCES_APPROVAL_REFERENCE: "raw secret with spaces"
+    })).toThrow("6-160 character non-secret reference");
+  });
+
+  it("keeps WeChat T+1 daily bill reconciliation fail closed and bounded", () => {
+    expect(() => validateEnvironment({
+      ...productionEnv,
+      WECHAT_DAILY_BILL_RECONCILIATION_ENABLED: "false"
+    })).toThrow("enabled and approved WeChat T+1 daily bill reconciliation");
+    expect(() => validateEnvironment({
+      ...productionEnv,
+      WECHAT_DAILY_BILL_RECONCILIATION_APPROVED: "false",
+      WECHAT_DAILY_BILL_RECONCILIATION_APPROVAL_REFERENCE: ""
+    })).toThrow("enabled and approved WeChat T+1 daily bill reconciliation");
+    expect(() => validateEnvironment({
+      ...productionEnv,
+      WECHAT_DAILY_BILL_RECONCILIATION_APPROVAL_REFERENCE: ""
+    })).toThrow("APPROVED=true requires WECHAT_DAILY_BILL_RECONCILIATION_APPROVAL_REFERENCE");
+    expect(() => validateEnvironment({
+      ...productionEnv,
+      WECHAT_DAILY_BILL_RECONCILIATION_APPROVAL_REFERENCE: "raw secret with spaces"
+    })).toThrow("6-160 character non-secret reference");
+    expect(() => validateEnvironment({
+      ...productionEnv,
+      WECHAT_DAILY_BILL_RECONCILIATION_START_DATE: ""
+    })).toThrow("WECHAT_DAILY_BILL_RECONCILIATION_START_DATE");
+    expect(() => validateEnvironment({
+      ...productionEnv,
+      WECHAT_DAILY_BILL_RECONCILIATION_START_DATE: "2026-02-31"
+    })).toThrow("valid calendar date");
+    expect(() => validateEnvironment({ WECHAT_DAILY_BILL_RECONCILIATION_HOUR: "9" }))
+      .toThrow("WECHAT_DAILY_BILL_RECONCILIATION_HOUR");
+    expect(() => validateEnvironment({ WECHAT_DAILY_BILL_RECONCILIATION_HOUR: "24" }))
+      .toThrow("WECHAT_DAILY_BILL_RECONCILIATION_HOUR");
+    expect(() => validateEnvironment({ WECHAT_DAILY_BILL_RECONCILIATION_BATCH_SIZE: "0" }))
+      .toThrow("WECHAT_DAILY_BILL_RECONCILIATION_BATCH_SIZE");
+    expect(() => validateEnvironment({ WECHAT_DAILY_BILL_RECONCILIATION_BATCH_SIZE: "17" }))
+      .toThrow("WECHAT_DAILY_BILL_RECONCILIATION_BATCH_SIZE");
+  });
+
   it("blocks a production commercial release without concrete legal disclosures and transactional notifications", () => {
     expect(() => validateEnvironment({
       ...productionEnv,
@@ -428,11 +726,67 @@ describe("validateEnvironment", () => {
     })).toThrow("REFUND_REQUEST_WINDOW_HOURS + 24");
   });
 
+  it("requires a controlled and approved refund policy in commercial mode", () => {
+    const configured = validateEnvironment({
+      REFUND_POLICY_VERSION: "2026.08-v2",
+      REFUND_POLICY_APPROVED: "true",
+      REFUND_POLICY_APPROVAL_REFERENCE: "legal:refund-policy-2026-08"
+    });
+    expect(configured.REFUND_POLICY_VERSION).toBe("2026.08-v2");
+    expect(configured.REFUND_POLICY_APPROVED).toBe(true);
+
+    expect(() => validateEnvironment({
+      COMMERCIAL_RELEASE_MODE: "commercial",
+      REFUND_POLICY_VERSION: "2026.08-v2",
+      REFUND_POLICY_APPROVED: "false"
+    })).toThrow("requires an approved refund policy version");
+    expect(() => validateEnvironment({
+      REFUND_POLICY_APPROVED: "true",
+      REFUND_POLICY_APPROVAL_REFERENCE: ""
+    })).toThrow("REFUND_POLICY_APPROVAL_REFERENCE");
+    expect(() => validateEnvironment({ REFUND_POLICY_VERSION: "current policy" }))
+      .toThrow("controlled 3-64 character version identifier");
+    expect(() => validateEnvironment({ REFUND_REQUEST_WINDOW_HOURS: "0" }))
+      .toThrow("between 1 and 720");
+    expect(() => validateEnvironment({ REFUND_REQUEST_WINDOW_HOURS: "721" }))
+      .toThrow("between 1 and 720");
+  });
+
   it("requires an explicit commercial mode in production", () => {
     expect(() => validateEnvironment({
       ...productionEnv,
       COMMERCIAL_RELEASE_MODE: "internal"
     })).toThrow("COMMERCIAL_RELEASE_MODE=commercial");
+  });
+
+  it("validates the optional controlled voice-evidence viewer as one secure configuration", () => {
+    const configured = validateEnvironment({
+      COMPANION_VOICE_EVIDENCE_VIEWER_URL: "https://evidence.example.com/listen",
+      COMPANION_VOICE_EVIDENCE_SIGNING_SECRET: "development-viewer-secret",
+      COMPANION_VOICE_EVIDENCE_URL_TTL_SECONDS: "60"
+    });
+
+    expect(configured.COMPANION_VOICE_EVIDENCE_VIEWER_URL).toBe("https://evidence.example.com/listen");
+    expect(configured.COMPANION_VOICE_EVIDENCE_SIGNING_SECRET).toBe("development-viewer-secret");
+    expect(configured.COMPANION_VOICE_EVIDENCE_URL_TTL_SECONDS).toBe(60);
+    expect(() => validateEnvironment({
+      COMPANION_VOICE_EVIDENCE_VIEWER_URL: "http://evidence.example.com/listen",
+      COMPANION_VOICE_EVIDENCE_SIGNING_SECRET: "development-viewer-secret"
+    })).toThrow("absolute HTTPS");
+    expect(() => validateEnvironment({
+      COMPANION_VOICE_EVIDENCE_VIEWER_URL: "https://evidence.example.com/listen"
+    })).toThrow("configured together");
+    expect(() => validateEnvironment({
+      COMPANION_VOICE_EVIDENCE_URL_TTL_SECONDS: "59"
+    })).toThrow("between 60 and 900");
+    expect(() => validateEnvironment({
+      COMPANION_VOICE_EVIDENCE_URL_TTL_SECONDS: "901"
+    })).toThrow("between 60 and 900");
+    expect(() => validateEnvironment({
+      ...productionEnv,
+      COMPANION_VOICE_EVIDENCE_VIEWER_URL: "https://evidence.example.com/listen",
+      COMPANION_VOICE_EVIDENCE_SIGNING_SECRET: "too-short"
+    })).toThrow("at least 32");
   });
 
   it("requires the complete, non-duplicated transactional notification template map in production", () => {

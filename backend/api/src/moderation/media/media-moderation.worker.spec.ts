@@ -18,11 +18,19 @@ describe("MediaModerationWorker", () => {
   const cases = { createFromResult: jest.fn() } as any;
   const restrictions = { recordAutomaticHighRiskBlock: jest.fn() } as any;
   const notifications = { createConversationMessageReceivedIfUnmuted: jest.fn() } as any;
+  const crisisIntervention = { recordCriticalChatSignal: jest.fn().mockResolvedValue(null) } as any;
   const rules = new RuleEngine();
   let worker: MediaModerationWorker;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mediaAssets.expireDueAssets.mockResolvedValue({
+      processed: 0,
+      expired: 0,
+      failed: 0,
+      batchSize: 100,
+      hasMore: false
+    });
     prisma.message.findMany.mockResolvedValue([]);
     prisma.moderationCase.count.mockResolvedValue(0);
     worker = new MediaModerationWorker(
@@ -33,8 +41,75 @@ describe("MediaModerationWorker", () => {
       rules,
       cases,
       restrictions,
-      notifications
+      notifications,
+      crisisIntervention
     );
+  });
+
+  it("drains bounded expiry batches in one run instead of ignoring hasMore", async () => {
+    mediaAssets.expireDueAssets
+      .mockResolvedValueOnce({ processed: 100, expired: 100, failed: 0, batchSize: 100, hasMore: true })
+      .mockResolvedValueOnce({ processed: 1, expired: 1, failed: 0, batchSize: 100, hasMore: false });
+
+    await worker.processPending();
+
+    expect(mediaAssets.expireDueAssets).toHaveBeenCalledTimes(2);
+    expect(prisma.message.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        attachments: {
+          some: {},
+          every: {
+            OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: expect.any(Date) } }]
+          }
+        }
+      }),
+      take: 21
+    }));
+  });
+
+  it("schedules an immediate continuation when the bounded maintenance limit is reached", async () => {
+    jest.useFakeTimers();
+    mediaAssets.expireDueAssets.mockResolvedValue({
+      processed: 100,
+      expired: 100,
+      failed: 0,
+      batchSize: 100,
+      hasMore: true
+    });
+
+    try {
+      await worker.processPending();
+      expect(mediaAssets.expireDueAssets).toHaveBeenCalledTimes(10);
+      const rerun = jest.spyOn(worker, "processPending").mockResolvedValue(undefined);
+
+      await jest.advanceTimersByTimeAsync(999);
+      expect(rerun).not.toHaveBeenCalled();
+      await jest.advanceTimersByTimeAsync(1);
+      expect(rerun).toHaveBeenCalledTimes(1);
+    } finally {
+      worker.onModuleDestroy();
+      jest.useRealTimers();
+    }
+  });
+
+  it("uses a look-ahead row and continues a queued-media backlog", async () => {
+    jest.useFakeTimers();
+    prisma.message.findMany.mockResolvedValue(
+      Array.from({ length: 21 }, (_, index) => ({ id: `queued-${index}` }))
+    );
+    const processMessage = jest.spyOn(worker, "processMessage").mockResolvedValue(undefined);
+
+    try {
+      await worker.processPending();
+      expect(processMessage).toHaveBeenCalledTimes(20);
+      const rerun = jest.spyOn(worker, "processPending").mockResolvedValue(undefined);
+
+      await jest.advanceTimersByTimeAsync(1_000);
+      expect(rerun).toHaveBeenCalledTimes(1);
+    } finally {
+      worker.onModuleDestroy();
+      jest.useRealTimers();
+    }
   });
 
   it("fuses image OCR and audio transcription into the text safety decision", async () => {
@@ -236,5 +311,123 @@ describe("MediaModerationWorker", () => {
       db
     );
     expect(notifications.createConversationMessageReceivedIfUnmuted).not.toHaveBeenCalled();
+  });
+
+  it("routes critical media to the authenticated uploader, never the conversation customer", async () => {
+    const message = {
+      id: "message-critical-media",
+      conversationId: "conversation-1",
+      senderId: "companion-owner",
+      content: "",
+      moderationStatus: "queued",
+      conversation: {
+        id: "conversation-1",
+        externalId: "companion-1",
+        userId: "customer-1",
+        companion: { ownerUserId: "companion-owner" }
+      },
+      attachments: [{ id: "audio-1", kind: "audio", retryCount: 0, nextAttemptAt: null }]
+    };
+    prisma.message.findUnique.mockResolvedValue(message);
+    prisma.message.updateMany.mockResolvedValue({ count: 1 });
+    analysisProvider.transcribeAudio = jest.fn().mockResolvedValue({
+      available: true,
+      score: 0.96,
+      reasons: ["critical"],
+      categories: ["violence"],
+      extractedText: "private transcript"
+    });
+    moderation.moderateAsync.mockResolvedValue({
+      decision: "block",
+      riskLevel: "high",
+      priority: "critical",
+      score: 0.96,
+      reasons: ["critical"],
+      matchedRules: ["violence.threat"],
+      categories: ["violence"],
+      policyVersion: "chat-v2",
+      usedAI: true
+    });
+    cases.createFromResult.mockResolvedValue({ id: "case-critical-media" });
+    const db = {
+      conversationBlock: { findFirst: jest.fn().mockResolvedValue(null) },
+      message: {
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        create: jest.fn().mockResolvedValue({})
+      },
+      mediaAsset: { update: jest.fn().mockResolvedValue({}) },
+      conversation: { update: jest.fn().mockResolvedValue({}) }
+    };
+    prisma.$transaction.mockImplementation(async (callback: any) => callback(db));
+
+    await worker.processMessage(message.id);
+
+    expect(crisisIntervention.recordCriticalChatSignal).toHaveBeenCalledWith(
+      "companion-owner",
+      { priority: "critical", categories: ["violence"] },
+      db
+    );
+    const serializedSignal = JSON.stringify(crisisIntervention.recordCriticalChatSignal.mock.calls[0]);
+    expect(serializedSignal).not.toContain("customer-1");
+    expect(serializedSignal).not.toContain("message-critical-media");
+    expect(serializedSignal).not.toContain("private transcript");
+  });
+
+  it("keeps critical media queued when its crisis gate transaction cannot commit", async () => {
+    const message = {
+      id: "message-critical-retry",
+      conversationId: "conversation-1",
+      senderId: "user-1",
+      content: "",
+      moderationStatus: "queued",
+      conversation: {
+        id: "conversation-1",
+        externalId: "companion-1",
+        userId: "user-1",
+        companion: { ownerUserId: "companion-owner" }
+      },
+      attachments: [{ id: "image-critical", kind: "image", retryCount: 0, nextAttemptAt: null }]
+    };
+    prisma.message.findUnique.mockResolvedValue(message);
+    prisma.message.updateMany.mockResolvedValue({ count: 1 });
+    analysisProvider.analyzeImage = jest.fn().mockResolvedValue({
+      available: true,
+      score: 0.96,
+      reasons: ["critical"],
+      categories: ["selfHarm"],
+      extractedText: "private OCR"
+    });
+    moderation.moderateAsync.mockResolvedValue({
+      decision: "block",
+      riskLevel: "high",
+      priority: "critical",
+      score: 0.96,
+      reasons: ["critical"],
+      matchedRules: ["selfharm.risk"],
+      categories: ["selfHarm"],
+      policyVersion: "chat-v2",
+      usedAI: true
+    });
+    cases.createFromResult.mockResolvedValue({ id: "case-critical-retry" });
+    crisisIntervention.recordCriticalChatSignal.mockRejectedValue(new Error("crisis-write-failed"));
+    const db = {
+      conversationBlock: { findFirst: jest.fn().mockResolvedValue(null) },
+      message: { updateMany: jest.fn().mockResolvedValue({ count: 1 }), create: jest.fn() },
+      mediaAsset: { update: jest.fn().mockResolvedValue({}) },
+      conversation: { update: jest.fn().mockResolvedValue({}) }
+    };
+    prisma.$transaction.mockImplementation(async (callback: any) => callback(db));
+
+    await expect(worker.processMessage(message.id)).rejects.toThrow("crisis-write-failed");
+
+    expect(prisma.message.updateMany).toHaveBeenLastCalledWith({
+      where: {
+        id: message.id,
+        moderationStatus: "queued",
+        moderationProcessingToken: expect.any(String)
+      },
+      data: { moderationProcessingToken: null, moderationProcessingAt: null }
+    });
+    expect(prisma.mediaAsset.updateMany).not.toHaveBeenCalled();
   });
 });

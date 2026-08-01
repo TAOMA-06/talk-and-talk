@@ -11,6 +11,7 @@ import { buildCorsOptions } from "../src/config/cors";
 import { PrismaService } from "../src/database/prisma.service";
 import { seedDatabase } from "../src/database/seed";
 import { grantCurrentLegalConsent } from "./legal-consent-fixture";
+import { issueSessionBoundAccessToken } from "./session-token-fixture";
 
 describe("Admin Moderation (e2e)", () => {
   let app: INestApplication;
@@ -93,10 +94,7 @@ describe("Admin Moderation (e2e)", () => {
     });
     if (role === "user") await grantCurrentLegalConsent(prisma, user.id);
 
-    const token = jwt.sign(
-      { sub: user.id, role },
-      { secret: "e2e-access-secret", expiresIn: "15m" }
-    );
+    const token = await issueSessionBoundAccessToken(prisma, jwt, user);
     return { user, token };
   }
 
@@ -145,7 +143,14 @@ describe("Admin Moderation (e2e)", () => {
     await request(app.getHttpServer())
       .patch(`/api/v1/admin/users/${user.id}/account-status`)
       .set("Authorization", `Bearer ${adminToken}`)
-      .send({ status: "banned", reason: "confirmed commercial abuse" })
+      .send({
+        status: "banned",
+        reasonCode: "COMMERCIAL_ABUSE",
+        reason: "confirmed commercial abuse",
+        sourceType: "manualSafetyReview",
+        sourceReference: "safety-review/e2e-case-1",
+        evidenceReference: "evidence-vault/e2e-item-1"
+      })
       .expect(200)
       .expect(({ body }) => expect(body.data.accountStatus).toBe("banned"));
 
@@ -201,7 +206,8 @@ describe("Admin Moderation (e2e)", () => {
         amountCents: 9900,
         status: "success",
         transactionId: "DELETION_RETAINED_TXN",
-        paidAt: new Date()
+        paidAt: new Date(),
+        providerPaidAt: new Date()
       }
     });
     await prisma.refundTransaction.create({
@@ -211,7 +217,9 @@ describe("Admin Moderation (e2e)", () => {
         outRefundNo: "DELETION_RETAINED_REFUND",
         amountCents: 9900,
         status: "success",
-        reason: "retention verification"
+        providerRefundAcceptedAt: new Date(),
+        reason: "retention verification",
+        resolutionDueAt: new Date(Date.now() + 72 * 60 * 60_000)
       }
     });
 
@@ -378,7 +386,8 @@ describe("Admin Moderation (e2e)", () => {
         amountCents: 9900,
         status: "success",
         transactionId: "DELETION_ACTIVE_TXN",
-        paidAt: new Date()
+        paidAt: new Date(),
+        providerPaidAt: new Date()
       }
     });
     const requested = await request(app.getHttpServer())
@@ -469,7 +478,8 @@ describe("Admin Moderation (e2e)", () => {
         amountCents: 12900,
         status: "success",
         transactionId: "DELETION_REFUND_PAYMENT_TXN",
-        paidAt: new Date()
+        paidAt: new Date(),
+        providerPaidAt: new Date()
       }
     });
     const processingRefund = await prisma.refundTransaction.create({
@@ -479,7 +489,8 @@ describe("Admin Moderation (e2e)", () => {
         outRefundNo: "DELETION_LOST_REFUND_CALLBACK",
         amountCents: 12900,
         status: "processing",
-        reason: "callback reconciliation test"
+        reason: "callback reconciliation test",
+        resolutionDueAt: new Date(Date.now() + 72 * 60 * 60_000)
       }
     });
     const remotelyPaidOrder = await prisma.order.create({

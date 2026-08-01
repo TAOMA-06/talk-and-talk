@@ -35,7 +35,8 @@ describe("ConversationsService moderation delivery state machine", () => {
       message: { findMany: jest.fn().mockResolvedValue([]) },
       moderationCase: { count: jest.fn().mockResolvedValue(0) },
       conversationBlock: { findFirst: jest.fn().mockResolvedValue(null) },
-      $transaction: jest.fn()
+      $transaction: jest.fn(),
+      $queryRaw: jest.fn().mockResolvedValue([{ available: true }])
     } as any;
     const moderation = { moderateAsync: jest.fn().mockResolvedValue(moderationResult(decision)) } as any;
     const moderationCases = { createFromResult: jest.fn().mockResolvedValue({ id: "case-1" }) } as any;
@@ -51,6 +52,7 @@ describe("ConversationsService moderation delivery state machine", () => {
     const mediaWorker = { enqueue: jest.fn() } as any;
     const notifications = { createConversationMessageReceivedIfUnmuted: jest.fn() } as any;
     const audit = { record: jest.fn() } as any;
+    const crisisIntervention = { recordCriticalChatSignal: jest.fn().mockResolvedValue(null) } as any;
     const create = jest.fn().mockImplementation(({ data }: any) => ({
       id: data.type === "safety" ? "safety-1" : "message-1",
       ...data
@@ -60,11 +62,31 @@ describe("ConversationsService moderation delivery state machine", () => {
       order: { findMany: jest.fn().mockResolvedValue([activeOrder]) },
       message: { create, update: jest.fn() },
       mediaAsset: { updateMany: jest.fn() },
-      conversation: { update: jest.fn() }
+      conversation: { update: jest.fn() },
+      $queryRaw: jest.fn().mockResolvedValue([{ available: true }])
     };
     prisma.$transaction.mockImplementation(async (callback: any) => callback(db));
-    const service = new ConversationsService(prisma, moderation, moderationCases, chatRestrictions, mediaAssets, mediaWorker, notifications, audit);
-    return { service, prisma, moderation, moderationCases, chatRestrictions, notifications, db };
+    const service = new ConversationsService(
+      prisma,
+      moderation,
+      moderationCases,
+      chatRestrictions,
+      mediaAssets,
+      mediaWorker,
+      notifications,
+      audit,
+      crisisIntervention
+    );
+    return {
+      service,
+      prisma,
+      moderation,
+      moderationCases,
+      chatRestrictions,
+      notifications,
+      crisisIntervention,
+      db
+    };
   }
 
   it("blocks a hard-rule message before delivery and records its appeal-eligible case", async () => {
@@ -122,12 +144,7 @@ describe("ConversationsService moderation delivery state machine", () => {
 
   it("rejects a completed order before moderation or message persistence, while history can remain readable", async () => {
     const { service, prisma, moderation, db } = setup("allow");
-    prisma.order.findMany.mockResolvedValue([{
-      status: "completed",
-      scheduledAt: new Date(Date.now() - 60 * 60_000),
-      serviceStartedAt: new Date(Date.now() - 60 * 60_000),
-      durationMinutes: 30
-    }]);
+    prisma.$queryRaw.mockResolvedValue([{ available: false }]);
 
     await expect(service.send("user-1", "c1", { content: "服务结束后不应继续发送" }))
       .rejects.toMatchObject({ code: "CONVERSATION_INTERACTION_UNAVAILABLE" });
@@ -149,22 +166,56 @@ describe("ConversationsService moderation delivery state machine", () => {
 
   it("rechecks the order communication window inside the message transaction", async () => {
     const { service, prisma, db } = setup("allow");
-    prisma.order.findMany.mockResolvedValueOnce([{
-      status: "paid",
-      scheduledAt: new Date(Date.now() + 5 * 60_000),
-      serviceStartedAt: null,
-      durationMinutes: 30
-    }]);
-    db.order.findMany.mockResolvedValueOnce([{
-      status: "completed",
-      scheduledAt: new Date(Date.now() - 60 * 60_000),
-      serviceStartedAt: new Date(Date.now() - 60 * 60_000),
-      durationMinutes: 30
-    }]);
+    prisma.$queryRaw.mockResolvedValueOnce([{ available: true }]);
+    db.$queryRaw.mockReset()
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ available: false }]);
 
     await expect(service.send("user-1", "c1", { content: "刚好与服务完成并发的消息" }))
       .rejects.toMatchObject({ code: "CONVERSATION_INTERACTION_UNAVAILABLE" });
 
     expect(db.message.create).not.toHaveBeenCalled();
+  });
+
+  it("records a critical self-harm signal for only the authenticated sender in the message transaction", async () => {
+    const { service, moderation, crisisIntervention, db } = setup("review");
+    moderation.moderateAsync.mockResolvedValue({
+      ...moderationResult("review"),
+      priority: "critical",
+      categories: ["selfHarm"]
+    });
+
+    await service.send("user-1", "c1", { content: "需要安全复核的原始输入" });
+
+    expect(crisisIntervention.recordCriticalChatSignal).toHaveBeenCalledWith(
+      "user-1",
+      { priority: "critical", categories: ["selfHarm"] },
+      db
+    );
+    const serializedSignal = JSON.stringify(crisisIntervention.recordCriticalChatSignal.mock.calls[0]);
+    expect(serializedSignal).not.toContain("需要安全复核的原始输入");
+    expect(serializedSignal).not.toContain("message-1");
+    expect(serializedSignal).not.toContain("companion-owner");
+  });
+
+  it("fails the message transaction closed when a critical crisis gate cannot be persisted", async () => {
+    const { service, moderation, crisisIntervention, notifications, db } = setup("block");
+    moderation.moderateAsync.mockResolvedValue({
+      ...moderationResult("block"),
+      priority: "critical",
+      categories: ["violence"]
+    });
+    crisisIntervention.recordCriticalChatSignal.mockRejectedValue(new Error("crisis-write-failed"));
+
+    await expect(service.send("user-1", "c1", { content: "critical input" }))
+      .rejects.toThrow("crisis-write-failed");
+
+    expect(crisisIntervention.recordCriticalChatSignal).toHaveBeenCalledWith(
+      "user-1",
+      { priority: "critical", categories: ["violence"] },
+      db
+    );
+    expect(db.conversation.update).not.toHaveBeenCalled();
+    expect(notifications.createConversationMessageReceivedIfUnmuted).not.toHaveBeenCalled();
   });
 });

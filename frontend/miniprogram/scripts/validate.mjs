@@ -66,8 +66,42 @@ if (!/^wx[a-zA-Z0-9]{16}$/.test(externalAppId)) {
   else warnings.push(`${message}; local structure checks continue in development mode`);
 }
 if (pages[0] !== "pages/consent/index") errors.push("pages/consent/index must remain the first-use entry page");
-for (const requiredPage of ["pages/consent/index", "pages/legal/index"]) {
+for (const requiredPage of ["pages/consent/index", "pages/legal/index", "pages/crisis/index"]) {
   if (!pages.includes(requiredPage)) errors.push(`app.json must register ${requiredPage}`);
+}
+
+const crisisTemplatePath = join(root, "pages/crisis/index.wxml");
+const crisisSourcePath = join(root, "pages/crisis/index.ts");
+const crisisGatePath = join(root, "utils/crisis-gate.ts");
+if (existsSync(crisisTemplatePath) && existsSync(crisisSourcePath) && existsSync(crisisGatePath)) {
+  const crisisTemplate = readFileSync(crisisTemplatePath, "utf8");
+  const crisisSource = readFileSync(crisisSourcePath, "utf8");
+  const crisisGate = readFileSync(crisisGatePath, "utf8");
+  for (const requiredText of ["一键拨号", "官方来源", "核验日期", "普通客服工单不是紧急服务", "不会自动报警"]) {
+    if (!crisisTemplate.includes(requiredText)) errors.push(`pages/crisis/index.wxml must disclose: ${requiredText}`);
+  }
+  if (!/code:\s*["']110["']/.test(crisisSource) || !/code:\s*["']120["']/.test(crisisSource)) {
+    errors.push("pages/crisis/index.ts must preserve the offline 110/120 emergency baseline");
+  }
+  if (!/lastVerifiedOn:\s*["']\d{4}-\d{2}-\d{2}["']/.test(crisisSource)) {
+    errors.push("pages/crisis/index.ts must show a dated resource verification fact");
+  }
+  if (/intentInput|messageId|content\s*:/.test(crisisGate)) {
+    errors.push("utils/crisis-gate.ts must never persist or route raw intent/message content");
+  }
+}
+
+for (const gatedPath of [
+  "pages/home/index.ts",
+  "pages/discover/index.ts",
+  "pages/companion/detail.ts"
+]) {
+  const source = readFileSync(join(root, gatedPath), "utf8");
+  if (!/passCrisisGate\s*\(/.test(source)) errors.push(`${gatedPath} must use the shared crisis gate`);
+}
+const chatTemplate = readFileSync(join(root, "pages/chat/index.wxml"), "utf8");
+if (!/item\.type === 'safety'[\s\S]*查看紧急帮助/.test(chatTemplate)) {
+  errors.push("pages/chat/index.wxml must provide a message-level emergency-help route for safety messages");
 }
 
 for (const page of pages) {
@@ -94,6 +128,21 @@ for (const page of pages) {
     const opens = (withoutSelfClosing.match(new RegExp(`<${tag}\\b`, "g")) || []).length;
     const closes = (withoutSelfClosing.match(new RegExp(`</${tag}>`, "g")) || []).length;
     if (opens !== closes) errors.push(`${page}.wxml has unbalanced <${tag}> tags (${opens} open, ${closes} close)`);
+  }
+
+  for (const match of template.matchAll(/<(?:view|image)\b[^>]*(?:bindtap|catchtap)="[^"]+"[^>]*>/g)) {
+    const control = match[0];
+    if (!/\baria-role="[^"]+"/.test(control) || !/\baria-label="[^"]+"/.test(control)) {
+      errors.push(`${page}.wxml has a custom tap target without aria-role and aria-label`);
+    }
+    if (/\baria-role="(?:button|checkbox|radio)"/.test(control) && !/\btabindex="0"/.test(control)) {
+      errors.push(`${page}.wxml has a custom interactive control without tabindex=0`);
+    }
+  }
+  for (const match of template.matchAll(/<switch\b[^>]*>/g)) {
+    if (!/\baria-label="[^"]+"/.test(match[0])) {
+      errors.push(`${page}.wxml has a switch without aria-label`);
+    }
   }
 }
 

@@ -1,0 +1,22 @@
+.notifications-page { padding-bottom: 64rpx; }
+.notification-hero { display: flex; align-items: flex-start; justify-content: space-between; gap: 20rpx; padding: 30rpx; border-radius: 26rpx; background: linear-gradient(135deg, #fff0f3, #f3f8fa); }
+.hero-title { color: #49343a; font-size: 36rpx; font-weight: 800; }
+.hero-copy { margin-top: 10rpx; color: #79636a; font-size: 23rpx; line-height: 1.6; }
+.unread-count { flex: 0 0 auto; padding: 7rpx 13rpx; border-radius: 999rpx; background: #b94a68; color: #fff; font-size: 21rpx; }
+.toolbar { display: flex; gap: 14rpx; margin: 20rpx 0; }
+.toolbar-button { flex: 1; margin: 0; border: 1rpx solid #decbd0; background: #fff; color: #88475a; font-size: 22rpx; line-height: 72rpx; }
+.notification-card { margin-bottom: 14rpx; padding: 24rpx; border-left: 7rpx solid #d9cdd1; border-radius: 20rpx; background: #fff; box-shadow: 0 7rpx 20rpx rgba(84, 50, 60, 0.05); }
+.notification-card.unread { border-left-color: #b94a68; background: #fffbfc; }
+.notification-top { display: flex; justify-content: space-between; gap: 16rpx; }
+.type { color: #a14a62; font-size: 21rpx; font-weight: 700; }
+.time { color: #9f898f; font-size: 20rpx; }
+.notification-title { margin-top: 11rpx; color: #4d373e; font-size: 28rpx; font-weight: 800; overflow-wrap: anywhere; }
+.notification-body { margin-top: 8rpx; color: #755f66; font-size: 23rpx; line-height: 1.6; overflow-wrap: anywhere; }
+.notification-footer { display: flex; justify-content: space-between; margin-top: 13rpx; color: #9a8189; font-size: 20rpx; }
+.unread-marker { color: #a6405b; font-weight: 800; }
+.retry-button { width: 100%; margin-top: 18rpx; border: 1rpx solid #ddc8ce; background: #fff; color: #88475a; font-size: 23rpx; }
+.toolbar-button::after, .retry-button::after { border: 0; }
+.unread-count-unknown { background: #fff0f2; color: #91475a; }
+.unread-error { margin: 0 0 18rpx; padding: 15rpx; border-left: 5rpx solid #b65a6e; background: #fff6f7; color: #8d4858; font-size: 23rpx; line-height: 1.6; }
+.unread-retry { width: 100%; margin: 12rpx 0 0; border: 1rpx solid #d6b9c1; background: #fff; color: #8c4056; font-size: 23rpx; }
+.unread-retry::after { border: 0; }

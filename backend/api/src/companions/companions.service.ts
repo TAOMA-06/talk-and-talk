@@ -11,6 +11,8 @@ import { ModerationService } from "../moderation/moderation.service";
 import { CreateCompanionDto, UpdateCompanionDto } from "./dto/companion-profile.dto";
 import { ListCompanionAvailabilityQueryDto } from "./dto/list-companion-availability.dto";
 import { ListCompanionsQueryDto, PublicCompanionSort } from "./dto/list-companions.dto";
+import { ListOwnScheduleItemsDto } from "./dto/list-own-schedule-items.dto";
+import { ListServiceOfferingsDto } from "./dto/list-service-offerings.dto";
 import { CreateOwnAvailabilityWindowDto, UpdateOwnAvailabilityWindowDto } from "./dto/manage-availability-window.dto";
 import {
   CreateOwnAvailabilityBlackoutDto,
@@ -23,8 +25,16 @@ import {
   CompanionAvailabilityScheduleRuleService,
   COMPANION_AVAILABILITY_SCHEDULE_TIMEZONE
 } from "./companion-availability-schedule-rule.service";
-import { COMPANION_RECURRING_AVAILABILITY_DRAFT_HORIZON_DAYS } from "./companion-recurring-availability-draft-materializer.service";
+import {
+  CompanionRecurringAvailabilityDraftMaterializerService,
+  COMPANION_RECURRING_AVAILABILITY_DRAFT_HORIZON_DAYS,
+  COMPANION_MAX_INACTIVE_AVAILABILITY_WINDOWS
+} from "./companion-recurring-availability-draft-materializer.service";
 import { deriveTopicIds, normalizeTopicIds } from "../recommendations/recommendation-topics";
+import {
+  findCompanionCapacityMatches,
+  findPublicAvailabilitySlots
+} from "./companion-capacity-query";
 
 type CompanionRecord = Awaited<ReturnType<CompanionsService["findRecordOrThrow"]>>;
 
@@ -32,11 +42,20 @@ const AVAILABILITY_TIMEZONE = "Asia/Shanghai";
 const AVAILABILITY_STEP_MS = 30 * 60_000;
 const MIN_PUBLIC_BOOKING_LEAD_TIME_MS = 15 * 60_000;
 const MAX_PUBLIC_AVAILABILITY_CANDIDATES = 100;
+export const PUBLIC_CAPACITY_SCAN_BATCH_SIZE = 100;
+export const MAX_BOUNDED_SELLABLE_COMPANIONS = 500;
+export const MAX_SERVICE_OFFERINGS_PER_COMPANION = 50;
 const DEFAULT_PUBLIC_AVAILABILITY_PRIORITY_DAYS = 7;
 const MAX_OWN_AVAILABILITY_WINDOW_DURATION_MS = 24 * 60 * 60_000;
+const MAX_INACTIVE_AVAILABILITY_WINDOW_HORIZON_MS = 90 * 24 * 60 * 60_000;
 const MAX_OWN_AVAILABILITY_CAPACITY = 10;
 const DAY_MS = 24 * 60 * 60_000;
 const SHANGHAI_OFFSET_MS = 8 * 60 * 60_000;
+const PUBLIC_REQUIRED_TRAINING = [
+  { moduleCode: "service-boundaries", moduleVersion: "2026.1" },
+  { moduleCode: "safety-escalation", moduleVersion: "2026.1" },
+  { moduleCode: "privacy-refresh", moduleVersion: "2026.1" }
+] as const;
 
 type AvailabilityReservation = {
   status: string;
@@ -63,7 +82,8 @@ export class CompanionsService {
     private readonly moderationCases: ModerationCaseService,
     private readonly availabilityReminderCandidates: AvailabilityReminderCandidateService,
     private readonly availabilityScheduleRules: CompanionAvailabilityScheduleRuleService,
-    @Optional() private readonly config?: ConfigService
+    @Optional() private readonly config?: ConfigService,
+    @Optional() private readonly recurringAvailabilityDraftMaterializer?: CompanionRecurringAvailabilityDraftMaterializerService
   ) {}
 
   async list(query: ListCompanionsQueryDto) {
@@ -79,84 +99,39 @@ export class CompanionsService {
         pagination: { page, pageSize, total: 0, totalPages: 0 }
       };
     }
-    const where = this.buildPublicWhere(query);
     const capacityDays = query.availableWithinDays ?? DEFAULT_PUBLIC_AVAILABILITY_PRIORITY_DAYS;
-    const capacityMatches = await this.findSellableCompanions(query, capacityDays);
-    // Public discovery is a sellable catalog, not a directory of profiles.
-    // Apply the capacity gate before pagination/counting so every returned card
-    // has at least one matching current service and one structured candidate
-    // with remaining capacity. Legacy free-text availability stays readable on
-    // existing profiles, but cannot claim that a paid appointment is available.
-    where.id = { in: capacityMatches.map((match) => match.id) };
-    const catalogByCompanionId = new Map(capacityMatches.map((match) => [match.id, match]));
-
-    if (query.sortBy === "soonestAvailable" || query.sortBy === "priceAsc") {
-      // Availability is volatile, so this is deliberately a current ordering
-      // pass rather than a booking claim. The DTO exposes the calculated time as
-      // a discovery hint; detail and order creation each recheck capacity.
-      const orderedMatches = [...capacityMatches].sort((left, right) =>
-        query.sortBy === "priceAsc"
-          ? left.startingPriceCents - right.startingPriceCents
-            || left.startingDurationMinutes - right.startingDurationMinutes
-            || left.id.localeCompare(right.id)
-          : left.earliestStartsAt.getTime() - right.earliestStartsAt.getTime()
-            || left.id.localeCompare(right.id)
-      );
-      const total = orderedMatches.length;
-      const pageIds = orderedMatches
-        .slice((page - 1) * pageSize, page * pageSize)
-        .map((match) => match.id);
-      if (!pageIds.length) {
-        return {
-          items: [],
-          pagination: {
-            page,
-            pageSize,
-            total,
-            totalPages: Math.ceil(total / pageSize)
-          }
-        };
-      }
-      const items = await this.prisma.companionProfile.findMany({
-        // Reapply the public gate and every explicit condition after the
-        // capacity snapshot, so a profile that loses public eligibility is
-        // never leaked by the ordering pass.
-        where: { ...where, id: { in: pageIds } },
-        include: this.includeTags()
-      });
-      const pagePosition = new Map(pageIds.map((id, index) => [id, index]));
-      items.sort((left, right) =>
-        (pagePosition.get(left.id) ?? Number.MAX_SAFE_INTEGER) - (pagePosition.get(right.id) ?? Number.MAX_SAFE_INTEGER)
-      );
+    const catalogPage = await this.findSellableCatalogPage(query, capacityDays, page, pageSize);
+    const pageIds = catalogPage.matches.map((match) => match.id);
+    if (pageIds.length === 0) {
       return {
-        items: items.map((item) => this.toDto(item, catalogByCompanionId.get(item.id))),
+        items: [],
         pagination: {
           page,
           pageSize,
-          total,
-          totalPages: Math.ceil(total / pageSize)
+          total: catalogPage.total,
+          totalPages: Math.ceil(catalogPage.total / pageSize)
         }
       };
     }
-
-    const [items, total] = await Promise.all([
-      this.prisma.companionProfile.findMany({
-        where,
-        include: this.includeTags(),
-        orderBy: this.publicCatalogOrderBy(query.sortBy),
-        skip: (page - 1) * pageSize,
-        take: pageSize
-      }),
-      this.prisma.companionProfile.count({ where })
-    ]);
+    const items = await this.prisma.companionProfile.findMany({
+      // Reapply the public gate after the volatile capacity snapshot. Only one
+      // bounded response-page id set crosses back into Prisma.
+      where: { ...this.buildPublicWhere(query), id: { in: pageIds } },
+      include: this.includeTags()
+    });
+    const pagePosition = new Map(pageIds.map((id, index) => [id, index]));
+    const catalogByCompanionId = new Map(catalogPage.matches.map((match) => [match.id, match]));
+    items.sort((left, right) =>
+      (pagePosition.get(left.id) ?? Number.MAX_SAFE_INTEGER) - (pagePosition.get(right.id) ?? Number.MAX_SAFE_INTEGER)
+    );
 
     return {
       items: items.map((item) => this.toDto(item, catalogByCompanionId.get(item.id))),
       pagination: {
         page,
         pageSize,
-        total,
-        totalPages: Math.ceil(total / pageSize)
+        total: catalogPage.total,
+        totalPages: Math.ceil(catalogPage.total / pageSize)
       }
     };
   }
@@ -170,7 +145,11 @@ export class CompanionsService {
           isVerified: true,
           ownerUserId: { not: null },
           owner: { accountStatus: "active", profile: { isVerified: true } },
-          commercialProfile: { status: "verified" }
+          commercialProfile: {
+            status: "verified",
+            adultEligibilityVerdict: "adult",
+            adultEligibilityValidUntil: { gt: new Date() }
+          }
         },
         include: this.includeTags()
       }),
@@ -192,7 +171,8 @@ export class CompanionsService {
   async findSellableCompanions(
     query: ListCompanionsQueryDto = {},
     days = DEFAULT_PUBLIC_AVAILABILITY_PRIORITY_DAYS,
-    companionIds?: string[]
+    companionIds?: string[],
+    limit = 200
   ): Promise<SellableCompanionMatch[]> {
     if (query.deliveryMode === "voice" && !this.isVoiceBookingEnabled()) return [];
     const boundedDays = Math.max(1, Math.min(7, Math.trunc(days)));
@@ -200,7 +180,12 @@ export class CompanionsService {
       ? [...new Set(companionIds.map((id) => id.trim()).filter(Boolean))]
       : undefined;
     if (normalizedIds && normalizedIds.length === 0) return [];
-    return this.findCompanionsWithFutureCapacity(query, boundedDays, normalizedIds);
+    return this.findCompanionsWithFutureCapacity(
+      query,
+      boundedDays,
+      normalizedIds,
+      Math.min(MAX_BOUNDED_SELLABLE_COMPANIONS, Math.max(1, Math.trunc(limit)))
+    );
   }
 
   /**
@@ -208,7 +193,11 @@ export class CompanionsService {
    * visibility gate as the companion profile, so an unpublished or unverified
    * profile cannot leak its commercial configuration through this endpoint.
    */
-  async listPublishedServiceOfferings(id: string) {
+  async listPublishedServiceOfferings(
+    id: string,
+    query: ListServiceOfferingsDto = new ListServiceOfferingsDto()
+  ) {
+    const serviceWhere = this.activeServiceOfferingWhere({});
     const item = await this.prisma.companionProfile.findFirst({
       where: {
         ...this.buildPublicWhere({}),
@@ -216,8 +205,13 @@ export class CompanionsService {
       },
       select: {
         serviceOfferings: {
-          where: { isActive: true },
-          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
+          where: serviceWhere,
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }, { id: "asc" }],
+          skip: (query.page - 1) * query.pageSize,
+          take: query.pageSize
+        },
+        _count: {
+          select: { serviceOfferings: { where: serviceWhere } }
         }
       }
     });
@@ -226,10 +220,17 @@ export class CompanionsService {
       throw new AppException("COMPANION_NOT_FOUND", "Companion not found", HttpStatus.NOT_FOUND);
     }
 
+    const total = item._count.serviceOfferings;
     return {
       items: item.serviceOfferings
         .filter((offering) => this.isPublicServiceOfferingEnabled(offering))
-        .map((offering) => this.toServiceOfferingDto(offering))
+        .map((offering) => this.toServiceOfferingDto(offering)),
+      pagination: {
+        page: query.page,
+        pageSize: query.pageSize,
+        total,
+        totalPages: Math.ceil(total / query.pageSize)
+      }
     };
   }
 
@@ -272,29 +273,14 @@ export class CompanionsService {
       companion.serviceOfferings.filter((offering) => this.isPublicServiceOfferingEnabled(offering)),
       query
     );
-    const [windows, reservations, structuredWindowCount] = await Promise.all([
-      this.prisma.companionAvailabilityWindow.findMany({
-        where: {
-          companionId: companion.id,
-          isActive: true,
-          startsAt: { lt: until },
-          endsAt: { gt: earliestStart }
-        },
-        orderBy: { startsAt: "asc" }
-      }),
-      this.prisma.order.findMany({
-        where: {
-          companionId: companion.id,
-          scheduledAt: { lt: until },
-          status: { in: ["pending", "paying", "paid", "inService", "completed"] }
-        },
-        select: {
-          status: true,
-          scheduledAt: true,
-          durationMinutes: true,
-          companionConfirmedAt: true,
-          paymentReservationExpiresAt: true
-        }
+    const [slots, structuredWindowCount] = await Promise.all([
+      findPublicAvailabilitySlots(this.prisma, {
+        companionId: companion.id,
+        durationMinutes: service.durationMinutes,
+        earliestStart,
+        until,
+        evaluatedAt: now,
+        limit: MAX_PUBLIC_AVAILABILITY_CANDIDATES
       }),
       this.prisma.companionAvailabilityWindow.count({
         where: {
@@ -312,9 +298,15 @@ export class CompanionsService {
       serviceOfferingId: service.serviceOfferingId,
       durationMinutes: service.durationMinutes,
       legacyAvailableTimes: source === "legacy" ? companion.availableTimes : [],
-      items: source === "structured"
-        ? this.expandAvailabilityCandidates(windows, reservations, service.durationMinutes, earliestStart, until, now)
-        : []
+      items: source === "structured" ? slots.map((slot) => ({
+        id: `${slot.availabilityWindowId}:${slot.startsAt.toISOString()}`,
+        availabilityWindowId: slot.availabilityWindowId,
+        startsAt: slot.startsAt.toISOString(),
+        endsAt: slot.endsAt.toISOString(),
+        capacity: slot.capacity,
+        reservedCount: slot.reservedCount,
+        availableCapacity: slot.capacity - slot.reservedCount
+      })) : []
     };
   }
 
@@ -334,13 +326,34 @@ export class CompanionsService {
    * the complete list, including drafts and retired entries, to operate the
    * catalog without ever being able to inspect another companion's data.
    */
-  async listOwnServiceOfferings(userId: string) {
+  async listOwnServiceOfferings(
+    userId: string,
+    query: ListServiceOfferingsDto = new ListServiceOfferingsDto()
+  ) {
     const companion = await this.findEligibleOwnCompanion(userId);
-    const items = await this.prisma.companionServiceOffering.findMany({
-      where: { companionId: companion.id },
-      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
-    } as any);
-    return { items: items.map((item: any) => this.toOwnServiceOfferingDto(item)) };
+    const where = { companionId: companion.id };
+    const [items, total, active] = await Promise.all([
+      this.prisma.companionServiceOffering.findMany({
+        where,
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }, { id: "asc" }],
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize
+      } as any),
+      this.prisma.companionServiceOffering.count({ where } as any),
+      this.prisma.companionServiceOffering.count({
+        where: { ...where, isActive: true }
+      } as any)
+    ]);
+    return {
+      items: items.map((item: any) => this.toOwnServiceOfferingDto(item)),
+      summary: { total, active },
+      pagination: {
+        page: query.page,
+        pageSize: query.pageSize,
+        total,
+        totalPages: Math.ceil(total / query.pageSize)
+      }
+    };
   }
 
   async createOwnServiceOffering(userId: string, dto: CreateOwnServiceOfferingDto) {
@@ -355,17 +368,52 @@ export class CompanionsService {
       actorId: userId,
       action: "创建"
     });
-    const created = await this.prisma.companionServiceOffering.create({
-      data: {
-        id,
-        companionId: companion.id,
-        // Codes are stable, server-owned identifiers. They are intentionally
-        // not a self-service field, so ordinary edits cannot collide with or
-        // rewrite historic order snapshots.
-        code: `service-${id}`,
-        ...data
+    const created = await this.prisma.$transaction(async (transaction) => {
+      const db = transaction as any;
+      // Concurrent creates for one catalog serialize on its profile row, so
+      // both requests cannot observe the same pre-limit count and overfill it.
+      await db.$queryRaw`SELECT "id" FROM "CompanionProfile" WHERE "id" = ${companion.id} FOR UPDATE`;
+      const lockedCompanion = await db.companionProfile.findUnique({
+        where: { id: companion.id },
+        select: {
+          id: true,
+          ownerUserId: true,
+          isVerified: true,
+          owner: {
+            select: {
+              accountStatus: true,
+              profile: { select: { isVerified: true } }
+            }
+          }
+        }
+      });
+      if (!lockedCompanion || lockedCompanion.ownerUserId !== userId) {
+        throw new AppException("COMPANION_PROFILE_NOT_FOUND", "Companion profile not found", HttpStatus.NOT_FOUND);
       }
-    } as any);
+      this.assertEligibleOwnCompanion(lockedCompanion);
+      const currentCount = await db.companionServiceOffering.count({
+        where: { companionId: lockedCompanion.id }
+      });
+      if (currentCount >= MAX_SERVICE_OFFERINGS_PER_COMPANION) {
+        throw new AppException(
+          "SERVICE_OFFERING_LIMIT_REACHED",
+          `A companion may keep at most ${MAX_SERVICE_OFFERINGS_PER_COMPANION} service offerings`,
+          HttpStatus.CONFLICT,
+          { limit: MAX_SERVICE_OFFERINGS_PER_COMPANION }
+        );
+      }
+      return db.companionServiceOffering.create({
+        data: {
+          id,
+          companionId: lockedCompanion.id,
+          // Codes are stable, server-owned identifiers. They are intentionally
+          // not a self-service field, so ordinary edits cannot collide with or
+          // rewrite historic order snapshots.
+          code: `service-${id}`,
+          ...data
+        }
+      });
+    });
     return this.toOwnServiceOfferingDto(created as any);
   }
 
@@ -412,23 +460,50 @@ export class CompanionsService {
    * never deleted by this API because orders retain a restrictive reference to
    * it; retirement is the reversible and auditable way to stop new bookings.
    */
-  async listOwnAvailabilityWindows(userId: string) {
+  async listOwnAvailabilityWindows(
+    userId: string,
+    query: ListOwnScheduleItemsDto = new ListOwnScheduleItemsDto()
+  ) {
     const companion = await this.findEligibleOwnCompanion(userId);
-    const items = await this.prisma.companionAvailabilityWindow.findMany({
+    const where = {
       // Generated inactive drafts have their own bounded owner-review endpoint.
       // Keep the ordinary window calendar focused on manual entries and already
       // activated windows, so an old draft cannot be mistaken for live supply.
-      where: {
-        companionId: companion.id,
-        NOT: {
-          isActive: false,
-          recurringOccurrenceStartsAt: { not: null }
-        }
+      companionId: companion.id,
+      NOT: {
+        isActive: false,
+        recurringOccurrenceStartsAt: { not: null }
+      }
+    };
+    const now = new Date();
+    const futureActiveWhere = {
+      ...where,
+      isActive: true,
+      startsAt: { gt: now }
+    };
+    const [items, total, futureActiveCount, nextFutureActive] = await Promise.all([
+      this.prisma.companionAvailabilityWindow.findMany({
+        where,
+        orderBy: [{ startsAt: "asc" }, { createdAt: "asc" }, { id: "asc" }],
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize
+      } as any),
+      this.prisma.companionAvailabilityWindow.count({ where } as any),
+      this.prisma.companionAvailabilityWindow.count({ where: futureActiveWhere } as any),
+      this.prisma.companionAvailabilityWindow.findFirst({
+        where: futureActiveWhere,
+        orderBy: [{ startsAt: "asc" }, { id: "asc" }],
+        select: { startsAt: true }
+      } as any)
+    ]);
+    return {
+      items: items.map((item: any) => this.toOwnAvailabilityWindowDto(item)),
+      summary: {
+        futureActiveCount,
+        nextFutureActiveStartsAt: nextFutureActive?.startsAt?.toISOString() ?? null
       },
-      orderBy: [{ startsAt: "asc" }, { createdAt: "asc" }],
-      take: 200
-    } as any);
-    return { items: items.map((item: any) => this.toOwnAvailabilityWindowDto(item)) };
+      pagination: this.ownerListPagination(query, total)
+    };
   }
 
   async createOwnAvailabilityWindow(userId: string, dto: CreateOwnAvailabilityWindowDto) {
@@ -446,6 +521,8 @@ export class CompanionsService {
           startsAt: data.startsAt,
           endsAt: data.endsAt
         });
+      } else {
+        await this.assertInactiveAvailabilityWindowCapacity(db, companion.id);
       }
       const created = await db.companionAvailabilityWindow.create({
         data: { companionId: companion.id, ...data }
@@ -501,6 +578,8 @@ export class CompanionsService {
           endsAt: next.endsAt,
           excludedWindowId: existing.id
         });
+      } else if (existing.isActive) {
+        await this.assertInactiveAvailabilityWindowCapacity(db, companion.id);
       }
       const updated = await db.companionAvailabilityWindow.update({
         where: { id: existing.id },
@@ -518,19 +597,31 @@ export class CompanionsService {
    * availability windows. Reading or writing them does not materialize drafts,
    * publish capacity, create reminder candidates, or touch orders.
    */
-  async listOwnRecurringAvailabilityRules(userId: string) {
+  async listOwnRecurringAvailabilityRules(
+    userId: string,
+    query: ListOwnScheduleItemsDto = new ListOwnScheduleItemsDto()
+  ) {
     const companion = await this.findEligibleOwnCompanion(userId);
-    const items = await this.prisma.companionRecurringAvailabilityRule.findMany({
-      where: { companionId: companion.id },
-      orderBy: [
-        { isActive: "desc" },
-        { weekday: "asc" },
-        { startsAtMinute: "asc" },
-        { createdAt: "asc" }
-      ],
-      take: 200
-    } as any);
-    return { items: items.map((item: any) => this.toOwnRecurringAvailabilityRuleDto(item)) };
+    const where = { companionId: companion.id };
+    const [items, total] = await Promise.all([
+      this.prisma.companionRecurringAvailabilityRule.findMany({
+        where,
+        orderBy: [
+          { isActive: "desc" },
+          { weekday: "asc" },
+          { startsAtMinute: "asc" },
+          { createdAt: "asc" },
+          { id: "asc" }
+        ],
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize
+      } as any),
+      this.prisma.companionRecurringAvailabilityRule.count({ where } as any)
+    ]);
+    return {
+      items: items.map((item: any) => this.toOwnRecurringAvailabilityRuleDto(item)),
+      pagination: this.ownerListPagination(query, total)
+    };
   }
 
   async createOwnRecurringAvailabilityRule(userId: string, dto: CreateOwnRecurringAvailabilityRuleDto) {
@@ -553,18 +644,30 @@ export class CompanionsService {
     return this.toOwnRecurringAvailabilityRuleDto(retired as any);
   }
 
-  async listOwnAvailabilityBlackouts(userId: string) {
+  async listOwnAvailabilityBlackouts(
+    userId: string,
+    query: ListOwnScheduleItemsDto = new ListOwnScheduleItemsDto()
+  ) {
     const companion = await this.findEligibleOwnCompanion(userId);
-    const items = await this.prisma.companionAvailabilityBlackout.findMany({
-      where: { companionId: companion.id },
-      orderBy: [
-        { isActive: "desc" },
-        { startsAt: "asc" },
-        { createdAt: "asc" }
-      ],
-      take: 200
-    } as any);
-    return { items: items.map((item: any) => this.toOwnAvailabilityBlackoutDto(item)) };
+    const where = { companionId: companion.id };
+    const [items, total] = await Promise.all([
+      this.prisma.companionAvailabilityBlackout.findMany({
+        where,
+        orderBy: [
+          { isActive: "desc" },
+          { startsAt: "asc" },
+          { createdAt: "asc" },
+          { id: "asc" }
+        ],
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize
+      } as any),
+      this.prisma.companionAvailabilityBlackout.count({ where } as any)
+    ]);
+    return {
+      items: items.map((item: any) => this.toOwnAvailabilityBlackoutDto(item)),
+      pagination: this.ownerListPagination(query, total)
+    };
   }
 
   async createOwnAvailabilityBlackout(userId: string, dto: CreateOwnAvailabilityBlackoutDto) {
@@ -588,26 +691,47 @@ export class CompanionsService {
    * This deliberately exposes only a short, future review horizon and does not
    * include another companion's configuration, a customer, or a public result.
    */
-  async listOwnRecurringAvailabilityDrafts(userId: string) {
+  async listOwnRecurringAvailabilityDrafts(
+    userId: string,
+    query: ListOwnScheduleItemsDto = new ListOwnScheduleItemsDto()
+  ) {
     const companion = await this.findEligibleOwnCompanion(userId);
     const now = new Date();
     const horizonEndsAt = this.recurringAvailabilityDraftHorizonEndsAt(now);
-    const items = await this.prisma.companionAvailabilityWindow.findMany({
-      where: {
-        companionId: companion.id,
-        isActive: false,
-        recurringAvailabilityRuleId: { not: null },
-        recurringOccurrenceStartsAt: { not: null },
-        startsAt: { gt: now },
-        endsAt: { lte: horizonEndsAt }
-      },
-      orderBy: [{ startsAt: "asc" }, { createdAt: "asc" }],
-      take: 200
-    } as any);
+    const where = {
+      companionId: companion.id,
+      isActive: false,
+      recurringAvailabilityRuleId: { not: null },
+      recurringOccurrenceStartsAt: { not: null },
+      startsAt: { gt: now },
+      endsAt: { lte: horizonEndsAt }
+    };
+    const [items, total] = await Promise.all([
+      this.prisma.companionAvailabilityWindow.findMany({
+        where,
+        orderBy: [{ startsAt: "asc" }, { createdAt: "asc" }, { id: "asc" }],
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize
+      } as any),
+      this.prisma.companionAvailabilityWindow.count({ where } as any)
+    ]);
     return {
       horizonEndsAt: horizonEndsAt.toISOString(),
-      items: items.map((item: any) => this.toOwnRecurringAvailabilityDraftDto(item))
+      items: items.map((item: any) => this.toOwnRecurringAvailabilityDraftDto(item)),
+      pagination: this.ownerListPagination(query, total)
     };
+  }
+
+  async materializeOwnRecurringAvailabilityDrafts(userId: string) {
+    const companion = await this.findEligibleOwnCompanion(userId);
+    if (!this.recurringAvailabilityDraftMaterializer) {
+      throw new AppException(
+        "RECURRING_AVAILABILITY_MATERIALIZER_UNAVAILABLE",
+        "Recurring availability draft generation is unavailable",
+        HttpStatus.SERVICE_UNAVAILABLE
+      );
+    }
+    return this.recurringAvailabilityDraftMaterializer.materialize(companion.id);
   }
 
   /**
@@ -723,21 +847,32 @@ export class CompanionsService {
 
   /** Staff-only view: includes unpublished applications so they can be
    * approved or taken down without relying on a direct database/API call. */
-  async listAdmin(page = 1, pageSize = 50) {
+  async listAdmin(page = 1, pageSize = 50, commercialStatus?: string) {
     const safePage = Math.max(1, Math.floor(page) || 1);
     const safePageSize = Math.min(Math.max(1, Math.floor(pageSize) || 50), 100);
+    if (commercialStatus && !["pendingReview", "verified", "suspended"].includes(commercialStatus)) {
+      throw new AppException(
+        "COMMERCIAL_PROFILE_STATUS_INVALID",
+        "Unknown commercial profile status",
+        HttpStatus.BAD_REQUEST
+      );
+    }
+    const where = commercialStatus
+      ? { commercialProfile: { is: { status: commercialStatus } } }
+      : {};
     const [items, total] = await Promise.all([
       this.prisma.companionProfile.findMany({
+        where,
         include: {
           ...this.includeTags(),
           owner: { include: { profile: true } },
           commercialProfile: true
         },
-        orderBy: [{ isPublished: "asc" }, { createdAt: "asc" }],
+        orderBy: [{ isPublished: "asc" }, { createdAt: "asc" }, { id: "asc" }],
         skip: (safePage - 1) * safePageSize,
         take: safePageSize
       } as any),
-      this.prisma.companionProfile.count()
+      this.prisma.companionProfile.count({ where } as any)
     ]);
     return {
       items: items.map((item: any) => ({
@@ -748,7 +883,29 @@ export class CompanionsService {
           isVerified: item.owner.profile?.isVerified === true,
           displayName: item.owner.profile?.displayName ?? null
         } : null,
-        commercialStatus: item.commercialProfile?.status ?? "missing"
+        commercialStatus: item.commercialProfile?.status ?? "missing",
+        commercialProfile: item.commercialProfile ? {
+          companionId: item.commercialProfile.companionId,
+          status: item.commercialProfile.status,
+          settlementRecipientMasked: item.commercialProfile.settlementRecipientMasked,
+          taxProfileRef: item.commercialProfile.taxProfileRef,
+          identityEvidenceRef: item.commercialProfile.identityEvidenceRef,
+          serviceAgreementVersion: item.commercialProfile.serviceAgreementVersion,
+          serviceAgreementEvidenceRef: item.commercialProfile.serviceAgreementEvidenceRef,
+          submittedAt: item.commercialProfile.submittedAt?.toISOString?.() ?? null,
+          verifiedAt: item.commercialProfile.verifiedAt?.toISOString?.() ?? null,
+          adultEligibility: {
+            verdict: item.commercialProfile.adultEligibilityVerdict ?? "pending",
+            verifiedAt: item.commercialProfile.adultEligibilityVerifiedAt?.toISOString?.() ?? null,
+            validUntil: item.commercialProfile.adultEligibilityValidUntil?.toISOString?.() ?? null,
+            evidenceAvailable: Boolean(item.commercialProfile.adultEligibilityEvidenceRef)
+          },
+          suspendedAt: item.commercialProfile.suspendedAt?.toISOString?.() ?? null,
+          suspendedReason: item.commercialProfile.suspendedReason ?? null,
+          nextReviewDueAt: item.commercialProfile.nextReviewDueAt?.toISOString?.() ?? null,
+          createdAt: item.commercialProfile.createdAt?.toISOString?.() ?? null,
+          updatedAt: item.commercialProfile.updatedAt?.toISOString?.() ?? null
+        } : null
       })),
       pagination: {
         page: safePage,
@@ -794,31 +951,47 @@ export class CompanionsService {
       subjectUserId: userId,
       title: "陪伴者申请公开资料待处理"
     });
-    await this.prisma.companionProfile.create({
-      data: {
-        id,
-        ownerUserId: userId,
-        name,
-        role,
-        initials: name.slice(0, 2),
-        rating: 0,
-        reviewCount: 0,
-        pricePerHalfHour: dto.pricePerHalfHour,
-        isOnline: false,
-        isVerified: true,
-        bio,
-        availableTimes,
-        languages,
-        specialties,
-        topicIds: this.resolveTopicIds({ ...dto, specialties, tags }),
-        completedOrders: 0,
-        responseTime: "暂无数据",
-        distanceKm: 0,
-        availability: "busy",
-        cityDistrict,
-        isPublished: false
+    await this.prisma.$transaction(async (tx) => {
+      const db = tx as any;
+      await this.assertAssignableOwnerUnderLock(db, userId);
+      const racedApplication = await db.companionProfile.findUnique({
+        where: { ownerUserId: userId },
+        select: { id: true }
+      });
+      if (racedApplication) {
+        throw new AppException(
+          "APPLICATION_EXISTS",
+          "Companion application already exists",
+          HttpStatus.CONFLICT
+        );
       }
-    } as any);
+      await db.companionProfile.create({
+        data: {
+          id,
+          ownerUserId: userId,
+          name,
+          role,
+          initials: name.slice(0, 2),
+          rating: 0,
+          ratingSum: 0,
+          reviewCount: 0,
+          pricePerHalfHour: dto.pricePerHalfHour,
+          isOnline: false,
+          isVerified: true,
+          bio,
+          availableTimes,
+          languages,
+          specialties,
+          topicIds: this.resolveTopicIds({ ...dto, specialties, tags }),
+          completedOrders: 0,
+          responseTime: "暂无数据",
+          distanceKm: 0,
+          availability: "busy",
+          cityDistrict,
+          isPublished: false
+        }
+      } as any);
+    });
     await this.replaceTags(id, tags);
     return this.getOwn(userId);
   }
@@ -828,17 +1001,69 @@ export class CompanionsService {
     if (!existing) {
       throw new AppException("COMPANION_PROFILE_NOT_FOUND", "Companion profile not found", HttpStatus.NOT_FOUND);
     }
+    const role = dto.role?.trim();
     const bio = dto.bio?.trim();
+    const cityDistrict = dto.cityDistrict?.trim();
+    const livedExperience = dto.livedExperience?.trim();
     const availableTimes = dto.availableTimes === undefined
       ? undefined
       : this.normalizeRequiredList(dto.availableTimes, "availableTimes");
-    if (bio !== undefined && !bio) {
+    const tags = dto.tags === undefined ? undefined : this.normalizeRequiredList(dto.tags, "tags");
+    const languages = dto.languages === undefined
+      ? undefined
+      : this.normalizeRequiredList(dto.languages, "languages");
+    const specialties = dto.specialties === undefined
+      ? undefined
+      : this.normalizeRequiredList(dto.specialties, "specialties");
+    const serviceBoundaries = dto.serviceBoundaries === undefined
+      ? undefined
+      : [...new Set(dto.serviceBoundaries.map((value) => value.trim()).filter(Boolean))];
+    const voiceIntroAssetRef = dto.voiceIntroAssetRef?.trim();
+    if ((role !== undefined && !role) || (bio !== undefined && !bio) || (cityDistrict !== undefined && !cityDistrict)) {
       throw new AppException("INVALID_COMPANION_PROFILE", "Public profile text cannot be blank", HttpStatus.BAD_REQUEST);
     }
-    if (bio !== undefined || availableTimes !== undefined) {
+    if (dto.serviceBoundaries !== undefined && serviceBoundaries?.length !== dto.serviceBoundaries.length) {
+      throw new AppException(
+        "INVALID_COMPANION_PROFILE",
+        "Service boundaries cannot contain blank or duplicate entries",
+        HttpStatus.BAD_REQUEST
+      );
+    }
+    if ((voiceIntroAssetRef === undefined) !== (dto.voiceIntroDurationSeconds === undefined)) {
+      throw new AppException(
+        "VOICE_INTRO_METADATA_INCOMPLETE",
+        "Voice introduction reference and duration must be submitted together",
+        HttpStatus.BAD_REQUEST
+      );
+    }
+    let currentTags: string[] = [];
+    if (
+      role !== undefined
+      || bio !== undefined
+      || cityDistrict !== undefined
+      || livedExperience !== undefined
+      || availableTimes !== undefined
+      || languages !== undefined
+      || specialties !== undefined
+      || serviceBoundaries !== undefined
+      || tags !== undefined
+    ) {
+      if (tags !== undefined || specialties !== undefined) {
+        currentTags = (await this.prisma.companionServiceTag.findMany({
+          where: { companionId: existing.id },
+          include: { tag: true }
+        } as any)).map((entry: any) => entry.tag.name);
+      }
       const content = [
+        role ?? existing.role,
         bio ?? existing.bio,
-        ...(availableTimes ?? existing.availableTimes)
+        cityDistrict ?? existing.cityDistrict,
+        livedExperience ?? existing.livedExperience ?? "",
+        ...(availableTimes ?? existing.availableTimes),
+        ...(languages ?? existing.languages),
+        ...(specialties ?? existing.specialties),
+        ...(serviceBoundaries ?? existing.serviceBoundaries ?? []),
+        ...(tags ?? currentTags)
       ].join("\n");
       await this.assertPublicContentAllowed({
         content,
@@ -852,13 +1077,33 @@ export class CompanionsService {
       where: { id: existing.id },
       data: {
         ...(bio !== undefined ? { bio } : {}),
+        ...(role !== undefined ? { role } : {}),
+        ...(cityDistrict !== undefined ? { cityDistrict } : {}),
+        ...(livedExperience !== undefined ? { livedExperience: livedExperience || null } : {}),
         ...(availableTimes !== undefined ? { availableTimes } : {}),
+        ...(languages !== undefined ? { languages } : {}),
+        ...(specialties !== undefined ? { specialties } : {}),
+        ...(serviceBoundaries !== undefined ? { serviceBoundaries } : {}),
+        ...(tags !== undefined || specialties !== undefined ? {
+          topicIds: this.resolveTopicIds({
+            specialties: specialties ?? existing.specialties,
+            tags: tags ?? currentTags
+          })
+        } : {}),
+        ...(voiceIntroAssetRef !== undefined ? {
+          voiceIntroAssetRef,
+          voiceIntroDurationSeconds: dto.voiceIntroDurationSeconds,
+          voiceIntroStatus: "pendingReview"
+        } : {}),
         ...(dto.availability !== undefined ? {
           availability: dto.availability,
           isOnline: dto.availability === "online"
         } : {})
       }
     } as any);
+    if (tags !== undefined) {
+      await this.replaceTags(existing.id, tags);
+    }
     return this.getOwn(userId);
   }
 
@@ -875,12 +1120,23 @@ export class CompanionsService {
       id,
       ...this.profileData(dto),
       rating: 0,
+      ratingSum: 0,
       reviewCount: 0,
       completedOrders: 0,
       responseTime: "暂无履约数据",
       isPublished: dto.isPublished ?? false
     };
-    await this.prisma.companionProfile.create({ data });
+    await this.prisma.$transaction(async (tx) => {
+      const db = tx as any;
+      // The retention worker locks the same User row before it verifies that no
+      // companion can be attached to a deleted subject. Do the eligibility and
+      // deletion checks after taking that lock so even an unpublished profile
+      // cannot be assigned from a stale pre-deletion read.
+      if (dto.ownerUserId !== undefined && dto.ownerUserId !== null) {
+        await this.assertAssignableOwnerUnderLock(db, dto.ownerUserId);
+      }
+      await db.companionProfile.create({ data });
+    });
 
     await this.replaceTags(id, dto.tags);
     return this.getAdmin(id);
@@ -904,19 +1160,73 @@ export class CompanionsService {
         title: "已发布陪伴者资料待处理"
       });
     }
-    if (
-      dto.isPublished ||
-      (existing.isPublished && (dto.ownerUserId !== undefined || dto.isVerified !== undefined))
-    ) {
-      await this.assertPublishable(
-        id,
-        dto.ownerUserId ?? existing.ownerUserId,
-        dto.isVerified ?? existing.isVerified
-      );
-    }
-    await this.prisma.companionProfile.update({
-      where: { id },
-      data: this.profileData(dto)
+    await this.prisma.$transaction(async (tx) => {
+      const db = tx as any;
+      // Every owner-sensitive path uses User(s, stable id order) ->
+      // CompanionProfile. Explicit reassignment locks and revalidates both the
+      // old and proposed owner, so an in-flight deletion of the old owner
+      // cannot be converted into a cross-subject erasure.
+      const mayRemainPublished = dto.isPublished ?? existing.isPublished;
+      const explicitOwnerAssignment = dto.ownerUserId !== undefined;
+      const ownerIdsToLock = [...new Set([
+        ...(explicitOwnerAssignment && existing.ownerUserId ? [existing.ownerUserId] : []),
+        ...(dto.ownerUserId ? [dto.ownerUserId] : []),
+        ...(!explicitOwnerAssignment && mayRemainPublished && existing.ownerUserId
+          ? [existing.ownerUserId]
+          : [])
+      ])].sort();
+      const checkedOwners = new Map<string, any>();
+      for (const ownerUserId of ownerIdsToLock) {
+        checkedOwners.set(
+          ownerUserId,
+          await this.assertAssignableOwnerUnderLock(db, ownerUserId)
+        );
+      }
+      await db.$queryRaw`SELECT "id" FROM "CompanionProfile" WHERE "id" = ${id} FOR UPDATE`;
+      const current = await db.companionProfile.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          ownerUserId: true,
+          isVerified: true,
+          isPublished: true,
+          updatedAt: true
+        }
+      });
+      if (!current) {
+        throw new AppException("COMPANION_NOT_FOUND", "Companion not found", HttpStatus.NOT_FOUND);
+      }
+      if (current.updatedAt.getTime() !== existing.updatedAt.getTime()) {
+        throw new AppException(
+          "COMPANION_PROFILE_CHANGED",
+          "Companion profile changed while this update was being reviewed",
+          HttpStatus.CONFLICT
+        );
+      }
+      if (current.ownerUserId !== existing.ownerUserId) {
+        throw new AppException(
+          "COMPANION_PROFILE_CHANGED",
+          "Companion owner changed while this update was being reviewed",
+          HttpStatus.CONFLICT
+        );
+      }
+
+      const nextOwnerUserId = dto.ownerUserId !== undefined ? dto.ownerUserId : current.ownerUserId;
+      const nextProfileVerified = dto.isVerified ?? current.isVerified;
+      const nextPublished = dto.isPublished ?? current.isPublished;
+      if (nextPublished) {
+        await this.assertPublishableUnderLock(
+          db,
+          id,
+          nextOwnerUserId,
+          nextProfileVerified,
+          nextOwnerUserId ? checkedOwners.get(nextOwnerUserId) : undefined
+        );
+      }
+      await db.companionProfile.update({
+        where: { id },
+        data: this.profileData(dto)
+      });
     });
 
     if (dto.tags) {
@@ -937,10 +1247,53 @@ export class CompanionsService {
       subjectUserId: existing.ownerUserId ?? undefined,
       title: "陪伴者资料发布前待处理"
     });
-    await this.assertPublishable(id, existing.ownerUserId, existing.isVerified);
-    await this.prisma.companionProfile.update({
-      where: { id },
-      data: { isPublished: true }
+    await this.prisma.$transaction(async (tx) => {
+      const db = tx as any;
+      // Publish shares the same User -> CompanionProfile order as owner
+      // assignment and account-deletion finalization. The profile read below
+      // then validates that the preflight owner did not change while content
+      // review was running.
+      const assignedOwner = existing.ownerUserId
+        ? await this.assertAssignableOwnerUnderLock(db, existing.ownerUserId)
+        : undefined;
+      await db.$queryRaw`SELECT "id" FROM "CompanionProfile" WHERE "id" = ${id} FOR UPDATE`;
+      const current = await db.companionProfile.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          ownerUserId: true,
+          isVerified: true,
+          updatedAt: true
+        }
+      });
+      if (!current) {
+        throw new AppException("COMPANION_NOT_FOUND", "Companion not found", HttpStatus.NOT_FOUND);
+      }
+      if (current.updatedAt.getTime() !== existing.updatedAt.getTime()) {
+        throw new AppException(
+          "COMPANION_PROFILE_CHANGED",
+          "Companion profile changed while publication was being reviewed",
+          HttpStatus.CONFLICT
+        );
+      }
+      if (current.ownerUserId !== existing.ownerUserId) {
+        throw new AppException(
+          "COMPANION_PROFILE_CHANGED",
+          "Companion owner changed while publication was being reviewed",
+          HttpStatus.CONFLICT
+        );
+      }
+      await this.assertPublishableUnderLock(
+        db,
+        id,
+        current.ownerUserId,
+        current.isVerified,
+        assignedOwner
+      );
+      await db.companionProfile.update({
+        where: { id },
+        data: { isPublished: true }
+      });
     });
     return this.getAdmin(id);
   }
@@ -959,6 +1312,14 @@ export class CompanionsService {
     return this.toDto(item);
   }
 
+  async ownerUserIdForAudit(id: string): Promise<string | null> {
+    const companion = await this.prisma.companionProfile.findUnique({
+      where: { id },
+      select: { ownerUserId: true }
+    } as any);
+    return companion?.ownerUserId ?? null;
+  }
+
   private buildPublicWhere(query: ListCompanionsQueryDto) {
     const where: any = this.publicCompanionWhere();
     if (query.availability) where.availability = query.availability;
@@ -972,6 +1333,11 @@ export class CompanionsService {
         }
       };
     }
+    // These are exact, explicitly selected public-profile facets. They are
+    // deliberately independent of private application/KYC material, review
+    // notes, behavioral inference, conversations and historic orders.
+    if (query.language) where.languages = { has: query.language };
+    if (query.specialty) where.specialties = { has: query.specialty };
     const search = this.publicSearchWhere(query);
     if (search) where.AND = [search];
     if (this.hasExplicitServiceFilters(query)) {
@@ -986,7 +1352,11 @@ export class CompanionsService {
       isVerified: true,
       ownerUserId: { not: null },
       owner: { accountStatus: "active", profile: { isVerified: true } },
-      commercialProfile: { status: "verified" }
+      commercialProfile: {
+        status: "verified",
+        adultEligibilityVerdict: "adult",
+        adultEligibilityValidUntil: { gt: new Date() }
+      }
     };
   }
 
@@ -1000,21 +1370,24 @@ export class CompanionsService {
           { rating: "desc" as const },
           { reviewCount: "desc" as const },
           { isOnline: "desc" as const },
-          { pricePerHalfHour: "asc" as const }
+          { pricePerHalfHour: "asc" as const },
+          { id: "asc" as const }
         ];
       case "reviewCount":
         return [
           { reviewCount: "desc" as const },
           { rating: "desc" as const },
           { isOnline: "desc" as const },
-          { pricePerHalfHour: "asc" as const }
+          { pricePerHalfHour: "asc" as const },
+          { id: "asc" as const }
         ];
       case "priceAsc":
         return [
           { pricePerHalfHour: "asc" as const },
           { isOnline: "desc" as const },
           { rating: "desc" as const },
-          { reviewCount: "desc" as const }
+          { reviewCount: "desc" as const },
+          { id: "asc" as const }
         ];
       case "online":
       default:
@@ -1024,7 +1397,8 @@ export class CompanionsService {
           { isOnline: "desc" as const },
           { rating: "desc" as const },
           { reviewCount: "desc" as const },
-          { pricePerHalfHour: "asc" as const }
+          { pricePerHalfHour: "asc" as const },
+          { id: "asc" as const }
         ];
     }
   }
@@ -1082,120 +1456,148 @@ export class CompanionsService {
   private async findCompanionsWithFutureCapacity(
     query: ListCompanionsQueryDto,
     days: number,
-    companionIds?: string[]
+    companionIds?: string[],
+    limit = 200
   ): Promise<SellableCompanionMatch[]> {
     const now = new Date();
     const earliestStart = new Date(now.getTime() + MIN_PUBLIC_BOOKING_LEAD_TIME_MS);
     const until = new Date(now.getTime() + days * 24 * 60 * 60_000);
     const serviceWhere = this.activeServiceOfferingWhere(query);
     const publicCatalogWhere = this.buildPublicWhere(query);
-    const candidates = (await this.prisma.companionProfile.findMany({
-      where: {
-        // Keep this pre-pagination capacity pass in the same public catalog
-        // scope as the final list, including an explicit keyword. The later
-        // list still re-applies every condition before returning a profile.
-        ...publicCatalogWhere,
-        ...(companionIds ? { id: { in: companionIds } } : {}),
-        serviceOfferings: { some: serviceWhere },
-        availabilityWindows: {
-          some: {
-            isActive: true,
-            startsAt: { lt: until },
-            endsAt: { gt: earliestStart }
-          }
-        }
-      },
-      select: {
-        id: true,
-        serviceOfferings: {
-          where: serviceWhere,
-          select: {
-            id: true,
-            durationMinutes: true,
-            priceCents: true,
-            currency: true,
-            deliveryMode: true
-          }
-        },
-        availabilityWindows: {
-          where: {
-            isActive: true,
-            startsAt: { lt: until },
-            endsAt: { gt: earliestStart }
-          },
-          select: { id: true, startsAt: true, endsAt: true, capacity: true },
-          orderBy: { startsAt: "asc" }
-        },
-        orders: {
-          // Only capacity metadata is selected here. Order body, chat,
-          // bookmarks, recent views, recommendations, and relationship data
-          // never participate in public discovery.
-          where: {
-            scheduledAt: { lt: until },
-            status: { in: ["pending", "paying", "paid", "inService", "completed"] }
-          },
-          select: {
-            status: true,
-            scheduledAt: true,
-            durationMinutes: true,
-            companionConfirmedAt: true,
-            paymentReservationExpiresAt: true
-          }
-        }
-      }
-    } as any) as unknown) as Array<{
-      id: string;
-      serviceOfferings: Array<{
-        id: string;
-        durationMinutes: number;
-        priceCents: number;
-        currency: string;
-        deliveryMode: "text" | "voice";
-      }>;
-      availabilityWindows: Array<{ id: string; startsAt: Date; endsAt: Date; capacity: number }>;
-      orders: AvailabilityReservation[];
-    }>;
-
     const matches: SellableCompanionMatch[] = [];
-    for (const companion of candidates) {
-      let earliestStartsAt: Date | null = null;
-      const sellableOfferings: typeof companion.serviceOfferings = [];
-      for (const offering of companion.serviceOfferings) {
-        // All explicitly selected service conditions are already present in
-        // serviceWhere. When none is selected, each currently active offering
-        // is eligible and the earliest real candidate among them wins.
-        const candidate = this.expandAvailabilityCandidates(
-          companion.availabilityWindows,
-          companion.orders,
-          offering.durationMinutes,
-          earliestStart,
-          until,
-          now
-        )[0];
-        if (!candidate) continue;
-        sellableOfferings.push(offering);
-        const startsAt = new Date(candidate.startsAt);
-        if (!earliestStartsAt || startsAt.getTime() < earliestStartsAt.getTime()) {
-          earliestStartsAt = startsAt;
-        }
-      }
-      if (earliestStartsAt && sellableOfferings.length > 0) {
-        const startingOffering = [...sellableOfferings].sort((left, right) =>
-          left.priceCents - right.priceCents
-          || left.durationMinutes - right.durationMinutes
-          || left.id.localeCompare(right.id)
-        )[0];
-        matches.push({
-          id: companion.id,
-          earliestStartsAt,
-          startingPriceCents: startingOffering.priceCents,
-          startingDurationMinutes: startingOffering.durationMinutes,
-          currency: startingOffering.currency,
-          deliveryModes: [...new Set(sellableOfferings.map((offering) => offering.deliveryMode))].sort()
-        });
-      }
+    let afterId: string | undefined;
+    while (true) {
+      const idFilter = companionIds || afterId
+        ? {
+            ...(companionIds ? { in: companionIds } : {}),
+            ...(afterId ? { gt: afterId } : {})
+          }
+        : undefined;
+      const candidates = (await this.prisma.companionProfile.findMany({
+        where: {
+          // Keep this capacity pass in the same public catalog scope as the
+          // final list, including an explicit keyword. The later list still
+          // re-applies every condition before returning a profile.
+          ...publicCatalogWhere,
+          ...(idFilter ? { id: idFilter } : {}),
+          serviceOfferings: { some: serviceWhere },
+          availabilityWindows: {
+            some: {
+              isActive: true,
+              startsAt: { lt: until },
+              endsAt: { gt: earliestStart }
+            }
+          }
+        },
+        select: { id: true },
+        orderBy: { id: "asc" },
+        take: PUBLIC_CAPACITY_SCAN_BATCH_SIZE
+      } as any) as unknown) as Array<{ id: string }>;
+
+      const batchMatches = await findCompanionCapacityMatches(this.prisma, {
+        companionIds: candidates.map((candidate) => candidate.id),
+        earliestStart,
+        until,
+        evaluatedAt: now,
+        topicId: query.topicId,
+        deliveryMode: serviceWhere.deliveryMode as "text" | "voice" | undefined,
+        maxServicePriceCents: query.maxServicePriceCents
+      });
+      matches.push(...batchMatches.slice(0, Math.max(0, limit - matches.length)));
+      if (matches.length >= limit) break;
+
+      if (candidates.length < PUBLIC_CAPACITY_SCAN_BATCH_SIZE) break;
+      afterId = candidates[candidates.length - 1].id;
     }
     return matches;
+  }
+
+  /**
+   * Exact public pagination without a full-catalog id/materialized-order set.
+   * Stable profile sorts stream in database order; volatile slot/price sorts
+   * retain only the requested top-K while an exact sellable count is computed.
+   */
+  private async findSellableCatalogPage(
+    query: ListCompanionsQueryDto,
+    days: number,
+    page: number,
+    pageSize: number
+  ): Promise<{ matches: SellableCompanionMatch[]; total: number }> {
+    const now = new Date();
+    const earliestStart = new Date(now.getTime() + MIN_PUBLIC_BOOKING_LEAD_TIME_MS);
+    const until = new Date(now.getTime() + days * DAY_MS);
+    const serviceWhere = this.activeServiceOfferingWhere(query);
+    const volatileSort = query.sortBy === "soonestAvailable" || query.sortBy === "priceAsc";
+    const start = (page - 1) * pageSize;
+    const end = page * pageSize;
+    const retained: SellableCompanionMatch[] = [];
+    let total = 0;
+    let offset = 0;
+
+    while (true) {
+      const candidates = await this.prisma.companionProfile.findMany({
+        where: {
+          ...this.buildPublicWhere(query),
+          serviceOfferings: { some: serviceWhere },
+          availabilityWindows: {
+            some: { isActive: true, startsAt: { lt: until }, endsAt: { gt: earliestStart } }
+          }
+        },
+        select: { id: true },
+        orderBy: volatileSort ? { id: "asc" } : this.publicCatalogOrderBy(query.sortBy),
+        skip: offset,
+        take: PUBLIC_CAPACITY_SCAN_BATCH_SIZE
+      } as any) as Array<{ id: string }>;
+      if (candidates.length === 0) break;
+
+      const batch = await findCompanionCapacityMatches(this.prisma, {
+        companionIds: candidates.map((candidate) => candidate.id),
+        earliestStart,
+        until,
+        evaluatedAt: now,
+        topicId: query.topicId,
+        deliveryMode: serviceWhere.deliveryMode as "text" | "voice" | undefined,
+        maxServicePriceCents: query.maxServicePriceCents
+      });
+      const byId = new Map(batch.map((match) => [match.id, match]));
+      const orderedBatch = volatileSort
+        ? batch
+        : candidates.flatMap((candidate) => {
+            const match = byId.get(candidate.id);
+            return match ? [match] : [];
+          });
+      if (volatileSort) {
+        retained.push(...orderedBatch);
+        retained.sort((left, right) => this.compareCapacityMatches(left, right, query.sortBy));
+        if (retained.length > end) retained.length = end;
+      } else {
+        for (const match of orderedBatch) {
+          if (total >= start && total < end) retained.push(match);
+          total += 1;
+        }
+      }
+      if (volatileSort) total += orderedBatch.length;
+      offset += candidates.length;
+      if (candidates.length < PUBLIC_CAPACITY_SCAN_BATCH_SIZE) break;
+    }
+
+    return {
+      matches: volatileSort ? retained.slice(start, end) : retained,
+      total
+    };
+  }
+
+  private compareCapacityMatches(
+    left: SellableCompanionMatch,
+    right: SellableCompanionMatch,
+    sortBy?: PublicCompanionSort
+  ) {
+    return sortBy === "priceAsc"
+      ? left.startingPriceCents - right.startingPriceCents
+        || left.startingDurationMinutes - right.startingDurationMinutes
+        || left.id.localeCompare(right.id)
+      : left.earliestStartsAt.getTime() - right.earliestStartsAt.getTime()
+        || left.id.localeCompare(right.id);
   }
 
   private includeTags() {
@@ -1208,6 +1610,26 @@ export class CompanionsService {
           tag: {
             name: "asc" as const
           }
+        }
+      },
+      // Only the dates needed for a truthful public review badge are loaded.
+      // Reviewer identities and every submitted KYC/evidence field stay out of
+      // this read model by construction.
+      commercialProfile: {
+        select: {
+          verifiedAt: true,
+          nextReviewDueAt: true
+        }
+      },
+      // Scores, attempt counts and answers are private. Public status is
+      // derived solely from the current required version and its expiry.
+      trainingRecords: {
+        select: {
+          moduleCode: true,
+          moduleVersion: true,
+          status: true,
+          passedAt: true,
+          expiresAt: true
         }
       }
     };
@@ -1248,10 +1670,15 @@ export class CompanionsService {
     if (!companion) {
       throw new AppException("COMPANION_PROFILE_NOT_FOUND", "Companion profile not found", HttpStatus.NOT_FOUND);
     }
+    this.assertEligibleOwnCompanion(companion);
+    return companion as { id: string };
+  }
+
+  private assertEligibleOwnCompanion(companion: any) {
     if (
-      companion.isVerified !== true ||
-      companion.owner?.accountStatus !== "active" ||
-      companion.owner?.profile?.isVerified !== true
+      companion.isVerified !== true
+      || companion.owner?.accountStatus !== "active"
+      || companion.owner?.profile?.isVerified !== true
     ) {
       throw new AppException(
         "COMPANION_OWNER_NOT_ELIGIBLE",
@@ -1259,7 +1686,6 @@ export class CompanionsService {
         HttpStatus.FORBIDDEN
       );
     }
-    return companion as { id: string };
   }
 
   private normalizeOwnServiceOfferingCreate(dto: CreateOwnServiceOfferingDto) {
@@ -1470,7 +1896,27 @@ export class CompanionsService {
         HttpStatus.CONFLICT
       );
     }
+    if (!input.isActive && endsAtMs > Date.now() + MAX_INACTIVE_AVAILABILITY_WINDOW_HORIZON_MS) {
+      throw new AppException(
+        "INACTIVE_AVAILABILITY_WINDOW_TOO_FAR",
+        "An inactive availability window may not extend beyond the 90-day planning horizon",
+        HttpStatus.CONFLICT
+      );
+    }
     this.normalizeOwnAvailabilityWindowCapacity(input.capacity);
+  }
+
+  private async assertInactiveAvailabilityWindowCapacity(db: any, companionId: string) {
+    const count = await db.companionAvailabilityWindow.count({
+      where: { companionId, isActive: false }
+    });
+    if (count >= COMPANION_MAX_INACTIVE_AVAILABILITY_WINDOWS) {
+      throw new AppException(
+        "INACTIVE_AVAILABILITY_WINDOW_LIMIT_REACHED",
+        `At most ${COMPANION_MAX_INACTIVE_AVAILABILITY_WINDOWS} inactive availability windows may be retained`,
+        HttpStatus.CONFLICT
+      );
+    }
   }
 
   private isFutureActiveAvailabilityWindow(input: {
@@ -1708,10 +2154,12 @@ export class CompanionsService {
       && (!order.paymentReservationExpiresAt || order.paymentReservationExpiresAt.getTime() > now.getTime());
   }
 
-  private async assertPublishable(
+  private async assertPublishableUnderLock(
+    db: any,
     companionId: string,
     ownerUserId: string | null | undefined,
-    profileVerified: boolean
+    profileVerified: boolean,
+    ownerAlreadyChecked?: any
   ) {
     if (!profileVerified) {
       throw new AppException(
@@ -1727,24 +2175,63 @@ export class CompanionsService {
         HttpStatus.CONFLICT
       );
     }
-    const [owner, commercialProfile] = await Promise.all([
-      this.prisma.user.findUnique({ where: { id: ownerUserId }, include: { profile: true } }),
-      this.prisma.companionCommercialProfile.findUnique({ where: { companionId } } as any)
-    ]);
-    if (!owner || owner.accountStatus !== "active" || owner.profile?.isVerified !== true) {
+    const owner = ownerAlreadyChecked
+      ?? await this.assertAssignableOwnerUnderLock(db, ownerUserId);
+    const commercialProfile = await db.companionCommercialProfile.findUnique({ where: { companionId } });
+    if (owner.profile?.isVerified !== true) {
       throw new AppException(
         "COMPANION_OWNER_NOT_ELIGIBLE",
         "Companion owner must be active and identity-verified",
         HttpStatus.CONFLICT
       );
     }
-    if (commercialProfile?.status !== "verified") {
+    if (
+      commercialProfile?.status !== "verified"
+      || commercialProfile.adultEligibilityVerdict !== "adult"
+      || !(commercialProfile.adultEligibilityValidUntil instanceof Date)
+      || commercialProfile.adultEligibilityValidUntil.getTime() <= Date.now()
+    ) {
       throw new AppException(
         "COMPANION_COMMERCIAL_PROFILE_NOT_VERIFIED",
-        "Identity evidence, service agreement, tax profile and settlement recipient must pass commercial review",
+        "Current adult eligibility, identity evidence, service agreement, tax profile and settlement recipient must pass commercial review",
         HttpStatus.CONFLICT
       );
     }
+  }
+
+  private async assertAssignableOwnerUnderLock(db: any, ownerUserId: string) {
+    await db.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${ownerUserId} FOR UPDATE`;
+    const [owner, deletion] = await Promise.all([
+      db.user.findUnique({ where: { id: ownerUserId }, include: { profile: true } }),
+      db.accountDeletionRequest.findFirst({
+        where: {
+          userId: ownerUserId,
+          status: { in: ["pending", "processing", "completed"] }
+        },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        select: { id: true, status: true }
+      })
+    ]);
+    if (deletion) {
+      throw new AppException(
+        deletion.status === "completed"
+          ? "COMPANION_OWNER_ACCOUNT_DELETED"
+          : "COMPANION_OWNER_DELETION_IN_PROGRESS",
+        deletion.status === "completed"
+          ? "A completed account deletion can never be assigned a companion profile"
+          : "A companion profile cannot be assigned while account deletion is pending or processing",
+        HttpStatus.CONFLICT,
+        { deletionRequestId: deletion.id, deletionStatus: deletion.status }
+      );
+    }
+    if (!owner || owner.accountStatus !== "active" || !["user", "companion"].includes(owner.role)) {
+      throw new AppException(
+        "COMPANION_OWNER_NOT_ELIGIBLE",
+        "Companion owner must be an active consumer or companion account",
+        HttpStatus.CONFLICT
+      );
+    }
+    return owner;
   }
 
   private profileData(dto: CreateCompanionDto | UpdateCompanionDto) {
@@ -1873,6 +2360,26 @@ export class CompanionsService {
   }
 
   private toDto(item: CompanionRecord, catalog?: SellableCompanionMatch) {
+    const now = Date.now();
+    const currentTraining = PUBLIC_REQUIRED_TRAINING.map((required) =>
+      item.trainingRecords.find((record) =>
+        record.moduleCode === required.moduleCode
+        && record.moduleVersion === required.moduleVersion
+        && record.status === "passed"
+        && (!record.expiresAt || record.expiresAt.getTime() > now)
+      )
+    ).filter((record): record is NonNullable<typeof record> => Boolean(record));
+    const trainingIsCurrent = currentTraining.length === PUBLIC_REQUIRED_TRAINING.length;
+    const trainingExpiryTimes = currentTraining
+      .map((record) => record.expiresAt?.getTime())
+      .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+    const commercialReview = item.commercialProfile;
+    const platformReviewIsCurrent = Boolean(
+      commercialReview?.verifiedAt
+      && commercialReview.nextReviewDueAt
+      && commercialReview.nextReviewDueAt.getTime() > now
+    );
+    const voiceIntroApproved = item.voiceIntroStatus === "approved";
     return {
       id: item.id,
       name: item.name,
@@ -1888,12 +2395,38 @@ export class CompanionsService {
       availableTimes: item.availableTimes,
       languages: item.languages,
       specialties: item.specialties,
+      livedExperience: item.livedExperience ?? null,
+      serviceBoundaries: item.serviceBoundaries ?? [],
+      voiceIntro: {
+        available: voiceIntroApproved,
+        status: voiceIntroApproved ? "approved" : "unavailable",
+        durationSeconds: voiceIntroApproved ? item.voiceIntroDurationSeconds ?? null : null,
+        // A durable asset reference is never public. Playback stays disabled
+        // until a customer-scoped, short-lived read URL can be issued safely.
+        playbackStatus: voiceIntroApproved ? "secureShortLivedUrlRequired" : "notAvailable",
+        playbackUrl: null
+      },
       topicIds: item.topicIds,
       completedOrders: item.completedOrders,
       responseTime: item.responseTime,
       distanceKm: item.distanceKm,
       availability: item.availability,
       cityDistrict: item.cityDistrict,
+      publicTrust: {
+        training: {
+          status: trainingIsCurrent ? "current" : "renewalDue",
+          currentModules: currentTraining.length,
+          requiredModules: PUBLIC_REQUIRED_TRAINING.length,
+          validUntil: trainingIsCurrent && trainingExpiryTimes.length
+            ? new Date(Math.min(...trainingExpiryTimes)).toISOString()
+            : null
+        },
+        platformReview: {
+          status: platformReviewIsCurrent ? "current" : "reviewDue",
+          verifiedAt: commercialReview?.verifiedAt?.toISOString() ?? null,
+          nextReviewDueAt: commercialReview?.nextReviewDueAt?.toISOString() ?? null
+        }
+      },
       catalog: catalog ? {
         sellable: true,
         startingPriceCents: catalog.startingPriceCents,
@@ -2044,6 +2577,15 @@ export class CompanionsService {
       recurringAvailabilityRuleId: item.recurringAvailabilityRuleId,
       recurringOccurrenceStartsAt: item.recurringOccurrenceStartsAt.toISOString(),
       createdAt: item.createdAt.toISOString()
+    };
+  }
+
+  private ownerListPagination(query: ListOwnScheduleItemsDto, total: number) {
+    return {
+      page: query.page,
+      pageSize: query.pageSize,
+      total,
+      totalPages: Math.ceil(total / query.pageSize)
     };
   }
 }

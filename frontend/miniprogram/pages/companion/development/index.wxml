@@ -1,0 +1,107 @@
+<view class="page">
+  <view wx:if="{{loading}}" class="empty">正在同步培训、质量和账号状态…</view>
+
+  <view wx:elif="{{error && !modules.length}}" class="empty">
+    <view class="empty-title">暂时无法加载</view>
+    <view class="muted">{{error}}</view>
+    <button class="primary-button retry" bindtap="retry">重新加载</button>
+  </view>
+
+  <block wx:else>
+    <view class="hero">
+      <view class="eyebrow">能力与账号健康</view>
+      <view class="hero-title">{{trainingComplete ? '必修培训有效' : '还有培训未通过或已到期'}}</view>
+      <view class="hero-copy">成绩由服务端根据当前课程版本计算；客户端提交的分数不会被采信。</view>
+      <view wx:if="{{activeRestriction}}" class="restriction">账号存在有效限制。限制解除前，平台会关闭公开供给，不会把页面操作当作恢复服务。</view>
+    </view>
+
+    <view wx:if="{{error}}" class="inline-error">{{error}}</view>
+
+    <view class="section-title">培训与考试</view>
+    <view wx:if="{{!modules.length}}" class="card empty-card">当前没有可用课程。商用资格不会因此自动通过，请联系平台核对培训目录。</view>
+    <view wx:for="{{modules}}" wx:key="code" wx:for-item="module" class="card module-card">
+      <view class="module-head" data-code="{{module.code}}" bindtap="toggleModule" aria-role="button" aria-expanded="{{module.expanded}}" aria-label="{{module.expanded ? '收起' : '展开'}}培训模块：{{module.title}}" tabindex="0">
+        <view class="module-main">
+          <view class="module-title">{{module.title}}</view>
+          <view class="module-summary">{{module.summary}}</view>
+        </view>
+        <view class="module-status status-{{module.record.status}}">{{module.statusText}}</view>
+      </view>
+      <view class="module-meta">版本 {{module.version}} · 通过线 {{module.passScore}} 分 · {{module.expiryText}}</view>
+      <view wx:if="{{module.record}}" class="module-score">最高 {{module.record.bestScore}} 分 · 已尝试 {{module.record.attemptCount}} 次</view>
+
+      <view wx:if="{{module.expanded}}" class="questions">
+        <view wx:for="{{module.questions}}" wx:key="id" wx:for-item="question" wx:for-index="questionIndex" class="question">
+          <view class="question-title">{{questionIndex + 1}}. {{question.prompt}}</view>
+          <radio-group data-code="{{module.code}}" data-question-index="{{questionIndex}}" bindchange="selectAnswer">
+            <label wx:for="{{question.options}}" wx:key="value" wx:for-item="option" class="option">
+              <radio value="{{option.value}}" checked="{{module.answers[questionIndex] === option.value}}" color="#b94a68" />
+              <text>{{option.label}}</text>
+            </label>
+          </radio-group>
+        </view>
+        <button class="primary-button" data-code="{{module.code}}" loading="{{submittingModuleCode === module.code}}" disabled="{{submittingModuleCode}}" bindtap="submitTraining">
+          提交本次考试
+        </button>
+      </view>
+    </view>
+
+    <view class="section-title">质量指标</view>
+    <view wx:if="{{quality}}" class="quality-grid">
+      <view wx:for="{{qualityCards}}" wx:key="label" class="quality-card">
+        <view class="quality-label">{{item.label}}</view>
+        <view class="quality-value">{{item.value}}</view>
+        <view class="quality-note">{{item.note}}</view>
+      </view>
+    </view>
+    <view wx:if="{{quality}}" class="card quality-detail">
+      <view>订单指标样本：最近 {{quality.orderSampleSize}} / 共 {{quality.orderPopulationSize}} 笔<text wx:if="{{quality.orderSampleTruncated}}">（滚动上限 {{quality.orderSampleLimit}}）</text></view>
+      <view>公开评价：{{quality.rating.value === null ? '证据不足' : quality.rating.value}}（{{quality.rating.sampleSize}} 条）</view>
+      <view>未结客服工单：{{quality.openSupportTickets}}</view>
+      <view>有效账号处置：{{quality.activeAccountActions}}</view>
+      <view wx:for="{{quality.limitations}}" wx:key="*this" class="limitation">· {{item}}</view>
+    </view>
+
+    <view class="section-title">警告、限制与申诉</view>
+    <view wx:if="{{focusActionId || focusAppealId}}" class="card limitation">
+      正在显示这条通知对应的账号处置。
+      <button class="secondary-button" bindtap="clearActionFocus">查看全部记录</button>
+    </view>
+    <view wx:if="{{!actions.length}}" class="card empty-card">当前没有账号警告、服务限制或暂停记录。</view>
+    <view wx:for="{{actions}}" wx:key="id" wx:for-item="action" class="card action-card">
+      <view class="action-head">
+        <view class="action-title">{{action.kind}}</view>
+        <view class="action-state {{action.active ? 'active' : ''}}">{{action.active ? '生效中' : '已结束'}}</view>
+      </view>
+      <view class="action-code">{{action.reasonCode}}</view>
+      <view class="action-message">{{action.message}}</view>
+      <view class="action-time">开始：{{action.startsAt}}<text wx:if="{{action.endsAt}}"> · 结束：{{action.endsAt}}</text></view>
+      <view class="action-time">申诉提交截止：{{action.appealDeadlineAt}}</view>
+      <view wx:if="{{action.appeals.length}}" class="appeal-result">
+        <view wx:for="{{action.appeals}}" wx:key="id" wx:for-item="appeal">
+          申诉状态：{{appeal.status}} · 平台处理时限：{{appeal.reviewDueAt}}
+          <text wx:if="{{appeal.overdue}}"> · 已逾期，已进入运营告警</text>
+          <text wx:if="{{appeal.resolution}}"> · {{appeal.resolution}}</text>
+        </view>
+      </view>
+      <button wx:if="{{!action.appeals.length && action.appealWindowOpen}}" class="secondary-button" data-id="{{action.id}}" bindtap="openAppeal">在期限内提交一次申诉</button>
+      <view wx:elif="{{!action.appeals.length}}" class="limitation">申诉提交期限已结束；如涉及法定权利或新证据，请通过公开客服渠道联系平台。</view>
+    </view>
+    <view wx:if="{{actionsTotalPages > 1}}" class="card">
+      <button class="secondary-button" disabled="{{actionsPage <= 1}}" bindtap="previousActionsPage">上一页</button>
+      <view>共 {{actionsTotal}} 条 · 第 {{actionsPage}} / {{actionsTotalPages}} 页</view>
+      <button class="secondary-button" disabled="{{actionsPage >= actionsTotalPages}}" bindtap="nextActionsPage">下一页</button>
+    </view>
+  </block>
+
+  <view wx:if="{{appealActionId}}" class="modal-mask">
+    <view class="modal">
+      <view class="modal-title">提交账号处置申诉</view>
+      <view class="modal-copy">只写可核验事实。证据字段只能填写平台受控存储生成的外部引用，不要粘贴证件、联系方式或聊天隐私。</view>
+      <textarea class="textarea" value="{{appealStatement}}" bindinput="setAppealStatement" maxlength="1000" placeholder="说明事实、时间和希望复核的结论" />
+      <textarea class="textarea compact" value="{{appealEvidenceReferences}}" bindinput="setAppealEvidence" maxlength="1000" placeholder="证据外部引用，逗号或换行分隔（可选）" />
+      <button class="primary-button" loading="{{submittingAppeal}}" disabled="{{submittingAppeal}}" bindtap="submitAppeal">提交为待处理</button>
+      <button class="secondary-button" disabled="{{submittingAppeal}}" bindtap="closeAppeal">取消</button>
+    </view>
+  </view>
+</view>

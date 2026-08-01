@@ -8,6 +8,7 @@ import { EnvelopeInterceptor } from "../src/common/envelope/envelope.interceptor
 import { HttpExceptionFilter } from "../src/common/errors/http-exception.filter";
 import { PrismaService } from "../src/database/prisma.service";
 import { HealthService } from "../src/health/health.service";
+import { issueSessionBoundAccessToken } from "./session-token-fixture";
 
 describe("Legal consent receipts (e2e)", () => {
   let app: INestApplication;
@@ -39,21 +40,23 @@ describe("Legal consent receipts (e2e)", () => {
     prisma = moduleRef.get(PrismaService);
     const user = await prisma.user.create({ data: { role: "user" } });
     userId = user.id;
-    accessToken = moduleRef.get(JwtService).sign(
-      { sub: user.id, role: "user" },
-      { secret: "e2e-access-secret", expiresIn: "15m" }
+    accessToken = await issueSessionBoundAccessToken(
+      prisma,
+      moduleRef.get(JwtService),
+      user
     );
   });
 
   afterAll(async () => {
     await prisma.legalConsentReceipt.deleteMany({ where: { userId } });
     await prisma.auditLog.deleteMany({ where: { actorId: userId } });
+    await prisma.refreshToken.deleteMany({ where: { userId } });
     await prisma.user.deleteMany({ where: { id: userId } });
     await app.close();
   });
 
   const consent = {
-    version: "2.0-2026-07-20",
+    version: "2.2-2026-08-01",
     acceptedAt: new Date(Date.now() - 60_000).toISOString(),
     privacyAccepted: true,
     termsAccepted: true,
@@ -147,6 +150,28 @@ describe("Legal consent receipts (e2e)", () => {
       .set("Authorization", `Bearer ${accessToken}`)
       .expect(200);
     expect(withdrawn.body.data).toEqual(expect.objectContaining({ withdrawn: true }));
+
+    await request(app.getHttpServer())
+      .get(`/api/v1/users/me/legal-consents?version=${consent.version}`)
+      .set("Authorization", `Bearer ${accessToken}`)
+      .expect(401);
+    await request(app.getHttpServer())
+      .get("/api/v1/me")
+      .set("Authorization", `Bearer ${accessToken}`)
+      .expect(401);
+
+    const storedAfterWithdrawal = await prisma.legalConsentReceipt.findFirstOrThrow({
+      where: { userId, version: consent.version },
+      orderBy: [{ consentedAt: "desc" }, { id: "desc" }]
+    });
+    expect(storedAfterWithdrawal.withdrawnAt).not.toBeNull();
+
+    const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+    accessToken = await issueSessionBoundAccessToken(
+      prisma,
+      app.get(JwtService),
+      user
+    );
 
     const afterWithdrawal = await request(app.getHttpServer())
       .get(`/api/v1/users/me/legal-consents?version=${consent.version}`)

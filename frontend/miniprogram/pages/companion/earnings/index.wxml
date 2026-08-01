@@ -1,0 +1,71 @@
+<view class="page">
+  <view wx:if="{{loading}}" class="empty">正在核对收益台账、暂缓原因和结算申请…</view>
+
+  <view wx:elif="{{error && !earnings.length && !withdrawals.length}}" class="empty">
+    <view class="empty-title">收益状态暂时无法加载</view>
+    <view class="muted">{{error}}</view>
+    <button class="primary-button retry" bindtap="retry">重新加载</button>
+  </view>
+
+  <block wx:else>
+    <view class="hero">
+      <view class="eyebrow">订单级不可变收益台账</view>
+      <view class="hero-title">{{availableTotalText}} 可申请结算</view>
+      <view class="hero-copy">待释放/暂缓 {{pendingTotalText}} · 已核验付款 {{paidTotalText}}</view>
+      <view class="source">数据来源：服务端 CompanionEarning 台账；“已核验付款”不由客户端自行判断。</view>
+      <view wx:if="{{suspended}}" class="blocked">商业资格已暂停。可以查看历史，但新的结算申请将失败关闭，必须先完成平台复核。</view>
+      <view wx:elif="{{commercialStatus !== 'verified'}}" class="blocked">商业资料状态为 {{commercialStatus}}。未通过前不能申请结算。<text class="link" bindtap="openOnboarding">去核对资料 ›</text></view>
+    </view>
+
+    <view wx:if="{{error}}" class="inline-error">{{error}}</view>
+
+    <view class="section-title">可选收益明细</view>
+    <picker mode="selector" range="{{earningStatuses}}" value="{{earningStatusIndex}}" bindchange="setEarningStatus">
+      <view class="card">筛选：{{earningStatuses[earningStatusIndex]}} · 服务端共 {{earningTotal}} 条</view>
+    </picker>
+    <view wx:if="{{!earnings.length}}" class="card empty-card">当前没有收益记录。平台不会用占位金额制造可提现余额。</view>
+    <view wx:for="{{earnings}}" wx:key="id" wx:for-item="earning" class="card earning-card {{earning.selected ? 'selected' : ''}}" data-id="{{earning.id}}" bindtap="toggleEarning" aria-role="checkbox" aria-checked="{{earning.selected}}" aria-label="选择收益明细，金额 {{earning.amountText}}，状态 {{earning.statusText}}" tabindex="0">
+      <view class="check">{{earning.status === 'available' ? (earning.selected ? '✓' : '○') : '·'}}</view>
+      <view class="earning-main">
+        <view class="earning-head"><view class="amount">{{earning.amountText}}</view><view class="status status-{{earning.status}}">{{earning.statusText}}</view></view>
+        <view class="meta">订单 {{earning.orderId}} · 可结算日 {{earning.timeText}}</view>
+        <view class="fee">订单收入 {{earning.grossCents / 100}} 元 · 平台费 {{earning.platformFeeCents / 100}} 元</view>
+        <view wx:if="{{earning.holdText}}" class="hold">{{earning.holdText}}</view>
+      </view>
+    </view>
+    <view class="selection-bar">
+      <view><view class="selection-label">已选 {{selectedIds.length}} 笔</view><view class="selection-value">{{selectedTotalText}}</view></view>
+      <button class="primary-button request-button" loading="{{requesting}}" disabled="{{!selectedIds.length || requesting || suspended || commercialStatus !== 'verified'}}" bindtap="requestWithdrawal">申请结算</button>
+    </view>
+    <view class="selection-bar">
+      <button class="secondary-button" disabled="{{earningPage <= 1}}" bindtap="previousEarningsPage">上一页</button>
+      <view>收益第 {{earningPage}} / {{earningTotalPages}} 页</view>
+      <button class="secondary-button" disabled="{{earningPage >= earningTotalPages}}" bindtap="nextEarningsPage">下一页</button>
+    </view>
+
+    <view class="section-title">结算申请状态</view>
+    <picker mode="selector" range="{{withdrawalStatuses}}" value="{{withdrawalStatusIndex}}" bindchange="setWithdrawalStatus">
+      <view class="card">筛选：{{withdrawalStatuses[withdrawalStatusIndex]}} · 服务端共 {{withdrawalTotal}} 条</view>
+    </picker>
+    <view wx:if="{{!withdrawals.length}}" class="card empty-card">还没有结算申请。只有选择真实可用收益并提交后，才会出现状态记录。</view>
+    <view wx:for="{{withdrawals}}" wx:key="id" wx:for-item="withdrawal" class="card withdrawal-card status-card-{{withdrawal.status}}">
+      <view class="withdrawal-head">
+        <view>
+          <view class="amount">{{withdrawal.amountText}}</view>
+          <view class="meta">{{withdrawal.createdText}} · {{withdrawal.earningIds.length}} 笔收益</view>
+        </view>
+        <view class="status">{{withdrawal.statusText}}</view>
+      </view>
+      <view class="next-step">{{withdrawal.nextStep}}</view>
+      <view class="recipient">接收方：{{withdrawal.settlementRecipientMasked}}</view>
+      <view wx:if="{{withdrawal.payoutReferenceMasked}}" class="recipient">付款引用掩码：{{withdrawal.payoutReferenceMasked}}</view>
+      <view wx:if="{{withdrawal.rejectionReason}}" class="rejection">未通过原因：{{withdrawal.rejectionReason}}</view>
+      <button wx:if="{{withdrawal.status === 'requested'}}" class="secondary-button" data-id="{{withdrawal.id}}" loading="{{actionId === withdrawal.id}}" bindtap="cancelWithdrawal">取消待审核申请</button>
+    </view>
+    <view class="selection-bar">
+      <button class="secondary-button" disabled="{{withdrawalPage <= 1}}" bindtap="previousWithdrawalsPage">上一页</button>
+      <view>申请第 {{withdrawalPage}} / {{withdrawalTotalPages}} 页</view>
+      <button class="secondary-button" disabled="{{withdrawalPage >= withdrawalTotalPages}}" bindtap="nextWithdrawalsPage">下一页</button>
+    </view>
+  </block>
+</view>

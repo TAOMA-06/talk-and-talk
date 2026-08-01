@@ -1,0 +1,22 @@
+.crisis-page { padding-bottom: 80rpx; }
+.crisis-hero { padding: 32rpx; border: 2rpx solid #d6959f; border-radius: 28rpx; background: #fff3f2; }
+.crisis-kicker { color: #a3354b; font-size: 23rpx; font-weight: 800; letter-spacing: 2rpx; }
+.crisis-title { margin-top: 12rpx; color: #592b35; font-size: 38rpx; font-weight: 850; line-height: 1.4; }
+.crisis-copy { margin-top: 16rpx; color: #704d55; font-size: 25rpx; line-height: 1.7; }
+.crisis-copy.strong { color: #7e3344; font-weight: 700; }
+.coverage-card { margin-top: 22rpx; padding: 24rpx; border-radius: 22rpx; background: #f4f0e9; }
+.coverage-label { color: #5d5041; font-size: 25rpx; font-weight: 800; }
+.coverage-copy, .load-notice { margin-top: 10rpx; color: #786b5b; font-size: 23rpx; line-height: 1.65; }
+.load-notice { color: #98683e; }
+.resource-card { margin-top: 22rpx; padding: 26rpx; border-radius: 24rpx; background: #fff; box-shadow: 0 9rpx 26rpx rgba(89, 45, 54, 0.07); }
+.resource-heading { display: flex; align-items: center; justify-content: space-between; gap: 18rpx; }
+.resource-name { color: #463037; font-size: 29rpx; font-weight: 800; }
+.resource-phone { margin-top: 5rpx; color: #a1344c; font-size: 46rpx; font-weight: 900; letter-spacing: 3rpx; }
+.call-button { flex: 0 0 auto; margin: 0; border-radius: 16rpx; background: #ad3c53; color: #fff; font-size: 25rpx; font-weight: 700; }
+.resource-copy { margin-top: 16rpx; color: #765d64; font-size: 23rpx; line-height: 1.6; }
+.source-box { margin-top: 18rpx; padding: 18rpx; border-radius: 16rpx; background: #f6f3f4; color: #817078; font-size: 21rpx; line-height: 1.65; }
+.source-button { margin-top: 10rpx; padding: 0; background: transparent; color: #81515f; font-size: 22rpx; text-align: left; }
+.safety-note { margin-top: 24rpx; padding: 22rpx; border-left: 6rpx solid #bd6a55; background: #fff8f1; color: #795d50; font-size: 23rpx; line-height: 1.7; }
+.completion-error { margin-top: 18rpx; color: #a43f4f; font-size: 23rpx; text-align: center; }
+.complete-button { margin-top: 24rpx; border-radius: 18rpx; background: #51393f; color: #fff; font-size: 27rpx; font-weight: 750; }
+.call-button::after, .source-button::after, .complete-button::after { border: 0; }

@@ -4,6 +4,7 @@ import { PrismaService } from "../database/prisma.service";
 import { ModerationCaseService } from "../moderation/moderation-case.service";
 import { ModerationService } from "../moderation/moderation.service";
 import { CreateReviewDto } from "./dto/review.dto";
+import { ListReviewsDto } from "./dto/list-reviews.dto";
 
 @Injectable()
 export class ReviewsService {
@@ -13,7 +14,7 @@ export class ReviewsService {
     private readonly moderationCases: ModerationCaseService
   ) {}
 
-  async list(companionId: string) {
+  async list(companionId: string, query: ListReviewsDto = new ListReviewsDto()) {
     const companion = await this.prisma.companionProfile.findFirst({
       where: {
         id: companionId,
@@ -28,11 +29,52 @@ export class ReviewsService {
     if (!companion) {
       throw new AppException("COMPANION_NOT_FOUND", "Companion not found", HttpStatus.NOT_FOUND);
     }
-    const items = await this.prisma.review.findMany({
-      where: { companionId }, include: { user: { include: { profile: true } } },
-      orderBy: { createdAt: "desc" }, take: 100
+    const where = { companionId };
+    const [items, total] = await Promise.all([
+      this.prisma.review.findMany({
+        where,
+        include: { user: { include: { profile: true } } },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize
+      } as any),
+      this.prisma.review.count({ where } as any)
+    ]);
+    return {
+      items: items.map((item: any) => this.toDto(item)),
+      pagination: {
+        page: query.page,
+        pageSize: query.pageSize,
+        total,
+        totalPages: Math.ceil(total / query.pageSize)
+      }
+    };
+  }
+
+  async findOwnForOrder(userId: string, orderId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { id: true, userId: true }
     } as any);
-    return { items: items.map((item: any) => this.toDto(item)) };
+    if (!order || order.userId !== userId) {
+      // Keep missing and non-owned orders indistinguishable so this endpoint
+      // cannot be used to discover another customer's order or review.
+      throw new AppException("ORDER_NOT_FOUND", "Order not found", HttpStatus.NOT_FOUND);
+    }
+
+    const review = await this.prisma.review.findFirst({
+      where: { orderId, userId },
+      select: {
+        id: true,
+        orderId: true,
+        companionId: true,
+        rating: true,
+        content: true,
+        createdAt: true,
+        user: { select: { profile: { select: { displayName: true } } } }
+      }
+    } as any);
+    return { review: review ? this.toDto(review) : null };
   }
 
   async create(userId: string, dto: CreateReviewDto) {
@@ -71,10 +113,11 @@ export class ReviewsService {
     }
     const review = await this.prisma.$transaction(async (tx) => {
       const db = tx as any;
-      // Serialize the aggregate by companion and re-check the order under lock.
-      // This prevents two simultaneous reviews from overwriting rating/count,
-      // and prevents a refund transition between eligibility check and insert.
-      await db.$queryRaw`SELECT "id" FROM "CompanionProfile" WHERE "id" = ${order.companionId} FOR UPDATE`;
+      // Lock and re-read the eligibility source before inserting. The
+      // statement-level Review trigger is the only rating projection writer
+      // and acquires affected CompanionProfile rows in global id order. Taking
+      // a profile lock here would invert the common Order -> CompanionProfile
+      // order/refund lock path and reintroduce a deadlock cycle.
       await db.$queryRaw`SELECT "id" FROM "Order" WHERE "id" = ${order.id} FOR UPDATE`;
       const currentOrder = await db.order.findUnique({ where: { id: order.id } });
       if (!currentOrder || currentOrder.userId !== userId) {
@@ -93,15 +136,9 @@ export class ReviewsService {
         },
         include: { user: { include: { profile: true } } }
       });
-      const aggregate = await db.review.aggregate({
-        where: { companionId: currentOrder.companionId },
-        _avg: { rating: true },
-        _count: true
-      });
-      await db.companionProfile.update({
-        where: { id: currentOrder.companionId },
-        data: { rating: aggregate._avg.rating ?? 0, reviewCount: aggregate._count }
-      });
+      // The statement-level Review trigger advances ratingSum/reviewCount/rating
+      // in this same transaction for INSERT, DELETE and UPDATE. Application
+      // code must not scan Review or write the projection a second time.
       return created;
     });
     return this.toDto(review);

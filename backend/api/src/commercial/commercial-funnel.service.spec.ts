@@ -124,6 +124,10 @@ describe("CommercialFunnelService", () => {
         resourceId: { in: ["o1", "o2", "o3"] }
       })
     }));
+    expect(prisma.order.findMany).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: 10_001
+    }));
     expect(JSON.stringify(result)).not.toMatch(/userId|chat|content|message/i);
   });
 

@@ -10,6 +10,11 @@
 .followup-section { margin-top: 32rpx; }
 .recommendation-card { margin-bottom: 14rpx; }
 .notification-note { margin: -4rpx 0 18rpx; color: #826b73; font-size: 24rpx; line-height: 1.55; }
+.resource-state { margin: 12rpx 0 18rpx; padding: 18rpx; border-radius: 14rpx; background: #f5f3f4; color: #715f65; font-size: 24rpx; line-height: 1.65; }
+.resource-error { border-left: 6rpx solid #b65a6e; background: #fff5f6; color: #8d4858; }
+.resource-empty { background: #f5f8f6; color: #65756e; }
+.resource-retry { width: 100%; margin: 14rpx 0 0; padding: 10rpx 14rpx; border: 1rpx solid #d6b9c1; background: #fff; color: #8c4056; font-size: 24rpx; line-height: 1.5; }
+.resource-retry::after { border: 0; }
 .status-explanation { margin-top: 14rpx; padding: 14rpx 16rpx; border-left: 5rpx solid #d86a84; background: #fff7f8; color: #5f3c46; font-size: 26rpx; line-height: 1.6; }
 .fulfillment-panel { margin-top: 16rpx; padding: 18rpx; border-left: 6rpx solid #9b7a8b; background: #fbf8fa; }
 .fulfillment-panel-waiting { border-left-color: #8b7898; background: #faf8fc; }
@@ -68,6 +73,11 @@
 .rebook-copy { margin-top: 13rpx; color: #587087; font-size: 24rpx; line-height: 1.65; }
 .rebook-action { width: 100%; margin: 16rpx 0 0; padding: 12rpx 14rpx; border: 1rpx solid #a9c0d3; background: #fff; color: #41657f; font-size: 26rpx; line-height: 1.45; text-align: left; }
 .rebook-action::after { border: 0; }
+.replacement-panel { border-color: #d9cfbd; border-top-color: #9a7b4f; background: #fcfaf5; }
+.replacement-panel .rebook-kicker, .replacement-panel .rebook-heading { color: #755d3e; }
+.replacement-panel .rebook-live { border-color: #d8c9ad; color: #80694a; }
+.replacement-panel .rebook-copy { color: #72644f; }
+.replacement-panel .rebook-action { border-color: #d4c4a7; color: #725938; }
 .service-guidelines-panel { margin-top: 16rpx; padding: 18rpx; border: 1rpx solid #c9dfd7; border-top: 6rpx solid #4f8d7c; background: #f5fbf8; }
 .service-guidelines-heading-row { display: flex; justify-content: space-between; gap: 18rpx; align-items: baseline; }
 .service-guidelines-kicker { color: #3f7466; font-size: 24rpx; font-weight: 700; letter-spacing: 2rpx; }
@@ -101,6 +111,9 @@
 .timeline-toggle::after { border: 0; }
 .order-timeline { margin-top: 16rpx; padding: 18rpx 0 2rpx; border-top: 1rpx solid #f1dfe4; }
 .timeline-loading { color: #7a6b70; font-size: 25rpx; line-height: 1.6; }
+.timeline-unavailable { padding: 14rpx; border-left: 5rpx solid #b65a6e; background: #fff6f7; color: #8d4858; }
+.timeline-retry { width: 100%; margin: 12rpx 0 0; padding: 8rpx 12rpx; border: 1rpx solid #d6b9c1; background: #fff; color: #8c4056; font-size: 23rpx; line-height: 1.5; }
+.timeline-retry::after { border: 0; }
 .timeline-event { display: flex; min-height: 104rpx; }
 .timeline-rail { position: relative; width: 36rpx; flex: 0 0 36rpx; }
 .timeline-rail::after { position: absolute; top: 22rpx; bottom: -8rpx; left: 10rpx; width: 2rpx; background: #ecd1d9; content: ""; }
@@ -139,3 +152,12 @@
 .reschedule-submit { width: 100%; margin: 0; font-size: 27rpx; }
 .reschedule-refresh { margin: 18rpx 0 0; padding: 0; min-height: auto; background: transparent; color: #9c3f59; font-size: 26rpx; line-height: 1.5; text-align: left; }
 .reschedule-refresh::after { border: 0; }
+.order-detail-entry { width: 100%; margin: 16rpx 0 4rpx; border: 1rpx solid #d9c4ca; background: #fff; color: #8b4358; font-size: 24rpx; line-height: 66rpx; }
+.order-detail-entry::after { border: 0; }
+.order-view-tabs { display: flex; gap: 12rpx; margin: 12rpx 0 18rpx; }
+.order-view-tab { flex: 1; border: 1rpx solid #ddcdd1; border-radius: 999rpx; background: #fff; color: #7a6269; font-size: 23rpx; }
+.order-view-tab.is-active { border-color: #9f5267; background: #f8e9ed; color: #8f4058; font-weight: 700; }
+.order-view-tab::after { border: 0; }
+.commercial-pagination { margin: 18rpx 0 28rpx; padding: 18rpx; border-radius: 16rpx; background: #f7f3f4; color: #75656a; font-size: 21rpx; text-align: center; }
+.commercial-pagination .resource-retry { margin-top: 12rpx; }
+.pagination-error { margin-top: 8rpx; color: #9b4b48; line-height: 1.5; }

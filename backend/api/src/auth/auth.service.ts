@@ -7,12 +7,19 @@ import * as bcrypt from "bcrypt";
 import Redis from "ioredis";
 import { parsePhoneNumberFromString } from "libphonenumber-js";
 import * as jose from "jose";
+import { Prisma } from "../../generated/prisma/client";
 
 import { AuditService } from "../common/audit/audit.service";
 import { AppException } from "../common/errors/app.exception";
 import { maskPhone as maskPhoneUtil } from "../common/logging/redact";
+import { validateConsumerJwtTtls } from "../config/configuration";
 import { PrismaService } from "../database/prisma.service";
+import {
+  AuthIdentityTombstoneService,
+  ConsumerAuthProvider
+} from "./auth-identity-tombstone.service";
 import { decryptTotpSecret, matchTotpCounter } from "./staff-auth.crypto";
+import { isStaffUserRole } from "./staff-roles";
 import { SMS_PROVIDER, SmsProvider } from "./sms/sms-provider.interface";
 
 const DUMMY_STAFF_PASSWORD_HASH = bcrypt.hashSync("invalid-staff-credential-padding", 12);
@@ -26,7 +33,15 @@ export interface AuthTokens {
 export interface AuthenticatedUser {
   id: string;
   role: string;
+  sessionId?: string;
 }
+
+export interface SessionMetadata {
+  sessionLabel?: string | null;
+  clientPlatform?: string | null;
+}
+
+type AuthenticationKind = "consumer" | "staff";
 
 export interface UserWithProfile {
   id: string;
@@ -45,6 +60,8 @@ function maskPhone(phone: string): string {
   return maskPhoneUtil(phone);
 }
 
+class ConsumerIdentityResolutionChangedError extends Error {}
+
 @Injectable()
 export class AuthService implements OnModuleDestroy {
   private redis: Redis | null = null;
@@ -54,7 +71,8 @@ export class AuthService implements OnModuleDestroy {
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
     @Inject(SMS_PROVIDER) private readonly sms: SmsProvider,
-    private readonly audit: AuditService
+    private readonly audit: AuditService,
+    private readonly tombstones: AuthIdentityTombstoneService
   ) {}
 
   private getRedis(): Redis {
@@ -102,8 +120,8 @@ export class AuthService implements OnModuleDestroy {
 
     const redis = this.getRedis();
     const phoneKey = `sms:phone:${e164}`;
-    const existing = await redis.get(phoneKey);
-    if (existing) {
+    const phoneRateLimitClaim = await redis.set(phoneKey, "1", "EX", 60, "NX");
+    if (phoneRateLimitClaim !== "OK") {
       throw new AppException("RATE_LIMITED", "Verification code sent too frequently, please try later", HttpStatus.TOO_MANY_REQUESTS);
     }
 
@@ -120,15 +138,24 @@ export class AuthService implements OnModuleDestroy {
     const ttl = this.config.get<number>("SMS_CODE_TTL_SECONDS", 300);
     const codeHash = await bcrypt.hash(code, 10);
 
+    const issuedAt = new Date();
+    await this.prisma.verificationCode.updateMany({
+      where: {
+        phone: e164,
+        consumedAt: null,
+        expiresAt: { gt: issuedAt }
+      },
+      data: { consumedAt: issuedAt }
+    });
     await this.prisma.verificationCode.create({
       data: {
         phone: e164,
         codeHash,
-        expiresAt: new Date(Date.now() + ttl * 1000)
+        expiresAt: new Date(issuedAt.getTime() + ttl * 1000)
       }
     });
 
-    await redis.set(phoneKey, "1", "EX", 60);
+    await redis.del(`sms:verify:${e164}`);
     await this.sms.sendCode(e164, code);
 
     const appEnv = this.config.get<string>("APP_ENV", "development");
@@ -139,7 +166,11 @@ export class AuthService implements OnModuleDestroy {
     return { expiresInSeconds: ttl };
   }
 
-  async loginWithPhone(phone: string, code: string): Promise<AuthTokens & { user: UserWithProfile }> {
+  async loginWithPhone(
+    phone: string,
+    code: string,
+    sessionMetadata?: SessionMetadata
+  ): Promise<AuthTokens & { user: UserWithProfile }> {
     const parsed = parsePhoneNumberFromString(phone, "CN");
     if (!parsed?.isValid()) {
       throw new AppException("INVALID_PHONE", "Invalid phone number", HttpStatus.BAD_REQUEST);
@@ -152,36 +183,47 @@ export class AuthService implements OnModuleDestroy {
         consumedAt: null,
         expiresAt: { gt: new Date() }
       },
-      orderBy: { createdAt: "desc" }
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }]
     });
 
     if (!record) {
-      throw new AppException("INVALID_VERIFICATION_CODE", "Verification code is invalid or expired", HttpStatus.UNAUTHORIZED);
+      return this.rejectPhoneVerificationAttempt(e164);
     }
 
     const matches = await bcrypt.compare(code, record.codeHash);
     if (!matches) {
-      throw new AppException("INVALID_VERIFICATION_CODE", "Verification code is invalid or expired", HttpStatus.UNAUTHORIZED);
+      return this.rejectPhoneVerificationAttempt(e164);
     }
 
-    await this.prisma.verificationCode.update({
-      where: { id: record.id },
+    const consumed = await this.prisma.verificationCode.updateMany({
+      where: {
+        id: record.id,
+        consumedAt: null,
+        expiresAt: { gt: new Date() }
+      },
       data: { consumedAt: new Date() }
     });
+    if (consumed.count !== 1) {
+      throw new AppException("INVALID_VERIFICATION_CODE", "Verification code is invalid or expired", HttpStatus.UNAUTHORIZED);
+    }
+    await this.getRedis().del(`sms:verify:${e164}`);
 
-    const user = await this.findOrCreateByPhone(e164);
-    const tokens = await this.issueTokens(user);
-    const profile = await this.getUserWithProfile(user.id);
-    await this.recordLoginAudit(user.id, user.role, "phone", { phone: e164 });
-
-    return { ...tokens, user: profile };
+    const result = await this.resolveConsumerIdentityAndIssueSession(
+      "phone",
+      e164,
+      { phone: e164 },
+      sessionMetadata
+    );
+    await this.recordLoginAudit(result.user.id, result.user.role, "phone");
+    return result;
   }
 
   async loginStaff(
     username: string,
     password: string,
     totpCode: string,
-    ip?: string
+    ip?: string,
+    sessionMetadata?: SessionMetadata
   ): Promise<AuthTokens & { user: UserWithProfile }> {
     const normalizedUsername = username.trim().toLowerCase();
     const usernameKey = createHash("sha256").update(normalizedUsername).digest("hex");
@@ -224,7 +266,8 @@ export class AuthService implements OnModuleDestroy {
     }
 
     const eligible = credential &&
-      (credential.user.role === "admin" || credential.user.role === "moderator") &&
+      (credential as any).status === "active" &&
+      isStaffUserRole(credential.user.role) &&
       credential.user.accountStatus === "active";
     const lockExpired = credential?.lockedUntil ? credential.lockedUntil <= now : true;
 
@@ -244,7 +287,6 @@ export class AuthService implements OnModuleDestroy {
           actorId: credential.userId,
           action: "admin.login_failed",
           resourceType: "auth",
-          resourceId: credential.userId,
           metadata: { provider: "staffPasswordTotp", ip: ip ?? null }
         });
       }
@@ -255,13 +297,16 @@ export class AuthService implements OnModuleDestroy {
       where: { id: credential.id },
       data: { failedAttempts: 0, lockedUntil: null, lastLoginAt: now }
     });
-    const tokens = await this.issueTokens(credential.user);
+    const tokens = await this.issueTokens(credential.user, sessionMetadata, "staff");
     const profile = await this.getUserWithProfile(credential.userId);
     await this.recordLoginAudit(credential.userId, credential.user.role, "staffPasswordTotp", { ip: ip ?? null });
     return { ...tokens, user: profile };
   }
 
-  async loginWithApple(identityToken: string): Promise<AuthTokens & { user: UserWithProfile }> {
+  async loginWithApple(
+    identityToken: string,
+    sessionMetadata?: SessionMetadata
+  ): Promise<AuthTokens & { user: UserWithProfile }> {
     const bundleId = this.config.get<string>("APPLE_SIGN_IN_BUNDLE_ID");
     if (!bundleId) {
       throw new AppException("APPLE_LOGIN_UNAVAILABLE", "Apple Sign-In is not configured", HttpStatus.SERVICE_UNAVAILABLE);
@@ -279,19 +324,24 @@ export class AuthService implements OnModuleDestroy {
       throw new AppException("INVALID_APPLE_TOKEN", "Apple identity token is invalid", HttpStatus.UNAUTHORIZED);
     }
 
-    const user = await this.findOrCreateByApple(sub);
-    const tokens = await this.issueTokens(user);
-    const profile = await this.getUserWithProfile(user.id);
-    await this.recordLoginAudit(user.id, user.role, "apple");
-
-    return { ...tokens, user: profile };
+    const result = await this.resolveConsumerIdentityAndIssueSession(
+      "apple",
+      sub,
+      {},
+      sessionMetadata
+    );
+    await this.recordLoginAudit(result.user.id, result.user.role, "apple");
+    return result;
   }
 
   /**
    * Exchanges the short-lived wx.login code on the server. The returned session_key
    * deliberately never leaves this method and is not persisted by Talk&Talk.
    */
-  async loginWithWechatMiniProgram(code: string): Promise<AuthTokens & { user: UserWithProfile }> {
+  async loginWithWechatMiniProgram(
+    code: string,
+    sessionMetadata?: SessionMetadata
+  ): Promise<AuthTokens & { user: UserWithProfile }> {
     const appId = this.config.get<string>("WECHAT_MINIPROGRAM_APP_ID", "").trim();
     const appSecret = this.config.get<string>("WECHAT_MINIPROGRAM_APP_SECRET", "").trim();
     const trimmedCode = code.trim();
@@ -344,46 +394,97 @@ export class AuthService implements OnModuleDestroy {
       );
     }
 
-    const user = await this.findOrCreateByWechatMiniProgram(openId);
-    const tokens = await this.issueTokens(user);
-    const profile = await this.getUserWithProfile(user.id);
-    await this.recordLoginAudit(user.id, user.role, "wechatMiniProgram");
-    return { ...tokens, user: profile };
+    const result = await this.resolveConsumerIdentityAndIssueSession(
+      "wechatMiniProgram",
+      openId,
+      {},
+      sessionMetadata
+    );
+    await this.recordLoginAudit(result.user.id, result.user.role, "wechatMiniProgram");
+    return result;
   }
 
-  async refresh(refreshToken: string): Promise<AuthTokens> {
+  async refresh(refreshToken: string, sessionMetadata?: SessionMetadata): Promise<AuthTokens> {
     const refreshSecret = this.config.getOrThrow<string>("JWT_REFRESH_SECRET");
 
-    let payload: { sub: string };
+    let payload: { sub?: string; sid?: string; kind?: string };
     try {
-      payload = this.jwt.verify(refreshToken, { secret: refreshSecret }) as { sub: string };
+      payload = this.jwt.verify(refreshToken, { secret: refreshSecret }) as {
+        sub?: string;
+        sid?: string;
+        kind?: string;
+      };
     } catch {
       throw new AppException("UNAUTHORIZED", "Invalid refresh token", HttpStatus.UNAUTHORIZED);
     }
+    if (!payload.sub) {
+      throw new AppException("UNAUTHORIZED", "Invalid refresh token", HttpStatus.UNAUTHORIZED);
+    }
 
+    const authenticationKind: AuthenticationKind = payload.kind === "staff" ? "staff" : "consumer";
     const tokenHash = this.hashToken(refreshToken);
-    const stored = await this.prisma.refreshToken.findUnique({ where: { tokenHash } });
-
-    if (!stored || stored.revokedAt || stored.expiresAt < new Date() || stored.userId !== payload.sub) {
-      throw new AppException("UNAUTHORIZED", "Refresh token has been revoked or expired", HttpStatus.UNAUTHORIZED);
+    if (authenticationKind === "staff") {
+      return this.refreshStaffToken(payload, tokenHash, sessionMetadata);
     }
 
-    const revoked = await this.prisma.refreshToken.updateMany({
-      where: { id: stored.id, revokedAt: null },
-      data: { revokedAt: new Date() }
-    });
-    if (revoked.count !== 1) {
-      throw new AppException("UNAUTHORIZED", "Refresh token has already been used", HttpStatus.UNAUTHORIZED);
-    }
+    return this.prisma.$transaction(async (tx) => {
+      const db = tx as any;
+      const locked = await db.$queryRaw<Array<{ id: string }>>`
+        SELECT "id" FROM "User" WHERE "id" = ${payload.sub!} FOR UPDATE
+      `;
+      if (!locked.length) {
+        throw new AppException("UNAUTHORIZED", "User no longer exists", HttpStatus.UNAUTHORIZED);
+      }
+      const stored = await db.refreshToken.findUnique({ where: { tokenHash } });
+      const now = new Date();
+      if (
+        !stored
+        || stored.revokedAt
+        || stored.expiresAt < now
+        || stored.userId !== payload.sub
+        || (payload.sid && payload.sid !== stored.id)
+      ) {
+        throw new AppException(
+          "UNAUTHORIZED",
+          "Refresh token has been revoked or expired",
+          HttpStatus.UNAUTHORIZED
+        );
+      }
+      const user = await db.user.findUnique({ where: { id: payload.sub } });
+      if (!user) {
+        throw new AppException("UNAUTHORIZED", "User no longer exists", HttpStatus.UNAUTHORIZED);
+      }
+      const deletionState = await this.tombstones.findUserBlockingStateTx(db, user.id, now);
+      if (deletionState) {
+        throw new AppException(
+          "UNAUTHORIZED",
+          "Refresh token is unavailable while account deletion is processing",
+          HttpStatus.UNAUTHORIZED
+        );
+      }
 
-    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: payload.sub } });
-    return this.issueTokens(user);
+      const revoked = await db.refreshToken.updateMany({
+        where: { id: stored.id, revokedAt: null },
+        data: { revokedAt: now, lastUsedAt: now }
+      });
+      if (revoked.count !== 1) {
+        throw new AppException(
+          "UNAUTHORIZED",
+          "Refresh token has already been used",
+          HttpStatus.UNAUTHORIZED
+        );
+      }
+      return this.issueConsumerTokensTx(db, user, {
+        sessionLabel: stored.sessionLabel ?? sessionMetadata?.sessionLabel,
+        clientPlatform: stored.clientPlatform ?? sessionMetadata?.clientPlatform
+      });
+    }, { maxWait: 5_000, timeout: 10_000 });
   }
 
-  async logout(refreshToken: string): Promise<void> {
+  async logout(userId: string, refreshToken: string): Promise<void> {
     const tokenHash = this.hashToken(refreshToken);
     await this.prisma.refreshToken.updateMany({
-      where: { tokenHash, revokedAt: null },
+      where: { tokenHash, userId, revokedAt: null },
       data: { revokedAt: new Date() }
     });
   }
@@ -420,118 +521,397 @@ export class AuthService implements OnModuleDestroy {
     provider: string,
     metadata: Record<string, unknown> = {}
   ) {
-    const isStaff = role === "admin" || role === "moderator";
+    const isStaff = isStaffUserRole(role);
     await this.audit.record({
       actorId: userId,
       action: isStaff ? "admin.login" : "user.login",
       resourceType: "auth",
-      resourceId: userId,
       metadata: { role, provider, ...metadata }
     });
   }
 
-  private async findOrCreateByPhone(phone: string) {
-    const identity = await this.prisma.authIdentity.findUnique({
-      where: { provider_providerId: { provider: "phone", providerId: phone } },
-      include: { user: true }
-    });
+  private async resolveConsumerIdentityAndIssueSession(
+    provider: ConsumerAuthProvider,
+    providerId: string,
+    profile: { phone?: string },
+    sessionMetadata?: SessionMetadata
+  ): Promise<AuthTokens & { user: UserWithProfile }> {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        return await this.prisma.$transaction(async (tx) => {
+          const db = tx as any;
+          const now = new Date();
+          const candidate = await db.authIdentity.findUnique({
+            where: { provider_providerId: { provider, providerId } },
+            select: { userId: true }
+          });
 
-    if (identity) return identity.user;
+          if (candidate) {
+            const locked = await db.$queryRaw<Array<{ id: string }>>`
+              SELECT "id" FROM "User" WHERE "id" = ${candidate.userId} FOR UPDATE
+            `;
+            if (!locked.length) {
+              throw new AppException("UNAUTHORIZED", "User no longer exists", HttpStatus.UNAUTHORIZED);
+            }
+            // Re-read after the canonical User lock. The deletion worker may
+            // have erased the identity between the optimistic lookup and lock.
+            const currentIdentity = await db.authIdentity.findUnique({
+              where: { provider_providerId: { provider, providerId } },
+              select: { userId: true }
+            });
+            const deletionState = await this.tombstones.findUserBlockingStateTx(
+              db,
+              candidate.userId,
+              now
+            );
+            if (deletionState) this.tombstones.throwAuthState(deletionState);
+            if (!currentIdentity || currentIdentity.userId !== candidate.userId) {
+              const tombstoneState = await this.tombstones.findBlockingStateTx(
+                db,
+                provider,
+                providerId,
+                now
+              );
+              if (tombstoneState) this.tombstones.throwAuthState(tombstoneState);
+              throw new ConsumerIdentityResolutionChangedError();
+            }
+            const user = await db.user.findUnique({
+              where: { id: candidate.userId },
+              include: { profile: true }
+            });
+            if (!user) {
+              throw new AppException("UNAUTHORIZED", "User no longer exists", HttpStatus.UNAUTHORIZED);
+            }
+            this.assertAuthenticationKind(user, "consumer");
+            const tokens = await this.issueConsumerTokensTx(db, user, sessionMetadata);
+            return { ...tokens, user: this.toUserWithProfile(user) };
+          }
 
-    return this.prisma.user.create({
-      data: {
-        identities: {
-          create: { provider: "phone", providerId: phone }
-        },
-        profile: {
-          create: { phone }
+          const tombstoneState = await this.tombstones.findBlockingStateTx(
+            db,
+            provider,
+            providerId,
+            now
+          );
+          if (tombstoneState) this.tombstones.throwAuthState(tombstoneState);
+
+          const user = await db.user.create({
+            data: {
+              identities: { create: { provider, providerId } },
+              profile: { create: profile }
+            },
+            include: { profile: true }
+          });
+          const tokens = await this.issueConsumerTokensTx(db, user, sessionMetadata);
+          return { ...tokens, user: this.toUserWithProfile(user) };
+        }, { maxWait: 5_000, timeout: 10_000 });
+      } catch (error) {
+        if (attempt === 0 && (
+          error instanceof ConsumerIdentityResolutionChangedError
+          || this.isAuthIdentityUniqueConflict(error)
+        )) {
+          continue;
         }
+        throw error;
       }
-    });
+    }
+    throw new AppException("UNAUTHORIZED", "Unable to resolve login identity", HttpStatus.UNAUTHORIZED);
   }
 
-  private async findOrCreateByApple(sub: string) {
-    const identity = await this.prisma.authIdentity.findUnique({
-      where: { provider_providerId: { provider: "apple", providerId: sub } },
-      include: { user: true }
-    });
-
-    if (identity) return identity.user;
-
-    return this.prisma.user.create({
-      data: {
-        identities: {
-          create: { provider: "apple", providerId: sub }
-        },
-        profile: { create: {} }
-      }
-    });
-  }
-
-  private async findOrCreateByWechatMiniProgram(openId: string) {
-    const identity = await this.prisma.authIdentity.findUnique({
-      where: {
-        provider_providerId: {
-          provider: "wechatMiniProgram",
-          providerId: openId
+  private async issueTokens(
+    user: { id: string; role: string },
+    sessionMetadata?: SessionMetadata,
+    authenticationKind: AuthenticationKind = "consumer"
+  ): Promise<AuthTokens> {
+    this.assertAuthenticationKind(user, authenticationKind);
+    if (authenticationKind === "consumer") {
+      return this.prisma.$transaction(async (tx) => {
+        const db = tx as any;
+        const locked = await db.$queryRaw<Array<{ id: string }>>`
+          SELECT "id" FROM "User" WHERE "id" = ${user.id} FOR UPDATE
+        `;
+        if (!locked.length) {
+          throw new AppException("UNAUTHORIZED", "User no longer exists", HttpStatus.UNAUTHORIZED);
         }
-      },
-      include: { user: true }
-    });
+        const current = await db.user.findUnique({ where: { id: user.id } });
+        if (!current) {
+          throw new AppException("UNAUTHORIZED", "User no longer exists", HttpStatus.UNAUTHORIZED);
+        }
+        const state = await this.tombstones.findUserBlockingStateTx(db, user.id, new Date());
+        if (state) this.tombstones.throwAuthState(state);
+        return this.issueConsumerTokensTx(db, current, sessionMetadata);
+      }, { maxWait: 5_000, timeout: 10_000 });
+    }
 
-    if (identity) return identity.user;
-
-    return this.prisma.user.create({
-      data: {
-        identities: {
-          create: { provider: "wechatMiniProgram", providerId: openId }
-        },
-        profile: { create: {} }
-      }
-    });
+    return this.issueStaffTokens(user, sessionMetadata);
   }
 
-  private async issueTokens(user: { id: string; role: string }): Promise<AuthTokens> {
+  private async issueStaffTokens(
+    user: { id: string; role: string },
+    sessionMetadata?: SessionMetadata
+  ): Promise<AuthTokens> {
     const accessSecret = this.config.getOrThrow<string>("JWT_ACCESS_SECRET");
     const refreshSecret = this.config.getOrThrow<string>("JWT_REFRESH_SECRET");
-    const accessTtl = this.config.get<string>("JWT_ACCESS_TTL", "15m");
-    const refreshTtl = this.config.get<string>("JWT_REFRESH_TTL", "30d");
+    const accessTtl = this.config.getOrThrow<string>("JWT_ACCESS_TTL");
+    const refreshTtl = this.config.getOrThrow<string>("JWT_REFRESH_TTL");
+    const { accessTtlMs, refreshTtlMs } = validateConsumerJwtTtls(accessTtl, refreshTtl);
+    const sessionId = randomUUID();
+    const metadata = this.normalizeSessionMetadata(sessionMetadata);
 
     const accessToken = this.jwt.sign(
-      { sub: user.id, role: user.role, jti: randomUUID() } as Record<string, unknown>,
+      {
+        sub: user.id,
+        role: user.role,
+        sid: sessionId,
+        kind: "staff",
+        jti: randomUUID()
+      } as Record<string, unknown>,
       { secret: accessSecret, expiresIn: accessTtl as any }
     );
 
     const refreshToken = this.jwt.sign(
-      { sub: user.id, jti: randomUUID() } as Record<string, unknown>,
+      {
+        sub: user.id,
+        sid: sessionId,
+        kind: "staff",
+        jti: randomUUID()
+      } as Record<string, unknown>,
       { secret: refreshSecret, expiresIn: refreshTtl as any }
     );
 
     const tokenHash = this.hashToken(refreshToken);
-    const refreshTtlMs = this.parseTtlToMs(refreshTtl);
-
-    await this.prisma.refreshToken.create({
-      data: {
-        userId: user.id,
-        tokenHash,
-        expiresAt: new Date(Date.now() + refreshTtlMs)
+    const sessionData = {
+      id: sessionId,
+      userId: user.id,
+      tokenHash,
+      sessionLabel: metadata.sessionLabel,
+      clientPlatform: metadata.clientPlatform,
+      lastUsedAt: new Date(),
+      expiresAt: new Date(Date.now() + refreshTtlMs)
+    };
+    await this.prisma.$transaction(async (tx) => {
+      const db = tx as any;
+      // Offboarding locks this same credential row before suspending access
+      // and revoking sessions. Token issuance therefore either commits first
+      // (and is included in the revocation) or observes the suspended state.
+      await db.$queryRaw`SELECT "id" FROM "StaffCredential" WHERE "userId" = ${user.id} FOR UPDATE`;
+      const credential = await db.staffCredential.findUnique({
+        where: { userId: user.id },
+        include: { user: true }
+      });
+      if (
+        !credential
+        || credential.status !== "active"
+        || !isStaffUserRole(credential.user.role)
+        || credential.user.accountStatus !== "active"
+      ) {
+        throw new AppException(
+          "STAFF_LOGIN_FAILED",
+          "Invalid staff credentials",
+          HttpStatus.UNAUTHORIZED
+        );
       }
+      await db.refreshToken.create({ data: sessionData });
     });
 
-    const accessTtlSeconds = Math.floor(this.parseTtlToMs(accessTtl) / 1000);
+    const accessTtlSeconds = Math.floor(accessTtlMs / 1000);
     return { accessToken, refreshToken, expiresIn: accessTtlSeconds };
+  }
+
+  private async issueConsumerTokensTx(
+    tx: any,
+    user: { id: string; role: string },
+    sessionMetadata?: SessionMetadata
+  ): Promise<AuthTokens> {
+    this.assertAuthenticationKind(user, "consumer");
+    const accessSecret = this.config.getOrThrow<string>("JWT_ACCESS_SECRET");
+    const refreshSecret = this.config.getOrThrow<string>("JWT_REFRESH_SECRET");
+    const accessTtl = this.config.getOrThrow<string>("JWT_ACCESS_TTL");
+    const refreshTtl = this.config.getOrThrow<string>("JWT_REFRESH_TTL");
+    const { accessTtlMs, refreshTtlMs } = validateConsumerJwtTtls(accessTtl, refreshTtl);
+    const sessionId = randomUUID();
+    const metadata = this.normalizeSessionMetadata(sessionMetadata);
+    const now = new Date();
+    const accessToken = this.jwt.sign(
+      {
+        sub: user.id,
+        role: user.role,
+        sid: sessionId,
+        kind: "consumer",
+        jti: randomUUID()
+      } as Record<string, unknown>,
+      { secret: accessSecret, expiresIn: accessTtl as any }
+    );
+    const refreshToken = this.jwt.sign(
+      {
+        sub: user.id,
+        sid: sessionId,
+        kind: "consumer",
+        jti: randomUUID()
+      } as Record<string, unknown>,
+      { secret: refreshSecret, expiresIn: refreshTtl as any }
+    );
+    await tx.refreshToken.create({
+      data: {
+        id: sessionId,
+        userId: user.id,
+        tokenHash: this.hashToken(refreshToken),
+        sessionLabel: metadata.sessionLabel,
+        clientPlatform: metadata.clientPlatform,
+        lastUsedAt: now,
+        expiresAt: new Date(now.getTime() + refreshTtlMs)
+      }
+    });
+    return {
+      accessToken,
+      refreshToken,
+      expiresIn: Math.floor(accessTtlMs / 1000)
+    };
+  }
+
+  private async refreshStaffToken(
+    payload: { sub?: string; sid?: string },
+    tokenHash: string,
+    sessionMetadata?: SessionMetadata
+  ): Promise<AuthTokens> {
+    const stored = await this.prisma.refreshToken.findUnique({ where: { tokenHash } });
+    const now = new Date();
+    if (
+      !stored
+      || stored.revokedAt
+      || stored.expiresAt < now
+      || stored.userId !== payload.sub
+      || (payload.sid && payload.sid !== stored.id)
+    ) {
+      throw new AppException(
+        "UNAUTHORIZED",
+        "Refresh token has been revoked or expired",
+        HttpStatus.UNAUTHORIZED
+      );
+    }
+    const revoked = await this.prisma.refreshToken.updateMany({
+      where: { id: stored.id, revokedAt: null },
+      data: { revokedAt: now, lastUsedAt: now }
+    });
+    if (revoked.count !== 1) {
+      throw new AppException(
+        "UNAUTHORIZED",
+        "Refresh token has already been used",
+        HttpStatus.UNAUTHORIZED
+      );
+    }
+    const user = await this.prisma.user.findUnique({ where: { id: payload.sub! } });
+    if (!user) {
+      throw new AppException("UNAUTHORIZED", "User no longer exists", HttpStatus.UNAUTHORIZED);
+    }
+    return this.issueStaffTokens(user, {
+      sessionLabel: stored.sessionLabel ?? sessionMetadata?.sessionLabel,
+      clientPlatform: stored.clientPlatform ?? sessionMetadata?.clientPlatform
+    });
+  }
+
+  private toUserWithProfile(user: {
+    id: string;
+    role: string;
+    profile?: {
+      displayName: string | null;
+      phone: string | null;
+      age: number | null;
+      gender: string | null;
+      isVerified: boolean;
+      safetyScore: number;
+    } | null;
+  }): UserWithProfile {
+    return {
+      id: user.id,
+      role: user.role,
+      profile: user.profile
+        ? {
+            displayName: user.profile.displayName,
+            phone: user.profile.phone ? maskPhone(user.profile.phone) : null,
+            age: user.profile.age,
+            gender: user.profile.gender,
+            isVerified: user.profile.isVerified,
+            safetyScore: user.profile.safetyScore
+          }
+        : null
+    };
+  }
+
+  private isAuthIdentityUniqueConflict(error: unknown): boolean {
+    if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") {
+      return false;
+    }
+    const modelName = typeof error.meta?.modelName === "string" ? error.meta.modelName : "";
+    const target = Array.isArray(error.meta?.target)
+      ? error.meta.target.map(String)
+      : typeof error.meta?.target === "string"
+        ? [error.meta.target]
+        : [];
+    return modelName === "AuthIdentity"
+      && target.includes("provider")
+      && target.includes("providerId");
+  }
+
+  private assertAuthenticationKind(
+    user: { role: string },
+    authenticationKind: AuthenticationKind
+  ): void {
+    const staffRole = isStaffUserRole(user.role);
+    if ((authenticationKind === "staff") !== staffRole) {
+      throw new AppException(
+        "AUTHENTICATION_METHOD_NOT_ALLOWED",
+        staffRole
+          ? "Staff accounts must use the staff sign-in flow"
+          : "This account cannot use the staff sign-in flow",
+        HttpStatus.UNAUTHORIZED
+      );
+    }
+  }
+
+  private normalizeSessionMetadata(metadata?: SessionMetadata): Required<SessionMetadata> {
+    const normalize = (value: string | null | undefined, maxLength: number) => {
+      if (typeof value !== "string") return null;
+      const cleaned = value
+        .replace(/[\u0000-\u001f\u007f]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, maxLength);
+      return cleaned || null;
+    };
+    return {
+      sessionLabel: normalize(metadata?.sessionLabel, 80),
+      clientPlatform: normalize(metadata?.clientPlatform, 32)
+    };
   }
 
   private hashToken(token: string): string {
     return createHash("sha256").update(token).digest("hex");
   }
 
-  private parseTtlToMs(ttl: string): number {
-    const match = ttl.match(/^(\d+)(s|m|h|d)$/);
-    if (!match) return 900_000; // default 15m
-    const value = parseInt(match[1]);
-    const unit = match[2];
-    const multipliers: Record<string, number> = { s: 1000, m: 60_000, h: 3_600_000, d: 86_400_000 };
-    return value * (multipliers[unit] ?? 60_000);
+  private async rejectPhoneVerificationAttempt(e164: string): Promise<never> {
+    const redis = this.getRedis();
+    const key = `sms:verify:${e164}`;
+    const attemptCount = await redis.incr(key);
+    if (attemptCount === 1) {
+      await redis.expire(key, 600);
+    }
+    if (attemptCount >= 5) {
+      const now = new Date();
+      await this.prisma.verificationCode.updateMany({
+        where: {
+          phone: e164,
+          consumedAt: null,
+          expiresAt: { gt: now }
+        },
+        data: { consumedAt: now }
+      });
+    }
+    throw new AppException(
+      "INVALID_VERIFICATION_CODE",
+      "Verification code is invalid or expired",
+      HttpStatus.UNAUTHORIZED
+    );
   }
+
 }

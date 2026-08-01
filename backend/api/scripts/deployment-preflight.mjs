@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import transactionalTemplateManifest from "../config/transactional-template-manifest.js";
+
 const PLACEHOLDER = /change[_-]?me|replace[_-]?me|example|your[_-]/i;
 const PAY_REQUIRED_FIELDS = [
   "WECHAT_PAY_APP_ID",
@@ -23,13 +25,31 @@ const LEGAL_REQUIRED_FIELDS = [
   "LEGAL_PRIVACY_URL",
   "LEGAL_TERMS_URL",
   "LEGAL_PLATFORM_RULES_URL",
-  "LEGAL_PRIVACY_RETENTION_DAYS"
+  "LEGAL_PRIVACY_RETENTION_DAYS",
+  "ACCOUNT_DELETION_RETENTION_POLICY_APPROVED",
+  "ACCOUNT_DELETION_RETENTION_POLICY_APPROVAL_REFERENCE",
+  "ACCOUNT_DATA_RETENTION_LEGAL_HOLD_POLICY_APPROVED",
+  "ACCOUNT_DATA_RETENTION_LEGAL_HOLD_POLICY_VERSION",
+  "ACCOUNT_DATA_RETENTION_LEGAL_HOLD_POLICY_APPROVAL_REFERENCE",
+  "ACCOUNT_DATA_RETENTION_LEGAL_HOLD_REASON_CODES_JSON"
 ];
-const REQUIRED_TRANSACTIONAL_TEMPLATE_KEYS = [
-  "newOrder", "orderConfirmed", "orderRejected", "orderResponseExpired", "paymentSuccess",
-  "serviceStarted", "serviceCompleted", "orderCancelled", "reservationExpired", "supportUpdate"
+const LEGAL_HOLD_ACTIONS = new Set(["placement", "release"]);
+const LEGAL_HOLD_RETENTION_CATEGORIES = new Set([
+  "identity_authentication_profile",
+  "preferences_behavior_notifications",
+  "public_user_content",
+  "transactions_tax_invoices",
+  "support_disputes_safety",
+  "consent_rights_account_governance",
+  "deletion_audit_evidence"
+]);
+const CRISIS_RELEASE_REQUIRED_FIELDS = [
+  "CRISIS_RESOURCES_APPROVED",
+  "CRISIS_RESOURCES_APPROVAL_REFERENCE"
 ];
+export const REQUIRED_TRANSACTIONAL_TEMPLATE_KEYS = transactionalTemplateManifest.map(({ key }) => key);
 const AVAILABILITY_REMINDER_TEMPLATE_KEY = "availabilityReminder";
+const JWT_TTL_MULTIPLIERS = { s: 1_000, m: 60_000, h: 3_600_000, d: 86_400_000 };
 
 export function parseEnv(text) {
   const env = {};
@@ -55,6 +75,14 @@ function validUrl(value, protocols) {
   }
 }
 
+function parseJwtTtlMs(value) {
+  const match = value?.match(/^([1-9]\d*)(s|m|h|d)$/);
+  if (!match) return null;
+  const amount = Number(match[1]);
+  const ttlMs = amount * JWT_TTL_MULTIPLIERS[match[2]];
+  return Number.isSafeInteger(amount) && Number.isSafeInteger(ttlMs) ? ttlMs : null;
+}
+
 export function validateDeploymentConfig(env) {
   const errors = [];
   const production = env.APP_ENV === "production";
@@ -64,22 +92,30 @@ export function validateDeploymentConfig(env) {
   const trtcEmergencyStopEnabled = env.TRTC_EMERGENCY_STOP_ENABLED === "true";
   const required = [
     "NODE_ENV", "APP_ENV", "API_PREFIX", "DATABASE_URL", "REDIS_URL", "CORS_ORIGINS",
-    "JWT_ACCESS_SECRET", "JWT_REFRESH_SECRET", "REVIEW_JWT_ACCESS_SECRET", "REVIEW_JWT_REFRESH_SECRET", "WECHAT_MINIPROGRAM_APP_ID",
+    "JWT_ACCESS_SECRET", "JWT_REFRESH_SECRET", "JWT_ACCESS_TTL", "JWT_REFRESH_TTL",
+    "AUTH_IDENTITY_TOMBSTONE_HMAC_KEYS", "AUTH_IDENTITY_TOMBSTONE_ACTIVE_KEY_ID",
+    "AUTH_IDENTITY_REREGISTRATION_POLICY",
+    "REVIEW_JWT_ACCESS_SECRET", "REVIEW_JWT_REFRESH_SECRET", "WECHAT_MINIPROGRAM_APP_ID",
     "WECHAT_MINIPROGRAM_APP_SECRET"
   ];
   if (production) {
     required.push(
       ...PAY_REQUIRED_FIELDS,
       ...LEGAL_REQUIRED_FIELDS,
+      ...CRISIS_RELEASE_REQUIRED_FIELDS,
       "METRICS_TOKEN",
       "STAFF_TOTP_ENCRYPTION_KEY",
       "REVIEW_TOTP_ENCRYPTION_KEY",
-      "DEEPSEEK_API_KEY",
-      "DEEPSEEK_URL",
-      "DEEPSEEK_MODEL",
+      "EXTERNAL_AI_USER_CONTENT_ENABLED",
       "COMMERCIAL_RELEASE_MODE",
+      "COMPANION_VOICE_EVIDENCE_VIEWER_URL",
+      "COMPANION_VOICE_EVIDENCE_SIGNING_SECRET",
+      "COMPANION_VOICE_EVIDENCE_URL_TTL_SECONDS",
       "PLATFORM_FEE_BPS",
       "COMPANION_SETTLEMENT_HOLD_HOURS",
+      "REFUND_POLICY_VERSION",
+      "REFUND_POLICY_APPROVED",
+      "REFUND_POLICY_APPROVAL_REFERENCE",
       "REFUND_REQUEST_WINDOW_HOURS",
       "ORDER_RESPONSE_WINDOW_MINUTES",
       "ORDER_MAX_SCHEDULE_DAYS",
@@ -94,6 +130,15 @@ export function validateDeploymentConfig(env) {
       "WECHAT_SUBSCRIBE_MESSAGES_ENABLED",
       "WECHAT_SUBSCRIBE_TEMPLATES_JSON",
       "PAYMENT_RECONCILIATION_ENABLED",
+      "WECHAT_DAILY_BILL_RECONCILIATION_ENABLED",
+      "WECHAT_DAILY_BILL_RECONCILIATION_APPROVED",
+      "WECHAT_DAILY_BILL_RECONCILIATION_APPROVAL_REFERENCE",
+      "WECHAT_DAILY_BILL_RECONCILIATION_START_DATE",
+      "WECHAT_DAILY_BILL_RECONCILIATION_HOUR",
+      "WECHAT_DAILY_BILL_RECONCILIATION_BATCH_SIZE",
+      "WECHAT_PAY_COMPLAINTS_ENABLED",
+      "WECHAT_PAY_COMPLAINT_POLL_INTERVAL_SECONDS",
+      "WECHAT_PAY_COMPLAINT_BATCH_SIZE",
       "TRTC_ENABLED"
     );
   }
@@ -121,8 +166,49 @@ export function validateDeploymentConfig(env) {
       // URL format is reported above.
     }
   }
-  if (production && env.DEEPSEEK_URL && !validUrl(env.DEEPSEEK_URL, ["https:"])) {
-    errors.push("DEEPSEEK_URL must be an HTTPS URL in production");
+  if (env.EXTERNAL_AI_USER_CONTENT_ENABLED && env.EXTERNAL_AI_USER_CONTENT_ENABLED !== "false") {
+    errors.push("EXTERNAL_AI_USER_CONTENT_ENABLED must remain false; user-authored content is local-only");
+  }
+  if (env.DEEPSEEK_API_KEY?.trim()) {
+    errors.push("DEEPSEEK_API_KEY must be unset because the generic DeepSeek service is not approved for user-authored content");
+  }
+  const voiceEvidenceViewerUrl = env.COMPANION_VOICE_EVIDENCE_VIEWER_URL?.trim() ?? "";
+  const voiceEvidenceSigningSecret = env.COMPANION_VOICE_EVIDENCE_SIGNING_SECRET?.trim() ?? "";
+  if (Boolean(voiceEvidenceViewerUrl) !== Boolean(voiceEvidenceSigningSecret)) {
+    errors.push(
+      "COMPANION_VOICE_EVIDENCE_VIEWER_URL and COMPANION_VOICE_EVIDENCE_SIGNING_SECRET must be configured together"
+    );
+  }
+  if (voiceEvidenceViewerUrl) {
+    try {
+      const viewer = new URL(voiceEvidenceViewerUrl);
+      if (
+        viewer.protocol !== "https:"
+        || viewer.username
+        || viewer.password
+        || viewer.search
+        || viewer.hash
+      ) {
+        errors.push(
+          "COMPANION_VOICE_EVIDENCE_VIEWER_URL must be an HTTPS base URL without credentials, query or fragment"
+        );
+      }
+    } catch {
+      errors.push("COMPANION_VOICE_EVIDENCE_VIEWER_URL must be an absolute HTTPS URL");
+    }
+  }
+  if (voiceEvidenceSigningSecret && voiceEvidenceSigningSecret.length < 32) {
+    errors.push("COMPANION_VOICE_EVIDENCE_SIGNING_SECRET must be at least 32 characters");
+  }
+  if (
+    env.COMPANION_VOICE_EVIDENCE_URL_TTL_SECONDS
+    && (
+      !/^\d+$/.test(env.COMPANION_VOICE_EVIDENCE_URL_TTL_SECONDS)
+      || Number(env.COMPANION_VOICE_EVIDENCE_URL_TTL_SECONDS) < 60
+      || Number(env.COMPANION_VOICE_EVIDENCE_URL_TTL_SECONDS) > 900
+    )
+  ) {
+    errors.push("COMPANION_VOICE_EVIDENCE_URL_TTL_SECONDS must be an integer between 60 and 900");
   }
 
   for (const key of ["JWT_ACCESS_SECRET", "JWT_REFRESH_SECRET", "REVIEW_JWT_ACCESS_SECRET", "REVIEW_JWT_REFRESH_SECRET"]) {
@@ -131,11 +217,23 @@ export function validateDeploymentConfig(env) {
   for (const key of ["METRICS_TOKEN", "STAFF_TOTP_ENCRYPTION_KEY", "REVIEW_TOTP_ENCRYPTION_KEY"]) {
     if (production && env[key] && env[key].length < 32) errors.push(`${key} must be at least 32 characters`);
   }
-  if (production && env.DEEPSEEK_API_KEY && env.DEEPSEEK_API_KEY.length < 24) {
-    errors.push("DEEPSEEK_API_KEY must be at least 24 characters");
-  }
   if (env.JWT_ACCESS_SECRET && env.JWT_ACCESS_SECRET === env.JWT_REFRESH_SECRET) {
     errors.push("JWT access and refresh secrets must be different");
+  }
+  const jwtAccessTtlMs = parseJwtTtlMs(env.JWT_ACCESS_TTL);
+  const jwtRefreshTtlMs = parseJwtTtlMs(env.JWT_REFRESH_TTL);
+  if (env.JWT_ACCESS_TTL && jwtAccessTtlMs === null) {
+    errors.push("JWT_ACCESS_TTL must use a positive integer followed by s, m, h, or d (for example 15m)");
+  } else if (jwtAccessTtlMs !== null && (jwtAccessTtlMs < 5 * 60_000 || jwtAccessTtlMs > 60 * 60_000)) {
+    errors.push("JWT_ACCESS_TTL must be between 5 minutes and 1 hour");
+  }
+  if (env.JWT_REFRESH_TTL && jwtRefreshTtlMs === null) {
+    errors.push("JWT_REFRESH_TTL must use a positive integer followed by s, m, h, or d (for example 30d)");
+  } else if (jwtRefreshTtlMs !== null && (jwtRefreshTtlMs < 60 * 60_000 || jwtRefreshTtlMs > 90 * 24 * 60 * 60_000)) {
+    errors.push("JWT_REFRESH_TTL must be between 1 hour and 90 days");
+  }
+  if (jwtAccessTtlMs !== null && jwtRefreshTtlMs !== null && jwtRefreshTtlMs <= jwtAccessTtlMs) {
+    errors.push("JWT_REFRESH_TTL must be greater than JWT_ACCESS_TTL");
   }
   if (env.REVIEW_JWT_ACCESS_SECRET && env.REVIEW_JWT_ACCESS_SECRET === env.REVIEW_JWT_REFRESH_SECRET) {
     errors.push("review JWT access and refresh secrets must be different");
@@ -206,6 +304,177 @@ export function validateDeploymentConfig(env) {
   if (env.LEGAL_CONSENT_EFFECTIVE_DATE && (!/^\d{4}-\d{2}-\d{2}$/.test(env.LEGAL_CONSENT_EFFECTIVE_DATE) || Number.isNaN(Date.parse(`${env.LEGAL_CONSENT_EFFECTIVE_DATE}T00:00:00Z`)))) {
     errors.push("LEGAL_CONSENT_EFFECTIVE_DATE must use YYYY-MM-DD");
   }
+  const retentionPolicyApproved = env.ACCOUNT_DELETION_RETENTION_POLICY_APPROVED;
+  const retentionPolicyApprovalReference = env.ACCOUNT_DELETION_RETENTION_POLICY_APPROVAL_REFERENCE?.trim() ?? "";
+  if (retentionPolicyApproved && !["true", "false"].includes(retentionPolicyApproved)) {
+    errors.push("ACCOUNT_DELETION_RETENTION_POLICY_APPROVED must be true or false");
+  }
+  if (
+    retentionPolicyApprovalReference
+    && !/^[A-Za-z0-9][A-Za-z0-9._:/-]{5,159}$/.test(retentionPolicyApprovalReference)
+  ) {
+    errors.push(
+      "ACCOUNT_DELETION_RETENTION_POLICY_APPROVAL_REFERENCE must be a 6-160 character non-secret reference"
+    );
+  }
+  if (retentionPolicyApproved === "true" && !retentionPolicyApprovalReference) {
+    errors.push(
+      "ACCOUNT_DELETION_RETENTION_POLICY_APPROVED=true requires ACCOUNT_DELETION_RETENTION_POLICY_APPROVAL_REFERENCE"
+    );
+  }
+  if (production && retentionPolicyApproved !== "true") {
+    errors.push("ACCOUNT_DELETION_RETENTION_POLICY_APPROVED must be true in production after external legal approval");
+  }
+  const legalHoldPolicyApproved = env.ACCOUNT_DATA_RETENTION_LEGAL_HOLD_POLICY_APPROVED;
+  const legalHoldPolicyVersion = env.ACCOUNT_DATA_RETENTION_LEGAL_HOLD_POLICY_VERSION?.trim() ?? "";
+  const legalHoldPolicyApprovalReference =
+    env.ACCOUNT_DATA_RETENTION_LEGAL_HOLD_POLICY_APPROVAL_REFERENCE?.trim() ?? "";
+  if (legalHoldPolicyApproved && !["true", "false"].includes(legalHoldPolicyApproved)) {
+    errors.push("ACCOUNT_DATA_RETENTION_LEGAL_HOLD_POLICY_APPROVED must be true or false");
+  }
+  if (
+    legalHoldPolicyVersion
+    && !/^[A-Za-z0-9][A-Za-z0-9._:/-]{2,63}$/.test(legalHoldPolicyVersion)
+  ) {
+    errors.push(
+      "ACCOUNT_DATA_RETENTION_LEGAL_HOLD_POLICY_VERSION must be a controlled 3-64 character version identifier"
+    );
+  }
+  if (
+    legalHoldPolicyApprovalReference
+    && !/^[A-Za-z0-9][A-Za-z0-9._:/-]{5,159}$/.test(legalHoldPolicyApprovalReference)
+  ) {
+    errors.push(
+      "ACCOUNT_DATA_RETENTION_LEGAL_HOLD_POLICY_APPROVAL_REFERENCE must be a 6-160 character non-secret reference"
+    );
+  }
+  let legalHoldReasonCatalog = null;
+  try {
+    legalHoldReasonCatalog = JSON.parse(
+      env.ACCOUNT_DATA_RETENTION_LEGAL_HOLD_REASON_CODES_JSON || ""
+    );
+  } catch {
+    errors.push("ACCOUNT_DATA_RETENTION_LEGAL_HOLD_REASON_CODES_JSON must be valid JSON");
+  }
+  let legalHoldReasonCatalogValid = Array.isArray(legalHoldReasonCatalog);
+  if (legalHoldReasonCatalogValid) {
+    const seenCodes = new Set();
+    for (const item of legalHoldReasonCatalog) {
+      const actions = item?.actions;
+      const categories = item?.categories;
+      const valid = item && typeof item === "object"
+        && typeof item.code === "string"
+        && /^[A-Z][A-Z0-9_]{2,63}$/.test(item.code)
+        && !seenCodes.has(item.code)
+        && Array.isArray(actions)
+        && actions.length > 0
+        && actions.every((action) => LEGAL_HOLD_ACTIONS.has(action))
+        && new Set(actions).size === actions.length
+        && Array.isArray(categories)
+        && categories.length > 0
+        && categories.every((category) => LEGAL_HOLD_RETENTION_CATEGORIES.has(category))
+        && new Set(categories).size === categories.length;
+      if (!valid) {
+        legalHoldReasonCatalogValid = false;
+        break;
+      }
+      seenCodes.add(item.code);
+    }
+  }
+  if (legalHoldReasonCatalog !== null && !legalHoldReasonCatalogValid) {
+    errors.push(
+      "ACCOUNT_DATA_RETENTION_LEGAL_HOLD_REASON_CODES_JSON must contain unique controlled reasons, actions and retention categories"
+    );
+  }
+  if (
+    legalHoldPolicyApproved === "true"
+    && (
+      !legalHoldPolicyVersion
+      || !legalHoldPolicyApprovalReference
+      || !legalHoldReasonCatalogValid
+      || legalHoldReasonCatalog.length === 0
+    )
+  ) {
+    errors.push(
+      "ACCOUNT_DATA_RETENTION_LEGAL_HOLD_POLICY_APPROVED=true requires a controlled version, approval reference and non-empty reason catalog"
+    );
+  }
+  if (production && legalHoldPolicyApproved !== "true") {
+    errors.push(
+      "ACCOUNT_DATA_RETENTION_LEGAL_HOLD_POLICY_APPROVED must be true in production after external legal approval"
+    );
+  }
+  let tombstoneKeys = {};
+  try {
+    const parsed = JSON.parse(env.AUTH_IDENTITY_TOMBSTONE_HMAC_KEYS || "");
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) tombstoneKeys = parsed;
+  } catch {
+    tombstoneKeys = {};
+  }
+  if (!Object.keys(tombstoneKeys).length) {
+    errors.push("AUTH_IDENTITY_TOMBSTONE_HMAC_KEYS must be a non-empty JSON keyring");
+  }
+  for (const [keyId, encoded] of Object.entries(tombstoneKeys)) {
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(keyId) || typeof encoded !== "string") {
+      errors.push("AUTH_IDENTITY_TOMBSTONE_HMAC_KEYS contains an invalid key id or value");
+      continue;
+    }
+    const key = Buffer.from(encoded, "base64");
+    if (key.length < 32
+      || key.toString("base64").replace(/=+$/u, "") !== encoded.replace(/=+$/u, "")) {
+      errors.push("Each auth identity tombstone HMAC key must be valid base64 for at least 32 bytes");
+    }
+    if (production && (PLACEHOLDER.test(encoded) || PLACEHOLDER.test(key.toString("utf8")))) {
+      errors.push(`AUTH_IDENTITY_TOMBSTONE_HMAC_KEYS key ${keyId} still contains a placeholder`);
+    }
+  }
+  if (!Object.prototype.hasOwnProperty.call(
+    tombstoneKeys,
+    env.AUTH_IDENTITY_TOMBSTONE_ACTIVE_KEY_ID || ""
+  )) {
+    errors.push("AUTH_IDENTITY_TOMBSTONE_ACTIVE_KEY_ID must exist in the configured keyring");
+  }
+  if (env.AUTH_IDENTITY_REREGISTRATION_POLICY !== "after_tombstone_expiry") {
+    errors.push("AUTH_IDENTITY_REREGISTRATION_POLICY must be after_tombstone_expiry");
+  }
+  const crisisResourcesApproved = env.CRISIS_RESOURCES_APPROVED;
+  const crisisResourcesApprovalReference = env.CRISIS_RESOURCES_APPROVAL_REFERENCE?.trim() ?? "";
+  if (crisisResourcesApproved && !["true", "false"].includes(crisisResourcesApproved)) {
+    errors.push("CRISIS_RESOURCES_APPROVED must be true or false");
+  }
+  if (
+    crisisResourcesApprovalReference
+    && !/^[A-Za-z0-9][A-Za-z0-9._:/-]{5,159}$/.test(crisisResourcesApprovalReference)
+  ) {
+    errors.push("CRISIS_RESOURCES_APPROVAL_REFERENCE must be a 6-160 character non-secret reference");
+  }
+  if (crisisResourcesApproved === "true" && !crisisResourcesApprovalReference) {
+    errors.push("CRISIS_RESOURCES_APPROVED=true requires CRISIS_RESOURCES_APPROVAL_REFERENCE");
+  }
+  if (production && crisisResourcesApproved !== "true") {
+    errors.push("CRISIS_RESOURCES_APPROVED must be true in production after safety and operations approval");
+  }
+  const refundPolicyVersion = env.REFUND_POLICY_VERSION?.trim() ?? "";
+  const refundPolicyApproved = env.REFUND_POLICY_APPROVED;
+  const refundPolicyApprovalReference = env.REFUND_POLICY_APPROVAL_REFERENCE?.trim() ?? "";
+  if (refundPolicyVersion && !/^[A-Za-z0-9][A-Za-z0-9._-]{2,63}$/.test(refundPolicyVersion)) {
+    errors.push("REFUND_POLICY_VERSION must be a controlled 3-64 character version identifier");
+  }
+  if (refundPolicyApproved && !["true", "false"].includes(refundPolicyApproved)) {
+    errors.push("REFUND_POLICY_APPROVED must be true or false");
+  }
+  if (
+    refundPolicyApprovalReference
+    && !/^[A-Za-z0-9][A-Za-z0-9._:/-]{5,159}$/.test(refundPolicyApprovalReference)
+  ) {
+    errors.push("REFUND_POLICY_APPROVAL_REFERENCE must be a 6-160 character non-secret reference");
+  }
+  if (refundPolicyApproved === "true" && !refundPolicyApprovalReference) {
+    errors.push("REFUND_POLICY_APPROVED=true requires REFUND_POLICY_APPROVAL_REFERENCE");
+  }
+  if (env.COMMERCIAL_RELEASE_MODE === "commercial" && refundPolicyApproved !== "true") {
+    errors.push("COMMERCIAL_RELEASE_MODE=commercial requires REFUND_POLICY_APPROVED=true");
+  }
   for (const key of ["LEGAL_PRIVACY_RETENTION_DAYS", "PLATFORM_FEE_BPS", "COMPANION_SETTLEMENT_HOLD_HOURS", "REFUND_REQUEST_WINDOW_HOURS", "ORDER_RESPONSE_WINDOW_MINUTES", "ORDER_MAX_SCHEDULE_DAYS", "ORDER_MAX_OPEN_TOTAL", "ORDER_MAX_OPEN_PER_USER", "ORDER_MAX_PENDING_PER_COMPANION", "SUPPORT_RESPONSE_HOURS", "SUPPORT_MAX_OPEN_PER_USER"]) {
     if (env[key] && !/^\d+$/.test(env[key])) errors.push(`${key} must be an integer`);
   }
@@ -220,6 +489,13 @@ export function validateDeploymentConfig(env) {
   }
   if (env.PLATFORM_FEE_BPS && (Number(env.PLATFORM_FEE_BPS) < 0 || Number(env.PLATFORM_FEE_BPS) > 10000)) {
     errors.push("PLATFORM_FEE_BPS must be between 0 and 10000");
+  }
+  if (
+    env.REFUND_REQUEST_WINDOW_HOURS
+    && /^\d+$/.test(env.REFUND_REQUEST_WINDOW_HOURS)
+    && (Number(env.REFUND_REQUEST_WINDOW_HOURS) < 1 || Number(env.REFUND_REQUEST_WINDOW_HOURS) > 720)
+  ) {
+    errors.push("REFUND_REQUEST_WINDOW_HOURS must be between 1 and 720");
   }
   if (
     env.COMMERCIAL_RELEASE_MODE === "commercial" &&
@@ -242,6 +518,79 @@ export function validateDeploymentConfig(env) {
   if (production && env.PAYMENT_RECONCILIATION_ENABLED !== "true") {
     errors.push("PAYMENT_RECONCILIATION_ENABLED must be true in production");
   }
+  const dailyBillEnabled = env.WECHAT_DAILY_BILL_RECONCILIATION_ENABLED;
+  const dailyBillApproved = env.WECHAT_DAILY_BILL_RECONCILIATION_APPROVED;
+  const dailyBillApprovalReference = env.WECHAT_DAILY_BILL_RECONCILIATION_APPROVAL_REFERENCE?.trim() ?? "";
+  const dailyBillStartDate = env.WECHAT_DAILY_BILL_RECONCILIATION_START_DATE?.trim() ?? "";
+  for (const [name, value] of [
+    ["WECHAT_DAILY_BILL_RECONCILIATION_ENABLED", dailyBillEnabled],
+    ["WECHAT_DAILY_BILL_RECONCILIATION_APPROVED", dailyBillApproved]
+  ]) {
+    if (value && !["true", "false"].includes(value)) errors.push(`${name} must be true or false`);
+  }
+  if (
+    dailyBillApprovalReference
+    && !/^[A-Za-z0-9][A-Za-z0-9._:/-]{5,159}$/.test(dailyBillApprovalReference)
+  ) {
+    errors.push(
+      "WECHAT_DAILY_BILL_RECONCILIATION_APPROVAL_REFERENCE must be a 6-160 character non-secret reference"
+    );
+  }
+  if (dailyBillApproved === "true" && !dailyBillApprovalReference) {
+    errors.push(
+      "WECHAT_DAILY_BILL_RECONCILIATION_APPROVED=true requires WECHAT_DAILY_BILL_RECONCILIATION_APPROVAL_REFERENCE"
+    );
+  }
+  if (dailyBillStartDate) {
+    const parsed = new Date(`${dailyBillStartDate}T00:00:00.000Z`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dailyBillStartDate)
+      || Number.isNaN(parsed.getTime())
+      || parsed.toISOString().slice(0, 10) !== dailyBillStartDate) {
+      errors.push("WECHAT_DAILY_BILL_RECONCILIATION_START_DATE must be a valid YYYY-MM-DD date");
+    }
+  }
+  if (dailyBillEnabled === "true" && !dailyBillStartDate) {
+    errors.push(
+      "WECHAT_DAILY_BILL_RECONCILIATION_ENABLED=true requires WECHAT_DAILY_BILL_RECONCILIATION_START_DATE"
+    );
+  }
+  if (production && dailyBillEnabled !== "true") {
+    errors.push("WECHAT_DAILY_BILL_RECONCILIATION_ENABLED must be true in production");
+  }
+  if (production && dailyBillApproved !== "true") {
+    errors.push("WECHAT_DAILY_BILL_RECONCILIATION_APPROVED must be true in production after finance approval");
+  }
+  if (env.WECHAT_DAILY_BILL_RECONCILIATION_HOUR && (
+    !/^\d+$/.test(env.WECHAT_DAILY_BILL_RECONCILIATION_HOUR)
+    || Number(env.WECHAT_DAILY_BILL_RECONCILIATION_HOUR) < 10
+    || Number(env.WECHAT_DAILY_BILL_RECONCILIATION_HOUR) > 23
+  )) {
+    errors.push("WECHAT_DAILY_BILL_RECONCILIATION_HOUR must be between 10 and 23");
+  }
+  if (env.WECHAT_DAILY_BILL_RECONCILIATION_BATCH_SIZE && (
+    !/^\d+$/.test(env.WECHAT_DAILY_BILL_RECONCILIATION_BATCH_SIZE)
+    || Number(env.WECHAT_DAILY_BILL_RECONCILIATION_BATCH_SIZE) < 1
+    || Number(env.WECHAT_DAILY_BILL_RECONCILIATION_BATCH_SIZE) > 16
+  )) {
+    errors.push("WECHAT_DAILY_BILL_RECONCILIATION_BATCH_SIZE must be between 1 and 16");
+  }
+  if (production && env.WECHAT_PAY_COMPLAINTS_ENABLED !== "true") {
+    errors.push("WECHAT_PAY_COMPLAINTS_ENABLED must be true in production");
+  }
+  if (env.WECHAT_PAY_COMPLAINT_POLL_INTERVAL_SECONDS && (
+    !/^\d+$/.test(env.WECHAT_PAY_COMPLAINT_POLL_INTERVAL_SECONDS)
+    || Number(env.WECHAT_PAY_COMPLAINT_POLL_INTERVAL_SECONDS) < 60
+    || Number(env.WECHAT_PAY_COMPLAINT_POLL_INTERVAL_SECONDS) > 3600
+  )) {
+    errors.push("WECHAT_PAY_COMPLAINT_POLL_INTERVAL_SECONDS must be between 60 and 3600");
+  }
+  if (env.WECHAT_PAY_COMPLAINT_BATCH_SIZE && (
+    !/^\d+$/.test(env.WECHAT_PAY_COMPLAINT_BATCH_SIZE)
+    || Number(env.WECHAT_PAY_COMPLAINT_BATCH_SIZE) < 1
+    || Number(env.WECHAT_PAY_COMPLAINT_BATCH_SIZE) > 200
+  )) {
+    errors.push("WECHAT_PAY_COMPLAINT_BATCH_SIZE must be between 1 and 200");
+  }
   if (env.TRTC_ENABLED && !["true", "false"].includes(env.TRTC_ENABLED)) {
     errors.push("TRTC_ENABLED must be true or false when configured");
   }
@@ -249,7 +598,9 @@ export function validateDeploymentConfig(env) {
     for (const key of [
       "TRTC_SDK_APP_ID",
       "TRTC_SDK_SECRET_KEY",
+      "TRTC_CALLBACK_SIGNING_KEY",
       "TRTC_PRIVATE_MAP_KEY_ENABLED",
+      "TRTC_PRIVACY_DISCLOSURE_REFERENCE",
       "TRTC_ROOM_CONTROL_ENABLED",
       "TENCENTCLOUD_SECRET_ID",
       "TENCENTCLOUD_SECRET_KEY"
@@ -264,12 +615,30 @@ export function validateDeploymentConfig(env) {
     if (env.TRTC_SDK_SECRET_KEY && env.TRTC_SDK_SECRET_KEY.length < 16) {
       errors.push("TRTC_SDK_SECRET_KEY is unexpectedly short");
     }
+    if (env.TRTC_CALLBACK_SIGNING_KEY && !/^[A-Za-z0-9]{16,32}$/.test(env.TRTC_CALLBACK_SIGNING_KEY)) {
+      errors.push("TRTC_CALLBACK_SIGNING_KEY must contain 16 to 32 ASCII letters or digits");
+    }
     if (env.TRTC_PRIVATE_MAP_KEY_ENABLED !== "true") {
       errors.push("TRTC_PRIVATE_MAP_KEY_ENABLED must be true when TRTC_ENABLED=true");
+    }
+    if (env.TRTC_PRIVACY_DISCLOSURE_APPROVED !== "true") {
+      errors.push("TRTC_PRIVACY_DISCLOSURE_APPROVED must be true when TRTC_ENABLED=true");
+    }
+    if (
+      env.TRTC_PRIVACY_DISCLOSURE_REFERENCE
+      && !/^[A-Za-z0-9][A-Za-z0-9._:/-]{5,159}$/.test(env.TRTC_PRIVACY_DISCLOSURE_REFERENCE)
+    ) {
+      errors.push("TRTC_PRIVACY_DISCLOSURE_REFERENCE must be a 6-160 character non-secret reference");
     }
     if (env.TRTC_ROOM_CONTROL_ENABLED !== "true") {
       errors.push("TRTC_ROOM_CONTROL_ENABLED must be true when TRTC_ENABLED=true");
     }
+  }
+  if (
+    env.TRTC_PRIVACY_DISCLOSURE_APPROVED
+    && !["true", "false"].includes(env.TRTC_PRIVACY_DISCLOSURE_APPROVED)
+  ) {
+    errors.push("TRTC_PRIVACY_DISCLOSURE_APPROVED must be true or false when configured");
   }
   if (env.TRTC_ROOM_CONTROL_ENABLED && !["true", "false"].includes(env.TRTC_ROOM_CONTROL_ENABLED)) {
     errors.push("TRTC_ROOM_CONTROL_ENABLED must be true or false when configured");

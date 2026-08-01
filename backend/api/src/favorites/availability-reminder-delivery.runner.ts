@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 
@@ -13,7 +15,13 @@ import {
 } from "./availability-reminder-attempt-delivery.service";
 
 const DEFAULT_INTERVAL_SECONDS = 60;
-const DEFAULT_BATCH_SIZE = 20;
+const DEFAULT_BATCH_SIZE = 100;
+const MAX_BATCH_SIZE = 100;
+const BATCHES_PER_TICK = 5;
+const WORK_LEASE_MS = 2 * 60_000;
+const TICK_WALL_BUDGET_MS = 45_000;
+const MAX_FAILURES = 8;
+const MAX_RETRY_DELAY_MS = 5 * 60_000;
 
 export type AvailabilityReminderDeliveryRunResult = {
   scanned: number;
@@ -27,6 +35,16 @@ export type AvailabilityReminderDeliveryRunResult = {
   inFlight: number;
   notReady: number;
   errors: number;
+  retryScheduled: number;
+  failed: number;
+  leaseLost: number;
+};
+
+type DeliveryClaim = {
+  id: string;
+  status: "reserved" | "readyToSend" | "sending";
+  deliveryFailureCount: number;
+  leaseToken: string;
 };
 
 /**
@@ -70,48 +88,36 @@ export class AvailabilityReminderDeliveryRunner implements OnModuleInit, OnModul
 
     this.running = true;
     try {
-      const now = new Date();
+      const tickStartedAt = Date.now();
       const batchSize = this.config.get<number>("AVAILABILITY_REMINDER_DELIVERY_BATCH_SIZE")
         ?? DEFAULT_BATCH_SIZE;
       const result = this.emptyResult();
 
-      // A ready/sending lease is only inspected when it is already expired or
-      // malformed. It is never handed back to delivery from this runner: an
-      // unknown remote boundary must remain quarantined rather than retried.
-      const expiredActiveAttempts = await this.prisma.availabilityReminderAttempt.findMany({
-        where: {
-          status: { in: ["readyToSend", "sending"] },
-          OR: [
-            { sendLeaseExpiresAt: { lte: now } },
-            { sendLeaseExpiresAt: null }
-          ]
-        },
-        select: { id: true },
-        orderBy: [{ sendLeaseExpiresAt: "asc" }, { id: "asc" }],
-        take: batchSize
-      } as any) as Array<{ id: string }>;
-      result.scanned += expiredActiveAttempts.length;
-
-      for (const attempt of expiredActiveAttempts) {
-        await this.recoverExpiredAttempt(attempt.id, now, result);
-      }
-
-      // Share the pass budget with recovery. The only eligible send path below
-      // starts from `reserved`, which guarantees that a delivery call can use
-      // only the brand-new in-memory lease returned by final consumption.
-      const remaining = Math.max(0, batchSize - expiredActiveAttempts.length);
-      if (remaining > 0) {
-        const reservedAttempts = await this.prisma.availabilityReminderAttempt.findMany({
-          where: { status: "reserved" },
-          select: { id: true },
-          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-          take: remaining
-        } as any) as Array<{ id: string }>;
-        result.scanned += reservedAttempts.length;
-
-        for (const attempt of reservedAttempts) {
-          await this.consumeAndDeliverFreshAttempt(attempt.id, now, result);
+      // Expired irreversible leases are claimed first; otherwise replicas
+      // claim fresh reserved attempts. One-at-a-time refill keeps the batch
+      // bounded and lets a poison row back off without blocking later work.
+      const normalizedBatchSize = this.normalizeLimit(batchSize);
+      let wallBudgetReached = false;
+      for (let batch = 0; batch < BATCHES_PER_TICK; batch += 1) {
+        let claimedInBatch = 0;
+        for (let index = 0; index < normalizedBatchSize; index += 1) {
+          // Every durable lease is based on wall-clock time at the actual claim,
+          // never the start of a potentially slow provider tick.
+          if (Date.now() - tickStartedAt >= TICK_WALL_BUDGET_MS) {
+            wallBudgetReached = true;
+            break;
+          }
+          const claim = await this.claimNext(new Date());
+          if (!claim) break;
+          claimedInBatch += 1;
+          result.scanned += 1;
+          if (claim.status === "reserved") {
+            await this.consumeAndDeliverFreshAttempt(claim, result);
+          } else {
+            await this.recoverExpiredAttempt(claim, result);
+          }
         }
+        if (wallBudgetReached || claimedInBatch < normalizedBatchSize) break;
       }
 
       if (result.scanned > 0) this.logAggregate(result);
@@ -130,34 +136,36 @@ export class AvailabilityReminderDeliveryRunner implements OnModuleInit, OnModul
   }
 
   private async recoverExpiredAttempt(
-    attemptId: string,
-    now: Date,
+    claim: DeliveryClaim,
     result: AvailabilityReminderDeliveryRunResult
   ) {
     try {
-      const recovery = await this.consumption.recoverExpiredSendLease(attemptId, now);
+      const recovery = await this.consumption.recoverExpiredSendLease(claim.id, new Date());
       if (recovery.decision === "recoveryRequired") {
         result.recovered += 1;
         result.uncertain += 1;
         this.metrics.recordAvailabilityReminderDeliveryFailure();
+        if (!await this.releaseClaim(claim)) result.leaseLost += 1;
         return;
       }
       this.recordConsumptionWithoutSend(recovery, result);
-    } catch {
+      if (!await this.releaseClaim(claim)) result.leaseLost += 1;
+    } catch (error) {
       result.errors += 1;
       this.metrics.recordAvailabilityReminderDeliveryFailure();
+      await this.recordClaimFailure(claim, error, new Date(), result);
     }
   }
 
   private async consumeAndDeliverFreshAttempt(
-    attemptId: string,
-    now: Date,
+    claim: DeliveryClaim,
     result: AvailabilityReminderDeliveryRunResult
   ) {
     try {
-      const authorization = await this.consumption.acquireFinalSendAuthorization(attemptId, now);
+      const authorization = await this.consumption.acquireFinalSendAuthorization(claim.id, new Date());
       if (authorization.decision !== "authorized") {
         this.recordConsumptionWithoutSend(authorization, result);
+        if (!await this.releaseClaim(claim)) result.leaseLost += 1;
         return;
       }
 
@@ -166,17 +174,113 @@ export class AvailabilityReminderDeliveryRunner implements OnModuleInit, OnModul
       // defensive guard here ensures a malformed internal result cannot turn
       // into a delivery call without the exact fresh lease token.
       if (!authorization.sendLeaseToken) {
-        result.errors += 1;
-        this.metrics.recordAvailabilityReminderDeliveryFailure();
-        return;
+        throw new Error("AVAILABILITY_REMINDER_SEND_LEASE_MISSING");
       }
 
-      const delivery = await this.delivery.deliver(attemptId, authorization.sendLeaseToken, now);
+      const delivery = await this.delivery.deliver(claim.id, authorization.sendLeaseToken, new Date());
       this.recordDelivery(delivery, result);
-    } catch {
+      if (!await this.releaseClaim(claim)) result.leaseLost += 1;
+    } catch (error) {
       result.errors += 1;
       this.metrics.recordAvailabilityReminderDeliveryFailure();
+      await this.recordClaimFailure(claim, error, new Date(), result);
     }
+  }
+
+  private async claimNext(now: Date): Promise<DeliveryClaim | null> {
+    const leaseToken = randomUUID();
+    const leaseExpiresAt = new Date(now.getTime() + WORK_LEASE_MS);
+    const rows = await this.prisma.$queryRaw<Array<{
+      id: string;
+      status: "reserved" | "readyToSend" | "sending";
+      deliveryFailureCount: number;
+    }>>`
+      WITH due AS (
+        SELECT attempt."id"
+        FROM "AvailabilityReminderAttempt" attempt
+        WHERE attempt."deliveryFailedAt" IS NULL
+          AND attempt."deliveryNextAttemptAt" <= ${now}
+          AND (
+            attempt."deliveryClaimToken" IS NULL
+            OR attempt."deliveryClaimExpiresAt" IS NULL
+            OR attempt."deliveryClaimExpiresAt" <= ${now}
+          )
+          AND (
+            attempt."status"::text = 'reserved'
+            OR (
+              attempt."status"::text IN ('readyToSend', 'sending')
+              AND (
+                attempt."sendLeaseExpiresAt" IS NULL
+                OR attempt."sendLeaseExpiresAt" <= ${now}
+              )
+            )
+          )
+        ORDER BY
+          CASE WHEN attempt."status"::text IN ('readyToSend', 'sending') THEN 0 ELSE 1 END,
+          attempt."createdAt" ASC,
+          attempt."id" ASC
+        FOR UPDATE SKIP LOCKED
+        LIMIT 1
+      )
+      UPDATE "AvailabilityReminderAttempt" attempt
+      SET "deliveryClaimToken" = ${leaseToken},
+          "deliveryClaimExpiresAt" = ${leaseExpiresAt},
+          "updatedAt" = ${now}
+      FROM due
+      WHERE attempt."id" = due."id"
+      RETURNING attempt."id", attempt."status"::text AS "status", attempt."deliveryFailureCount"
+    `;
+    return rows[0] ? { ...rows[0], leaseToken } : null;
+  }
+
+  private async releaseClaim(claim: DeliveryClaim) {
+    const released = await this.prisma.availabilityReminderAttempt.updateMany({
+      where: { id: claim.id, deliveryClaimToken: claim.leaseToken },
+      data: {
+        deliveryClaimToken: null,
+        deliveryClaimExpiresAt: null,
+        deliveryLastErrorCode: null
+      }
+    } as any);
+    return released.count === 1;
+  }
+
+  private async recordClaimFailure(
+    claim: DeliveryClaim,
+    error: unknown,
+    now: Date,
+    result: AvailabilityReminderDeliveryRunResult
+  ) {
+    const failureCount = claim.deliveryFailureCount + 1;
+    const terminal = failureCount >= MAX_FAILURES;
+    const failed = await this.prisma.availabilityReminderAttempt.updateMany({
+      where: { id: claim.id, deliveryClaimToken: claim.leaseToken },
+      data: {
+        deliveryClaimToken: null,
+        deliveryClaimExpiresAt: null,
+        deliveryFailureCount: failureCount,
+        deliveryNextAttemptAt: new Date(now.getTime() + this.retryDelayMs(failureCount)),
+        deliveryLastErrorCode: this.errorCode(error),
+        deliveryFailedAt: terminal ? now : null
+      }
+    } as any);
+    if (failed.count !== 1) result.leaseLost += 1;
+    else if (terminal) result.failed += 1;
+    else result.retryScheduled += 1;
+  }
+
+  private normalizeLimit(value: number) {
+    if (!Number.isFinite(value)) return DEFAULT_BATCH_SIZE;
+    return Math.min(MAX_BATCH_SIZE, Math.max(1, Math.floor(value)));
+  }
+
+  private retryDelayMs(failureCount: number) {
+    return Math.min(MAX_RETRY_DELAY_MS, 5_000 * 2 ** Math.max(0, failureCount - 1));
+  }
+
+  private errorCode(error: unknown) {
+    const name = error instanceof Error ? error.name : "unknown_error";
+    return name.replace(/[^A-Za-z0-9_.-]/g, "_").slice(0, 80) || "unknown_error";
   }
 
   private recordConsumptionWithoutSend(
@@ -256,7 +360,10 @@ export class AvailabilityReminderDeliveryRunner implements OnModuleInit, OnModul
       uncertain: 0,
       inFlight: 0,
       notReady: 0,
-      errors: 0
+      errors: 0,
+      retryScheduled: 0,
+      failed: 0,
+      leaseLost: 0
     };
   }
 
@@ -266,7 +373,8 @@ export class AvailabilityReminderDeliveryRunner implements OnModuleInit, OnModul
       + `authorized=${result.authorized} sent=${result.sent} skipped=${result.skipped} `
       + `failedBeforeSend=${result.failedBeforeSend} rejected=${result.rejected} `
       + `uncertain=${result.uncertain} inFlight=${result.inFlight} `
-      + `notReady=${result.notReady} errors=${result.errors}`
+      + `notReady=${result.notReady} errors=${result.errors} `
+      + `retryScheduled=${result.retryScheduled} failed=${result.failed} leaseLost=${result.leaseLost}`
     );
   }
 }

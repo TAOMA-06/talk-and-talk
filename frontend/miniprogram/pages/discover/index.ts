@@ -1,5 +1,6 @@
 import { api, ensureSession } from "../../utils/api";
 import { CatalogDisplay, withCatalogDisplays } from "../../utils/catalog";
+import { openCrisisResources, passCrisisGate } from "../../utils/crisis-gate";
 import { Companion, RecommendedCompanion, RecommendationTopic } from "../../utils/models";
 import { flushRecommendationEvents, queueRecommendationEvent, trackRecommendationCardViews } from "../../utils/recommendations";
 
@@ -10,7 +11,21 @@ type PriceFilter = { value: number; label: string; selected: boolean };
 type AvailabilityWithinDaysFilter = { value: number; label: string; selected: boolean };
 type PublicSort = "" | "online" | "rating" | "reviewCount" | "priceAsc" | "soonestAvailable";
 type PublicSortFilter = { value: Exclude<PublicSort, "">; label: string; selected: boolean };
+type TrustFacetFilter = { value: string; label: string; selected: boolean };
 type DisplayCompanion = CatalogDisplay<Companion | RecommendedCompanion>;
+type TopicLoadState = "loading" | "available" | "error";
+type DiscoveryIntent = {
+  topicId?: string;
+  deliveryMode?: DeliveryMode;
+  availableWithinDays?: number;
+  sortBy?: PublicSort;
+  recovery?: {
+    sourceOrderId: string;
+    durationMinutes: number;
+    serviceTitle: string;
+    scheduledAt: string | null;
+  };
+};
 
 const DELIVERY_MODES: Array<Omit<DeliveryModeFilter, "selected">> = [
   { value: "text", label: "文字服务" },
@@ -30,6 +45,21 @@ const PUBLIC_SORTS: Array<Omit<PublicSortFilter, "selected">> = [
   { value: "rating", label: "评分优先" },
   { value: "reviewCount", label: "评价量优先" },
   { value: "priceAsc", label: "商品起价低优先" }
+];
+const PUBLIC_LANGUAGES: Array<Omit<TrustFacetFilter, "selected">> = [
+  { value: "中文", label: "中文" },
+  { value: "普通话", label: "普通话" },
+  { value: "粤语", label: "粤语" },
+  { value: "英语", label: "英语" },
+  { value: "日语", label: "日语" }
+];
+const PUBLIC_SPECIALTIES: Array<Omit<TrustFacetFilter, "selected">> = [
+  { value: "情绪倾听", label: "情绪倾听" },
+  { value: "睡前语音", label: "睡前陪伴" },
+  { value: "职场减压", label: "职场减压" },
+  { value: "学习陪伴", label: "学习陪伴" },
+  { value: "兴趣聊天", label: "兴趣聊天" },
+  { value: "运动鼓励", label: "运动鼓励" }
 ];
 
 function displayTopics(topics: RecommendationTopic[], selectedTopicId: string): DisplayTopic[] {
@@ -55,11 +85,20 @@ function displayPublicSorts(selectedSortBy: PublicSort): PublicSortFilter[] {
   return PUBLIC_SORTS.map((sort) => ({ ...sort, selected: sort.value === selectedSortBy }));
 }
 
+function displayTrustFacets(
+  facets: Array<Omit<TrustFacetFilter, "selected">>,
+  selectedValue: string
+): TrustFacetFilter[] {
+  return facets.map((facet) => ({ ...facet, selected: facet.value === selectedValue }));
+}
+
 function filterSummary(
   topics: RecommendationTopic[],
   selectedKeyword: string,
   selectedSortBy: PublicSort,
   selectedTopicId: string,
+  selectedLanguage: string,
+  selectedSpecialty: string,
   selectedDeliveryMode: DeliveryMode,
   selectedMaxServicePriceCents: number,
   selectedAvailableWithinDays: number
@@ -68,6 +107,8 @@ function filterSummary(
     selectedKeyword ? `搜索：${selectedKeyword}` : "",
     PUBLIC_SORTS.find((sort) => sort.value === selectedSortBy)?.label,
     topics.find((topic) => topic.id === selectedTopicId)?.name,
+    PUBLIC_LANGUAGES.find((language) => language.value === selectedLanguage)?.label,
+    PUBLIC_SPECIALTIES.find((specialty) => specialty.value === selectedSpecialty)?.label,
     DELIVERY_MODES.find((mode) => mode.value === selectedDeliveryMode)?.label,
     PRICE_LIMITS.find((limit) => limit.value === selectedMaxServicePriceCents)?.label,
     AVAILABILITY_WITHIN_DAYS.find((option) => option.value === selectedAvailableWithinDays)?.label
@@ -91,7 +132,11 @@ Page({
     priceFilters: displayPriceLimits(0),
     availabilityWithinDaysFilters: displayAvailabilityWithinDays(0),
     publicSortFilters: displayPublicSorts(""),
+    languageFilters: displayTrustFacets(PUBLIC_LANGUAGES, ""),
+    specialtyFilters: displayTrustFacets(PUBLIC_SPECIALTIES, ""),
     selectedTopicId: "",
+    selectedLanguage: "",
+    selectedSpecialty: "",
     searchInput: "",
     selectedKeyword: "",
     selectedSortBy: "" as PublicSort,
@@ -102,32 +147,73 @@ Page({
     isFiltering: false,
     loading: true,
     error: "",
-    recommendationFallback: false
+    topicsState: "loading" as TopicLoadState,
+    topicsError: "",
+    recommendationFallback: false,
+    recoveryNotice: "",
+    recoverySourceOrderId: ""
   },
   stopRecommendationTracking: null as (() => void) | null,
   loadSequence: 0,
-  onShow() { void this.load(); },
+  async onShow() {
+    const intent = (getApp()?.globalData?.discoveryIntent || null) as DiscoveryIntent | null;
+    if (getApp()?.globalData) getApp().globalData.discoveryIntent = null;
+    if (intent) {
+      const selectedTopicId = typeof intent.topicId === "string" ? intent.topicId : "";
+      const selectedDeliveryMode = DELIVERY_MODES.some((mode) => mode.value === intent.deliveryMode)
+        ? intent.deliveryMode!
+        : "";
+      const selectedAvailableWithinDays = AVAILABILITY_WITHIN_DAYS.some((item) => item.value === intent.availableWithinDays)
+        ? intent.availableWithinDays!
+        : 0;
+      const selectedSortBy = PUBLIC_SORTS.some((item) => item.value === intent.sortBy) ? intent.sortBy! : "";
+      this.setData({
+        selectedTopicId,
+        selectedDeliveryMode,
+        selectedAvailableWithinDays,
+        selectedSortBy,
+        deliveryModeFilters: displayDeliveryModes(selectedDeliveryMode),
+        availabilityWithinDaysFilters: displayAvailabilityWithinDays(selectedAvailableWithinDays),
+        publicSortFilters: displayPublicSorts(selectedSortBy),
+        recoveryNotice: intent.recovery
+          ? `已按订单中的「${intent.recovery.serviceTitle}」带入主题、服务方式和 ${intent.recovery.durationMinutes} 分钟需求，并优先查看最早可约人选。请选择新陪伴者并重新确认价格与时段；旧订单和支付不会转移。`
+          : "",
+        recoverySourceOrderId: intent.recovery?.sourceOrderId || ""
+      });
+    }
+    if (!await passCrisisGate("discover")) return;
+    void this.load();
+  },
   onHide() { this.stopTracking(); },
   onUnload() { this.stopTracking(); },
   onPullDownRefresh() { void this.load(true); },
+  dismissRecoveryNotice() {
+    this.setData({ recoveryNotice: "", recoverySourceOrderId: "" });
+  },
   async load(stopRefresh = false) {
     this.stopTracking();
     const sequence = ++this.loadSequence;
     const selectedTopicId = this.data.selectedTopicId;
     const selectedKeyword = this.data.selectedKeyword;
     const selectedSortBy = this.data.selectedSortBy;
+    const selectedLanguage = this.data.selectedLanguage;
+    const selectedSpecialty = this.data.selectedSpecialty;
     const selectedDeliveryMode = this.data.selectedDeliveryMode;
     const selectedMaxServicePriceCents = this.data.selectedMaxServicePriceCents;
     const selectedAvailableWithinDays = this.data.selectedAvailableWithinDays;
     const isFiltering = Boolean(
-      selectedKeyword || selectedSortBy || selectedTopicId || selectedDeliveryMode || selectedMaxServicePriceCents || selectedAvailableWithinDays
+      selectedKeyword || selectedSortBy || selectedTopicId || selectedLanguage || selectedSpecialty
+      || selectedDeliveryMode || selectedMaxServicePriceCents || selectedAvailableWithinDays
     );
-    this.setData({ loading: true, error: "", isFiltering });
+    this.setData({ loading: true, error: "", isFiltering, topicsState: "loading", topicsError: "" });
     try {
       await ensureSession();
-      const topicsTask = api.recommendationTopics().catch(() => ({
-        algorithmVersion: "", items: [] as RecommendationTopic[]
-      }));
+      const topicsTask = api.recommendationTopics()
+        .then((value) => ({ value, available: true as const }))
+        .catch(() => ({
+          value: { algorithmVersion: "", items: [] as RecommendationTopic[] },
+          available: false as const
+        }));
       if (isFiltering) {
         const [topics, result] = await Promise.all([
           topicsTask,
@@ -135,6 +221,8 @@ Page({
             ...(selectedKeyword ? { keyword: selectedKeyword } : {}),
             ...(selectedSortBy ? { sortBy: selectedSortBy } : {}),
             ...(selectedTopicId ? { topicId: selectedTopicId } : {}),
+            ...(selectedLanguage ? { language: selectedLanguage } : {}),
+            ...(selectedSpecialty ? { specialty: selectedSpecialty } : {}),
             ...(selectedDeliveryMode ? { deliveryMode: selectedDeliveryMode } : {}),
             ...(selectedMaxServicePriceCents ? { maxServicePriceCents: selectedMaxServicePriceCents } : {}),
             ...(selectedAvailableWithinDays ? { availableWithinDays: selectedAvailableWithinDays } : {})
@@ -143,16 +231,22 @@ Page({
         if (sequence !== this.loadSequence) return;
         this.setData({
           companions: displayCompanions(result.items || []),
-          topicFilters: displayTopics(topics.items || [], selectedTopicId),
+          topicFilters: displayTopics(topics.value.items || [], selectedTopicId),
+          topicsState: topics.available ? "available" : "error",
+          topicsError: topics.available ? "" : "主题列表暂时无法读取；其他筛选和结果仍可使用。",
+          languageFilters: displayTrustFacets(PUBLIC_LANGUAGES, selectedLanguage),
+          specialtyFilters: displayTrustFacets(PUBLIC_SPECIALTIES, selectedSpecialty),
           deliveryModeFilters: displayDeliveryModes(selectedDeliveryMode),
           priceFilters: displayPriceLimits(selectedMaxServicePriceCents),
           availabilityWithinDaysFilters: displayAvailabilityWithinDays(selectedAvailableWithinDays),
           publicSortFilters: displayPublicSorts(selectedSortBy),
           activeFilterSummary: filterSummary(
-            topics.items || [],
+            topics.value.items || [],
             selectedKeyword,
             selectedSortBy,
             selectedTopicId,
+            selectedLanguage,
+            selectedSpecialty,
             selectedDeliveryMode,
             selectedMaxServicePriceCents,
             selectedAvailableWithinDays
@@ -170,7 +264,11 @@ Page({
         if (sequence !== this.loadSequence) return;
         this.setData({
           companions: displayCompanions(result.items || []),
-          topicFilters: displayTopics(topics.items || [], ""),
+          topicFilters: displayTopics(topics.value.items || [], ""),
+          topicsState: topics.available ? "available" : "error",
+          topicsError: topics.available ? "" : "主题列表暂时无法读取；其他筛选和结果仍可使用。",
+          languageFilters: displayTrustFacets(PUBLIC_LANGUAGES, ""),
+          specialtyFilters: displayTrustFacets(PUBLIC_SPECIALTIES, ""),
           deliveryModeFilters: displayDeliveryModes(""),
           priceFilters: displayPriceLimits(0),
           availabilityWithinDaysFilters: displayAvailabilityWithinDays(0),
@@ -181,18 +279,26 @@ Page({
         });
         setTimeout(() => this.startTracking(), 0);
       } catch {
-        const [topics, result] = await Promise.all([topicsTask, api.companions()]);
+        const topics = await topicsTask;
         if (sequence !== this.loadSequence) return;
         this.setData({
-          companions: displayCompanions(result.items || []),
-          topicFilters: displayTopics(topics.items || [], ""),
+          // Recommendation exclusions are enforced by the authenticated
+          // recommendation endpoint. Never bypass them by silently replacing
+          // a failed feed with the unfiltered public catalog.
+          companions: [],
+          topicFilters: displayTopics(topics.value.items || [], ""),
+          topicsState: topics.available ? "available" : "error",
+          topicsError: topics.available ? "" : "主题列表暂时无法读取；其他筛选和结果仍可使用。",
+          languageFilters: displayTrustFacets(PUBLIC_LANGUAGES, ""),
+          specialtyFilters: displayTrustFacets(PUBLIC_SPECIALTIES, ""),
           deliveryModeFilters: displayDeliveryModes(""),
           priceFilters: displayPriceLimits(0),
           availabilityWithinDaysFilters: displayAvailabilityWithinDays(0),
           publicSortFilters: displayPublicSorts(""),
           activeFilterSummary: "",
           loading: false,
-          recommendationFallback: true
+          error: "推荐暂时无法加载。你仍可使用上方搜索手动查找当前公开资料。",
+          recommendationFallback: false
         });
       }
     } catch (error) {
@@ -201,6 +307,30 @@ Page({
       }
     } finally {
       if (stopRefresh) wx.stopPullDownRefresh();
+    }
+  },
+  async retryTopics() {
+    if (this.data.topicsState === "loading") return;
+    this.setData({ topicsState: "loading", topicsError: "" });
+    try {
+      await ensureSession();
+      const topics = await api.recommendationTopics();
+      const previousTopicId = this.data.selectedTopicId;
+      const selectedTopicId = (topics.items || []).some((item) => item.id === previousTopicId)
+        ? previousTopicId
+        : "";
+      this.setData({
+        selectedTopicId,
+        topicFilters: displayTopics(topics.items || [], selectedTopicId),
+        topicsState: "available",
+        topicsError: ""
+      });
+      if (selectedTopicId !== previousTopicId) await this.load();
+    } catch {
+      this.setData({
+        topicsState: "error",
+        topicsError: "主题列表仍无法读取；请稍后重试。其他筛选和结果不受影响。"
+      });
     }
   },
   async selectTopic(event: any) {
@@ -238,6 +368,26 @@ Page({
     });
     await this.load();
   },
+  async selectLanguage(event: any) {
+    const requested = String(event.currentTarget.dataset.value || "");
+    const value = PUBLIC_LANGUAGES.some((language) => language.value === requested) ? requested : "";
+    const selectedLanguage = value === this.data.selectedLanguage ? "" : value;
+    this.setData({
+      selectedLanguage,
+      languageFilters: displayTrustFacets(PUBLIC_LANGUAGES, selectedLanguage)
+    });
+    await this.load();
+  },
+  async selectSpecialty(event: any) {
+    const requested = String(event.currentTarget.dataset.value || "");
+    const value = PUBLIC_SPECIALTIES.some((specialty) => specialty.value === requested) ? requested : "";
+    const selectedSpecialty = value === this.data.selectedSpecialty ? "" : value;
+    this.setData({
+      selectedSpecialty,
+      specialtyFilters: displayTrustFacets(PUBLIC_SPECIALTIES, selectedSpecialty)
+    });
+    await this.load();
+  },
   async selectPriceLimit(event: any) {
     const rawValue = Number(event.currentTarget.dataset.value || 0);
     const value = PRICE_LIMITS.some((limit) => limit.value === rawValue) ? rawValue : 0;
@@ -263,6 +413,8 @@ Page({
       !this.data.selectedTopicId
       && !this.data.selectedKeyword
       && !this.data.selectedSortBy
+      && !this.data.selectedLanguage
+      && !this.data.selectedSpecialty
       && !this.data.selectedDeliveryMode
       && !this.data.selectedMaxServicePriceCents
       && !this.data.selectedAvailableWithinDays
@@ -272,10 +424,14 @@ Page({
       searchInput: "",
       selectedKeyword: "",
       selectedSortBy: "",
+      selectedLanguage: "",
+      selectedSpecialty: "",
       selectedDeliveryMode: "",
       selectedMaxServicePriceCents: 0,
       selectedAvailableWithinDays: 0,
       topicFilters: displayTopics(this.data.topicFilters, ""),
+      languageFilters: displayTrustFacets(PUBLIC_LANGUAGES, ""),
+      specialtyFilters: displayTrustFacets(PUBLIC_SPECIALTIES, ""),
       deliveryModeFilters: displayDeliveryModes(""),
       priceFilters: displayPriceLimits(0),
       availabilityWithinDaysFilters: displayAvailabilityWithinDays(0),
@@ -294,7 +450,11 @@ Page({
     this.stopRecommendationTracking = null;
     void flushRecommendationEvents();
   },
-  openCompanion(event: any) {
+  openEmergencyHelp() {
+    openCrisisResources({ source: "directEmergencyHelp", riskCode: "userRequested" });
+  },
+  async openCompanion(event: any) {
+    if (!await passCrisisGate("discover")) return;
     const { id, impressionId, themeId } = event.currentTarget.dataset;
     if (impressionId) {
       queueRecommendationEvent(impressionId, "click");

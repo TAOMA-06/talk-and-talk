@@ -4,10 +4,12 @@ import { AuditService } from "../common/audit/audit.service";
 import { AppException } from "../common/errors/app.exception";
 import { PrismaService } from "../database/prisma.service";
 import { SetFavoriteAvailabilityReminderDto } from "./dto/set-favorite-availability-reminder.dto";
+import { ListFavoriteCompanionsDto } from "./dto/list-favorite-companions.dto";
 import { publicFavoriteCompanionWhere } from "./favorite-companion-eligibility";
 
 type FavoriteCompanionRecord = {
   id: string;
+  ownerUserId: string;
   name: string;
   role: string;
   initials: string;
@@ -55,17 +57,25 @@ export class FavoritesService {
     private readonly audit: AuditService
   ) {}
 
-  async listCompanions(userId: string) {
-    const favorites = await this.prisma.companionFavorite.findMany({
-      where: {
+  async listCompanions(userId: string, query: ListFavoriteCompanionsDto = {}) {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 20;
+    const where = {
         userId,
         companion: { is: this.publicCompanionWhere() }
-      },
-      include: {
-        companion: { include: this.companionInclude() }
-      },
-      orderBy: [{ createdAt: "desc" }, { id: "asc" }]
-    } as any) as unknown as FavoriteCompanionPreferenceRecord[];
+    };
+    const [favorites, total] = await Promise.all([
+      this.prisma.companionFavorite.findMany({
+        where,
+        include: {
+          companion: { include: this.companionInclude() }
+        },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        skip: (page - 1) * pageSize,
+        take: pageSize
+      } as any) as unknown as FavoriteCompanionPreferenceRecord[],
+      this.prisma.companionFavorite.count({ where } as any)
+    ]);
 
     return {
       items: favorites.map((favorite) => ({
@@ -73,7 +83,26 @@ export class FavoritesService {
         availabilityReminderEnabled: favorite.availabilityReminderEnabled === true,
         availabilityReminderUpdatedAt: favorite.availabilityReminderUpdatedAt?.toISOString() ?? null,
         availabilityReminderMinimumIntervalHours: AVAILABILITY_REMINDER_MINIMUM_INTERVAL_HOURS
-      }))
+      })),
+      pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) }
+    };
+  }
+
+  async companionStatus(userId: string, companionId: string) {
+    const companion = await this.findPublicCompanionOrThrow(companionId);
+    const favorite = await this.prisma.companionFavorite.findUnique({
+      where: { userId_companionId: { userId, companionId: companion.id } },
+      select: {
+        availabilityReminderEnabled: true,
+        availabilityReminderUpdatedAt: true
+      }
+    } as any);
+    return {
+      companionId: companion.id,
+      favorited: Boolean(favorite),
+      availabilityReminderEnabled: favorite?.availabilityReminderEnabled === true,
+      availabilityReminderUpdatedAt: favorite?.availabilityReminderUpdatedAt?.toISOString() ?? null,
+      availabilityReminderMinimumIntervalHours: AVAILABILITY_REMINDER_MINIMUM_INTERVAL_HOURS
     };
   }
 
@@ -89,6 +118,7 @@ export class FavoritesService {
     // customer-side save intent only; no companion-facing event is created.
     await this.audit.record({
       actorId: userId,
+      subjectUserIds: [userId, companion.ownerUserId],
       action: "favorite.companion_saved",
       resourceType: "companionFavorite",
       resourceId: favorite.id,
@@ -106,8 +136,15 @@ export class FavoritesService {
     } as any);
     const removed = result.count > 0;
     if (removed) {
+      const companion = await this.prisma.companionProfile.findUnique({
+        where: { id: normalizedCompanionId },
+        select: { ownerUserId: true }
+      } as any);
       await this.audit.record({
         actorId: userId,
+        subjectUserIds: [userId, companion?.ownerUserId].filter(
+          (subjectUserId): subjectUserId is string => Boolean(subjectUserId)
+        ),
         action: "favorite.companion_removed",
         resourceType: "companionFavorite",
         metadata: { companionId: normalizedCompanionId }
@@ -230,7 +267,6 @@ export class FavoritesService {
         : "favorite.availability_reminder_disabled",
       resourceType: "companionFavorite",
       metadata: {
-        companionId: normalizedCompanionId,
         minimumIntervalHours: AVAILABILITY_REMINDER_MINIMUM_INTERVAL_HOURS
       }
     });

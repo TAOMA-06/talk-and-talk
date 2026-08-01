@@ -9,6 +9,13 @@ export type AuthUser = {
 
 export type AuthSession = { accessToken: string; refreshToken: string; expiresIn: number; user: AuthUser };
 
+/** Local-only generic notice. It deliberately carries no previous account
+ * status, deletion dates, policy version, or re-registration date. */
+export type LoginIdentityUnavailableNotice = {
+  code: "LOGIN_IDENTITY_UNAVAILABLE";
+  message: string;
+};
+
 export type PublicCatalogSummary = {
   sellable: boolean;
   startingPriceCents: number | null;
@@ -18,11 +25,38 @@ export type PublicCatalogSummary = {
   nextAvailableAt: string | null;
 };
 
+export type PublicCompanionVoiceIntro = {
+  available: boolean;
+  status: "approved" | "unavailable";
+  durationSeconds: number | null;
+  playbackStatus: "secureShortLivedUrlRequired" | "notAvailable";
+  /** Null until the backend can issue a customer-scoped short-lived HTTPS URL. */
+  playbackUrl: string | null;
+};
+
+export type PublicCompanionTrust = {
+  training: {
+    status: "current" | "renewalDue";
+    currentModules: number;
+    requiredModules: number;
+    validUntil: string | null;
+  };
+  platformReview: {
+    status: "current" | "reviewDue";
+    verifiedAt: string | null;
+    nextReviewDueAt: string | null;
+  };
+};
+
 export type Companion = {
   id: string; name: string; role: string; initials: string; bio: string;
   rating: number; reviewCount: number; pricePerHalfHour: number; isOnline: boolean;
   isVerified: boolean; availability: string; tags?: string[]; serviceTags?: string[]; availableTimes?: string[];
-  topicIds?: string[]; specialties?: string[]; cityDistrict?: string;
+  topicIds?: string[]; languages?: string[]; specialties?: string[]; cityDistrict?: string;
+  livedExperience?: string | null; serviceBoundaries?: string[];
+  voiceIntro?: PublicCompanionVoiceIntro;
+  completedOrders?: number; responseTime?: string;
+  publicTrust?: PublicCompanionTrust;
   catalog?: PublicCatalogSummary;
 };
 
@@ -40,6 +74,16 @@ export type FavoriteAvailabilityReminderPreference = {
   enabled: boolean;
   updatedAt: string;
   minimumIntervalHours: number;
+};
+
+export type AvailabilityReminderChannel = {
+  available: boolean;
+  channelEnabled: boolean;
+  preparationRunnerEnabled: boolean;
+  deliveryRunnerEnabled: boolean;
+  templateConfigured: boolean;
+  reasonCode: "CHANNEL_DISABLED" | "TEMPLATE_UNAVAILABLE" | "PREPARATION_DISABLED" | "DELIVERY_DISABLED" | null;
+  message: string;
 };
 
 export type ServiceOffering = {
@@ -137,6 +181,20 @@ export type RecommendedCompanion = Companion & {
   reasonText: string;
 };
 
+/** Private and recommendation-only. It is not a block, report, bookmark or
+ * companion-visible relationship, and public catalog search remains available. */
+export type RecommendationCompanionExclusion = {
+  companionId: string;
+  excludedAt: string;
+  companion: {
+    id: string;
+    name: string;
+    role: string;
+    initials: string;
+    currentlyPublic: boolean;
+  };
+};
+
 export type CommunityPost = {
   id: string; authorId: string; authorName: string; authorInitials: string; companionId?: string | null;
   kind: "femaleRequest" | "malePromotion"; topic: string; content: string; coverImageUrl?: string | null;
@@ -169,6 +227,31 @@ export type OrderRefund = {
   reason: string | null;
   reviewNote: string | null;
   failureReason: string | null;
+  reviewDueAt?: string | null;
+  resolutionDueAt?: string | null;
+};
+
+/** Customer-safe status returned by GET /payments/disputes/me. Provider
+ * references, complaint text, evidence and staff assignment stay server-side. */
+export type PaymentDisputeStatus = "pendingSync" | "open" | "processing" | "resolved" | "syncFailed";
+
+export type PaymentDispute = {
+  id: string;
+  channel: "wechat";
+  type: "consumer_complaint";
+  orderId: string | null;
+  /** Every linked order the current actor actually owns. The API deliberately
+   * omits other participants' order ids from a multi-order complaint. */
+  ownedOrderIds: string[];
+  ownedOrders: Array<{ orderId: string }>;
+  status: PaymentDisputeStatus;
+  providerStatus: "PENDING" | "PROCESSING" | "PROCESSED" | null;
+  complaintOccurredAt: string | null;
+  firstResponseDueAt: string | null;
+  resolutionDueAt: string | null;
+  firstRespondedAt: string | null;
+  resolvedAt: string | null;
+  updatedAt: string;
 };
 
 export type OrderExperienceFeedbackTag =
@@ -203,8 +286,21 @@ export type CompanionTodayServiceSchedule = {
   items: CompanionTodayServiceEntry[];
 };
 
+export type OrderServiceIntentCode =
+  | "listen"
+  | "comfort"
+  | "organize"
+  | "advice"
+  | "lightCompanionship";
+
 export type Order = {
   id: string; companionId: string; themeId: string; durationMinutes: number; amountCents: number; status: string;
+  /** Present on participant-scoped order responses. It is server-derived and
+   * must be used instead of inferring the active role from local profile state. */
+  viewerRole?: "customer" | "companion";
+  /** Participant-safe fulfillment gate. Companion responses never expose the
+   * customer's refund statement or review notes. */
+  fulfillmentBlockedByRefund?: boolean;
   scheduledAt?: string; createdAt: string; companion?: Companion; companionSnapshot?: { name: string; role: string; initials: string };
   conversationId?: string | null;
   customer?: { id: string; name: string; initials: string } | null;
@@ -221,6 +317,11 @@ export type Order = {
   } | null;
   availabilityWindowId?: string | null;
   availabilitySnapshot?: { availabilityWindowId: string | null; startsAt: string | null; endsAt: string | null; capacity: number | null } | null;
+  serviceIntent?: {
+    code: OrderServiceIntentCode;
+    label: string;
+    policyVersion: string;
+  } | null;
   companionConfirmedAt?: string | null;
   companionResponseDeadlineAt?: string | null;
   paymentReservationExpiresAt?: string | null;
@@ -229,6 +330,8 @@ export type Order = {
   cancelledAt?: string | null;
   completedAt?: string | null;
   refundRequestDeadlineAt?: string | null;
+  refundPolicyVersionSnapshot: string;
+  refundRequestWindowHoursSnapshot: number;
   customerConfirmedAt?: string | null;
   customerServiceGuidelinesConfirmedAt?: string | null;
   companionServiceGuidelinesConfirmedAt?: string | null;
@@ -237,6 +340,19 @@ export type Order = {
   companionPayableCents?: number;
   updatedAt?: string;
   refund?: OrderRefund | null;
+  attendanceDispute?: {
+    id: string;
+    issue: string;
+    status: string;
+    updatedAt: string;
+  } | null;
+  attendanceDisputeEligibility?: {
+    eligible: boolean;
+    opensAt: string;
+    createDeadlineAt: string;
+    reasonCode: "existingCase" | "orderStateInvalid" | "waitingPeriod" | "windowClosed" | null;
+    reason: string | null;
+  };
 };
 
 /** Server-issued only after the order is accepted, paid and manually started.
@@ -288,6 +404,12 @@ export type OrderTimelineEvent = {
 export type OrderTimeline = {
   orderId: string;
   items: OrderTimelineEvent[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
 };
 
 export type Conversation = {
@@ -309,7 +431,7 @@ export type Conversation = {
 export type MediaAttachment = {
   id: string;
   kind: "image" | "audio";
-  status: "reserved" | "uploaded" | "scanning" | "approved" | "blocked" | "failed" | "expired";
+  status: "reserved" | "uploaded" | "scanning" | "approved" | "reviewRequired" | "blocked" | "failed" | "expired";
   mimeType: string;
   sizeBytes: number;
   durationMs?: number | null;
@@ -329,6 +451,63 @@ export type ChatMessage = {
   timestamp: string;
 };
 
+export type CrisisInterventionSource =
+  | "homeIntent"
+  | "homeBrowseAll"
+  | "homeRecommendation"
+  | "discover"
+  | "companionDetail"
+  | "order"
+  | "chatSafetyRule"
+  | "directEmergencyHelp";
+
+export type CrisisInterventionRiskCode =
+  | "userRequested"
+  | "selfHarmSignal"
+  | "violenceSignal"
+  | "immediateDangerSignal"
+  | "chatSafetyRule";
+
+export type CrisisIntervention = {
+  id: string;
+  source: CrisisInterventionSource;
+  riskCode: CrisisInterventionRiskCode;
+  region: string;
+  resourcePolicyVersion: string;
+  status: "resourcesPending" | "resourcesViewed";
+  resourcesViewedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CrisisResource = {
+  code: string;
+  name: string;
+  kind: "policeEmergency" | "medicalEmergency" | "mentalHealthSupport" | string;
+  phone: string;
+  region: string;
+  availability: string;
+  officialSourceOrganization: string;
+  officialSourceTitle: string;
+  officialSourceUrl: string;
+  lastVerifiedOn: string;
+};
+
+export type CrisisResourceCatalog = {
+  policyVersion: string;
+  requestedRegion: string;
+  coverageRegion: string;
+  coverageStatus: "emergencyBaselineOnly" | "approvedNationalBaseline";
+  approved: boolean;
+  coverageStatement: string;
+  disclaimers: {
+    platformCannotDispatch: true;
+    platformCannotDispatchText: string;
+    ordinarySupportNotEmergencyText: string;
+  };
+  resources: CrisisResource[];
+};
+
 export type Notification = {
   id: string;
   type: string;
@@ -337,6 +516,231 @@ export type Notification = {
   data?: Record<string, unknown> | null;
   readAt?: string | null;
   createdAt: string;
+};
+
+export type SupportTicketCategory = "orderIssue" | "refund" | "safety" | "privacy" | "general";
+
+export type SupportTicketOrderFact = {
+  id: string;
+  statement: string;
+  evidenceAttachments: MediaAttachment[];
+  createdAt: string;
+};
+
+export type SupportTicket = {
+  id: string;
+  orderId: string | null;
+  category: SupportTicketCategory;
+  status: string;
+  subject: string;
+  body: string;
+  resolution: string | null;
+  resolutionCode: string | null;
+  dueAt: string | null;
+  updatedAt: string;
+  orderFacts: SupportTicketOrderFact[];
+};
+
+export type ReporterCaseFollowUp = {
+  id: string;
+  statement: string;
+  createdAt: string;
+};
+
+export type ReporterCase = {
+  id: string;
+  category: string;
+  riskLevel: string;
+  priority: number;
+  status: string;
+  outcome: "received" | "reviewing" | "actionTaken" | "closed";
+  outcomeSummary: string;
+  submittedSummary: string | null;
+  dueAt: string | null;
+  resolvedAt: string | null;
+  createdAt: string;
+  followUpCount: number;
+  followUps: ReporterCaseFollowUp[];
+};
+
+export type ReporterCaseSummary = Omit<ReporterCase, "followUps">;
+
+export type ModerationAppeal = {
+  id: string;
+  caseId: string;
+  status: "pending" | "upheld" | "overturned" | "dismissed" | string;
+  reason: string;
+  appealDeadlineAt: string | null;
+  reviewDueAt: string;
+  overdue: boolean;
+  policyVersion: string;
+  resolution: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+};
+
+export type ModerationAppealableCase = {
+  caseId: string;
+  kind: "contentAction" | "chatRestriction" | string;
+  source: string;
+  summary: string;
+  contentPreview: string;
+  restrictionEndsAt: string | null;
+  appealDeadlineAt: string;
+  policyVersion: string;
+  createdAt: string;
+};
+
+export type AccountSession = {
+  id: string;
+  sessionLabel: string | null;
+  clientPlatform: string | null;
+  lastUsedAt: string;
+  createdAt: string;
+  expiresAt: string;
+  current: boolean;
+};
+
+export type UserAccountAppeal = {
+  id: string;
+  status: "pending" | "upheld" | "overturned" | "dismissed" | string;
+  statement: string;
+  reviewDueAt: string;
+  overdue: boolean;
+  resolution: string | null;
+  resolvedAt: string | null;
+  policyVersion: string;
+  createdAt: string;
+};
+
+export type UserAccountAction = {
+  id: string;
+  kind: "restriction" | "ban" | string;
+  reasonCode: string;
+  message: string;
+  policyVersion: string;
+  startsAt: string;
+  endsAt: string | null;
+  appealDeadlineAt: string;
+  revokedAt: string | null;
+  canAppeal: boolean;
+  appeal: UserAccountAppeal | null;
+};
+
+export type AccountDeletionRequest = {
+  id: string;
+  status: "pending" | "processing" | "completed" | "cancelled" | string;
+  dueAt: string;
+  overdue: boolean;
+  policyVersion: string;
+  createdAt: string;
+  updatedAt: string;
+  processingStartedAt: string | null;
+  completedAt: string | null;
+  cancelledAt: string | null;
+  canCancel: boolean;
+  companionReactivationRequired: boolean;
+};
+
+export type AccountDeletionPolicy = {
+  version: string;
+  businessDays: number;
+  timezone: string;
+  calendarRule: string;
+  holidayNotice: string;
+};
+
+export type CustomerAdultEligibilityMethod =
+  | "externalProvider"
+  | "governmentNetworkIdentity"
+  | "secureManualReview";
+
+export type CustomerAdultEligibilityStatus = {
+  currentAdult: boolean;
+  status: "notSubmitted" | "pending" | "adult" | "expired" | "ineligible";
+  recordedStatus: "pending" | "adult" | "ineligible" | null;
+  verificationMethod: CustomerAdultEligibilityMethod | null;
+  evidenceReferenceMasked: string | null;
+  submittedAt: string | null;
+  verifiedAt: string | null;
+  validUntil: string | null;
+  reviewReason: string | null;
+  canSubmit: boolean;
+  recovery: {
+    submissionPath: string;
+    existingOrdersPath: string;
+    accountRightsRemainAvailable: boolean;
+    unpaidOrderCancellationRemainsAvailable: boolean;
+    paidUnfulfilledRefundRequestsRemainAvailable: boolean;
+  };
+};
+
+export type DataRightsRequestType = "access" | "export" | "correction" | "deletion";
+export type DataRightsFollowUp = {
+  id: string;
+  requestedInformation: string;
+  statement: string;
+  createdAt: string;
+};
+
+export type DataRightsRequest = {
+  id: string;
+  type: DataRightsRequestType;
+  status: "submitted" | "inReview" | "needsInformation" | "completed" | "rejected";
+  description: string;
+  statusReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+  resolvedAt: string | null;
+  resolutionEvidenceAvailable: boolean;
+  followUps: DataRightsFollowUp[];
+};
+
+export type PublicSupportInfo = {
+  operatorName: string;
+  channel: string;
+  email: string;
+  phone: string;
+  serviceHours: string;
+  expectedFirstResponseHours: number;
+  statusUrl: string | null;
+  authenticatedTicketPath: string;
+  ticketAccessRequiresLogin: boolean;
+  emergencyBoundary: string;
+};
+
+export type InvoiceRequest = {
+  id: string;
+  orderId: string;
+  status: "submitted" | "inReview" | "issued" | "rejected" | "voided" | "cancelled";
+  invoiceTitle: string;
+  amountCents: number;
+  currency: string;
+  paymentPaidAt: string;
+  service: {
+    title: string;
+    deliveryMode: string | null;
+    durationMinutes: number;
+    companionName: string;
+  };
+  statusReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+  issuedAt: string | null;
+  voidedAt: string | null;
+  cancelledAt: string | null;
+};
+
+export type InvoiceCandidateOrder = {
+  id: string;
+  status: "paid" | "inService" | "completed";
+  scheduledAt: string;
+  amountCents: number;
+  currency: string;
+  serviceTitle: string;
+  companionName: string;
+  eligible: boolean;
+  ineligibleReason: "paymentNotConfirmed" | "refundInProgressOrCompleted" | "requestAlreadyExists" | null;
 };
 
 export type MiniProgramPayParams = { timeStamp: string; nonceStr: string; package: string; signType: "RSA"; paySign: string };

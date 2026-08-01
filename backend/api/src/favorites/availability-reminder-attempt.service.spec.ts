@@ -36,7 +36,7 @@ function liveEligible() {
 describe("AvailabilityReminderAttemptService", () => {
   const prisma = {
     $queryRaw: jest.fn(),
-    availabilityReminderHandoff: { findUnique: jest.fn() },
+    availabilityReminderHandoff: { findUnique: jest.fn(), update: jest.fn() },
     availabilityReminderAttempt: { findUnique: jest.fn(), create: jest.fn() }
   } as any;
   prisma.$transaction = jest.fn((callback: (transaction: typeof prisma) => unknown) => callback(prisma));
@@ -48,6 +48,7 @@ describe("AvailabilityReminderAttemptService", () => {
     prisma.availabilityReminderHandoff.findUnique.mockResolvedValue(handoff());
     prisma.availabilityReminderAttempt.findUnique.mockResolvedValue(null);
     prisma.availabilityReminderAttempt.create.mockResolvedValue(attempt());
+    prisma.availabilityReminderHandoff.update.mockResolvedValue({ id: "handoff-1" });
     preflight.recheckEligibleCandidateWithinTransaction.mockResolvedValue(liveEligible());
   });
 
@@ -71,6 +72,10 @@ describe("AvailabilityReminderAttemptService", () => {
       data: { handoffId: "handoff-1", subscriptionGrantId: "grant-1" },
       select: { id: true, handoffId: true, status: true, createdAt: true }
     });
+    expect(prisma.availabilityReminderHandoff.update).toHaveBeenCalledWith({
+      where: { id: "handoff-1" },
+      data: { reservationProcessedAt: NOW, reservationOutcomeReason: null }
+    });
   });
 
   it("returns the existing reservation without rechecking or creating another binding", async () => {
@@ -84,6 +89,10 @@ describe("AvailabilityReminderAttemptService", () => {
 
     expect(preflight.recheckEligibleCandidateWithinTransaction).not.toHaveBeenCalled();
     expect(prisma.availabilityReminderAttempt.create).not.toHaveBeenCalled();
+    expect(prisma.availabilityReminderHandoff.update).toHaveBeenCalledWith({
+      where: { id: "handoff-1" },
+      data: { reservationProcessedAt: NOW, reservationOutcomeReason: null }
+    });
   });
 
   it("does not misreport a later consumed or quarantined attempt as a fresh reservation", async () => {
@@ -120,6 +129,10 @@ describe("AvailabilityReminderAttemptService", () => {
     }));
     expect(preflight.recheckEligibleCandidateWithinTransaction).not.toHaveBeenCalled();
     expect(prisma.availabilityReminderAttempt.create).not.toHaveBeenCalled();
+    expect(prisma.availabilityReminderHandoff.update).toHaveBeenCalledWith({
+      where: { id: "handoff-1" },
+      data: { reservationProcessedAt: NOW, reservationOutcomeReason: null }
+    });
   });
 
   it("does not create a reservation when the shared live check no longer permits delivery", async () => {
@@ -139,6 +152,10 @@ describe("AvailabilityReminderAttemptService", () => {
       reservedAt: null
     });
     expect(prisma.availabilityReminderAttempt.create).not.toHaveBeenCalled();
+    expect(prisma.availabilityReminderHandoff.update).toHaveBeenCalledWith({
+      where: { id: "handoff-1" },
+      data: { reservationProcessedAt: NOW, reservationOutcomeReason: "rateLimited" }
+    });
   });
 
   it("does not disclose another handoff when the exact grant is already privately reserved", async () => {

@@ -1,5 +1,7 @@
 # 微信小程序与 iOS 双端验证记录
 
+> **历史验证快照（2026-07-13，不得用于当前发布决策）。** 下列页面数、测试数、工具版本和 iOS 结果只证明当时工作区；当前唯一发行范围是微信小程序 + NestJS，最新验证以 [小程序 README](../frontend/miniprogram/README.md)、[商用界面闭环台账](./commercial-interface-closure.md) 和 [生产检查清单](./production-checklist.md) 为准。
+>
 更新时间：2026-07-13
 
 ## 当前已验证

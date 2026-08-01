@@ -34,6 +34,46 @@ describe("WeChatSubscriptionService", () => {
     });
   });
 
+  it("fails closed until the complete availability-reminder channel is enabled", () => {
+    config.get.mockImplementation((key: string) => {
+      if (key === "WECHAT_SUBSCRIBE_MESSAGES_ENABLED") return true;
+      if (key === "WECHAT_SUBSCRIBE_TEMPLATES") return [
+        ...templates,
+        { key: "availabilityReminder", templateId: "tmpl-reminder" }
+      ];
+      if (key === "AVAILABILITY_REMINDER_PREPARATION_ENABLED") return true;
+      if (key === "AVAILABILITY_REMINDER_DELIVERY_ENABLED") return false;
+      return undefined;
+    });
+
+    expect(service.availabilityReminderChannel()).toEqual(expect.objectContaining({
+      available: false,
+      channelEnabled: true,
+      preparationRunnerEnabled: true,
+      deliveryRunnerEnabled: false,
+      templateConfigured: true,
+      reasonCode: "DELIVERY_DISABLED"
+    }));
+  });
+
+  it("reports availability reminders available only when channel, template and both runners are present", () => {
+    config.get.mockImplementation((key: string) => {
+      if (key === "WECHAT_SUBSCRIBE_MESSAGES_ENABLED") return true;
+      if (key === "WECHAT_SUBSCRIBE_TEMPLATES") return [
+        ...templates,
+        { key: "availabilityReminder", templateId: "tmpl-reminder" }
+      ];
+      if (key === "AVAILABILITY_REMINDER_PREPARATION_ENABLED") return true;
+      if (key === "AVAILABILITY_REMINDER_DELIVERY_ENABLED") return true;
+      return undefined;
+    });
+
+    expect(service.availabilityReminderChannel()).toEqual(expect.objectContaining({
+      available: true,
+      reasonCode: null
+    }));
+  });
+
   it("records an explicit user grant for a configured template", async () => {
     prisma.weChatSubscriptionGrant.count.mockResolvedValue(0);
     prisma.weChatSubscriptionGrant.create.mockResolvedValue({

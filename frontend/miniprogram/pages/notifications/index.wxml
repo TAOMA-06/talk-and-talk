@@ -1,0 +1,33 @@
+<view class="page notifications-page">
+  <view class="notification-hero">
+    <view>
+      <view class="hero-title">事务与消息提醒</view>
+      <view class="hero-copy">订单、支付、客服、安全和聊天通知集中在这里；微信订阅授权不影响站内记录。</view>
+    </view>
+    <view wx:if="{{unreadState === 'error'}}" class="unread-count unread-count-unknown">未读数待核对</view>
+    <view wx:elif="{{unreadState === 'available' && unreadCount}}" class="unread-count">{{unreadCount}} 未读</view>
+  </view>
+  <view class="toolbar">
+    <button class="toolbar-button" loading="{{enabling}}" bindtap="enableImportantNotifications">开启关键微信提醒</button>
+    <button class="toolbar-button" disabled="{{unreadState !== 'available' || !unreadCount}}" loading="{{markingAll}}" bindtap="markAllRead">全部已读</button>
+  </view>
+  <view wx:if="{{unreadState === 'error' && !loading && !error}}" class="unread-error" aria-live="polite">
+    <view>{{unreadError}}</view>
+    <button class="unread-retry" bindtap="retryUnreadCount" aria-label="重新读取通知未读数量">重新读取未读数</button>
+  </view>
+
+  <view wx:if="{{loading}}" class="empty">正在读取通知…</view>
+  <view wx:elif="{{error}}" class="empty">
+    <view>{{error}}</view>
+    <button class="retry-button" bindtap="load">重新加载通知</button>
+  </view>
+  <view wx:elif="{{!notifications.length}}" class="empty">暂无通知。订单状态和客服进度仍可在对应页面主动查看。</view>
+  <view wx:else class="notification-card {{item.readAt ? '' : 'unread'}}" wx:for="{{notifications}}" wx:key="id" bindtap="openNotification" data-id="{{item.id}}" aria-role="button" aria-label="{{item.readAt ? '已读通知' : '未读通知'}}：{{item.title}}" tabindex="0">
+    <view class="notification-top"><text class="type">{{item.typeText}}</text><text class="time">{{item.timeText}}</text></view>
+    <view class="notification-title">{{item.title}}</view>
+    <view class="notification-body">{{item.body}}</view>
+    <view class="notification-footer"><text wx:if="{{!item.readAt}}" class="unread-marker">未读</text><text class="open-hint">查看关联内容 ›</text></view>
+  </view>
+  <view wx:if="{{notifications.length}}" class="pagination-note">已加载 {{notifications.length}} / {{total}} 条 · 第 {{page}} / {{totalPages}} 页</view>
+  <button wx:if="{{page < totalPages}}" class="retry-button" loading="{{loadingMore}}" disabled="{{loadingMore}}" bindtap="loadMore">加载更多通知</button>
+</view>

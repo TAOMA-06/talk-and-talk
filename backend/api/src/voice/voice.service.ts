@@ -4,7 +4,9 @@ import { createHash } from "node:crypto";
 
 import { AuditService } from "../common/audit/audit.service";
 import { AppException } from "../common/errors/app.exception";
+import { assertCurrentCompanionCommercialEligibility } from "../commercial/companion-commercial-eligibility";
 import { PrismaService } from "../database/prisma.service";
+import { assertCurrentCustomerAdultEligibility } from "../users/customer-adult-eligibility.service";
 
 type ParticipantRole = "customer" | "companion";
 
@@ -26,6 +28,8 @@ type VoiceRuntimeConfig = {
   sdkAppId: number;
   sdkSecretKey: string;
   userSigTtlSeconds: number;
+  privacyNoticeVersion: string;
+  privacyDisclosureReference: string;
 };
 
 const TRTC_AUDIO_ROOM_PRIVILEGES = 15;
@@ -51,6 +55,13 @@ export class VoiceService {
     // credential can never be produced from a mixed pre-/post-refund snapshot.
     const access = await this.prisma.$transaction(async (tx) => {
       const db = tx as any;
+      const target = await db.order.findUnique({
+        where: { id: orderId },
+        select: { companionId: true }
+      });
+      if (target?.companionId) {
+        await db.$queryRaw`SELECT "id" FROM "CompanionProfile" WHERE "id" = ${target.companionId} FOR UPDATE`;
+      }
       await db.$queryRaw`SELECT "id" FROM "Order" WHERE "id" = ${orderId} FOR UPDATE`;
       const order: any = await db.order.findFirst({
         where: {
@@ -75,6 +86,7 @@ export class VoiceService {
       if (!order) {
         throw new AppException("ORDER_NOT_FOUND", "Order not found", HttpStatus.NOT_FOUND);
       }
+      await db.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${order.userId} FOR UPDATE`;
       if (order.serviceOfferingDeliveryModeSnapshot !== "voice") {
         throw new AppException(
           "VOICE_ORDER_NOT_ELIGIBLE",
@@ -120,6 +132,13 @@ export class VoiceService {
         order.serviceStartedAt.getTime()
       ));
       const serviceEndsAt = new Date(billableServiceStartAt.getTime() + order.durationMinutes * 60_000);
+      await assertCurrentCustomerAdultEligibility(db, order.userId, now, serviceEndsAt);
+      await assertCurrentCompanionCommercialEligibility(
+        db,
+        order.companionId,
+        now,
+        serviceEndsAt
+      );
       const remainingSeconds = Math.floor((serviceEndsAt.getTime() - now.getTime()) / 1_000);
       if (remainingSeconds < MIN_JOINABLE_REMAINING_SECONDS) {
         throw new AppException(
@@ -189,6 +208,8 @@ export class VoiceService {
 
     await this.audit.record({
       actorId: userId,
+      subjectUserIds: [access.order.userId, access.order.companion.ownerUserId]
+        .filter((candidate): candidate is string => Boolean(candidate)),
       action: "voice.room_access_granted",
       resourceType: "order",
       resourceId: access.order.id,
@@ -197,7 +218,10 @@ export class VoiceService {
         roomId: access.roomId,
         participantRole: access.participantRole,
         expiresAt: access.expiresAt.toISOString(),
-        serviceEndsAt: access.serviceEndsAt.toISOString()
+        serviceEndsAt: access.serviceEndsAt.toISOString(),
+        privacyNoticeVersion: runtime.privacyNoticeVersion,
+        privacyDisclosureReference: runtime.privacyDisclosureReference,
+        recording: "notRecordedByPlatform"
       }
     });
 
@@ -239,15 +263,32 @@ export class VoiceService {
     const sdkAppId = this.config.get<number>("TRTC_SDK_APP_ID", 0);
     const sdkSecretKey = this.config.get<string>("TRTC_SDK_SECRET_KEY", "");
     const privateMapKeyEnabled = this.config.get<boolean>("TRTC_PRIVATE_MAP_KEY_ENABLED", false);
+    const privacyDisclosureApproved = this.config.get<boolean>("TRTC_PRIVACY_DISCLOSURE_APPROVED", false);
+    const privacyDisclosureReference = this.config.get<string>("TRTC_PRIVACY_DISCLOSURE_REFERENCE", "");
+    const privacyNoticeVersion = this.config.get<string>("LEGAL_CONSENT_VERSION", "");
     const userSigTtlSeconds = this.config.get<number>("TRTC_USER_SIG_TTL_SECONDS", 300);
-    if (!Number.isSafeInteger(sdkAppId) || sdkAppId < 1 || !sdkSecretKey || !privateMapKeyEnabled) {
+    if (
+      !Number.isSafeInteger(sdkAppId)
+      || sdkAppId < 1
+      || !sdkSecretKey
+      || !privateMapKeyEnabled
+      || !privacyDisclosureApproved
+      || !privacyDisclosureReference
+      || !privacyNoticeVersion
+    ) {
       throw new AppException(
         "VOICE_FEATURE_DISABLED",
         "Real-time voice is not configured for this environment",
         HttpStatus.SERVICE_UNAVAILABLE
       );
     }
-    return { sdkAppId, sdkSecretKey, userSigTtlSeconds };
+    return {
+      sdkAppId,
+      sdkSecretKey,
+      userSigTtlSeconds,
+      privacyNoticeVersion,
+      privacyDisclosureReference
+    };
   }
 
   private createSigner(runtime: VoiceRuntimeConfig): TrtcSigner {

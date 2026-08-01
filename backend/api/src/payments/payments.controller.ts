@@ -6,6 +6,7 @@ import {
   HttpCode,
   Param,
   Post,
+  Query,
   Req,
   Res,
   UseGuards
@@ -17,7 +18,7 @@ import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
-import { RejectRefundDto, ReviewRefundDto } from "./dto/review-refund.dto";
+import { ListRefundReviewQueueDto, RejectRefundDto, ReviewRefundDto } from "./dto/review-refund.dto";
 import { PaymentsService } from "./payments.service";
 
 type RequestWithRawBody = Request & { rawBody?: Buffer };
@@ -60,35 +61,42 @@ export class PaymentsController {
 
   @Post("refunds/:id/approve")
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles("admin")
+  @Roles("finance", "admin")
   approveRefund(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string, @Body() body: ReviewRefundDto) {
     return this.paymentsService.approveRefund(user.id, id, body.note);
   }
 
   @Get("refunds/review-queue")
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles("admin")
-  refundReviewQueue() {
-    return this.paymentsService.listRefundsAwaitingReview();
+  @Roles("finance", "admin")
+  refundReviewQueue(@Query() query: ListRefundReviewQueueDto) {
+    return this.paymentsService.listRefundsAwaitingReview(query.page, query.pageSize, query.status);
+  }
+
+  @Post("refunds/:id/claim")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("finance", "admin")
+  claimRefund(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
+    return this.paymentsService.claimRefund(user.id, id);
   }
 
   @Post("refunds/:id/reject")
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles("admin")
+  @Roles("finance", "admin")
   rejectRefund(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string, @Body() body: RejectRefundDto) {
     return this.paymentsService.rejectRefund(user.id, id, body.note);
   }
 
   @Post("refunds/:id/retry")
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles("admin")
+  @Roles("finance", "admin")
   retryRefund(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string, @Body() body: ReviewRefundDto) {
     return this.paymentsService.retryRefund(user.id, id, body.note);
   }
 
   @Post("refunds/:id/sync")
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles("admin")
+  @Roles("finance", "admin")
   syncRefund(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
     return this.paymentsService.syncRefundForAdmin(user.id, id);
   }

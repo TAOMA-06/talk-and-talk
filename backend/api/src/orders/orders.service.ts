@@ -1,13 +1,28 @@
 import { HttpStatus, Inject, Injectable, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { AppException } from "../common/errors/app.exception";
+import {
+  ATTENDANCE_CASE_WINDOW_DAYS,
+  ATTENDANCE_WAIT_MINUTES,
+  FULFILLMENT_POLICY_VERSION,
+  FULFILLMENT_TIMEZONE
+} from "../common/fulfillment-policy";
+import {
+  SERVICE_INTENT_CODES,
+  SERVICE_INTENT_POLICY_VERSION,
+  ServiceIntentCode,
+  serviceIntentLabel
+} from "../common/service-intent-policy";
 import { AuditRecordInput, AuditService } from "../common/audit/audit.service";
+import { assertCurrentCompanionCommercialEligibility } from "../commercial/companion-commercial-eligibility";
 import { PrismaService } from "../database/prisma.service";
+import { CrisisInterventionService } from "../crisis-intervention/crisis-intervention.service";
 import { ModerationCaseService } from "../moderation/moderation-case.service";
 import { ModerationService } from "../moderation/moderation.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { RecommendationsService } from "../recommendations/recommendations.service";
 import { VoiceRoomControlService } from "../voice/voice-room-control.service";
+import { assertCurrentCustomerAdultEligibility } from "../users/customer-adult-eligibility.service";
 import {
   WECHAT_PAY_PROVIDER,
   WECHAT_PREPAY_TTL_MS,
@@ -16,6 +31,8 @@ import {
 import { CreateOrderDto } from "./dto/create-order.dto";
 import { CreateOrderExperienceFeedbackDto } from "./dto/create-order-experience-feedback.dto";
 import { CreateOrderRescheduleRequestDto } from "./dto/create-order-reschedule-request.dto";
+import { ListOrderTimelineDto } from "./dto/list-order-timeline.dto";
+import { ListOrdersDto } from "./dto/list-orders.dto";
 
 const SERVICE_EARLY_START_MS = 15 * 60 * 1000;
 export const COMPANION_PAYMENT_RESERVATION_MS = 15 * 60 * 1000;
@@ -26,6 +43,8 @@ const DEFAULT_RESCHEDULE_RESPONSE_WINDOW_MINUTES = 12 * 60;
 const BEIJING_UTC_OFFSET_MS = 8 * 60 * 60 * 1000;
 const WORKBENCH_TODAY_TIMEZONE = "Asia/Shanghai";
 const WORKBENCH_TODAY_ORDER_STATUSES = ["pending", "paying", "paid", "inService", "completed"] as const;
+const ACTIVE_ORDER_STATUSES = ["pending", "paying", "paid", "inService"] as const;
+const HISTORICAL_ORDER_STATUSES = ["completed", "cancelled", "refunded"] as const;
 
 function twoDigits(value: number): string {
   return String(value).padStart(2, "0");
@@ -86,6 +105,13 @@ type OrderRecord = {
   customerServiceGuidelinesConfirmedAt?: Date | null;
   companionServiceGuidelinesConfirmedAt?: Date | null;
   refundRequestDeadlineAt?: Date | null;
+  refundPolicyVersionSnapshot?: string | null;
+  refundRequestWindowHoursSnapshot?: number | null;
+  adultEligibilityVerdictSnapshot?: "pending" | "adult" | "ineligible" | null;
+  adultEligibilityVerifiedAtSnapshot?: Date | null;
+  adultEligibilityValidUntilSnapshot?: Date | null;
+  serviceIntentSnapshot?: ServiceIntentCode | null;
+  serviceIntentPolicyVersionSnapshot?: string | null;
   clientRequestId?: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -100,6 +126,12 @@ type OrderRecord = {
     note: string | null;
     createdAt: Date;
   } | null;
+  attendanceDispute?: {
+    id: string;
+    issue: string;
+    status: string;
+    updatedAt: Date;
+  } | null;
 };
 
 @Injectable()
@@ -113,27 +145,37 @@ export class OrdersService {
     @Optional() private readonly audit?: AuditService,
     @Optional() private readonly moderation?: ModerationService,
     @Optional() private readonly moderationCases?: ModerationCaseService,
-    @Optional() private readonly voiceRoomControl?: VoiceRoomControlService
+    @Optional() private readonly voiceRoomControl?: VoiceRoomControlService,
+    @Optional() private readonly crisisIntervention?: CrisisInterventionService
   ) {}
 
   async create(userId: string, dto: CreateOrderDto) {
     const serviceOfferingId = this.normalizeServiceOfferingId(dto.serviceOfferingId);
     const availabilityWindowId = this.normalizeAvailabilityWindowId(dto.availabilityWindowId);
+    const serviceIntent = this.normalizeServiceIntent(dto.serviceIntent);
     const clientRequestId = dto.clientRequestId?.trim() || null;
     if (clientRequestId) {
       const existing = await this.prisma.order.findFirst({
         where: { userId, clientRequestId },
         include: {
           conversation: { select: { externalId: true } },
-          refunds: { orderBy: { createdAt: "desc" }, take: 1 }
+          refunds: { orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 1 }
         }
       } as any);
       if (existing) {
-        this.assertIdempotentOrderMatches(existing, dto, serviceOfferingId, availabilityWindowId);
+        this.assertIdempotentOrderMatches(
+          existing,
+          dto,
+          serviceOfferingId,
+          availabilityWindowId,
+          serviceIntent
+        );
         return this.toDto(existing);
       }
     }
+    await this.assertCrisisResourcesViewed(userId);
     const commercialMode = this.config?.get<string>("COMMERCIAL_RELEASE_MODE", "internal") === "commercial";
+    const refundPolicySnapshot = this.currentRefundPolicySnapshot(commercialMode);
     if (commercialMode && !clientRequestId) {
       throw new AppException(
         "ORDER_CLIENT_REQUEST_ID_REQUIRED",
@@ -145,6 +187,13 @@ export class OrdersService {
       throw new AppException(
         "ORDER_STRUCTURED_CATALOG_REQUIRED",
         "serviceOfferingId and availabilityWindowId are required for commercial order intake",
+        HttpStatus.UNPROCESSABLE_ENTITY
+      );
+    }
+    if (commercialMode && !serviceIntent) {
+      throw new AppException(
+        "ORDER_SERVICE_INTENT_REQUIRED",
+        "serviceIntent is required for commercial order intake",
         HttpStatus.UNPROCESSABLE_ENTITY
       );
     }
@@ -207,28 +256,83 @@ export class OrdersService {
       if (clientRequestId) {
         const duplicate = await db.order.findFirst({ where: { userId, clientRequestId } });
         if (duplicate) {
-          this.assertIdempotentOrderMatches(duplicate, dto, serviceOfferingId, availabilityWindowId);
+          this.assertIdempotentOrderMatches(
+            duplicate,
+            dto,
+            serviceOfferingId,
+            availabilityWindowId,
+            serviceIntent,
+            refundPolicySnapshot
+          );
           return duplicate;
         }
       }
+      await this.assertCrisisResourcesViewed(userId, db);
       // Commercial submission/suspension also locks this row. Eligibility,
       // pricing and evidence snapshots must therefore be read after acquiring
       // the same lock, not from a pre-transaction marketplace lookup.
       await db.$queryRaw`SELECT "id" FROM "CompanionProfile" WHERE "id" = ${dto.companionId} FOR UPDATE`;
+      await db.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${userId} FOR UPDATE`;
+      const futureBoundary = await db.companionCustomerFutureBoundary.findUnique({
+        where: {
+          companionId_customerUserId: {
+            companionId: dto.companionId,
+            customerUserId: userId
+          }
+        },
+        select: { id: true }
+      });
+      if (futureBoundary) {
+        // Do not reveal whether the companion made a private relationship
+        // choice, changed availability, or became commercially ineligible.
+        throw new AppException(
+          "ORDER_COMPANION_UNAVAILABLE",
+          "This companion is currently unavailable for a new order",
+          HttpStatus.CONFLICT
+        );
+      }
+      const activeDeletion = await db.accountDeletionRequest.findFirst({
+        where: { userId, status: { in: ["pending", "processing"] } },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        select: { id: true, status: true }
+      });
+      if (activeDeletion) {
+        throw new AppException(
+          "ACCOUNT_DELETION_ORDER_INTAKE_BLOCKED",
+          "New orders are unavailable while account deletion is pending",
+          HttpStatus.CONFLICT,
+          {
+            deletionRequestId: activeDeletion.id,
+            deletionStatus: activeDeletion.status,
+            existingOrderRightsRemainAvailable: true
+          }
+        );
+      }
+      await assertCurrentCustomerAdultEligibility(
+        db,
+        userId,
+        new Date(now),
+        new Date(scheduledAt.getTime() + requestedDurationMinutes * 60_000)
+      );
       const companion: any = await db.companionProfile.findFirst({
         where: {
           id: dto.companionId,
           isPublished: true,
           isVerified: true,
           ownerUserId: { not: null },
-          owner: { accountStatus: "active", profile: { isVerified: true } },
-          commercialProfile: { status: "verified" }
+          owner: { accountStatus: "active", profile: { isVerified: true } }
         },
         include: { commercialProfile: true }
       });
       if (!companion) {
         throw new AppException("COMPANION_NOT_FOUND", "Companion not found", HttpStatus.NOT_FOUND);
       }
+      await assertCurrentCompanionCommercialEligibility(
+        db,
+        companion.id,
+        new Date(now),
+        new Date(scheduledAt.getTime() + requestedDurationMinutes * 60_000)
+      );
       await this.assertOrderIntakeCapacity(db, userId, companion.id);
       const serviceOffering = serviceOfferingId
         ? await this.lockActiveServiceOffering(db, {
@@ -297,8 +401,21 @@ export class OrdersService {
           settlementRecipientMaskedSnapshot: companion.commercialProfile?.settlementRecipientMasked ?? null,
           taxProfileRefSnapshot: companion.commercialProfile?.taxProfileRef ?? null,
           identityEvidenceRefSnapshot: companion.commercialProfile?.identityEvidenceRef ?? null,
+          adultEligibilityVerdictSnapshot:
+            companion.commercialProfile?.adultEligibilityVerdict ?? null,
+          adultEligibilityVerifiedAtSnapshot:
+            companion.commercialProfile?.adultEligibilityVerifiedAt ?? null,
+          adultEligibilityValidUntilSnapshot:
+            companion.commercialProfile?.adultEligibilityValidUntil ?? null,
           serviceAgreementVersionSnapshot: companion.commercialProfile?.serviceAgreementVersion ?? null,
-          serviceAgreementEvidenceRefSnapshot: companion.commercialProfile?.serviceAgreementEvidenceRef ?? null
+          serviceAgreementEvidenceRefSnapshot: companion.commercialProfile?.serviceAgreementEvidenceRef ?? null,
+          serviceIntentSnapshot: serviceIntent,
+          serviceIntentPolicyVersionSnapshot:
+            serviceIntent ? SERVICE_INTENT_POLICY_VERSION : "legacy",
+          refundPolicyVersionSnapshot: refundPolicySnapshot.version,
+          refundRequestWindowHoursSnapshot: refundPolicySnapshot.hours,
+          fulfillmentPolicyVersionSnapshot: FULFILLMENT_POLICY_VERSION,
+          fulfillmentTimezoneSnapshot: FULFILLMENT_TIMEZONE
         }
       });
       await db.orderTimelineEvent.create({
@@ -326,6 +443,7 @@ export class OrdersService {
       }
       await this.recordAudit(db, {
         actorId: userId,
+        subjectUserIds: await this.orderAuditSubjectUserIds(db, created.id),
         action: "order.created",
         resourceType: "order",
         resourceId: created.id,
@@ -336,7 +454,11 @@ export class OrdersService {
           amountCents,
           durationMinutes,
           scheduledAt: scheduledAt.toISOString(),
-          clientRequestId
+          clientRequestId,
+          serviceIntent,
+          serviceIntentPolicyVersion: serviceIntent ? SERVICE_INTENT_POLICY_VERSION : "legacy",
+          refundPolicyVersion: refundPolicySnapshot.version,
+          refundRequestWindowHours: refundPolicySnapshot.hours
         }
       });
       return created;
@@ -345,16 +467,36 @@ export class OrdersService {
     return this.toDto(order);
   }
 
+  private async assertCrisisResourcesViewed(userId: string, database?: any): Promise<void> {
+    if (this.crisisIntervention) {
+      await this.crisisIntervention.assertResourcesViewedBeforeOrder(userId, database);
+      return;
+    }
+    // Direct service construction is used by isolated Jest unit tests. A real
+    // Nest runtime must never accept an order if the crisis-routing dependency
+    // is absent, because that would turn a missing module into a safety bypass.
+    if (process.env.NODE_ENV !== "test") {
+      throw new AppException(
+        "CRISIS_ROUTING_UNAVAILABLE",
+        "Crisis routing is unavailable; new order intake is temporarily blocked",
+        HttpStatus.SERVICE_UNAVAILABLE
+      );
+    }
+  }
+
   private assertIdempotentOrderMatches(
     existing: any,
     dto: CreateOrderDto,
     serviceOfferingId: string | null,
-    availabilityWindowId: string | null
+    availabilityWindowId: string | null,
+    serviceIntent: ServiceIntentCode | null,
+    expectedRefundPolicy?: { version: string; hours: number }
   ): void {
     if (
       existing.companionId !== dto.companionId ||
       (existing.serviceOfferingId ?? null) !== serviceOfferingId ||
       (existing.availabilityWindowId ?? null) !== availabilityWindowId ||
+      (existing.serviceIntentSnapshot ?? null) !== serviceIntent ||
       existing.themeId !== dto.themeId ||
       existing.durationMinutes !== dto.durationMinutes ||
       new Date(existing.scheduledAt).getTime() !== new Date(dto.scheduledAt).getTime()
@@ -365,6 +507,76 @@ export class OrdersService {
         HttpStatus.CONFLICT
       );
     }
+    const existingRefundPolicy = this.requireOrderRefundPolicySnapshot(existing);
+    if (expectedRefundPolicy && (
+      existingRefundPolicy.version !== expectedRefundPolicy.version ||
+      existingRefundPolicy.hours !== expectedRefundPolicy.hours
+    )) {
+      throw new AppException(
+        "ORDER_IDEMPOTENCY_KEY_REUSED",
+        "clientRequestId was already used with a different refund policy snapshot",
+        HttpStatus.CONFLICT
+      );
+    }
+  }
+
+  private currentRefundPolicySnapshot(commercialMode: boolean): { version: string; hours: number } {
+    const version = String(
+      this.config?.get<string>("REFUND_POLICY_VERSION", "development-v1")
+        ?? "development-v1"
+    ).trim();
+    const hours = this.config?.get<number>("REFUND_REQUEST_WINDOW_HOURS", 72) ?? 72;
+    const approved = this.config?.get<boolean>("REFUND_POLICY_APPROVED", false) === true;
+    const approvalReference = String(
+      this.config?.get<string>("REFUND_POLICY_APPROVAL_REFERENCE", "") ?? ""
+    ).trim();
+    if (
+      !/^[A-Za-z0-9][A-Za-z0-9._-]{2,63}$/.test(version)
+      || !Number.isInteger(hours)
+      || hours < 1
+      || hours > 720
+      || (commercialMode && (!approved || !approvalReference))
+    ) {
+      throw new AppException(
+        "ORDER_REFUND_POLICY_UNAVAILABLE",
+        "New order intake is paused until an approved refund policy version is configured",
+        HttpStatus.SERVICE_UNAVAILABLE
+      );
+    }
+    return { version, hours };
+  }
+
+  private requireOrderRefundPolicySnapshot(order: any): { version: string; hours: number } {
+    const version = typeof order?.refundPolicyVersionSnapshot === "string"
+      ? order.refundPolicyVersionSnapshot.trim()
+      : "";
+    const hours = order?.refundRequestWindowHoursSnapshot;
+    if (
+      !/^[A-Za-z0-9][A-Za-z0-9._-]{2,63}$/.test(version)
+      || !Number.isInteger(hours)
+      || hours < 1
+      || hours > 720
+    ) {
+      throw new AppException(
+        "ORDER_REFUND_POLICY_SNAPSHOT_INVALID",
+        "The order refund policy snapshot is unavailable; contact support before continuing",
+        HttpStatus.SERVICE_UNAVAILABLE,
+        { orderId: order?.id ?? null, supportReviewRequired: true }
+      );
+    }
+    return { version, hours };
+  }
+
+  private normalizeServiceIntent(value: string | null | undefined): ServiceIntentCode | null {
+    if (value === undefined || value === null) return null;
+    if (!SERVICE_INTENT_CODES.includes(value as ServiceIntentCode)) {
+      throw new AppException(
+        "ORDER_SERVICE_INTENT_INVALID",
+        "serviceIntent is not supported",
+        HttpStatus.BAD_REQUEST
+      );
+    }
+    return value as ServiceIntentCode;
   }
 
   private normalizeServiceOfferingId(value: string | null | undefined): string | null {
@@ -651,38 +863,70 @@ export class OrdersService {
     return this.recommendations.validateOrderAttribution(userId, impressionId, companionId);
   }
 
-  async list(userId: string) {
-    const orders = await this.prisma.order.findMany({
-      where: { userId },
-      include: {
-        conversation: { select: { externalId: true } },
-        refunds: { orderBy: { createdAt: "desc" }, take: 1 },
-        experienceFeedback: true
-      },
-      orderBy: { createdAt: "desc" }
-    } as any);
+  async list(userId: string, query: ListOrdersDto = {}) {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 20;
+    const where = { userId, ...this.orderListStatusWhere(query) };
+    const [orders, total] = await Promise.all([
+      this.prisma.order.findMany({
+        where,
+        include: {
+          conversation: { select: { externalId: true } },
+          refunds: { orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 1 },
+          experienceFeedback: true,
+          attendanceDispute: { select: { id: true, issue: true, status: true, updatedAt: true } }
+        },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        skip: (page - 1) * pageSize,
+        take: pageSize
+      } as any),
+      this.prisma.order.count({ where } as any)
+    ]);
 
     return {
-      items: orders.map((order: OrderRecord) => this.toDto(order))
+      items: orders.map((order: OrderRecord) => this.toParticipantDto(order, "customer")),
+      pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) }
     };
   }
 
-  async listForCompanion(userId: string) {
+  async listForCompanion(userId: string, query: ListOrdersDto = {}) {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 20;
     const companion = await this.prisma.companionProfile.findUnique({
       where: { ownerUserId: userId }
     } as any);
     if (!companion) {
-      return { items: [] };
+      return { items: [], pagination: { page, pageSize, total: 0, totalPages: 0 } };
     }
-    const orders = await this.prisma.order.findMany({
-      where: { companionId: companion.id },
-      include: {
-        conversation: { select: { externalId: true } },
-        user: { select: { profile: { select: { displayName: true } } } }
-      },
-      orderBy: { scheduledAt: "asc" }
-    } as any);
-    return { items: orders.map((order: OrderRecord) => this.toDto(order)) };
+    const where = { companionId: companion.id, ...this.orderListStatusWhere(query) };
+    const [orders, total] = await Promise.all([
+      this.prisma.order.findMany({
+        where,
+        include: {
+          conversation: { select: { externalId: true } },
+          user: { select: { profile: { select: { displayName: true } } } },
+          refunds: { orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 1 },
+          attendanceDispute: { select: { id: true, issue: true, status: true, updatedAt: true } }
+        },
+        orderBy: query.view === "active" && !query.status
+          ? [{ scheduledAt: "asc" }, { id: "asc" }]
+          : [{ createdAt: "desc" }, { id: "desc" }],
+        skip: (page - 1) * pageSize,
+        take: pageSize
+      } as any),
+      this.prisma.order.count({ where } as any)
+    ]);
+    return {
+      items: orders.map((order: OrderRecord) => this.toParticipantDto(order, "companion")),
+      pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) }
+    };
+  }
+
+  private orderListStatusWhere(query: ListOrdersDto): { status?: string | { in: readonly string[] } } {
+    if (query.status) return { status: query.status };
+    if (query.view === "active") return { status: { in: ACTIVE_ORDER_STATUSES } };
+    if (query.view === "history") return { status: { in: HISTORICAL_ORDER_STATUSES } };
+    return {};
   }
 
   async listTodayForCompanion(userId: string, now = new Date()) {
@@ -741,6 +985,13 @@ export class OrdersService {
   async startService(userId: string, orderId: string) {
     const updated = await this.prisma.$transaction(async (tx) => {
       const db = tx as any;
+      const target = await db.order.findUnique({
+        where: { id: orderId },
+        select: { companionId: true }
+      });
+      if (target?.companionId) {
+        await db.$queryRaw`SELECT "id" FROM "CompanionProfile" WHERE "id" = ${target.companionId} FOR UPDATE`;
+      }
       await db.$queryRaw`SELECT "id" FROM "Order" WHERE "id" = ${orderId} FOR UPDATE`;
       const order = await db.order.findUnique({
         where: { id: orderId },
@@ -770,26 +1021,37 @@ export class OrdersService {
           HttpStatus.CONFLICT
         );
       }
-      const now = Date.now();
+      const now = new Date();
       const scheduledStart = order.scheduledAt.getTime();
       const scheduledEnd = scheduledStart + order.durationMinutes * 60_000;
-      if (now < scheduledStart - SERVICE_EARLY_START_MS) {
+      if (now.getTime() < scheduledStart - SERVICE_EARLY_START_MS) {
         throw new AppException(
           "ORDER_SERVICE_NOT_READY",
           "Service can only start within 15 minutes of the scheduled time",
           HttpStatus.CONFLICT
         );
       }
-      if (now >= scheduledEnd) {
+      if (now.getTime() >= scheduledEnd) {
         throw new AppException(
           "ORDER_SERVICE_WINDOW_EXPIRED",
           "The scheduled service window has ended",
           HttpStatus.CONFLICT
         );
       }
+      const serviceEndsAt = new Date(
+        Math.max(scheduledStart, now.getTime()) + order.durationMinutes * 60_000
+      );
+      await db.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${order.userId} FOR UPDATE`;
+      await assertCurrentCustomerAdultEligibility(db, order.userId, now, serviceEndsAt);
+      await assertCurrentCompanionCommercialEligibility(
+        db,
+        order.companionId,
+        now,
+        serviceEndsAt
+      );
       const updated = await db.order.update({
         where: { id: orderId },
-        data: { status: "inService", serviceStartedAt: new Date() },
+        data: { status: "inService", serviceStartedAt: now },
         include: { conversation: { select: { externalId: true } } }
       });
       await this.cancelPendingRescheduleRequest(db, {
@@ -809,6 +1071,7 @@ export class OrdersService {
       });
       await this.recordAudit(db, {
         actorId: userId,
+        subjectUserIds: await this.orderAuditSubjectUserIds(db, orderId),
         action: "order.service_started",
         resourceType: "order",
         resourceId: orderId,
@@ -865,11 +1128,16 @@ export class OrdersService {
         order.companion.availability === "busy" ||
         (!order.availabilityWindowId && (order.companion.availableTimes?.length ?? 0) === 0) ||
         order.companion.owner?.accountStatus !== "active" ||
-        order.companion.owner?.profile?.isVerified !== true ||
-        order.companion.commercialProfile?.status !== "verified"
+        order.companion.owner?.profile?.isVerified !== true
       ) {
         throw new AppException("COMPANION_UNAVAILABLE", "Companion is not accepting this booking", HttpStatus.CONFLICT);
       }
+      await assertCurrentCompanionCommercialEligibility(
+        db,
+        order.companionId,
+        now,
+        new Date(order.scheduledAt.getTime() + order.durationMinutes * 60_000)
+      );
       if (
         order.companionConfirmedAt &&
         (!order.paymentReservationExpiresAt || order.paymentReservationExpiresAt.getTime() > now.getTime())
@@ -920,6 +1188,7 @@ export class OrdersService {
       });
       await this.recordAudit(db, {
         actorId: userId,
+        subjectUserIds: await this.orderAuditSubjectUserIds(db, orderId),
         action: "order.companion_confirmed",
         resourceType: "order",
         resourceId: orderId,
@@ -982,6 +1251,7 @@ export class OrdersService {
       });
       await this.recordAudit(db, {
         actorId: userId,
+        subjectUserIds: await this.orderAuditSubjectUserIds(db, orderId),
         action: "order.companion_rejected",
         resourceType: "order",
         resourceId: orderId
@@ -1020,8 +1290,10 @@ export class OrdersService {
           HttpStatus.CONFLICT
         );
       }
-      const refundWindowHours = this.config?.get<number>("REFUND_REQUEST_WINDOW_HOURS") ?? 72;
-      const refundRequestDeadlineAt = new Date(completedAt.getTime() + refundWindowHours * 60 * 60_000);
+      const refundPolicySnapshot = this.requireOrderRefundPolicySnapshot(order);
+      const refundRequestDeadlineAt = new Date(
+        completedAt.getTime() + refundPolicySnapshot.hours * 60 * 60_000
+      );
       const updated = await db.order.update({
         where: { id: orderId },
         data: { status: "completed", completedAt, refundRequestDeadlineAt },
@@ -1083,18 +1355,27 @@ export class OrdersService {
         type: "orderStatus",
         title: "服务已完成",
         body: "本次服务已完成；如有履约或退款问题，请在订单中提交客服工单。",
-        data: { orderId, status: "completed", refundRequestDeadlineAt: refundRequestDeadlineAt.toISOString() },
+        data: {
+          orderId,
+          status: "completed",
+          refundRequestDeadlineAt: refundRequestDeadlineAt.toISOString(),
+          refundPolicyVersion: refundPolicySnapshot.version,
+          refundRequestWindowHours: refundPolicySnapshot.hours
+        },
         eventKey: `order:${orderId}:completed`,
         templateKey: "serviceCompleted"
       });
       await this.recordAudit(db, {
         actorId: userId,
+        subjectUserIds: await this.orderAuditSubjectUserIds(db, orderId),
         action: "order.service_completed",
         resourceType: "order",
         resourceId: orderId,
         metadata: {
           completedAt: completedAt.toISOString(),
           refundRequestDeadlineAt: refundRequestDeadlineAt.toISOString(),
+          refundPolicyVersion: refundPolicySnapshot.version,
+          refundRequestWindowHours: refundPolicySnapshot.hours,
           earningAvailableAt: new Date(completedAt.getTime() + holdHours * 60 * 60_000).toISOString()
         }
       });
@@ -1105,8 +1386,9 @@ export class OrdersService {
   }
 
   async get(userId: string, orderId: string) {
-    const order = await this.findOwnedOrThrow(userId, orderId);
-    return this.toDto(order);
+    const order = await this.findOrderParticipantDetailOrThrow(userId, orderId);
+    const viewerRole = order.userId === userId ? "customer" : "companion";
+    return this.toParticipantDto(order, viewerRole);
   }
 
   /**
@@ -1114,14 +1396,26 @@ export class OrdersService {
    * customer and companion clients never receive staff-only evidence,
    * moderation details, or settlement metadata.
    */
-  async timeline(userId: string, orderId: string) {
+  async timeline(userId: string, orderId: string, query: ListOrderTimelineDto = {}) {
     await this.findOrderParticipantOrThrow(userId, orderId);
-    const events = await (this.prisma as any).orderTimelineEvent.findMany({
-      where: { orderId },
-      include: { rescheduleRequest: true },
-      orderBy: [{ createdAt: "asc" }, { id: "asc" }]
-    });
-    return { orderId, items: events.map((event: any) => this.toTimelineDto(event)) };
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 20;
+    const where = { orderId };
+    const [events, total] = await Promise.all([
+      (this.prisma as any).orderTimelineEvent.findMany({
+        where,
+        include: { rescheduleRequest: true },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        skip: (page - 1) * pageSize,
+        take: pageSize
+      }),
+      (this.prisma as any).orderTimelineEvent.count({ where })
+    ]);
+    return {
+      orderId,
+      items: events.map((event: any) => this.toTimelineDto(event)),
+      pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) }
+    };
   }
 
   /**
@@ -1132,6 +1426,13 @@ export class OrdersService {
   async requestReschedule(userId: string, orderId: string, dto: CreateOrderRescheduleRequestDto) {
     const result = await this.prisma.$transaction(async (tx) => {
       const db = tx as any;
+      const target = await db.order.findUnique({
+        where: { id: orderId },
+        select: { companionId: true }
+      });
+      if (target?.companionId) {
+        await db.$queryRaw`SELECT "id" FROM "CompanionProfile" WHERE "id" = ${target.companionId} FOR UPDATE`;
+      }
       await db.$queryRaw`SELECT "id" FROM "Order" WHERE "id" = ${orderId} FOR UPDATE`;
       const order: any = await db.order.findUnique({
         where: { id: orderId },
@@ -1151,6 +1452,19 @@ export class OrdersService {
       const now = new Date();
       this.assertRescheduleEligible(order, now);
       const requestedScheduledAt = this.parseRescheduleRequestedAt(dto.requestedScheduledAt, now);
+      await db.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${order.userId} FOR UPDATE`;
+      await assertCurrentCustomerAdultEligibility(
+        db,
+        order.userId,
+        now,
+        new Date(requestedScheduledAt.getTime() + order.durationMinutes * 60_000)
+      );
+      await assertCurrentCompanionCommercialEligibility(
+        db,
+        order.companionId,
+        now,
+        new Date(requestedScheduledAt.getTime() + order.durationMinutes * 60_000)
+      );
       if (requestedScheduledAt.getTime() === order.scheduledAt.getTime()) {
         throw new AppException(
           "RESCHEDULE_SCHEDULE_UNCHANGED",
@@ -1174,7 +1488,7 @@ export class OrdersService {
 
       const existing = await db.orderRescheduleRequest.findFirst({
         where: { orderId, status: "pending" },
-        orderBy: { createdAt: "asc" }
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }]
       });
       if (existing) {
         if (existing.expiresAt.getTime() > now.getTime()) {
@@ -1284,6 +1598,7 @@ export class OrdersService {
       });
       await this.recordAudit(db, {
         actorId: userId,
+        subjectUserIds: await this.orderAuditSubjectUserIds(db, orderId),
         action: "order.reschedule_requested",
         resourceType: "orderRescheduleRequest",
         resourceId: created.id,
@@ -1310,6 +1625,13 @@ export class OrdersService {
   async acceptReschedule(userId: string, orderId: string, requestId: string) {
     const result = await this.prisma.$transaction(async (tx) => {
       const db = tx as any;
+      const target = await db.order.findUnique({
+        where: { id: orderId },
+        select: { companionId: true }
+      });
+      if (target?.companionId) {
+        await db.$queryRaw`SELECT "id" FROM "CompanionProfile" WHERE "id" = ${target.companionId} FOR UPDATE`;
+      }
       await db.$queryRaw`SELECT "id" FROM "Order" WHERE "id" = ${orderId} FOR UPDATE`;
       await db.$queryRaw`SELECT "id" FROM "OrderRescheduleRequest" WHERE "id" = ${requestId} FOR UPDATE`;
       const order: any = await db.order.findUnique({
@@ -1371,6 +1693,19 @@ export class OrdersService {
         );
       }
       this.assertRescheduleEligible(order, now);
+      await db.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${order.userId} FOR UPDATE`;
+      await assertCurrentCustomerAdultEligibility(
+        db,
+        order.userId,
+        now,
+        new Date(request.requestedScheduledAt.getTime() + order.durationMinutes * 60_000)
+      );
+      await assertCurrentCompanionCommercialEligibility(
+        db,
+        order.companionId,
+        now,
+        new Date(request.requestedScheduledAt.getTime() + order.durationMinutes * 60_000)
+      );
       const hasStructuredAvailability = Boolean(
         order.availabilityWindowId ||
         order.availabilityWindowStartsAtSnapshot ||
@@ -1420,7 +1755,10 @@ export class OrdersService {
           availabilityWindowEndsAtSnapshot: availabilityWindow?.endsAt ?? null,
           availabilityWindowCapacitySnapshot: availabilityWindow?.capacity ?? null
         },
-        include: { conversation: { select: { externalId: true } }, refunds: { orderBy: { createdAt: "desc" }, take: 1 } }
+        include: {
+          conversation: { select: { externalId: true } },
+          refunds: { orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 1 }
+        }
       });
       const accepted = await db.orderRescheduleRequest.update({
         where: { id: request.id },
@@ -1451,6 +1789,7 @@ export class OrdersService {
       });
       await this.recordAudit(db, {
         actorId: userId,
+        subjectUserIds: await this.orderAuditSubjectUserIds(db, orderId),
         action: "order.reschedule_accepted",
         resourceType: "orderRescheduleRequest",
         resourceId: accepted.id,
@@ -1555,6 +1894,7 @@ export class OrdersService {
       });
       await this.recordAudit(db, {
         actorId: userId,
+        subjectUserIds: await this.orderAuditSubjectUserIds(db, orderId),
         action: "order.reschedule_rejected",
         resourceType: "orderRescheduleRequest",
         resourceId: resolved.id,
@@ -1606,6 +1946,7 @@ export class OrdersService {
       });
       await this.recordAudit(db, {
         actorId: userId,
+        subjectUserIds: await this.orderAuditSubjectUserIds(db, orderId),
         action: "order.customer_confirmed_completion",
         resourceType: "order",
         resourceId: orderId,
@@ -1679,6 +2020,7 @@ export class OrdersService {
       });
       await this.recordAudit(db, {
         actorId: userId,
+        subjectUserIds: await this.orderAuditSubjectUserIds(db, orderId),
         action: `order.${actorRole}_confirmed_service_guidelines`,
         resourceType: "order",
         resourceId: orderId,
@@ -1735,6 +2077,7 @@ export class OrdersService {
       });
       await this.recordAudit(db, {
         actorId: userId,
+        subjectUserIds: await this.orderAuditSubjectUserIds(db, orderId),
         action: "order.customer_submitted_experience_feedback",
         resourceType: "orderExperienceFeedback",
         resourceId: experienceFeedback.id,
@@ -1858,6 +2201,7 @@ export class OrdersService {
       }
       await this.recordAudit(db, {
         actorId: userId,
+        subjectUserIds: await this.orderAuditSubjectUserIds(db, orderId),
         action: "order.customer_cancelled",
         resourceType: "order",
         resourceId: orderId
@@ -1903,6 +2247,18 @@ export class OrdersService {
         initials: order.companionInitialsSnapshot ?? ""
       },
       themeNameSnapshot: order.themeNameSnapshot ?? this.themeName(order.themeId),
+      serviceIntent: order.serviceIntentSnapshot ? {
+        code: order.serviceIntentSnapshot,
+        label: serviceIntentLabel(order.serviceIntentSnapshot),
+        policyVersion: order.serviceIntentPolicyVersionSnapshot ?? "legacy"
+      } : null,
+      commercialAssurances: {
+        adultEligibilityVerdict: order.adultEligibilityVerdictSnapshot ?? null,
+        adultEligibilityVerifiedAt:
+          order.adultEligibilityVerifiedAtSnapshot?.toISOString() ?? null,
+        adultEligibilityValidUntil:
+          order.adultEligibilityValidUntilSnapshot?.toISOString() ?? null
+      },
       customer: order.user ? {
         id: order.userId,
         name: order.user.profile?.displayName ?? "用户",
@@ -1915,7 +2271,9 @@ export class OrdersService {
         status: order.refunds[0].status,
         reason: order.refunds[0].reason,
         reviewNote: order.refunds[0].reviewNote,
-        failureReason: order.refunds[0].failureReason
+        failureReason: order.refunds[0].failureReason,
+        reviewDueAt: order.refunds[0].reviewDueAt?.toISOString?.() ?? null,
+        resolutionDueAt: order.refunds[0].resolutionDueAt?.toISOString?.() ?? null
       } : null,
       experienceFeedback: order.experienceFeedback ? {
         id: order.experienceFeedback.id,
@@ -1923,6 +2281,12 @@ export class OrdersService {
         tags: order.experienceFeedback.tags,
         note: order.experienceFeedback.note,
         createdAt: order.experienceFeedback.createdAt.toISOString()
+      } : null,
+      attendanceDispute: order.attendanceDispute ? {
+        id: order.attendanceDispute.id,
+        issue: order.attendanceDispute.issue,
+        status: order.attendanceDispute.status,
+        updatedAt: order.attendanceDispute.updatedAt.toISOString()
       } : null,
       conversationId: order.conversation?.externalId ?? null,
       companionConfirmedAt: order.companionConfirmedAt?.toISOString() ?? null,
@@ -1939,9 +2303,57 @@ export class OrdersService {
       customerServiceGuidelinesConfirmedAt: order.customerServiceGuidelinesConfirmedAt?.toISOString() ?? null,
       companionServiceGuidelinesConfirmedAt: order.companionServiceGuidelinesConfirmedAt?.toISOString() ?? null,
       refundRequestDeadlineAt: order.refundRequestDeadlineAt?.toISOString() ?? null,
+      refundPolicyVersionSnapshot: order.refundPolicyVersionSnapshot,
+      refundRequestWindowHoursSnapshot: order.refundRequestWindowHoursSnapshot,
       createdAt: order.createdAt.toISOString(),
       updatedAt: order.updatedAt.toISOString()
     };
+  }
+
+  private toParticipantDto(order: OrderRecord, viewerRole: "customer" | "companion") {
+    const dto = this.toDto(order);
+    const attendanceDisputeEligibility = this.attendanceDisputeEligibility(order);
+    const fulfillmentBlockedByRefund = Boolean(
+      order.refunds?.some((refund: any) =>
+        ["pendingReview", "pending", "processing", "success", "failed"].includes(refund.status)
+      )
+    );
+    return {
+      ...dto,
+      viewerRole,
+      fulfillmentBlockedByRefund,
+      attendanceDisputeEligibility,
+      // Private customer feedback and free-text refund material are not part of
+      // the assigned companion's participant view.  The boolean above carries
+      // only the fulfillment consequence needed to render correct actions.
+      ...(viewerRole === "companion" ? { refund: null, experienceFeedback: null } : {})
+    };
+  }
+
+  private attendanceDisputeEligibility(order: OrderRecord, now = new Date()) {
+    const opensAt = new Date(order.scheduledAt.getTime() + ATTENDANCE_WAIT_MINUTES * 60_000);
+    const createDeadlineAt = new Date(
+      order.scheduledAt.getTime()
+        + order.durationMinutes * 60_000
+        + ATTENDANCE_CASE_WINDOW_DAYS * 24 * 60 * 60_000
+    );
+    const base = {
+      opensAt: opensAt.toISOString(),
+      createDeadlineAt: createDeadlineAt.toISOString()
+    };
+    if (order.attendanceDispute) {
+      return { ...base, eligible: false, reasonCode: "existingCase", reason: "本订单已有履约争议，请查看现有案件。" };
+    }
+    if (!["paid", "inService", "completed", "refunded"].includes(order.status)) {
+      return { ...base, eligible: false, reasonCode: "orderStateInvalid", reason: "只有已支付的服务预约可以提交履约争议。" };
+    }
+    if (now.getTime() < opensAt.getTime()) {
+      return { ...base, eligible: false, reasonCode: "waitingPeriod", reason: "公开等待期尚未结束，请先尝试联系对方。" };
+    }
+    if (now.getTime() > createDeadlineAt.getTime()) {
+      return { ...base, eligible: false, reasonCode: "windowClosed", reason: "履约争议提交期限已结束；如仍需协助，请提交客服工单。" };
+    }
+    return { ...base, eligible: true, reasonCode: null, reason: null };
   }
 
   private toTimelineDto(event: any) {
@@ -2083,7 +2495,7 @@ export class OrdersService {
       where: { id: orderId },
       include: {
         conversation: { select: { externalId: true } },
-        refunds: { orderBy: { createdAt: "desc" }, take: 1 },
+        refunds: { orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 1 },
         experienceFeedback: true
       }
     } as any);
@@ -2099,6 +2511,26 @@ export class OrdersService {
     const order: any = await this.prisma.order.findUnique({
       where: { id: orderId },
       include: { companion: { select: { ownerUserId: true } } }
+    } as any);
+    if (!order || (order.userId !== userId && order.companion?.ownerUserId !== userId)) {
+      // Deliberately indistinguishable from a nonexistent id to avoid exposing
+      // appointment existence or scheduling information to other users.
+      throw new AppException("ORDER_NOT_FOUND", "Order not found", HttpStatus.NOT_FOUND);
+    }
+    return order;
+  }
+
+  private async findOrderParticipantDetailOrThrow(userId: string, orderId: string): Promise<OrderRecord> {
+    const order: any = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        companion: { select: { ownerUserId: true } },
+        user: { select: { profile: { select: { displayName: true } } } },
+        conversation: { select: { externalId: true } },
+        refunds: { orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 1 },
+        experienceFeedback: true,
+        attendanceDispute: { select: { id: true, issue: true, status: true, updatedAt: true } }
+      }
     } as any);
     if (!order || (order.userId !== userId && order.companion?.ownerUserId !== userId)) {
       // Deliberately indistinguishable from a nonexistent id to avoid exposing
@@ -2162,6 +2594,7 @@ export class OrdersService {
         });
         await this.recordAudit(db, {
           actorId: null,
+          subjectUserIds: await this.orderAuditSubjectUserIds(db, candidate.id),
           action: "order.payment_reservation_expired",
           resourceType: "order",
           resourceId: candidate.id,
@@ -2223,6 +2656,7 @@ export class OrdersService {
         });
         await this.recordAudit(db, {
           actorId: null,
+          subjectUserIds: await this.orderAuditSubjectUserIds(db, candidate.id),
           action: "order.companion_response_expired",
           resourceType: "order",
           resourceId: candidate.id,
@@ -2314,6 +2748,7 @@ export class OrdersService {
         }
         await this.recordAudit(db, {
           actorId: null,
+          subjectUserIds: await this.orderAuditSubjectUserIds(db, order.id),
           action: "order.reschedule_expired",
           resourceType: "orderRescheduleRequest",
           resourceId: resolved.id,
@@ -2321,8 +2756,7 @@ export class OrdersService {
             orderId: order.id,
             originalScheduledAt: request.originalScheduledAt.toISOString(),
             requestedScheduledAt: request.requestedScheduledAt.toISOString(),
-            expiresAt: resolved.expiresAt.toISOString(),
-            notifiedUserIds: recipientUserIds
+            expiresAt: resolved.expiresAt.toISOString()
           }
         });
         return true;
@@ -2350,7 +2784,7 @@ export class OrdersService {
   ): Promise<void> {
     const candidate = await db.orderRescheduleRequest.findFirst({
       where: { orderId: input.order.id, status: "pending" },
-      orderBy: { createdAt: "asc" }
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }]
     });
     if (!candidate) return;
 
@@ -2403,6 +2837,7 @@ export class OrdersService {
     }
     await this.recordAudit(db, {
       actorId: input.actorId,
+      subjectUserIds: await this.orderAuditSubjectUserIds(db, input.order.id),
       action: "order.reschedule_cancelled",
       resourceType: "orderRescheduleRequest",
       resourceId: resolved.id,
@@ -2412,8 +2847,7 @@ export class OrdersService {
         requesterRole: request.requestedByRole,
         actorRole: input.actorRole,
         originalScheduledAt: request.originalScheduledAt.toISOString(),
-        requestedScheduledAt: request.requestedScheduledAt.toISOString(),
-        notifiedUserIds: recipientUserIds
+        requestedScheduledAt: request.requestedScheduledAt.toISOString()
       }
     });
   }
@@ -2488,6 +2922,22 @@ export class OrdersService {
     // Isolated legacy unit doubles do not model the outbox. Production always
     // receives NotificationsService and therefore takes the transactional path.
     return this.notifications.create(input.userId, input.type, input.title, input.body, input.data);
+  }
+
+  private async orderAuditSubjectUserIds(db: any, orderId: string): Promise<string[]> {
+    const order = await db.order.findUnique({
+      where: { id: orderId },
+      select: {
+        userId: true,
+        companion: { select: { ownerUserId: true } }
+      }
+    });
+    const subjectUserIds = [order?.userId, order?.companion?.ownerUserId]
+      .filter((candidate): candidate is string => Boolean(candidate));
+    if (!subjectUserIds.length) {
+      throw new Error(`Order audit is missing its user subjects: ${orderId}`);
+    }
+    return [...new Set(subjectUserIds)];
   }
 
   private async recordAudit(db: any, input: AuditRecordInput) {

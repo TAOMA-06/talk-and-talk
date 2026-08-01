@@ -15,7 +15,10 @@ describe("VoiceService", () => {
     TRTC_SDK_APP_ID: 1400000001,
     TRTC_SDK_SECRET_KEY: "trtc-test-secret-key-material",
     TRTC_PRIVATE_MAP_KEY_ENABLED: true,
-    TRTC_USER_SIG_TTL_SECONDS: 300
+    TRTC_USER_SIG_TTL_SECONDS: 300,
+    TRTC_PRIVACY_DISCLOSURE_APPROVED: true,
+    TRTC_PRIVACY_DISCLOSURE_REFERENCE: "legal:trtc-disclosure-2026-08",
+    LEGAL_CONSENT_VERSION: "2.2-2026-08-01"
   };
 
   let configValues: Record<string, unknown>;
@@ -26,6 +29,7 @@ describe("VoiceService", () => {
   const activeVoiceOrder = (overrides: Record<string, unknown> = {}) => ({
     id: "11111111-2222-4333-8444-555555555555",
     userId: "customer-user-123",
+    companionId: "companion-1",
     status: "inService",
     serviceOfferingDeliveryModeSnapshot: "voice",
     companionConfirmedAt: new Date(Date.now() - 5 * 60_000),
@@ -41,7 +45,27 @@ describe("VoiceService", () => {
     prisma = {
       $transaction: jest.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback(prisma)),
       $queryRaw: jest.fn().mockResolvedValue([]),
-      order: { findFirst: jest.fn().mockResolvedValue(activeVoiceOrder()) },
+      order: {
+        findUnique: jest.fn().mockResolvedValue({ companionId: "companion-1" }),
+        findFirst: jest.fn().mockResolvedValue(activeVoiceOrder())
+      },
+      companionCommercialProfile: { findUnique: jest.fn().mockResolvedValue({
+        status: "verified",
+        adultEligibilityVerdict: "adult",
+        adultEligibilityVerifiedAt: new Date(Date.now() - 24 * 60 * 60_000),
+        adultEligibilityValidUntil: new Date(Date.now() + 180 * 24 * 60 * 60_000)
+      }) },
+      customerAdultEligibility: { findFirst: jest.fn().mockResolvedValue({
+        id: "adult-customer",
+        userId: "customer-user-123",
+        status: "adult",
+        verificationMethod: "externalProvider",
+        submittedById: "customer-user-123",
+        submittedAt: new Date(),
+        reviewedById: "supply-2",
+        verifiedAt: new Date(Date.now() - 60_000),
+        validUntil: new Date(Date.now() + 24 * 60 * 60_000)
+      }) },
       refundTransaction: { findFirst: jest.fn().mockResolvedValue(null) },
       voiceSession: { upsert: jest.fn().mockResolvedValue({ roomId: "tt_voice_11111111222243338444555555555555" }) }
     };
@@ -79,6 +103,11 @@ describe("VoiceService", () => {
     }));
     const auditInput = audit.record.mock.calls[0][0];
     expect(auditInput).toEqual(expect.objectContaining({ action: "voice.room_access_granted" }));
+    expect(auditInput.metadata).toEqual(expect.objectContaining({
+      privacyNoticeVersion: "2.2-2026-08-01",
+      privacyDisclosureReference: "legal:trtc-disclosure-2026-08",
+      recording: "notRecordedByPlatform"
+    }));
     expect(auditInput.metadata).not.toHaveProperty("userSig");
     expect(auditInput.metadata).not.toHaveProperty("privateMapKey");
     expect(JSON.stringify(auditInput.metadata)).not.toContain("trtc-test-secret-key-material");
@@ -103,15 +132,30 @@ describe("VoiceService", () => {
       maxWait: 5_000,
       timeout: 10_000
     });
-    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(3);
     const query = Array.from(prisma.$queryRaw.mock.calls[0][0] as string[]).join("");
-    expect(query).toContain('SELECT "id" FROM "Order"');
+    expect(query).toContain('SELECT "id" FROM "CompanionProfile"');
     expect(query).toContain("FOR UPDATE");
-    expect(prisma.$queryRaw.mock.calls[0][1]).toBe("11111111-2222-4333-8444-555555555555");
+    expect(prisma.$queryRaw.mock.calls[0][1]).toBe("companion-1");
+    const orderQuery = Array.from(prisma.$queryRaw.mock.calls[1][0] as string[]).join("");
+    expect(orderQuery).toContain('SELECT "id" FROM "Order"');
+    expect(prisma.$queryRaw.mock.calls[1][1]).toBe("11111111-2222-4333-8444-555555555555");
+    const customerQuery = Array.from(prisma.$queryRaw.mock.calls[2][0] as string[]).join("");
+    expect(customerQuery).toContain('SELECT "id" FROM "User"');
+    expect(prisma.$queryRaw.mock.calls[2][1]).toBe("customer-user-123");
   });
 
   it("does not query orders or load a signer while real-time voice is disabled", async () => {
     configValues.TRTC_ENABLED = false;
+
+    await expect(service.issueRoomAccess("customer-user-123", "order-1"))
+      .rejects.toMatchObject({ code: "VOICE_FEATURE_DISABLED" });
+    expect(prisma.order.findFirst).not.toHaveBeenCalled();
+    expect(mockSignerConstructor).not.toHaveBeenCalled();
+  });
+
+  it("fails closed before data access when the TRTC disclosure approval is absent", async () => {
+    configValues.TRTC_PRIVACY_DISCLOSURE_APPROVED = false;
 
     await expect(service.issueRoomAccess("customer-user-123", "order-1"))
       .rejects.toMatchObject({ code: "VOICE_FEATURE_DISABLED" });
@@ -134,6 +178,28 @@ describe("VoiceService", () => {
 
     await expect(service.issueRoomAccess("unrelated-user", "order-1"))
       .rejects.toMatchObject({ code: "ORDER_NOT_FOUND" });
+    expect(prisma.voiceSession.upsert).not.toHaveBeenCalled();
+    expect(mockSignerConstructor).not.toHaveBeenCalled();
+  });
+
+  it("checks the order customer's current adult fact even when the companion requests access", async () => {
+    prisma.customerAdultEligibility.findFirst.mockResolvedValue({
+      id: "adult-pending",
+      userId: "customer-user-123",
+      status: "pending",
+      verificationMethod: "externalProvider",
+      submittedById: "customer-user-123",
+      submittedAt: new Date(),
+      reviewedById: null,
+      verifiedAt: null,
+      validUntil: null
+    });
+
+    await expect(service.issueRoomAccess("companion-user-456", "order-1"))
+      .rejects.toMatchObject({ code: "CUSTOMER_ADULT_ELIGIBILITY_PENDING" });
+    expect(prisma.customerAdultEligibility.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: { userId: "customer-user-123" }
+    }));
     expect(prisma.voiceSession.upsert).not.toHaveBeenCalled();
     expect(mockSignerConstructor).not.toHaveBeenCalled();
   });

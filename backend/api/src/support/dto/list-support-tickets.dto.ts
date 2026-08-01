@@ -1,5 +1,5 @@
 import { Transform } from "class-transformer";
-import { IsIn, IsInt, IsOptional, Max, Min } from "class-validator";
+import { IsBoolean, IsIn, IsInt, IsOptional, Max, Min } from "class-validator";
 
 export class ListSupportTicketsDto {
   @IsOptional()
@@ -18,4 +18,9 @@ export class ListSupportTicketsDto {
   @Min(1)
   @Max(100)
   pageSize?: number;
+
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === "true" ? true : value === false || value === "false" ? false : value)
+  @IsBoolean()
+  assignedOnly?: boolean;
 }

@@ -1,4 +1,5 @@
 import { api, ApiError, ensureSession, readLocalFile, uploadAuthorizedMedia } from "../../utils/api";
+import { openCrisisResources } from "../../utils/crisis-gate";
 import { ChatMessage } from "../../utils/models";
 import { ensurePrivacyAuthorization } from "../../utils/privacy";
 import { sha256Hex } from "../../utils/sha256";
@@ -72,11 +73,15 @@ Page({
     messageNotificationsMuted: false,
     messageNotificationUpdating: false,
     conversationBlockedByYou: false,
+    viewerCanManageFutureBookingBoundary: false,
+    futureBookingsDeclinedByYou: false,
+    futureBookingBoundaryUpdating: false,
     messageHistoryAvailable: true,
     messageInteractionAvailable: true,
     conversationBlockUpdating: false,
     recording: false,
     hasConversation: false,
+    hasLoadedInitial: false,
     restrictionEndsAt: "",
     restrictionNotice: "",
     appealCaseId: "",
@@ -185,6 +190,8 @@ Page({
         mediaEnabled: status.mediaEnabled,
         messageNotificationsMuted: status.messageNotificationsMuted,
         conversationBlockedByYou: status.conversationBlockedByYou,
+        viewerCanManageFutureBookingBoundary: status.viewerCanManageFutureBookingBoundary,
+        futureBookingsDeclinedByYou: status.futureBookingsDeclinedByYou,
         messageHistoryAvailable: status.messageHistoryAvailable,
         messageInteractionAvailable: status.messageInteractionAvailable
       });
@@ -210,17 +217,25 @@ Page({
         this.setData({
           messages: mergeMessages(this.data.messages as ChatMessage[], result.messages || []),
           loading: false,
+          hasLoadedInitial: true,
           hasMore: this.hasMore,
           mediaEnabled: status.mediaEnabled,
           messageNotificationsMuted: status.messageNotificationsMuted,
           conversationBlockedByYou: status.conversationBlockedByYou,
+          viewerCanManageFutureBookingBoundary: status.viewerCanManageFutureBookingBoundary,
+          futureBookingsDeclinedByYou: status.futureBookingsDeclinedByYou,
           messageHistoryAvailable: status.messageHistoryAvailable,
           messageInteractionAvailable: status.messageInteractionAvailable,
           error: ""
         });
         this.applyRestriction(status.chatRestriction);
       } catch (error) {
-        this.setData({ loading: false, error: (error as Error).message || "加载消息失败" });
+        this.hasLoadedInitial = false;
+        this.setData({
+          loading: false,
+          hasLoadedInitial: false,
+          error: (error as Error).message || "加载消息失败"
+        });
       }
     })();
     this.initialLoadInFlight = operation;
@@ -228,6 +243,10 @@ Page({
     finally {
       if (this.initialLoadInFlight === operation) this.initialLoadInFlight = null;
     }
+  },
+  async retryInitial() {
+    if (this.data.loading || this.hasLoadedInitial) return;
+    await this.loadInitial();
   },
   async refreshLatest(showFailure = false) {
     if (!this.hasLoadedInitial) {
@@ -533,8 +552,57 @@ Page({
       this.setData({ conversationBlockUpdating: false });
     }
   },
+  async toggleFutureBookingBoundary() {
+    if (
+      !this.conversationId
+      || !this.data.viewerCanManageFutureBookingBoundary
+      || this.data.futureBookingBoundaryUpdating
+    ) return;
+    const declined = !this.data.futureBookingsDeclinedByYou;
+    const confirmation = await new Promise<any>((resolve) => wx.showModal({
+      title: declined ? "不再接受此客户的新预约" : "恢复此客户未来预约",
+      content: declined
+        ? "这是你的私密未来交易设置：此客户不会再在推荐中看到你，也无法向你创建新订单。客户不会收到原因或被处罚；现有订单、聊天、退款、评价、举报与客服处理均不受影响。"
+        : "恢复后，此客户可能再次在推荐中看到你，并可在你仍公开可约时创建新订单。现有订单与聊天不会发生变化。",
+      confirmText: declined ? "确认设置" : "恢复",
+      confirmColor: declined ? "#7A5B3B" : "#55748F",
+      success: resolve,
+      fail: () => resolve({ confirm: false })
+    }));
+    if (!confirmation?.confirm) return;
+
+    this.setData({ futureBookingBoundaryUpdating: true });
+    try {
+      const result = await api.setConversationFutureBookingBoundary(
+        this.conversationId,
+        declined
+      );
+      this.setData({
+        viewerCanManageFutureBookingBoundary: result.viewerCanManageFutureBookingBoundary,
+        futureBookingsDeclinedByYou: result.futureBookingsDeclinedByYou
+      });
+      wx.showToast({
+        title: result.futureBookingsDeclinedByYou
+          ? "已停止未来新预约"
+          : "已恢复未来预约",
+        icon: "success"
+      });
+    } catch (error) {
+      wx.showToast({ title: (error as Error).message || "暂时无法更新未来预约设置", icon: "none" });
+    } finally {
+      this.setData({ futureBookingBoundaryUpdating: false });
+    }
+  },
   openSafetyCenter() {
     wx.navigateTo({ url: "/pages/safety/index" });
+  },
+  openEmergencyHelp() {
+    openCrisisResources({ source: "directEmergencyHelp", riskCode: "userRequested" });
+  },
+  openMessageEmergencyHelp() {
+    // Deliberately omit message id/content: the intervention stores only the
+    // structured fact that a server safety rule produced this route.
+    openCrisisResources({ source: "chatSafetyRule", riskCode: "chatSafetyRule" });
   },
   leaveConversation() {
     // Leaving only changes the visible page. It never cancels an order,
@@ -574,11 +642,23 @@ Page({
       success: async (result: any) => {
         if (!result.confirm || !result.content?.trim()) return;
         try {
-          await api.appeal(caseId, result.content.trim());
+          const response = await api.appeal(caseId, result.content.trim());
           this.setData({ appealCaseId: "" });
-          wx.showToast({ title: "申诉已提交", icon: "success" });
+          wx.showModal({
+            title: "申诉已进入独立复核",
+            content: `平台计划在 ${formatAppealDueAt(response.appeal.reviewDueAt)} 前完成复核。可在“安全与支持”查看进度和最终结果。`,
+            showCancel: false,
+            confirmText: "知道了"
+          });
         } catch (error) { this.handleSendError(error, "申诉提交失败"); }
       }
     });
   }
 });
+
+function formatAppealDueAt(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "约定处理期限";
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}

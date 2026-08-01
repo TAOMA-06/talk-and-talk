@@ -1,0 +1,287 @@
+<view class="page account-page">
+  <view wx:if="{{loading}}" class="empty">正在读取账户信息…</view>
+  <view wx:elif="{{error && !limitedAccountMode}}" class="state-panel error-panel">
+    <view>{{error}}</view>
+    <button class="retry-button" bindtap="load">重新读取</button>
+  </view>
+  <view wx:else>
+    <block wx:if="{{user && !limitedAccountMode}}">
+    <view class="account-hero">
+      <view class="avatar">{{avatarText}}</view>
+      <view class="identity">
+        <view class="identity-name">{{displayName}}</view>
+        <view class="identity-meta">{{maskedPhone}} · {{verificationText}}</view>
+      </view>
+      <button class="edit-button" bindtap="openProfile">编辑资料</button>
+    </view>
+
+    <view class="quick-grid">
+      <view class="quick-card" bindtap="openNotificationCenter" aria-role="button" aria-label="打开通知中心：订单、支付、客服与安全" tabindex="0"><view class="quick-title">通知中心</view><view class="quick-copy">订单、支付、客服与安全</view></view>
+      <view class="quick-card" bindtap="openSupportCenter" aria-role="button" aria-label="打开案件中心：查看处理状态和结果" tabindex="0"><view class="quick-title">案件中心</view><view class="quick-copy">查看处理状态和结果</view></view>
+    </view>
+    <view class="quick-card adult-eligibility-entry" bindtap="openAdultEligibility" aria-role="button" aria-label="打开成年资格核验：查看状态或提交受控证据引用" tabindex="0">
+      <view class="quick-title">成年资格核验</view>
+      <view class="quick-copy">付费预约、支付、改期及语音服务前由服务端独立核验</view>
+      <view class="entry-arrow">查看状态 ›</view>
+    </view>
+    <view wx:if="{{partialWarning}}" class="partial-warning">{{partialWarning}}</view>
+    </block>
+
+    <view wx:if="{{limitedAccountMode}}" class="account-hero locked-hero">
+      <view class="avatar locked-avatar">!</view>
+      <view class="identity">
+        <view class="identity-name">{{legalRecoveryMode ? '账号权利与申诉中心' : '受限账号自助中心'}}</view>
+        <view class="identity-meta">{{limitedAccountMessage}}</view>
+      </view>
+      <button class="edit-button" bindtap="signOut">退出</button>
+    </view>
+
+    <view wx:if="{{legalRecoveryMode}}" class="card legal-recovery-card">
+      <view class="section-title">受限恢复通道</view>
+      <view class="section-copy">本页不会记录新的平台协议同意。身份仅用于保护账号处置记录和个人数据；可用范围严格限于账号申诉、个人信息权利与账号注销。</view>
+    </view>
+
+    <view class="card account-action-card">
+      <view wx:if="{{focusAccountActionId || focusAccountAppealId}}" class="partial-warning">
+        正在显示这条通知对应的正式记录。
+        <button class="text-button" bindtap="clearAccountActionFocus">查看全部处置</button>
+      </view>
+      <view class="section-heading">
+        <view><view class="section-title">账号处置与申诉</view><view class="section-copy">正式处置会显示理由、规则版本和申诉期限；申诉由非原处置人员复核。</view></view>
+        <view class="capability {{accountActionsState === 'error' ? 'unavailable' : 'available'}}">{{accountActionsState === 'error' ? '读取失败' : '正式记录'}}</view>
+      </view>
+      <view wx:if="{{accountActionsState === 'loading'}}" class="empty compact">正在核对账号处置记录…</view>
+      <view wx:elif="{{accountActionsState === 'error'}}" class="state-panel error-panel">
+        <view>{{accountActionsError}}</view>
+        <button class="retry-button" bindtap="loadAccountActions">重新读取</button>
+      </view>
+      <view wx:elif="{{accountActionsState === 'empty'}}" class="empty compact">当前没有账号限制或封禁处置</view>
+      <view wx:else class="request-list">
+        <view class="request-item" wx:for="{{accountActions}}" wx:key="id">
+          <view class="request-top"><view class="request-title">{{item.kindText}}</view><view class="status">{{item.stateText}}</view></view>
+          <view class="action-message">{{item.message}}</view>
+          <view class="request-copy">理由代码：{{item.reasonCode}} · 规则版本：{{item.policyVersion}}</view>
+          <view class="request-meta">生效：{{item.startsText}}<text wx:if="{{item.endsAt}}"> · 预计结束：{{item.endsText}}</text></view>
+          <view class="appeal-deadline">申诉截止：{{item.appealDeadlineText}}</view>
+          <view wx:if="{{item.appeal}}" class="appeal-result">
+            <view class="request-copy">申诉状态：{{item.stateText}}</view>
+            <view class="request-copy">我的说明：{{item.appeal.statement}}</view>
+            <view wx:if="{{item.appeal.resolution}}" class="status-reason">复核结论：{{item.appeal.resolution}}</view>
+            <view class="request-meta">复核目标时间：{{item.appealReviewDueText}}<text wx:if="{{item.appeal.overdue}}" class="overdue-text"> · 已超期</text><text wx:if="{{item.appeal.resolvedAt}}"> · 完成：{{item.appealResolvedText}}</text></view>
+          </view>
+          <button wx:if="{{item.canAppeal && !item.appeal && !item.revokedAt && accountAppealActionId !== item.id}}" class="follow-up-button" data-id="{{item.id}}" bindtap="openAccountAppeal">提交正式申诉</button>
+          <view wx:if="{{accountAppealActionId === item.id}}" class="inline-form follow-up-form">
+            <view class="form-title">就这次处置提交申诉</view>
+            <textarea class="form-textarea" value="{{accountAppealStatement}}" maxlength="1000" placeholder="说明你认为处置有误的事实与理由（10–1000 字）；请勿填写密码、验证码或无关敏感信息" bindinput="setAccountAppealStatement"></textarea>
+            <view class="form-note">提交成功仅表示进入独立复核队列，原处置在推翻前仍然有效。</view>
+            <button class="primary-button full-button" loading="{{accountAppealSubmitting}}" disabled="{{accountAppealSubmitting}}" bindtap="submitAccountAppeal">确认提交申诉</button>
+            <button class="text-button" disabled="{{accountAppealSubmitting}}" bindtap="closeAccountAppeal">取消</button>
+          </view>
+        </view>
+      </view>
+      <view wx:if="{{accountActionsTotalPages > 1}}" class="request-meta">
+        <button class="text-button" disabled="{{accountActionsPage <= 1}}" bindtap="previousAccountActionsPage">上一页</button>
+        <text>共 {{accountActionsTotal}} 条 · 第 {{accountActionsPage}} / {{accountActionsTotalPages}} 页</text>
+        <button class="text-button" disabled="{{accountActionsPage >= accountActionsTotalPages}}" bindtap="nextAccountActionsPage">下一页</button>
+      </view>
+    </view>
+
+    <view wx:if="{{!limitedAccountMode}}" class="card">
+      <view class="section-heading">
+        <view><view class="section-title">登录设备与账号安全</view><view class="section-copy">每条记录来自服务端会话；当前会话不能在这里误下线。</view></view>
+        <view class="capability {{sessionState === 'error' ? 'unavailable' : 'available'}}">{{sessionState === 'error' ? '读取失败' : '已接入'}}</view>
+      </view>
+      <view wx:if="{{sessionState === 'loading'}}" class="empty compact">正在核对登录设备…</view>
+      <view wx:elif="{{sessionState === 'error'}}" class="state-panel error-panel">
+        <view>{{sessionError}}</view>
+        <button class="retry-button" bindtap="loadSessions">重新读取</button>
+      </view>
+      <view wx:elif="{{sessionState === 'empty'}}" class="empty compact">服务端没有返回可展示会话；这不表示其他设备一定安全。</view>
+      <view wx:else class="session-list">
+        <view class="session-item" wx:for="{{sessions}}" wx:key="id">
+          <view class="session-top">
+            <view>
+              <view class="session-title">{{item.sessionLabel || '登录会话'}}</view>
+              <view class="session-platform">{{item.clientPlatform || '未知平台'}}</view>
+            </view>
+            <view wx:if="{{item.current}}" class="current-badge">当前设备</view>
+            <button wx:else class="small-danger" data-id="{{item.id}}" loading="{{revokingSessionId === item.id}}" disabled="{{!!revokingSessionId}}" bindtap="revokeSession">下线</button>
+          </view>
+          <view class="session-copy">最近使用：{{item.lastUsedText}}</view>
+          <view class="session-copy">创建：{{item.createdText}} · 到期：{{item.expiresText}}</view>
+        </view>
+        <button wx:if="{{sessionHasMore}}" class="secondary-button full-button" loading="{{sessionLoadingMore}}" disabled="{{sessionLoadingMore}}" bindtap="loadMoreSessions">加载更多登录设备</button>
+      </view>
+      <button wx:if="{{otherSessionCount > 0}}" class="secondary-button full-button" loading="{{revokingOtherSessions}}" disabled="{{revokingOtherSessions || !!revokingSessionId}}" bindtap="revokeOtherSessions">下线其他所有设备（{{otherSessionCount}}）</button>
+      <button class="secondary-button full-button" bindtap="signOut">退出当前账号</button>
+    </view>
+
+    <view class="card">
+      <view class="section-heading">
+        <view><view class="section-title">隐私与数据权利</view><view class="section-copy">可直接提交访问、导出、更正或特定数据删除请求，并查看真实处理状态。</view></view>
+        <view class="capability {{dataRightsState === 'error' ? 'unavailable' : 'available'}}">{{dataRightsState === 'error' ? '读取失败' : '自助申请'}}</view>
+      </view>
+      <button wx:if="{{!limitedAccountMode}}" class="row-button" bindtap="openProfile"><text>更正显示名称与性别</text><text>›</text></button>
+      <button class="row-button" bindtap="openPrivacyRequest"><text>新建数据权利请求</text><text>›</text></button>
+      <button class="row-button" bindtap="openPrivacy"><text>查看隐私政策</text><text>›</text></button>
+      <button class="row-button" bindtap="openTerms"><text>查看用户协议</text><text>›</text></button>
+
+      <view wx:if="{{dataRightFormOpen}}" class="inline-form">
+        <view class="form-title">提交数据权利请求</view>
+        <picker mode="selector" range="{{dataRightTypeLabels}}" value="{{dataRightTypeIndex}}" bindchange="selectDataRightType">
+          <view class="picker-field"><text class="picker-label">{{dataRightTypeLabels[dataRightTypeIndex]}}</text><text>⌄</text></view>
+        </picker>
+        <textarea class="form-textarea" value="{{dataRightDescription}}" maxlength="500" placeholder="说明希望访问、导出、更正或删除哪些平台数据（5–500 字）" bindinput="setDataRightDescription"></textarea>
+        <view class="form-note">提交只表示平台收到请求，不表示数据包已生成或数据已删除。账号注销请使用页面底部的独立入口。</view>
+        <button class="primary-button full-button" loading="{{dataRightSubmitting}}" disabled="{{dataRightSubmitting}}" bindtap="submitDataRightRequest">确认提交请求</button>
+        <button class="text-button" bindtap="toggleDataRightForm">取消</button>
+      </view>
+
+      <view wx:if="{{dataRightsState === 'loading'}}" class="empty compact">正在读取数据权利请求…</view>
+      <view wx:elif="{{dataRightsState === 'error'}}" class="state-panel error-panel">
+        <view>{{dataRightsError}}</view>
+        <button class="retry-button" bindtap="loadDataRights">重新读取</button>
+      </view>
+      <view wx:elif="{{dataRightsState === 'empty'}}" class="empty compact">还没有数据权利请求</view>
+      <view wx:else class="request-list">
+        <view class="request-item" wx:for="{{dataRights}}" wx:key="id">
+          <view class="request-top"><view class="request-title">{{item.typeText}}</view><view class="status status-{{item.status}}">{{item.statusText}}</view></view>
+          <view class="request-copy">{{item.description}}</view>
+          <view wx:if="{{item.statusReason}}" class="status-reason">{{item.statusReason}}</view>
+          <view wx:if="{{item.followUps.length}}" class="follow-up-list">
+            <view class="follow-up-item" wx:for="{{item.followUps}}" wx:for-item="followUp" wx:key="id">
+              <view wx:if="{{followUp.requestedInformation}}" class="follow-up-copy"><text class="follow-up-label">平台需要：</text>{{followUp.requestedInformation}}</view>
+              <view wx:if="{{followUp.statement}}" class="follow-up-copy"><text class="follow-up-label">我的补充：</text>{{followUp.statement}}</view>
+              <view class="request-meta">{{followUp.createdText}}</view>
+            </view>
+          </view>
+          <view class="request-meta">更新：{{item.updatedText}}<text wx:if="{{item.resolvedAt}}"> · 完成：{{item.resolvedText}}</text></view>
+          <button wx:if="{{item.status === 'needsInformation' && dataRightFollowUpRequestId !== item.id}}" class="follow-up-button" data-id="{{item.id}}" bindtap="openDataRightFollowUp">补充处理所需信息</button>
+          <view wx:if="{{dataRightFollowUpRequestId === item.id}}" class="inline-form follow-up-form">
+            <view class="form-title">补充这条请求</view>
+            <textarea class="form-textarea" value="{{dataRightFollowUpStatement}}" maxlength="500" placeholder="根据平台所需信息补充可核验说明（5–500 字）" bindinput="setDataRightFollowUpStatement"></textarea>
+            <view class="form-note">补充记录仅用于继续处理当前请求，不会创建新的删除、导出或注销请求。</view>
+            <button class="primary-button full-button" loading="{{dataRightFollowUpSubmitting}}" disabled="{{dataRightFollowUpSubmitting}}" bindtap="submitDataRightFollowUp">提交补充信息</button>
+            <button class="text-button" disabled="{{dataRightFollowUpSubmitting}}" bindtap="closeDataRightFollowUp">取消</button>
+          </view>
+          <view wx:if="{{item.status === 'completed' && item.type === 'export'}}" class="delivery-note">
+            <view wx:if="{{item.canDownload}}">平台已生成数据副本。文件仅通过当前登录会话从私有交付通道读取，不会展示内部存储地址。</view>
+            <view wx:else>处理状态已完成，但安全数据包尚未由交付接口确认可用；请通过客服查询，页面不会伪造下载结果。</view>
+          </view>
+          <button
+            wx:if="{{item.canDownload}}"
+            class="download-export-button"
+            data-id="{{item.id}}"
+            loading="{{downloadingDataRightId === item.id}}"
+            disabled="{{!!downloadingDataRightId}}"
+            bindtap="downloadDataRightExport"
+          >安全下载个人数据副本</button>
+        </view>
+      </view>
+      <view wx:if="{{dataRightsTotalPages > 1}}" class="request-meta">
+        <button class="text-button" disabled="{{dataRightsPage <= 1}}" bindtap="previousDataRightsPage">上一页</button>
+        <text>共 {{dataRightsTotal}} 条 · 第 {{dataRightsPage}} / {{dataRightsTotalPages}} 页</text>
+        <button class="text-button" disabled="{{dataRightsPage >= dataRightsTotalPages}}" bindtap="nextDataRightsPage">下一页</button>
+      </view>
+    </view>
+
+    <view wx:if="{{!limitedAccountMode}}" class="card">
+      <view class="section-heading">
+        <view><view class="section-title">支付记录与发票</view><view class="section-copy">订单记录来自服务端；发票申请状态与微信账单分开显示。</view></view>
+        <view class="capability {{invoiceState === 'error' ? 'unavailable' : 'available'}}">{{invoiceState === 'error' ? '读取失败' : '自助申请'}}</view>
+      </view>
+      <view wx:if="{{bills.length}}" class="bill-item" wx:for="{{bills}}" wx:key="id" bindtap="openBill" data-id="{{item.id}}" aria-role="button" aria-label="查看账单：{{item.serviceName}}，{{item.amountText}}，{{item.statusText}}" tabindex="0">
+        <view class="bill-main"><view class="bill-name">{{item.serviceName}}</view><view class="bill-amount {{item.refunded ? 'refunded' : ''}}">{{item.amountText}}</view></view>
+        <view class="bill-meta"><text>{{item.statusText}}</text><text>{{item.timeText}}</text></view>
+      </view>
+      <view wx:else class="empty compact">暂无订单支付记录</view>
+      <view wx:if="{{bills.length}}" class="account-load-more">
+        <view>已显示 {{bills.length}} / {{billTotal}} 笔订单记录</view>
+        <view wx:if="{{billsLoadMoreError}}" class="load-more-error">{{billsLoadMoreError}}</view>
+        <button wx:if="{{billPage < billTotalPages}}" class="text-button" loading="{{billsLoadingMore}}" disabled="{{billsLoadingMore}}" bindtap="loadMoreBills">{{billsLoadMoreError ? '重试读取更多账单' : '读取更多账单'}}</button>
+        <view wx:else class="request-meta">已显示全部订单记录</view>
+      </view>
+      <button class="secondary-button full-button" bindtap="openInvoiceRequest">{{invoiceFormOpen ? '收起发票申请' : '申请发票'}}</button>
+      <view class="account-load-more">
+        <view>已核对 {{invoiceCandidatePage >= invoiceCandidateTotalPages ? invoiceCandidateTotal : invoiceCandidatePage * 20}} / {{invoiceCandidateTotal}} 笔可开票范围订单</view>
+        <view wx:if="{{invoiceCandidatesLoadMoreError}}" class="load-more-error">{{invoiceCandidatesLoadMoreError}}</view>
+        <button wx:if="{{invoiceCandidatePage < invoiceCandidateTotalPages}}" class="text-button" loading="{{invoiceCandidatesLoadingMore}}" disabled="{{invoiceCandidatesLoadingMore}}" bindtap="loadMoreInvoiceCandidates">{{invoiceCandidatesLoadMoreError ? '重试核对更多订单' : '核对更多可开票订单'}}</button>
+        <view wx:else class="request-meta">候选范围已全部遍历；不符合支付、退款或重复申请规则的订单不会进入选择器。</view>
+      </view>
+
+      <view wx:if="{{invoiceFormOpen}}" class="inline-form">
+        <view class="form-title">选择已支付订单</view>
+        <picker mode="selector" range="{{invoiceOrderLabels}}" value="{{invoiceOrderIndex}}" bindchange="selectInvoiceOrder">
+          <view class="picker-field"><text class="picker-label">{{invoiceOrderLabels[invoiceOrderIndex]}}</text><text>⌄</text></view>
+        </picker>
+        <input class="form-input" value="{{invoiceTitle}}" maxlength="100" placeholder="发票抬头（2–100 字）" bindinput="setInvoiceTitle" />
+        <view class="form-note">提交后以平台审核结果为准；本页不会把“已提交”显示成“已开具”。</view>
+        <button class="primary-button full-button" loading="{{invoiceSubmitting}}" disabled="{{invoiceSubmitting}}" bindtap="submitInvoiceRequest">提交发票申请</button>
+      </view>
+
+      <view wx:if="{{invoiceState === 'loading'}}" class="empty compact">正在读取发票申请…</view>
+      <view wx:elif="{{invoiceState === 'error'}}" class="state-panel error-panel">
+        <view>{{invoiceError}}</view>
+        <button class="retry-button" bindtap="loadInvoices">重新读取</button>
+      </view>
+      <view wx:elif="{{invoiceState === 'empty'}}" class="empty compact">还没有发票申请</view>
+      <view wx:else class="request-list">
+        <view class="request-item" wx:for="{{invoices}}" wx:key="id">
+          <view class="request-top"><view class="request-title">{{item.invoiceTitle}}</view><view class="status status-{{item.status}}">{{item.statusText}}</view></view>
+          <view class="request-copy">{{item.serviceText}}</view>
+          <view class="request-copy">金额：{{item.amountText}}</view>
+          <view wx:if="{{item.statusReason}}" class="status-reason">{{item.statusReason}}</view>
+          <view class="request-meta">更新：{{item.updatedText}}<text wx:if="{{item.issuedAt}}"> · 开具：{{item.issuedText}}</text><text wx:if="{{item.voidedAt}}"> · 作废：{{item.voidedText}}</text><text wx:if="{{item.cancelledAt}}"> · 撤回：{{item.cancelledText}}</text></view>
+          <button wx:if="{{item.status === 'submitted'}}" class="follow-up-button" data-id="{{item.id}}" loading="{{cancellingInvoiceId === item.id}}" disabled="{{!!cancellingInvoiceId}}" bindtap="cancelInvoiceRequest">撤回发票申请</button>
+          <view wx:if="{{item.status === 'issued'}}" class="delivery-note">状态为已开具；外部票据通过平台已验证渠道交付，本页不展示不存在的下载链接。</view>
+          <view wx:if="{{item.status === 'voided'}}" class="voided-note">该发票已作废，之前交付的票据不再有效；如仍需开票，请联系平台核对原因与后续方式。</view>
+          <view wx:if="{{item.status === 'cancelled'}}" class="voided-note">申请已由你在审核前撤回；订单和支付状态没有改变，需要时可基于仍符合条件的订单重新申请。</view>
+        </view>
+      </view>
+      <view wx:if="{{invoiceTotalPages > 1}}" class="request-meta">
+        <button class="text-button" disabled="{{invoicePage <= 1}}" bindtap="previousInvoicePage">上一页</button>
+        <text>共 {{invoiceTotal}} 条 · 第 {{invoicePage}} / {{invoiceTotalPages}} 页</text>
+        <button class="text-button" disabled="{{invoicePage >= invoiceTotalPages}}" bindtap="nextInvoicePage">下一页</button>
+      </view>
+    </view>
+
+    <view wx:if="{{!limitedAccountMode}}" class="card">
+      <view class="section-title">我已拉黑的会话</view>
+      <view class="section-copy">拉黑只影响会话收发，不会取消订单、退款、举报或客服案件。</view>
+      <view wx:if="{{blockedConversations.length}}" class="blocked-item" wx:for="{{blockedConversations}}" wx:key="id" bindtap="openBlockedConversation" data-id="{{item.id}}" aria-role="button" aria-label="管理已拉黑会话：{{item.name}}" tabindex="0">
+        <text>{{item.name}}</text><text>管理或解除 ›</text>
+      </view>
+      <view wx:else class="empty compact">当前没有由你拉黑的会话</view>
+      <view wx:if="{{blockedConversations.length}}" class="account-load-more">
+        <view>已显示 {{blockedConversations.length}} / {{blockedConversationTotal}} 个已拉黑会话</view>
+        <view wx:if="{{blockedConversationsLoadMoreError}}" class="load-more-error">{{blockedConversationsLoadMoreError}}</view>
+        <button wx:if="{{blockedConversationPage < blockedConversationTotalPages}}" class="text-button" loading="{{blockedConversationsLoadingMore}}" disabled="{{blockedConversationsLoadingMore}}" bindtap="loadMoreBlockedConversations">{{blockedConversationsLoadMoreError ? '重试读取更多' : '读取更多已拉黑会话'}}</button>
+        <view wx:else class="request-meta">已显示全部由你拉黑的会话</view>
+      </view>
+    </view>
+
+    <view class="card danger-zone">
+      <view class="section-title">账号重要操作</view>
+      <view wx:if="{{deletionPolicy}}" class="deletion-policy">
+        注销处理目标为 {{deletionPolicy.businessDays}} 个工作日（{{deletionPolicy.timezone}}）。{{deletionPolicy.calendarRule}}{{deletionPolicy.holidayNotice}}
+      </view>
+      <view wx:if="{{deletionMessage}}" class="deletion-message">{{deletionMessage}}</view>
+      <view wx:if="{{deletionState === 'loading'}}" class="empty compact">正在读取注销申请状态…</view>
+      <view wx:elif="{{deletionState === 'error'}}" class="state-panel error-panel">
+        <view>{{deletionError}}</view>
+        <button class="retry-button" bindtap="loadDeletionRequest">重新读取</button>
+      </view>
+      <view wx:elif="{{deletionRequest}}" class="deletion-status {{deletionRequest.overdue ? 'overdue' : ''}}">
+        <view class="request-top"><view class="request-title">注销申请：{{deletionRequest.statusText}}</view><view wx:if="{{deletionRequest.overdue}}" class="status status-rejected">已超期</view></view>
+        <view class="request-copy">规则版本：{{deletionRequest.policyVersion}}</view>
+        <view class="request-meta">提交：{{deletionRequest.createdText}} · 目标完成：{{deletionRequest.dueText}}</view>
+        <view wx:if="{{deletionRequest.completedAt}}" class="request-meta">完成：{{deletionRequest.completedText}}</view>
+        <view wx:if="{{deletionRequest.cancelledAt}}" class="request-meta">取消：{{deletionRequest.cancelledText}}</view>
+        <view wx:if="{{deletionRequest.reactivationMessage}}" class="request-copy">{{deletionRequest.reactivationMessage}}</view>
+      </view>
+      <button wx:if="{{deletionRequest && deletionRequest.canCancel}}" class="secondary-button full-button" loading="{{deletionCancelling}}" disabled="{{deletionCancelling}}" bindtap="cancelDeletionRequest">取消注销申请</button>
+      <button wx:if="{{deletionCanRequest}}" class="danger-button full-button" loading="{{deletionSubmitting}}" disabled="{{deletionSubmitting}}" bindtap="requestDeletion">申请注销账号</button>
+      <button wx:if="{{!legalRecoveryMode}}" class="danger-button full-button" bindtap="withdrawConsent">撤回协议同意并退出</button>
+    </view>
+  </view>
+</view>

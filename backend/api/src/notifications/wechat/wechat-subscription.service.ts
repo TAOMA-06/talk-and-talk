@@ -25,6 +25,39 @@ export class WeChatSubscriptionService {
     };
   }
 
+  availabilityReminderChannel() {
+    const channelEnabled = this.config.get<boolean>("WECHAT_SUBSCRIBE_MESSAGES_ENABLED") === true;
+    const preparationRunnerEnabled =
+      this.config.get<boolean>("AVAILABILITY_REMINDER_PREPARATION_ENABLED") === true;
+    const deliveryRunnerEnabled =
+      this.config.get<boolean>("AVAILABILITY_REMINDER_DELIVERY_ENABLED") === true;
+    const templateConfigured = Boolean(this.findTemplate("availabilityReminder"));
+    const available = channelEnabled
+      && preparationRunnerEnabled
+      && deliveryRunnerEnabled
+      && templateConfigured;
+    const reasonCode = !channelEnabled
+      ? "CHANNEL_DISABLED"
+      : !templateConfigured
+        ? "TEMPLATE_UNAVAILABLE"
+        : !preparationRunnerEnabled
+          ? "PREPARATION_DISABLED"
+          : !deliveryRunnerEnabled
+            ? "DELIVERY_DISABLED"
+            : null;
+    return {
+      available,
+      channelEnabled,
+      preparationRunnerEnabled,
+      deliveryRunnerEnabled,
+      templateConfigured,
+      reasonCode,
+      message: available
+        ? "可约提醒通道当前可申请微信一次性订阅授权。"
+        : "可约提醒通道尚未由平台正式启用；收藏功能仍可使用。"
+    };
+  }
+
   async recordGrant(userId: string, templateKey: string, granted: boolean) {
     const enabled = this.config.get<boolean>("WECHAT_SUBSCRIBE_MESSAGES_ENABLED") === true;
     const template = this.findTemplate(templateKey);

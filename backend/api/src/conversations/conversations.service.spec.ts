@@ -4,7 +4,8 @@ describe("ConversationsService.ensureConversation", () => {
   const prisma = {
     conversation: {
       findFirst: jest.fn(),
-      findMany: jest.fn()
+      findMany: jest.fn(),
+      count: jest.fn()
     },
     companionProfile: {
       findFirst: jest.fn()
@@ -15,7 +16,8 @@ describe("ConversationsService.ensureConversation", () => {
     message: {
       findFirst: jest.fn(),
       findMany: jest.fn(),
-      count: jest.fn()
+      count: jest.fn(),
+      groupBy: jest.fn()
     },
     conversationNotificationPreference: {
       findUnique: jest.fn(),
@@ -28,8 +30,16 @@ describe("ConversationsService.ensureConversation", () => {
       upsert: jest.fn(),
       deleteMany: jest.fn()
     },
+    companionCustomerFutureBoundary: {
+      findUnique: jest.fn(),
+      create: jest.fn(),
+      delete: jest.fn()
+    },
+    recommendationRequest: { updateMany: jest.fn() },
     notification: { deleteMany: jest.fn() },
+    supportTicket: { count: jest.fn() },
     $transaction: jest.fn(),
+    $queryRaw: jest.fn(),
     $executeRaw: jest.fn()
   } as any;
 
@@ -51,11 +61,16 @@ describe("ConversationsService.ensureConversation", () => {
   const mediaWorker = { enqueue: jest.fn() } as any;
   const notifications = { createConversationMessageReceivedIfUnmuted: jest.fn() } as any;
   const audit = { record: jest.fn().mockResolvedValue(undefined) } as any;
+  const crisisIntervention = { recordCriticalChatSignal: jest.fn().mockResolvedValue(null) } as any;
 
   let service: ConversationsService;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    prisma.$queryRaw.mockResolvedValue([{ available: false }]);
+    prisma.$transaction.mockImplementation(async (fn: any) => fn(prisma));
+    prisma.companionCustomerFutureBoundary.findUnique.mockResolvedValue(null);
+    prisma.recommendationRequest.updateMany.mockResolvedValue({ count: 0 });
     service = new ConversationsService(
       prisma,
       moderation,
@@ -64,7 +79,8 @@ describe("ConversationsService.ensureConversation", () => {
       mediaAssets,
       mediaWorker,
       notifications,
-      audit
+      audit,
+      crisisIntervention
     );
   });
 
@@ -95,6 +111,92 @@ describe("ConversationsService.ensureConversation", () => {
         user: { include: { profile: true } }
       }
     });
+  });
+
+  it("keeps the companion's future-booking choice private while invalidating future recommendation cursors", async () => {
+    const existing = {
+      id: "conv-1",
+      externalId: "c1",
+      userId: "customer-1",
+      companionId: "c1",
+      companion: { id: "c1", ownerUserId: "companion-owner", name: "林屿" },
+      user: { id: "customer-1", profile: { nickname: "顾客" } }
+    };
+    prisma.conversation.findFirst.mockResolvedValue(existing);
+    prisma.companionCustomerFutureBoundary.create.mockResolvedValue({ id: "boundary-1" });
+
+    const declined = await service.setFutureBookingBoundary(
+      "companion-owner",
+      "conv-1",
+      { declined: true }
+    );
+
+    expect(declined).toEqual({
+      viewerCanManageFutureBookingBoundary: true,
+      futureBookingsDeclinedByYou: true,
+      futureBookingBoundaryScope: "newOrdersAndRecommendationsOnly",
+      existingOrdersUnaffected: true,
+      conversationUnaffected: true,
+      changed: true
+    });
+    expect(prisma.companionCustomerFutureBoundary.create).toHaveBeenCalledWith({
+      data: { companionId: "c1", customerUserId: "customer-1" }
+    });
+    expect(prisma.recommendationRequest.updateMany).toHaveBeenCalledWith({
+      where: { userId: "customer-1", expiresAt: { gt: expect.any(Date) } },
+      data: { expiresAt: expect.any(Date) }
+    });
+    expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({
+      actorId: "companion-owner",
+      subjectUserIds: ["companion-owner", "customer-1"],
+      action: "conversation.future_booking_declined",
+      resourceType: "conversation",
+      resourceId: "conv-1",
+      metadata: {
+        scope: "new_orders_and_recommendations_only",
+        existingOrdersUnaffected: true,
+        conversationUnaffected: true
+      }
+    }), prisma);
+
+    prisma.companionCustomerFutureBoundary.findUnique.mockResolvedValue({ id: "boundary-1" });
+    const companionStatus = await service.conversationStatus("companion-owner", "conv-1");
+    expect(companionStatus).toEqual(expect.objectContaining({
+      viewerCanManageFutureBookingBoundary: true,
+      futureBookingsDeclinedByYou: true,
+      existingOrdersUnaffected: true,
+      conversationUnaffected: true
+    }));
+
+    prisma.companionCustomerFutureBoundary.findUnique.mockClear();
+    const customerStatus = await service.conversationStatus("customer-1", "c1");
+    expect(customerStatus).toEqual(expect.objectContaining({
+      viewerCanManageFutureBookingBoundary: false,
+      futureBookingsDeclinedByYou: false,
+      existingOrdersUnaffected: true,
+      conversationUnaffected: true
+    }));
+    expect(prisma.companionCustomerFutureBoundary.findUnique).not.toHaveBeenCalled();
+
+    await expect(service.setFutureBookingBoundary("customer-1", "c1", { declined: true }))
+      .rejects.toMatchObject({ code: "FUTURE_BOOKING_BOUNDARY_COMPANION_ONLY" });
+
+    prisma.companionCustomerFutureBoundary.findUnique.mockResolvedValue({ id: "boundary-1" });
+    const restored = await service.setFutureBookingBoundary(
+      "companion-owner",
+      "conv-1",
+      { declined: false }
+    );
+    expect(restored).toEqual(expect.objectContaining({
+      futureBookingsDeclinedByYou: false,
+      changed: true
+    }));
+    expect(prisma.companionCustomerFutureBoundary.delete).toHaveBeenCalledWith({
+      where: { id: "boundary-1" }
+    });
+    expect(audit.record).toHaveBeenLastCalledWith(expect.objectContaining({
+      action: "conversation.future_booking_restored"
+    }), prisma);
   });
 
   it("rejects free messaging to a published companion", async () => {
@@ -328,22 +430,39 @@ describe("ConversationsService.ensureConversation", () => {
       readStates: [],
       notificationPreferences: [{ mutedAt: new Date("2026-07-20T00:00:00.000Z") }],
       blocks: [],
-      orders: [],
       updatedAt: new Date("2026-07-20T00:00:00.000Z")
     }]);
-    prisma.message.count.mockResolvedValue(0);
+    prisma.conversation.count.mockResolvedValue(1);
+    prisma.message.groupBy.mockResolvedValue([{ conversationId: "conv-1", _count: { _all: 3 } }]);
 
-    const result = await service.list("u1");
+    const result = await service.list("u1", { page: 2, pageSize: 10 });
 
-    expect(result.conversations[0]).toEqual(expect.objectContaining({ messageNotificationsMuted: true }));
+    expect(result.conversations[0]).toEqual(expect.objectContaining({
+      messageNotificationsMuted: true,
+      unreadCount: 3
+    }));
+    expect(result.pagination).toEqual({ page: 2, pageSize: 10, total: 1, totalPages: 1 });
     expect(prisma.conversation.findMany).toHaveBeenCalledWith(expect.objectContaining({
       include: expect.objectContaining({
         notificationPreferences: { where: { userId: "u1" }, select: { mutedAt: true }, take: 1 },
-        blocks: { select: { blockedByUserId: true }, take: 2 },
-        orders: expect.objectContaining({
-          where: { status: { in: ["paid", "inService"] } }
-        })
-      })
+        blocks: { select: { blockedByUserId: true }, take: 2 }
+      }),
+      orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+      skip: 10,
+      take: 10
     }));
+    expect(prisma.conversation.findMany.mock.calls[0][0].include).not.toHaveProperty("orders");
+    expect(prisma.$queryRaw).toHaveBeenCalled();
+    expect(prisma.message.groupBy).toHaveBeenCalledTimes(1);
+    expect(prisma.message.count).not.toHaveBeenCalled();
+  });
+
+  it("returns an authoritative aggregate for active customer support work", async () => {
+    prisma.supportTicket.count.mockResolvedValue(4);
+
+    await expect(service.summary("u1")).resolves.toEqual({ activeSupportCount: 4 });
+    expect(prisma.supportTicket.count).toHaveBeenCalledWith({
+      where: { userId: "u1", status: { in: ["open", "inProgress"] } }
+    });
   });
 });

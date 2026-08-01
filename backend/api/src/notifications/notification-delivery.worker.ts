@@ -5,12 +5,20 @@ import { randomUUID } from "node:crypto";
 import { PrismaService } from "../database/prisma.service";
 import { MetricsService } from "../metrics/metrics.service";
 import { conversationIdFromMessageNotificationEventKey } from "./notifications.service";
+import { notificationDeliveryIntervalSeconds } from "./notification-delivery.policy";
 import { WeChatSubscribeMessageProvider } from "./wechat/wechat-subscribe-message.provider";
 
 const LEASE_MS = 2 * 60_000;
 const AUTHORIZATION_WAIT_MS = 10 * 60_000;
 const NO_GRANT_RECHECK_MS = 30_000;
 const MAX_PRE_SEND_RETRIES = 3;
+const MAX_DELIVERY_BATCH_SIZE = 200;
+const CLAIM_CHUNK_SIZE = 20;
+const PROVIDER_CONCURRENCY = 5;
+const MAX_RECOVERY_BATCHES_PER_RUN = 4;
+
+type DeliveryClaim = { id: string; leaseToken: string };
+type DeliveryResult = "sent" | "failed" | "skipped" | "deferred" | "lost";
 
 /**
  * Durable delivery worker. It leases a database row before reading a
@@ -32,7 +40,7 @@ export class NotificationDeliveryWorker implements OnModuleInit, OnModuleDestroy
 
   onModuleInit() {
     if (!this.config.get<boolean>("NOTIFICATION_DELIVERY_ENABLED")) return;
-    const interval = (this.config.get<number>("NOTIFICATION_DELIVERY_INTERVAL_SECONDS") ?? 30) * 1_000;
+    const interval = notificationDeliveryIntervalSeconds(this.config) * 1_000;
     this.timer = setInterval(() => this.deliverDueSafely(), interval);
     this.timer.unref?.();
     this.deliverDueSafely();
@@ -48,38 +56,35 @@ export class NotificationDeliveryWorker implements OnModuleInit, OnModuleDestroy
     this.running = true;
     try {
       const now = new Date();
-      const recovered = await this.prisma.notificationDelivery.updateMany({
-        where: { status: "processing", leaseExpiresAt: { lte: now } },
-        data: {
-          status: "failed",
-          errorCode: "LEASE_EXPIRED_UNKNOWN_STATE",
-          lastError: "Worker lease expired after an unknown remote delivery state",
-          leaseToken: null,
-          leaseExpiresAt: null
+      const batchSize = this.normalizeBatchSize(
+        this.config.get<number>("NOTIFICATION_DELIVERY_BATCH_SIZE") ?? 20
+      );
+      const recovered = await this.recoverExpiredLeases(now, batchSize);
+      if (recovered > 0) {
+        for (let index = 0; index < recovered; index += 1) {
+          this.metrics.recordNotificationDeliveryFailure();
         }
-      } as any);
-      if (recovered.count > 0) {
-        this.metrics.recordNotificationDeliveryFailure();
-        this.logger.warn(`Marked ${recovered.count} expired notification lease(s) failed to avoid duplicate delivery.`);
+        this.logger.warn(`Marked ${recovered} expired notification lease(s) failed to avoid duplicate delivery.`);
       }
 
-      const batchSize = this.config.get<number>("NOTIFICATION_DELIVERY_BATCH_SIZE") ?? 20;
-      const candidates = await this.prisma.notificationDelivery.findMany({
-        where: { status: "pending", nextAttemptAt: { lte: now } },
-        select: { id: true },
-        orderBy: { nextAttemptAt: "asc" },
-        take: batchSize
-      } as any);
+      let scanned = 0;
       let sent = 0;
       let failed = 0;
       let skipped = 0;
-      for (const candidate of candidates) {
-        const result = await this.deliverOne(candidate.id);
-        if (result === "sent") sent += 1;
-        if (result === "failed") failed += 1;
-        if (result === "skipped") skipped += 1;
+      while (scanned < batchSize) {
+        const claimLimit = Math.min(CLAIM_CHUNK_SIZE, batchSize - scanned);
+        const claims = await this.claimDueBatch(new Date(), claimLimit);
+        if (claims.length === 0) break;
+        scanned += claims.length;
+        const outcomes = await this.deliverClaimedBatch(claims);
+        for (const result of outcomes) {
+          if (result === "sent") sent += 1;
+          if (result === "failed") failed += 1;
+          if (result === "skipped") skipped += 1;
+        }
+        if (claims.length < claimLimit) break;
       }
-      return { scanned: candidates.length, sent, failed, skipped, recovered: recovered.count };
+      return { scanned, sent, failed, skipped, recovered };
     } finally {
       this.running = false;
     }
@@ -91,19 +96,98 @@ export class NotificationDeliveryWorker implements OnModuleInit, OnModuleDestroy
     });
   }
 
-  private async deliverOne(deliveryId: string): Promise<"sent" | "failed" | "skipped" | "deferred" | "lost"> {
+  private async claimDueBatch(now: Date, limit: number): Promise<DeliveryClaim[]> {
     const leaseToken = randomUUID();
-    const now = new Date();
-    const claimed = await this.prisma.notificationDelivery.updateMany({
-      where: { id: deliveryId, status: "pending", nextAttemptAt: { lte: now } },
-      data: {
-        status: "processing",
-        leaseToken,
-        leaseExpiresAt: new Date(now.getTime() + LEASE_MS)
-      }
-    } as any);
-    if (claimed.count !== 1) return "lost";
+    const leaseExpiresAt = new Date(now.getTime() + LEASE_MS);
+    return this.prisma.$transaction(async (tx) => {
+      const db = tx as any;
+      const claims = await db.$queryRaw`
+        WITH candidates AS (
+          SELECT delivery."id", delivery."nextAttemptAt"
+          FROM "NotificationDelivery" AS delivery
+          WHERE delivery."status" = 'pending'::"NotificationDeliveryStatus"
+            AND delivery."nextAttemptAt" <= ${now}
+          ORDER BY delivery."nextAttemptAt" ASC, delivery."id" ASC
+          FOR UPDATE SKIP LOCKED
+          LIMIT ${limit}
+        ), claimed AS (
+          UPDATE "NotificationDelivery" AS delivery
+          SET "status" = 'processing'::"NotificationDeliveryStatus",
+              "leaseToken" = ${leaseToken},
+              "leaseExpiresAt" = ${leaseExpiresAt},
+              "updatedAt" = ${now}
+          FROM candidates
+          WHERE delivery."id" = candidates."id"
+          RETURNING delivery."id", delivery."leaseToken", candidates."nextAttemptAt"
+        )
+        SELECT claimed."id", claimed."leaseToken"
+        FROM claimed
+        ORDER BY claimed."nextAttemptAt" ASC, claimed."id" ASC
+      `;
+      return claims as DeliveryClaim[];
+    });
+  }
 
+  private async recoverExpiredLeases(now: Date, batchSize: number): Promise<number> {
+    let recovered = 0;
+    for (let batch = 0; batch < MAX_RECOVERY_BATCHES_PER_RUN; batch += 1) {
+      const ids = await this.prisma.$transaction(async (tx) => {
+        const db = tx as any;
+        const rows = await db.$queryRaw`
+          WITH candidates AS (
+            SELECT delivery."id", delivery."leaseExpiresAt"
+            FROM "NotificationDelivery" AS delivery
+            WHERE delivery."status" = 'processing'::"NotificationDeliveryStatus"
+              AND (delivery."leaseExpiresAt" IS NULL OR delivery."leaseExpiresAt" <= ${now})
+            ORDER BY delivery."leaseExpiresAt" ASC NULLS FIRST, delivery."id" ASC
+            FOR UPDATE SKIP LOCKED
+            LIMIT ${batchSize}
+          ), finalized AS (
+            UPDATE "NotificationDelivery" AS delivery
+            SET "status" = 'failed'::"NotificationDeliveryStatus",
+                "errorCode" = 'LEASE_EXPIRED_UNKNOWN_STATE',
+                "lastError" = 'Worker lease expired after an unknown remote delivery state',
+                "leaseToken" = NULL,
+                "leaseExpiresAt" = NULL,
+                "updatedAt" = ${now}
+            FROM candidates
+            WHERE delivery."id" = candidates."id"
+            RETURNING delivery."id", candidates."leaseExpiresAt"
+          )
+          SELECT finalized."id"
+          FROM finalized
+          ORDER BY finalized."leaseExpiresAt" ASC NULLS FIRST, finalized."id" ASC
+        `;
+        return rows as Array<{ id: string }>;
+      });
+      recovered += ids.length;
+      if (ids.length < batchSize) break;
+    }
+    return recovered;
+  }
+
+  private async deliverClaimedBatch(claims: DeliveryClaim[]): Promise<DeliveryResult[]> {
+    const results: DeliveryResult[] = [];
+    for (let offset = 0; offset < claims.length; offset += PROVIDER_CONCURRENCY) {
+      const wave = claims.slice(offset, offset + PROVIDER_CONCURRENCY);
+      const outcomes = await Promise.all(wave.map((claim) => this.deliverClaimedSafely(claim)));
+      results.push(...outcomes);
+    }
+    return results;
+  }
+
+  private async deliverClaimedSafely(claim: DeliveryClaim): Promise<DeliveryResult> {
+    try {
+      return await this.deliverClaimed(claim);
+    } catch (error) {
+      this.logger.error(
+        `Claimed notification delivery failed (${error instanceof Error ? error.name : "unknown_error"})`
+      );
+      return "lost";
+    }
+  }
+
+  private async deliverClaimed({ id: deliveryId, leaseToken }: DeliveryClaim): Promise<DeliveryResult> {
     const reserved = await this.reserveGrant(deliveryId, leaseToken);
     if (reserved.kind !== "ready") {
       if (reserved.kind === "deferred") return "deferred";
@@ -361,5 +445,10 @@ export class NotificationDeliveryWorker implements OnModuleInit, OnModuleDestroy
       data: { ...data, leaseToken: null, leaseExpiresAt: null }
     } as any);
     return finalized.count === 1;
+  }
+
+  private normalizeBatchSize(value: number): number {
+    if (!Number.isFinite(value)) return 20;
+    return Math.min(MAX_DELIVERY_BATCH_SIZE, Math.max(1, Math.floor(value)));
   }
 }

@@ -5,6 +5,7 @@ App({
     initializeBackend();
   },
   globalData: {
-    appName: "Talk&Talk"
+    appName: "Talk&Talk",
+    discoveryIntent: null
   }
 });

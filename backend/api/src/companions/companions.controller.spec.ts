@@ -9,6 +9,7 @@ describe("CompanionsController owner schedule routes", () => {
     createOwnAvailabilityBlackout: jest.fn(),
     deactivateOwnAvailabilityBlackout: jest.fn(),
     listOwnRecurringAvailabilityDrafts: jest.fn(),
+    materializeOwnRecurringAvailabilityDrafts: jest.fn(),
     activateOwnRecurringAvailabilityDraft: jest.fn()
   } as any;
   const controller = new CompanionsController(companionsService);
@@ -24,6 +25,7 @@ describe("CompanionsController owner schedule routes", () => {
     companionsService.createOwnAvailabilityBlackout.mockResolvedValue({ id: "blackout-1" });
     companionsService.deactivateOwnAvailabilityBlackout.mockResolvedValue({ id: "blackout-1", isActive: false });
     companionsService.listOwnRecurringAvailabilityDrafts.mockResolvedValue({ items: [] });
+    companionsService.materializeOwnRecurringAvailabilityDrafts.mockResolvedValue({ created: 1 });
     companionsService.activateOwnRecurringAvailabilityDraft.mockResolvedValue({ id: "draft-1", isActive: true });
     const rule = { weekday: 1, startsAtMinute: 540, endsAtMinute: 720, capacity: 2 };
     const blackout = {
@@ -38,15 +40,26 @@ describe("CompanionsController owner schedule routes", () => {
     await controller.createOwnAvailabilityBlackout(user, blackout);
     await controller.deactivateOwnAvailabilityBlackout(user, "blackout-1");
     await controller.listOwnRecurringAvailabilityDrafts(user);
+    await controller.materializeOwnRecurringAvailabilityDrafts(user);
     await controller.activateOwnRecurringAvailabilityDraft(user, { id: "123e4567-e89b-42d3-a456-426614174000" });
 
-    expect(companionsService.listOwnRecurringAvailabilityRules).toHaveBeenCalledWith("owner-1");
+    expect(companionsService.listOwnRecurringAvailabilityRules).toHaveBeenCalledWith(
+      "owner-1",
+      expect.objectContaining({ page: 1, pageSize: 50 })
+    );
     expect(companionsService.createOwnRecurringAvailabilityRule).toHaveBeenCalledWith("owner-1", rule);
     expect(companionsService.deactivateOwnRecurringAvailabilityRule).toHaveBeenCalledWith("owner-1", "rule-1");
-    expect(companionsService.listOwnAvailabilityBlackouts).toHaveBeenCalledWith("owner-1");
+    expect(companionsService.listOwnAvailabilityBlackouts).toHaveBeenCalledWith(
+      "owner-1",
+      expect.objectContaining({ page: 1, pageSize: 50 })
+    );
     expect(companionsService.createOwnAvailabilityBlackout).toHaveBeenCalledWith("owner-1", blackout);
     expect(companionsService.deactivateOwnAvailabilityBlackout).toHaveBeenCalledWith("owner-1", "blackout-1");
-    expect(companionsService.listOwnRecurringAvailabilityDrafts).toHaveBeenCalledWith("owner-1");
+    expect(companionsService.listOwnRecurringAvailabilityDrafts).toHaveBeenCalledWith(
+      "owner-1",
+      expect.objectContaining({ page: 1, pageSize: 50 })
+    );
+    expect(companionsService.materializeOwnRecurringAvailabilityDrafts).toHaveBeenCalledWith("owner-1");
     expect(companionsService.activateOwnRecurringAvailabilityDraft).toHaveBeenCalledWith("owner-1", {
       id: "123e4567-e89b-42d3-a456-426614174000"
     });

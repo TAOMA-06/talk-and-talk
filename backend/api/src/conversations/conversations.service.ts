@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 
 import { AppException } from "../common/errors/app.exception";
 import { AuditService } from "../common/audit/audit.service";
+import { CrisisInterventionService } from "../crisis-intervention/crisis-intervention.service";
 import { PrismaService } from "../database/prisma.service";
 import { ChatRestrictionService } from "../moderation/chat-restriction.service";
 import { MediaAssetService } from "../moderation/media/media-asset.service";
@@ -11,15 +12,16 @@ import { MediaModerationWorker } from "../moderation/media/media-moderation.work
 import { ModerationCaseService } from "../moderation/moderation-case.service";
 import { ModerationService, ModerationResult } from "../moderation/moderation.service";
 import { NotificationsService } from "../notifications/notifications.service";
+import { ListConversationsDto } from "./dto/list-conversations.dto";
 import { ListMessagesQueryDto } from "./dto/list-messages.dto";
 import { ReserveMediaUploadDto } from "./dto/reserve-media-upload.dto";
 import { SendMessageDto } from "./dto/send-message.dto";
 import { SetConversationBlockDto } from "./dto/set-conversation-block.dto";
 import { SetConversationNotificationPreferenceDto } from "./dto/set-conversation-notification-preference.dto";
+import { SetFutureBookingBoundaryDto } from "./dto/set-future-booking-boundary.dto";
 
 type Db = any;
 const CHAT_ENABLED_ORDER_STATUSES = ["paid", "inService", "completed"] as const;
-const CHAT_INTERACTION_ORDER_STATUSES = ["paid", "inService"] as const;
 const DEFAULT_ORDER_CHAT_PRE_SERVICE_WINDOW_MINUTES = 15;
 const DEFAULT_ORDER_CHAT_POST_SERVICE_WINDOW_MINUTES = 15;
 
@@ -34,6 +36,7 @@ export class ConversationsService {
     private readonly mediaWorker: MediaModerationWorker,
     private readonly notifications: NotificationsService,
     private readonly audit: AuditService,
+    private readonly crisisIntervention: CrisisInterventionService,
     @Optional() private readonly config?: ConfigService
   ) {}
 
@@ -47,7 +50,8 @@ export class ConversationsService {
 
   async conversationStatus(userId: string, externalId: string) {
     const conversation = await this.ensureConversation(userId, externalId);
-    const [restriction, preference, ownBlock, availability] = await Promise.all([
+    const viewerCanManageFutureBookingBoundary = conversation.companion.ownerUserId === userId;
+    const [restriction, preference, ownBlock, availability, futureBoundary] = await Promise.all([
       this.chatRestrictions.activeForUser(userId),
       this.prisma.conversationNotificationPreference.findUnique({
         where: { conversationId_userId: { conversationId: conversation.id, userId } },
@@ -57,12 +61,31 @@ export class ConversationsService {
         where: { conversationId_blockedByUserId: { conversationId: conversation.id, blockedByUserId: userId } },
         select: { id: true }
       } as any),
-      this.messageAvailability(conversation.id)
+      this.messageAvailability(conversation.id),
+      viewerCanManageFutureBookingBoundary
+        ? this.prisma.companionCustomerFutureBoundary.findUnique({
+            where: {
+              companionId_customerUserId: {
+                companionId: conversation.companionId,
+                customerUserId: conversation.userId
+              }
+            },
+            select: { id: true }
+          } as any)
+        : Promise.resolve(null)
     ]);
     return {
       mediaEnabled: this.mediaAssets.isFeatureEnabled(),
       messageNotificationsMuted: Boolean(preference?.mutedAt),
       conversationBlockedByYou: Boolean(ownBlock),
+      // Viewer-owned state only. Customers always receive false and therefore
+      // cannot infer whether the companion set this private marketplace boundary.
+      viewerCanManageFutureBookingBoundary,
+      futureBookingsDeclinedByYou:
+        viewerCanManageFutureBookingBoundary && Boolean(futureBoundary),
+      futureBookingBoundaryScope: "newOrdersAndRecommendationsOnly" as const,
+      existingOrdersUnaffected: true,
+      conversationUnaffected: true,
       ...availability,
       chatRestriction: restriction
         ? {
@@ -74,12 +97,26 @@ export class ConversationsService {
     };
   }
 
-  async list(userId: string) {
-    const conversations = await this.prisma.conversation.findMany({
-      where: {
+  async summary(userId: string) {
+    const activeSupportCount = await this.prisma.supportTicket.count({
+      where: { userId, status: { in: ["open", "inProgress"] } }
+    } as any);
+    return { activeSupportCount };
+  }
+
+  async list(userId: string, query: ListConversationsDto = {}) {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 20;
+    const where: any = {
         orders: { some: { status: { in: [...CHAT_ENABLED_ORDER_STATUSES] } } },
-        OR: [{ userId }, { companion: { ownerUserId: userId } }]
-      },
+        OR: [{ userId }, { companion: { ownerUserId: userId } }],
+        ...(query.blockedByYou === true
+          ? { blocks: { some: { blockedByUserId: userId } } }
+          : {})
+    };
+    const [conversations, total] = await Promise.all([
+      this.prisma.conversation.findMany({
+      where,
       include: {
         companion: true,
         user: { include: { profile: true } },
@@ -104,54 +141,58 @@ export class ConversationsService {
           select: { blockedByUserId: true },
           take: 2
         },
-        // History remains visible after the normal order communication window
-        // closes, but only a current paid/in-service order may enable sending.
-        orders: {
-          where: { status: { in: [...CHAT_INTERACTION_ORDER_STATUSES] } },
-          select: {
-            status: true,
-            scheduledAt: true,
-            serviceStartedAt: true,
-            durationMinutes: true
-          }
-        }
+        // Interaction availability is resolved below with a database EXISTS
+        // predicate; never attach an unbounded paid-order history to the list.
       },
-      orderBy: { updatedAt: "desc" }
-    } as any);
+      orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+      skip: (page - 1) * pageSize,
+      take: pageSize
+    } as any),
+      this.prisma.conversation.count({ where } as any)
+    ]);
+
+    const unreadConditions = conversations
+      .filter((conversation: any) => conversation.blocks.length === 0)
+      .map((conversation: any) => {
+        const readState = conversation.readStates[0];
+        return {
+          conversationId: conversation.id,
+          senderId: { not: userId },
+          moderationStatus: "published",
+          visibility: "participants",
+          ...(readState
+            ? {
+                OR: [
+                  { createdAt: { gt: readState.readAt } },
+                  ...(readState.lastReadMessageId
+                    ? [{ createdAt: readState.readAt, id: { gt: readState.lastReadMessageId } }]
+                    : [])
+                ]
+              }
+            : {})
+        };
+      });
+    const unreadRows: Array<{ conversationId: string; _count: { _all: number } }> = unreadConditions.length
+      ? await (this.prisma.message as any).groupBy({
+          by: ["conversationId"],
+          where: { OR: unreadConditions },
+          _count: { _all: true }
+        })
+      : [];
+    const unreadByConversation = new Map(
+      unreadRows.map((row) => [row.conversationId, Number(row._count?._all ?? 0)])
+    );
 
     const items = await Promise.all(
       conversations.map(async (conversation: any) => {
         const isCustomer = conversation.userId === userId;
         const conversationBlockedByYou = conversation.blocks.some((block: any) => block.blockedByUserId === userId);
         const messageHistoryAvailable = conversation.blocks.length === 0;
-        const messageInteractionAvailable = messageHistoryAvailable && this.hasMessageInteractionWindow(conversation.orders);
-        const readState = conversation.readStates[0];
-        const unreadPosition = readState
-          ? {
-              OR: [
-                { createdAt: { gt: readState.readAt } },
-                ...(readState.lastReadMessageId
-                  ? [
-                      {
-                        createdAt: readState.readAt,
-                        id: { gt: readState.lastReadMessageId }
-                      }
-                    ]
-                  : [])
-              ]
-            }
-          : {};
+        const messageInteractionAvailable = messageHistoryAvailable
+          && await this.hasCurrentMessageInteractionWindow(conversation.id);
         const unreadCount = !messageHistoryAvailable
           ? 0
-          : await this.prisma.message.count({
-              where: {
-                conversationId: conversation.id,
-                senderId: { not: userId },
-                moderationStatus: "published",
-                visibility: "participants",
-                ...unreadPosition
-              }
-            } as any);
+          : unreadByConversation.get(conversation.id) ?? 0;
 
         return {
           // Customer routes stay compatible with the public companion id. An
@@ -181,7 +222,10 @@ export class ConversationsService {
       })
     );
 
-    return { conversations: items };
+    return {
+      conversations: items,
+      pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) }
+    };
   }
 
   async setMessageNotificationsMuted(
@@ -228,6 +272,8 @@ export class ConversationsService {
         });
         await this.audit.record({
           actorId: userId,
+          subjectUserIds: [conversation.userId, conversation.companion?.ownerUserId]
+            .filter((subjectUserId): subjectUserId is string => Boolean(subjectUserId)),
           action: "conversation.blocked",
           resourceType: "conversation",
           resourceId: conversation.id,
@@ -240,6 +286,8 @@ export class ConversationsService {
         if (removed.count) {
           await this.audit.record({
             actorId: userId,
+            subjectUserIds: [conversation.userId, conversation.companion?.ownerUserId]
+              .filter((subjectUserId): subjectUserId is string => Boolean(subjectUserId)),
             action: "conversation.unblocked",
             resourceType: "conversation",
             resourceId: conversation.id,
@@ -251,6 +299,79 @@ export class ConversationsService {
       return {
         conversationBlockedByYou: dto.blocked,
         ...availability
+      };
+    });
+  }
+
+  async setFutureBookingBoundary(
+    userId: string,
+    externalId: string,
+    dto: SetFutureBookingBoundaryDto
+  ) {
+    const conversation = await this.ensureConversation(userId, externalId);
+    if (conversation.companion.ownerUserId !== userId) {
+      throw new AppException(
+        "FUTURE_BOOKING_BOUNDARY_COMPANION_ONLY",
+        "Only the companion may manage this private future-booking boundary",
+        HttpStatus.FORBIDDEN
+      );
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const db = tx as Db;
+      // Match order-intake lock order. Whichever transaction commits first owns
+      // the boundary for that instant; an already-created order remains intact.
+      await db.$queryRaw`SELECT "id" FROM "CompanionProfile" WHERE "id" = ${conversation.companionId} FOR UPDATE`;
+      await db.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${conversation.userId} FOR UPDATE`;
+      const key = {
+        companionId: conversation.companionId,
+        customerUserId: conversation.userId
+      };
+      const existing = await db.companionCustomerFutureBoundary.findUnique({
+        where: { companionId_customerUserId: key },
+        select: { id: true }
+      });
+      let changed = false;
+
+      if (dto.declined && !existing) {
+        await db.companionCustomerFutureBoundary.create({ data: key });
+        changed = true;
+      } else if (!dto.declined && existing) {
+        await db.companionCustomerFutureBoundary.delete({ where: { id: existing.id } });
+        changed = true;
+      }
+
+      if (changed) {
+        const changedAt = new Date();
+        // Invalidate every active cursor for this customer. Historical
+        // impressions and existing order attribution remain immutable.
+        await db.recommendationRequest.updateMany({
+          where: { userId: conversation.userId, expiresAt: { gt: changedAt } },
+          data: { expiresAt: changedAt }
+        });
+        await this.audit.record({
+          actorId: userId,
+          subjectUserIds: [userId, conversation.userId],
+          action: dto.declined
+            ? "conversation.future_booking_declined"
+            : "conversation.future_booking_restored",
+          resourceType: "conversation",
+          resourceId: conversation.id,
+          metadata: {
+            scope: "new_orders_and_recommendations_only",
+            existingOrdersUnaffected: true,
+            conversationUnaffected: true
+          }
+        }, db);
+      }
+
+      return {
+        viewerCanManageFutureBookingBoundary: true,
+        futureBookingsDeclinedByYou: dto.declined,
+        futureBookingBoundaryScope: "newOrdersAndRecommendationsOnly" as const,
+        existingOrdersUnaffected: true,
+        conversationUnaffected: true,
+        changed
       };
     });
   }
@@ -469,6 +590,16 @@ export class ConversationsService {
         });
       }
 
+      // The authenticated sender is authoritative here. Never derive crisis
+      // ownership from the recipient, conversation customer, or a later report.
+      // The narrow signal excludes message content/id and commits atomically
+      // with this delivery decision and its moderation evidence.
+      await this.crisisIntervention.recordCriticalChatSignal(
+        userId,
+        { priority: moderation.priority, categories: moderation.categories },
+        db
+      );
+
       await db.conversation.update({
         where: { id: conversation.id },
         data: { updatedAt: new Date(now + 3) }
@@ -544,7 +675,7 @@ export class ConversationsService {
         companion: true,
         user: { include: { profile: true } }
       }
-    } as any);
+    });
 
     if (existing) {
       return existing;
@@ -609,50 +740,28 @@ export class ConversationsService {
   }
 
   private async hasCurrentMessageInteractionWindow(conversationId: string, db: Db = this.prisma as any) {
-    const orders = await db.order.findMany({
-      where: {
-        conversationId,
-        status: { in: [...CHAT_INTERACTION_ORDER_STATUSES] }
-      },
-      select: {
-        status: true,
-        scheduledAt: true,
-        serviceStartedAt: true,
-        durationMinutes: true
-      }
-    } as any);
-    return this.hasMessageInteractionWindow(orders);
-  }
-
-  private hasMessageInteractionWindow(orders: unknown, now = Date.now()): boolean {
-    if (!Array.isArray(orders)) return false;
-    const preServiceWindowMs = this.orderChatPreServiceWindowMinutes() * 60_000;
-    const postServiceWindowMs = this.orderChatPostServiceWindowMinutes() * 60_000;
-
-    return orders.some((order: any) => {
-      if (!CHAT_INTERACTION_ORDER_STATUSES.includes(order?.status)) return false;
-      const scheduledAt = new Date(order.scheduledAt).getTime();
-      const serviceStartedAt = order.serviceStartedAt ? new Date(order.serviceStartedAt).getTime() : null;
-      const durationMinutes = Number(order.durationMinutes);
-      if (!Number.isFinite(scheduledAt)
-        || (serviceStartedAt !== null && !Number.isFinite(serviceStartedAt))
-        || !Number.isSafeInteger(durationMinutes)
-        || durationMinutes < 1) {
-        return false;
-      }
-
-      // A paid order opens shortly before its booked time for logistics. Once
-      // service begins, its recorded start is also honored; the end remains
-      // based on the later of booked and actual start so an allowed early start
-      // cannot shorten the paid conversation window.
-      const interactionStartsAt = Math.min(
-        scheduledAt - preServiceWindowMs,
-        serviceStartedAt ?? scheduledAt
-      );
-      const serviceAnchorAt = Math.max(scheduledAt, serviceStartedAt ?? scheduledAt);
-      const interactionEndsAt = serviceAnchorAt + durationMinutes * 60_000 + postServiceWindowMs;
-      return now >= interactionStartsAt && now < interactionEndsAt;
-    });
+    const now = new Date();
+    const preServiceWindowMinutes = this.orderChatPreServiceWindowMinutes();
+    const postServiceWindowMinutes = this.orderChatPostServiceWindowMinutes();
+    const rows = await db.$queryRaw<Array<{ available: boolean }>>`
+      SELECT EXISTS (
+        SELECT 1
+        FROM "Order"
+        WHERE "conversationId" = ${conversationId}
+          AND "status"::text IN ('paid', 'inService')
+          AND "durationMinutes" > 0
+          AND ${now} >= LEAST(
+            "scheduledAt" - (${preServiceWindowMinutes} * INTERVAL '1 minute'),
+            COALESCE("serviceStartedAt", "scheduledAt")
+          )
+          AND ${now} < GREATEST(
+            "scheduledAt",
+            COALESCE("serviceStartedAt", "scheduledAt")
+          ) + ("durationMinutes" * INTERVAL '1 minute')
+            + (${postServiceWindowMinutes} * INTERVAL '1 minute')
+      ) AS "available"
+    `;
+    return rows[0]?.available === true;
   }
 
   private orderChatPreServiceWindowMinutes(): number {

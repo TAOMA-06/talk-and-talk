@@ -1,0 +1,39 @@
+.dispute-page { padding-bottom: 72rpx; }
+.policy-card, .card { margin-bottom: 22rpx; padding: 30rpx; border-radius: 26rpx; background: #fff; box-shadow: 0 10rpx 28rpx rgba(93, 53, 66, .07); }
+.policy-card { background: linear-gradient(145deg, #fff1f3, #fffaf5); }
+.eyebrow { color: #b94a68; font-size: 21rpx; font-weight: 700; letter-spacing: 2rpx; }
+.policy-title { margin-top: 10rpx; color: #49333b; font-size: 34rpx; font-weight: 800; }
+.policy-copy, .hint { margin-top: 12rpx; color: #806970; font-size: 23rpx; line-height: 1.65; }
+.policy-error { margin-top: 14rpx; padding: 14rpx; border-left: 5rpx solid #b65a6e; background: #fff6f7; color: #8d4858; font-size: 23rpx; line-height: 1.65; }
+.section-title { color: #49343a; font-size: 30rpx; font-weight: 800; }
+.issue { display: flex; gap: 16rpx; align-items: flex-start; padding: 19rpx 0; border-bottom: 1rpx solid #f0e4e7; }
+.issue-label { color: #503940; font-size: 26rpx; font-weight: 700; }
+.issue-help { margin-top: 5rpx; color: #957f86; font-size: 21rpx; line-height: 1.5; }
+.statement { width: 100%; min-height: 180rpx; box-sizing: border-box; margin-top: 20rpx; padding: 20rpx; border: 1rpx solid #dfcbd0; border-radius: 16rpx; background: #fffcfc; color: #503940; font-size: 24rpx; line-height: 1.6; }
+.primary, .secondary, .retry { width: 100%; margin-top: 18rpx; border-radius: 16rpx; font-size: 25rpx; }
+.primary { background: #b94a68; color: #fff; }
+.secondary, .retry { border: 1rpx solid #d9bec6; background: #fff; color: #8a4358; }
+.primary::after, .secondary::after, .retry::after { border: 0; }
+.status-card { border-left: 8rpx solid #b94a68; }
+.status-row, .deadline, .statement-meta { display: flex; justify-content: space-between; gap: 18rpx; }
+.status-row { align-items: baseline; color: #826d74; font-size: 23rpx; }
+.status { color: #b74665; font-size: 31rpx; font-weight: 800; }
+.deadline { padding: 13rpx 0; border-bottom: 1rpx solid #f1e7e9; color: #806970; font-size: 22rpx; }
+.deadline text:last-child { color: #49343a; }
+.trusted, .warning { margin-top: 14rpx; padding: 15rpx; border-radius: 12rpx; font-size: 22rpx; line-height: 1.5; }
+.trusted { background: #edf8f3; color: #34705a; }
+.warning { background: #fff6e8; color: #8b602e; }
+.participant-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14rpx; margin-top: 18rpx; }
+.participant { padding: 18rpx; border-radius: 14rpx; background: #faf6f7; color: #806970; font-size: 20rpx; line-height: 1.7; }
+.participant-title { color: #503940; font-size: 25rpx; font-weight: 800; }
+.statement-item { margin-top: 16rpx; padding: 18rpx; border-radius: 14rpx; background: #faf6f7; }
+.statement-meta { color: #9a838a; font-size: 20rpx; }
+.statement-copy { margin-top: 9rpx; color: #594249; font-size: 24rpx; line-height: 1.65; white-space: pre-wrap; }
+.decision-card { border-left: 8rpx solid #8574aa; }
+.decision { margin-top: 12rpx; color: #594249; font-size: 24rpx; line-height: 1.65; }
+.refund-state { margin-top: 16rpx; color: #704b78; font-size: 25rpx; font-weight: 700; }
+.evidence-panel { margin: 18rpx 0; padding: 18rpx; border-radius: 18rpx; background: #f7f3f1; }
+.evidence-toolbar, .evidence-list { display: flex; flex-wrap: wrap; gap: 12rpx; }
+.evidence-toolbar button, .evidence-list button, .evidence-draft button { margin: 0; }
+.evidence-draft { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; margin-top: 12rpx; font-size: 24rpx; }
+.evidence-list { margin-top: 12rpx; }

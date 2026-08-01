@@ -15,8 +15,6 @@ type SeedCompanion = {
   role: string;
   initials: string;
   tags: string[];
-  rating: number;
-  reviewCount: number;
   pricePerHalfHour: number;
   isOnline: boolean;
   isVerified: boolean;
@@ -38,8 +36,6 @@ export const seedCompanions: SeedCompanion[] = [
     role: "温柔倾听者",
     initials: "LY",
     tags: ["心理学背景", "深夜在线"],
-    rating: 4.9,
-    reviewCount: 168,
     pricePerHalfHour: 39,
     isOnline: true,
     isVerified: true,
@@ -59,8 +55,6 @@ export const seedCompanions: SeedCompanion[] = [
     role: "职场沟通陪伴",
     initials: "XC",
     tags: ["职业沟通", "疏解压力", "高效"],
-    rating: 4.8,
-    reviewCount: 116,
     pricePerHalfHour: 49,
     isOnline: true,
     isVerified: true,
@@ -80,8 +74,6 @@ export const seedCompanions: SeedCompanion[] = [
     role: "睡前声音陪伴",
     initials: "ZY",
     tags: ["情绪稳定", "慢节奏"],
-    rating: 4.9,
-    reviewCount: 204,
     pricePerHalfHour: 45,
     isOnline: false,
     isVerified: true,
@@ -101,8 +93,6 @@ export const seedCompanions: SeedCompanion[] = [
     role: "专注陪跑伙伴",
     initials: "SY",
     tags: ["互相监督", "考研陪伴"],
-    rating: 4.7,
-    reviewCount: 92,
     pricePerHalfHour: 29,
     isOnline: true,
     isVerified: true,
@@ -122,8 +112,6 @@ export const seedCompanions: SeedCompanion[] = [
     role: "兴趣聊天搭子",
     initials: "WZ",
     tags: ["电影", "旅行", "摄影"],
-    rating: 4.6,
-    reviewCount: 74,
     pricePerHalfHour: 35,
     isOnline: true,
     isVerified: false,
@@ -251,6 +239,10 @@ export async function seedDatabase(client: SeedClient = prisma) {
   for (const [index, companion] of seedCompanions.entries()) {
     const ownerUserId = `seed-owner-${companion.id}`;
     const ownerPhone = `+86138000001${String(index + 1).padStart(2, "0")}`;
+    const adultEligibilityVerifiedAt = new Date();
+    const adultEligibilityValidUntil = new Date(
+      adultEligibilityVerifiedAt.getTime() + 365 * 24 * 60 * 60_000
+    );
     await client.user.upsert({
       where: { id: ownerUserId },
       create: {
@@ -289,8 +281,12 @@ export async function seedDatabase(client: SeedClient = prisma) {
         name: companion.name,
         role: companion.role,
         initials: companion.initials,
-        rating: companion.rating,
-        reviewCount: companion.reviewCount,
+        // Review is the only rating source. Fresh seed profiles start with an
+        // empty projection; subsequent seed runs must never overwrite a
+        // trigger-maintained projection for existing profiles.
+        rating: 0,
+        ratingSum: 0,
+        reviewCount: 0,
         pricePerHalfHour: companion.pricePerHalfHour,
         isOnline: companion.isOnline,
         isVerified: companion.isVerified,
@@ -311,8 +307,6 @@ export async function seedDatabase(client: SeedClient = prisma) {
         name: companion.name,
         role: companion.role,
         initials: companion.initials,
-        rating: companion.rating,
-        reviewCount: companion.reviewCount,
         pricePerHalfHour: companion.pricePerHalfHour,
         isOnline: companion.isOnline,
         isVerified: companion.isVerified,
@@ -338,6 +332,10 @@ export async function seedDatabase(client: SeedClient = prisma) {
         settlementRecipientMasked: `STAGING-****-${companion.id.toUpperCase()}`,
         taxProfileRef: `seed-tax-${companion.id}`,
         identityEvidenceRef: `seed-identity-${companion.id}`,
+        adultEligibilityVerdict: companion.isVerified ? "adult" : "pending",
+        adultEligibilityVerifiedAt: companion.isVerified ? adultEligibilityVerifiedAt : null,
+        adultEligibilityValidUntil: companion.isVerified ? adultEligibilityValidUntil : null,
+        adultEligibilityEvidenceRef: companion.isVerified ? `seed-adult-${companion.id}` : null,
         serviceAgreementVersion: "staging-v1",
         serviceAgreementEvidenceRef: `seed-agreement-${companion.id}`,
         submittedById: "seed-system",
@@ -350,6 +348,10 @@ export async function seedDatabase(client: SeedClient = prisma) {
         settlementRecipientMasked: `STAGING-****-${companion.id.toUpperCase()}`,
         taxProfileRef: `seed-tax-${companion.id}`,
         identityEvidenceRef: `seed-identity-${companion.id}`,
+        adultEligibilityVerdict: companion.isVerified ? "adult" : "pending",
+        adultEligibilityVerifiedAt: companion.isVerified ? adultEligibilityVerifiedAt : null,
+        adultEligibilityValidUntil: companion.isVerified ? adultEligibilityValidUntil : null,
+        adultEligibilityEvidenceRef: companion.isVerified ? `seed-adult-${companion.id}` : null,
         serviceAgreementVersion: "staging-v1",
         serviceAgreementEvidenceRef: `seed-agreement-${companion.id}`,
         submittedById: "seed-system",

@@ -44,6 +44,7 @@ type SendClaim =
     sendLeaseToken: string;
     userId: string;
     templateId: string;
+    companionId: string;
   }
   | { kind: "result"; result: AvailabilityReminderAttemptDeliveryResult };
 
@@ -86,7 +87,10 @@ export class AvailabilityReminderAttemptDeliveryService {
         templateId: claim.templateId,
         title: AVAILABILITY_REMINDER_TITLE,
         body: AVAILABILITY_REMINDER_BODY,
-        data: null
+        // The provider adapter accepts only this allowlisted routing key. It is
+        // enough to open the public companion detail page without exposing the
+        // private favorite, handoff, grant, or attempt identifiers.
+        data: { companionId: claim.companionId }
       });
     } catch (error) {
       // A thrown client error occurs after the remote boundary was entered.
@@ -139,8 +143,8 @@ export class AvailabilityReminderAttemptDeliveryService {
       await this.lockCandidate(db, handoff.candidateId);
       const candidate = await db.availabilityReminderCandidate.findUnique({
         where: { id: handoff.candidateId },
-        select: { favoriteId: true }
-      }) as { favoriteId: string } | null;
+        select: { favoriteId: true, companionId: true }
+      }) as { favoriteId: string; companionId: string } | null;
       if (!candidate) {
         return { kind: "result", result: await this.finishSkippedWithoutProvider(db, attempt, now, "CANDIDATE_UNAVAILABLE") };
       }
@@ -197,7 +201,8 @@ export class AvailabilityReminderAttemptDeliveryService {
         attemptId: attempt.id,
         sendLeaseToken,
         userId: grant.userId,
-        templateId: grant.templateId.trim()
+        templateId: grant.templateId.trim(),
+        companionId: candidate.companionId
       };
     });
   }

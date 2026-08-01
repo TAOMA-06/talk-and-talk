@@ -2,6 +2,7 @@ import { FavoritesService } from "./favorites.service";
 
 const companion = {
   id: "companion-1",
+  ownerUserId: "companion-owner-1",
   name: "林屿",
   role: "温柔倾听者",
   initials: "LY",
@@ -29,9 +30,16 @@ const companion = {
 describe("FavoritesService", () => {
   const prisma = {
     $queryRaw: jest.fn(),
-    companionFavorite: { findMany: jest.fn(), upsert: jest.fn(), deleteMany: jest.fn(), updateMany: jest.fn() },
+    companionFavorite: {
+      findMany: jest.fn(),
+      findUnique: jest.fn(),
+      count: jest.fn(),
+      upsert: jest.fn(),
+      deleteMany: jest.fn(),
+      updateMany: jest.fn()
+    },
     companionRecentView: { findMany: jest.fn(), upsert: jest.fn(), deleteMany: jest.fn() },
-    companionProfile: { findFirst: jest.fn() },
+    companionProfile: { findFirst: jest.fn(), findUnique: jest.fn() },
     weChatSubscriptionGrant: { findFirst: jest.fn() }
   } as any;
   prisma.$transaction = jest.fn((callback: (transaction: typeof prisma) => unknown) => callback(prisma));
@@ -46,8 +54,9 @@ describe("FavoritesService", () => {
       availabilityReminderEnabled: true,
       availabilityReminderUpdatedAt: new Date("2026-07-21T01:00:00.000Z")
     }]);
+    prisma.companionFavorite.count.mockResolvedValue(1);
 
-    const result = await service.listCompanions("customer-1");
+    const result = await service.listCompanions("customer-1", { page: 2, pageSize: 10 });
 
     expect(prisma.companionFavorite.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({
@@ -62,7 +71,9 @@ describe("FavoritesService", () => {
           })
         }
       }),
-      orderBy: [{ createdAt: "desc" }, { id: "asc" }]
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      skip: 10,
+      take: 10
     }));
     expect(result.items).toEqual([expect.objectContaining({
       id: "companion-1",
@@ -75,6 +86,27 @@ describe("FavoritesService", () => {
     expect(result.items[0]).not.toHaveProperty("ownerUserId");
     expect(result.items[0]).not.toHaveProperty("favoriteCount");
     expect(result.items[0]).not.toHaveProperty("availabilityReminderGrantId");
+    expect(result.pagination).toEqual({ page: 2, pageSize: 10, total: 1, totalPages: 1 });
+  });
+
+  it("returns one private bookmark status without scanning the bookmark list", async () => {
+    prisma.companionProfile.findFirst.mockResolvedValue(companion);
+    prisma.companionFavorite.findUnique.mockResolvedValue({
+      availabilityReminderEnabled: true,
+      availabilityReminderUpdatedAt: new Date("2026-07-21T01:00:00.000Z")
+    });
+
+    await expect(service.companionStatus("customer-1", "companion-1")).resolves.toEqual({
+      companionId: "companion-1",
+      favorited: true,
+      availabilityReminderEnabled: true,
+      availabilityReminderUpdatedAt: "2026-07-21T01:00:00.000Z",
+      availabilityReminderMinimumIntervalHours: 24
+    });
+    expect(prisma.companionFavorite.findUnique).toHaveBeenCalledWith(expect.objectContaining({
+      where: { userId_companionId: { userId: "customer-1", companionId: "companion-1" } }
+    }));
+    expect(prisma.companionFavorite.findMany).not.toHaveBeenCalled();
   });
 
   it("saves only a currently public companion and leaves an internal audit record", async () => {
@@ -100,6 +132,7 @@ describe("FavoritesService", () => {
     });
     expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({
       actorId: "customer-1",
+      subjectUserIds: ["customer-1", "companion-owner-1"],
       action: "favorite.companion_saved",
       resourceType: "companionFavorite",
       metadata: { companionId: "companion-1" }
@@ -118,6 +151,7 @@ describe("FavoritesService", () => {
 
   it("removes only the caller's bookmark and does not emit a no-op audit event", async () => {
     prisma.companionFavorite.deleteMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 0 });
+    prisma.companionProfile.findUnique.mockResolvedValue({ ownerUserId: "companion-owner-1" });
 
     await expect(service.removeCompanion("customer-1", "companion-1"))
       .resolves.toEqual({ favorited: false, removed: true });
@@ -126,6 +160,7 @@ describe("FavoritesService", () => {
     });
     expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({
       actorId: "customer-1",
+      subjectUserIds: ["customer-1", "companion-owner-1"],
       action: "favorite.companion_removed",
       metadata: { companionId: "companion-1" }
     }));

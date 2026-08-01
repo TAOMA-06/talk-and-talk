@@ -22,6 +22,11 @@
 .earnings-value { color: #a43f5c; }
 .overview-unavailable { margin-top: 13rpx; color: #765b60; font-size: 32rpx; font-weight: 700; line-height: 1.35; }
 .overview-note { margin-top: 14rpx; overflow: hidden; color: #a9878e; font-size: 22rpx; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
+.lifecycle-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16rpx; }
+.lifecycle-card { min-height: 172rpx; padding: 24rpx; border-radius: 22rpx; background: #fff; box-shadow: 0 6rpx 20rpx rgba(96, 50, 60, 0.06); }
+.lifecycle-title { color: #4b353a; font-size: 26rpx; font-weight: 700; line-height: 1.4; }
+.lifecycle-state { margin-top: 13rpx; color: #765b60; font-size: 23rpx; line-height: 1.45; }
+.lifecycle-link { margin-top: 13rpx; color: #a43f5c; font-size: 22rpx; font-weight: 700; }
 .schedule-card { padding: 28rpx; }
 .today-service-card + .today-service-card { margin-top: 16rpx; }
 .schedule-head { display: flex; align-items: flex-start; gap: 16rpx; }

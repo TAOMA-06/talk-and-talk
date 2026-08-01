@@ -2,12 +2,15 @@ import { MiddlewareConsumer, Module, NestModule } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 
 import { AdminModule } from "./admin/admin.module";
+import { AccountGovernanceModule } from "./account-governance/account-governance.module";
+import { AttendanceDisputesModule } from "./attendance-disputes/attendance-disputes.module";
 import { AuthModule } from "./auth/auth.module";
 import { CompanionsModule } from "./companions/companions.module";
 import { CommunityModule } from "./community/community.module";
 import { CommercialModule } from "./commercial/commercial.module";
 import { configuration, validateEnvironment } from "./config/configuration";
 import { ConversationsModule } from "./conversations/conversations.module";
+import { CrisisInterventionModule } from "./crisis-intervention/crisis-intervention.module";
 import { AuditModule } from "./common/audit/audit.module";
 import { RequestIdMiddleware } from "./common/middleware/request-id.middleware";
 import { IpRateLimitMiddleware } from "./common/rate-limit/ip-rate-limit.middleware";
@@ -37,11 +40,14 @@ import { UsersModule } from "./users/users.module";
     DatabaseModule,
     AuditModule,
     AuthModule,
+    AccountGovernanceModule,
+    AttendanceDisputesModule,
     UsersModule,
     CompanionsModule,
     FavoritesModule,
     CommunityModule,
     ConversationsModule,
+    CrisisInterventionModule,
     ModerationModule,
     OrdersModule,
     PaymentsModule,

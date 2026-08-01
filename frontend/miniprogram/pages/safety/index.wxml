@@ -24,17 +24,78 @@
   </view>
 
   <view class="card action-card">
-    <view class="section-title">举报与申请复核</view>
-    <view class="section-copy">在具体聊天中，你可以举报整个会话，或长按一条消息举报该内容。若聊天提示可申请复核，可在同一会话提交说明。</view>
-    <view class="section-note">安全中心不会代你提交举报或读取聊天内容，避免脱离具体会话产生误报。</view>
-    <button class="secondary-button" bindtap="openMessages">前往消息</button>
+    <view class="section-title">举报与处理进度</view>
+    <view class="section-copy">你可以在这里新建安全举报；若事件与具体聊天有关，也可在聊天中举报整个会话或长按一条消息举报该内容。</view>
+    <view class="section-note">提交后会生成案件编号，并可查看受理、审核、处置结果及补充说明。平台不会把“已提交”冒充“已处理”。</view>
+    <button class="primary-action" bindtap="openSafetyReport">新建安全举报</button>
+    <button class="secondary-button" bindtap="openMessages">从具体消息举报</button>
+  </view>
+
+  <view class="card appeal-card">
+    <view class="section-title">我的内容申诉</view>
+    <view class="section-copy">被拦截的内容或聊天限言可以在通知中发起一次申诉。提交后由非原处置审核员独立复核，平台会展示计划处理时间和最终结果。</view>
+    <view wx:if="{{focusCaseId || focusAppealId || focusRestrictionId}}" class="section-note">
+      正在显示这条通知对应的处置或申诉。
+      <button class="text-button" bindtap="clearNotificationFocus">查看全部记录</button>
+    </view>
+    <view class="appeal-subtitle">可以申请复核</view>
+    <view wx:if="{{appealableCasesLoading}}" class="appeal-state">正在核对可申诉处置…</view>
+    <view wx:elif="{{appealableCasesError}}" class="appeal-error" role="alert">
+      <view>{{appealableCasesError}}</view>
+      <button class="retry-button" bindtap="retryAppealableCases">重新核对</button>
+    </view>
+    <block wx:elif="{{appealableCases.length}}">
+      <view wx:for="{{appealableCases}}" wx:key="caseId" class="appeal-item eligible-item">
+        <view class="appeal-head">
+          <view class="appeal-status status-pending">可申诉</view>
+          <view class="appeal-id">案件 {{item.caseId}}</view>
+        </view>
+        <view class="appeal-reason">{{item.summary}}</view>
+        <view wx:if="{{item.contentPreview}}" class="appeal-preview">{{item.contentPreview}}</view>
+        <view class="appeal-deadline">请在 {{item.appealDeadlineText}} 前提交</view>
+        <view wx:if="{{item.restrictionEndsAtText}}" class="appeal-meta">限制预计结束：{{item.restrictionEndsAtText}}</view>
+        <view class="appeal-meta">处置时间 {{item.createdAtText}} · 规则版本 {{item.policyVersion}}</view>
+        <button class="appeal-submit" data-case-id="{{item.caseId}}" loading="{{submittingCaseId === item.caseId}}" disabled="{{submittingCaseId !== ''}}" bindtap="appealCase">申请独立复核</button>
+      </view>
+    </block>
+    <view wx:elif="{{appealableCasesLoaded}}" class="appeal-state">目前没有处于提交期限内的可申诉处置。</view>
+    <view wx:if="{{appealableCasesTotalPages > 1}}" class="rule-actions">
+      <button class="text-button" disabled="{{appealableCasesPage <= 1}}" bindtap="previousAppealableCasesPage">上一页</button>
+      <text>共 {{appealableCasesTotal}} 条 · {{appealableCasesPage}} / {{appealableCasesTotalPages}} 页</text>
+      <button class="text-button" disabled="{{appealableCasesPage >= appealableCasesTotalPages}}" bindtap="nextAppealableCasesPage">下一页</button>
+    </view>
+    <view class="appeal-subtitle history-subtitle">处理记录</view>
+    <view wx:if="{{appealsLoading}}" class="appeal-state">正在同步申诉状态…</view>
+    <view wx:elif="{{appealsError}}" class="appeal-error" role="alert">
+      <view>{{appealsError}}</view>
+      <button class="retry-button" bindtap="retryAppeals">重新加载</button>
+    </view>
+    <block wx:elif="{{appeals.length}}">
+      <view wx:for="{{appeals}}" wx:key="id" class="appeal-item {{item.overdue ? 'appeal-overdue' : ''}}">
+        <view class="appeal-head">
+          <view class="appeal-status status-{{item.status}}">{{item.statusText}}</view>
+          <view class="appeal-id">案件 {{item.caseId}}</view>
+        </view>
+        <view class="appeal-reason">{{item.reason}}</view>
+        <view class="appeal-deadline">{{item.reviewStateText}}</view>
+        <view wx:if="{{item.reviewedAtText}}" class="appeal-meta">{{item.reviewedAtText}}</view>
+        <view class="appeal-meta">提交于 {{item.createdAtText}} · 规则版本 {{item.policyVersion}}</view>
+      </view>
+    </block>
+    <view wx:elif="{{appealsLoaded}}" class="appeal-state">目前没有内容申诉记录。</view>
+    <view wx:if="{{appealsTotalPages > 1}}" class="rule-actions">
+      <button class="text-button" disabled="{{appealsPage <= 1}}" bindtap="previousAppealsPage">上一页</button>
+      <text>共 {{appealsTotal}} 条 · {{appealsPage}} / {{appealsTotalPages}} 页</text>
+      <button class="text-button" disabled="{{appealsPage >= appealsTotalPages}}" bindtap="nextAppealsPage">下一页</button>
+    </view>
   </view>
 
   <view class="card action-card">
-    <view class="section-title">订单、退款与售后</view>
-    <view class="section-copy">需要处理退款、履约、骚扰或安全问题时，请在订单页选择对应订单后提交售后或安全工单；工单进度会显示在订单中。</view>
-    <view class="section-note">此入口不创建工单。没有关联订单时，请先从具体聊天使用举报入口。</view>
-    <button class="secondary-button" bindtap="openOrders">前往订单</button>
+    <view class="section-title">客服案件、订单与售后</view>
+    <view class="section-copy">退款、支付、履约、隐私与一般问题可创建客服案件。若问题对应某一订单，建议先从订单详情进入售后，以便自动关联订单。</view>
+    <view class="section-note">客服案件与安全举报分开记录；列表加载不完整时会明确提示，不会用空列表冒充没有案件。</view>
+    <button class="primary-action" bindtap="openSupportCenter">查看全部案件</button>
+    <button class="secondary-button" bindtap="openOrders">从订单进入售后</button>
   </view>
 
   <view class="card rules-card">
@@ -46,5 +107,5 @@
     </view>
   </view>
 
-  <view class="safety-footer">本页只提供说明和跳转：不会读取聊天或订单正文、保存安全标签、发送消息或替你创建举报与工单。</view>
+  <view class="safety-footer">只有在你确认提交举报或客服表单后，平台才会创建案件；单纯浏览本页或离开当前互动不会写入安全记录。</view>
 </view>

@@ -19,7 +19,7 @@
       <view class="title">服务商品</view>
       <view class="muted">客户只会看到“已上架”的服务。暂停服务不会改写已创建订单的价格、时长或服务内容。</view>
       <view class="workbench-actions">
-        <button class="primary-button create-button" bindtap="openCreate">新建服务</button>
+        <button class="primary-button create-button" disabled="{{offeringTotal >= 50}}" bindtap="openCreate">{{offeringTotal >= 50 ? '已达 50 项上限' : '新建服务'}}</button>
         <button class="plain-button availability-button" bindtap="openAvailabilityWindows">查看可约时段</button>
       </view>
     </view>
@@ -42,10 +42,13 @@
       <view class="offering-actions">
         <button class="plain-button action-button" bindtap="editOffering" data-id="{{item.id}}">编辑</button>
         <button class="plain-button action-button" loading="{{changingOfferingId === item.id}}" bindtap="toggleOfferingActive" data-id="{{item.id}}">{{item.isActive ? '暂停' : '上架'}}</button>
-        <button class="plain-button direction-button" disabled="{{!item.canMoveUp || reorderingId !== ''}}" loading="{{reorderingId === item.id}}" bindtap="moveOffering" data-id="{{item.id}}" data-direction="-1">上移</button>
-        <button class="plain-button direction-button" disabled="{{!item.canMoveDown || reorderingId !== ''}}" loading="{{reorderingId === item.id}}" bindtap="moveOffering" data-id="{{item.id}}" data-direction="1">下移</button>
+        <button class="plain-button direction-button" disabled="{{!item.canMoveUp || reorderingId !== '' || offerings.length < offeringTotal}}" loading="{{reorderingId === item.id}}" bindtap="moveOffering" data-id="{{item.id}}" data-direction="-1">上移</button>
+        <button class="plain-button direction-button" disabled="{{!item.canMoveDown || reorderingId !== '' || offerings.length < offeringTotal}}" loading="{{reorderingId === item.id}}" bindtap="moveOffering" data-id="{{item.id}}" data-direction="1">下移</button>
       </view>
     </view>
+    <view wx:if="{{offerings.length}}" class="catalog-pagination">已显示 {{offerings.length}} / {{offeringTotal}} 项</view>
+    <view wx:if="{{offeringsLoadMoreError}}" class="catalog-pagination-error" aria-live="polite">{{offeringsLoadMoreError}}</view>
+    <button wx:if="{{offeringPage < offeringTotalPages}}" class="plain-button load-more-button" loading="{{offeringsLoadingMore}}" disabled="{{offeringsLoadingMore}}" bindtap="loadMoreOfferings">{{offeringsLoadMoreError ? '重试加载更多' : '加载更多服务商品'}}</button>
   </view>
 
   <view wx:if="{{editorVisible}}" class="editor-mask">
@@ -78,14 +81,19 @@
       <view class="field-hint">最低 ¥1.00，最高 ¥20,000.00；平台会以分为单位准确保存。</view>
 
       <view class="field-label">关联主题（可选，最多 6 个）</view>
-      <view wx:if="{{topicChoices.length}}" class="topic-choices">
-        <view wx:for="{{topicChoices}}" wx:key="id" class="topic-choice {{item.selected ? 'selected' : ''}}" bindtap="toggleFormTopic" data-id="{{item.id}}">{{item.selected ? '✓ ' : ''}}{{item.name}}</view>
+      <view wx:if="{{topicsState === 'loading'}}" class="field-hint" aria-live="polite">正在读取服务主题…</view>
+      <view wx:elif="{{topicsState === 'error'}}" class="topic-state-error" aria-live="polite">
+        <view>{{topicsError}}</view>
+        <button class="topic-retry" bindtap="retryTopics" aria-label="重新读取服务主题">重新读取主题</button>
       </view>
-      <view wx:else class="field-hint">主题暂时无法加载，不影响保存服务。</view>
+      <view wx:elif="{{topicsState === 'available'}}" class="topic-choices">
+        <view wx:for="{{topicChoices}}" wx:key="id" class="topic-choice {{item.selected ? 'selected' : ''}}" bindtap="toggleFormTopic" data-id="{{item.id}}" aria-role="checkbox" aria-checked="{{item.selected}}" aria-label="服务主题：{{item.name}}" tabindex="0">{{item.selected ? '✓ ' : ''}}{{item.name}}</view>
+      </view>
+      <view wx:else class="field-hint">平台当前没有可选择的服务主题；不影响保存服务。</view>
 
       <view class="publish-row">
         <view><view class="field-label compact-label">立即上架</view><view class="field-hint">关闭则保存为草稿，客户不可见。</view></view>
-        <switch checked="{{formActive}}" color="#B94A68" bindchange="setFormActive" />
+        <switch checked="{{formActive}}" color="#B94A68" bindchange="setFormActive" aria-label="{{formActive ? '停用' : '启用'}}当前服务商品" />
       </view>
 
       <view wx:if="{{formError}}" class="form-error">{{formError}}</view>

@@ -7,6 +7,8 @@ import { CompanionsService } from "./companions.service";
 import { ApplyCompanionDto, UpdateOwnCompanionDto } from "./dto/apply-companion.dto";
 import { ListCompanionAvailabilityQueryDto } from "./dto/list-companion-availability.dto";
 import { ListCompanionsQueryDto } from "./dto/list-companions.dto";
+import { ListOwnScheduleItemsDto } from "./dto/list-own-schedule-items.dto";
+import { ListServiceOfferingsDto } from "./dto/list-service-offerings.dto";
 import { CreateOwnAvailabilityWindowDto, UpdateOwnAvailabilityWindowDto } from "./dto/manage-availability-window.dto";
 import {
   CreateOwnAvailabilityBlackoutDto,
@@ -49,8 +51,11 @@ export class CompanionsController {
 
   @Get("me/service-offerings")
   @UseGuards(JwtAuthGuard)
-  listOwnServiceOfferings(@CurrentUser() user: AuthenticatedUser) {
-    return this.companionsService.listOwnServiceOfferings(user.id);
+  listOwnServiceOfferings(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: ListServiceOfferingsDto = new ListServiceOfferingsDto()
+  ) {
+    return this.companionsService.listOwnServiceOfferings(user.id, query);
   }
 
   @Post("me/service-offerings")
@@ -71,8 +76,11 @@ export class CompanionsController {
 
   @Get("me/availability-windows")
   @UseGuards(JwtAuthGuard)
-  listOwnAvailabilityWindows(@CurrentUser() user: AuthenticatedUser) {
-    return this.companionsService.listOwnAvailabilityWindows(user.id);
+  listOwnAvailabilityWindows(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: ListOwnScheduleItemsDto = new ListOwnScheduleItemsDto()
+  ) {
+    return this.companionsService.listOwnAvailabilityWindows(user.id, query);
   }
 
   @Post("me/availability-windows")
@@ -93,8 +101,11 @@ export class CompanionsController {
 
   @Get("me/availability-schedule/rules")
   @UseGuards(JwtAuthGuard)
-  listOwnRecurringAvailabilityRules(@CurrentUser() user: AuthenticatedUser) {
-    return this.companionsService.listOwnRecurringAvailabilityRules(user.id);
+  listOwnRecurringAvailabilityRules(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: ListOwnScheduleItemsDto = new ListOwnScheduleItemsDto()
+  ) {
+    return this.companionsService.listOwnRecurringAvailabilityRules(user.id, query);
   }
 
   @Post("me/availability-schedule/rules")
@@ -114,8 +125,11 @@ export class CompanionsController {
 
   @Get("me/availability-schedule/blackouts")
   @UseGuards(JwtAuthGuard)
-  listOwnAvailabilityBlackouts(@CurrentUser() user: AuthenticatedUser) {
-    return this.companionsService.listOwnAvailabilityBlackouts(user.id);
+  listOwnAvailabilityBlackouts(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: ListOwnScheduleItemsDto = new ListOwnScheduleItemsDto()
+  ) {
+    return this.companionsService.listOwnAvailabilityBlackouts(user.id, query);
   }
 
   @Post("me/availability-schedule/blackouts")
@@ -132,8 +146,17 @@ export class CompanionsController {
 
   @Get("me/availability-schedule/drafts")
   @UseGuards(JwtAuthGuard)
-  listOwnRecurringAvailabilityDrafts(@CurrentUser() user: AuthenticatedUser) {
-    return this.companionsService.listOwnRecurringAvailabilityDrafts(user.id);
+  listOwnRecurringAvailabilityDrafts(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: ListOwnScheduleItemsDto = new ListOwnScheduleItemsDto()
+  ) {
+    return this.companionsService.listOwnRecurringAvailabilityDrafts(user.id, query);
+  }
+
+  @Post("me/availability-schedule/drafts/materialize")
+  @UseGuards(JwtAuthGuard)
+  materializeOwnRecurringAvailabilityDrafts(@CurrentUser() user: AuthenticatedUser) {
+    return this.companionsService.materializeOwnRecurringAvailabilityDrafts(user.id);
   }
 
   @Patch("me/availability-schedule/drafts/:id/activate")
@@ -146,8 +169,11 @@ export class CompanionsController {
   }
 
   @Get(":id/service-offerings")
-  listServiceOfferings(@Param("id") id: string) {
-    return this.companionsService.listPublishedServiceOfferings(id);
+  listServiceOfferings(
+    @Param("id") id: string,
+    @Query() query: ListServiceOfferingsDto = new ListServiceOfferingsDto()
+  ) {
+    return this.companionsService.listPublishedServiceOfferings(id, query);
   }
 
   @Get(":id/availability")

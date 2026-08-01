@@ -4,7 +4,7 @@ import { ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { ConfigService } from "@nestjs/config";
 import { NestExpressApplication } from "@nestjs/platform-express";
-import { json, urlencoded } from "express";
+import { json, text, urlencoded } from "express";
 import helmet from "helmet";
 import "reflect-metadata";
 
@@ -20,6 +20,7 @@ async function bootstrap() {
   });
   const config = app.get(ConfigService);
   const bodyLimit = config.get<string>("BODY_SIZE_LIMIT") ?? "1mb";
+  const apiPrefix = config.getOrThrow<string>("API_PREFIX").replace(/^\/+|\/+$/g, "");
 
   // Production is deployed behind exactly one trusted reverse-proxy hop (the compose Nginx
   // service). Express then derives req.ip from the right-most untrusted address instead of
@@ -38,6 +39,14 @@ async function bootstrap() {
       }
     }
   }));
+  // Large historical statements use a route-scoped text parser. This keeps
+  // the ordinary JSON API at its small global limit while making the promised
+  // 20 MiB import reachable without serializing the raw bill into JSON. The
+  // text exists only on the request object and is never copied to rawBody.
+  app.use(
+    `/${apiPrefix}/admin/commercial/payment-reconciliation/merchant-imports/text`,
+    text({ type: ["text/plain", "text/csv"], limit: "20mb", defaultCharset: "utf-8" })
+  );
   app.use(
     json({
       limit: bodyLimit,
@@ -55,12 +64,10 @@ async function bootstrap() {
   const router: any = app.getHttpAdapter();
   router.get("/review", (_req: any, res: any) => res.redirect(302, "/review/"));
   router.get("/review/", (_req: any, res: any) => res.sendFile(join(publicRoot, "review", "index.html")));
-  // Preserve a safe bookmark migration without leaving the former user-role
-  // review dashboard available as an alternate data path.
-  router.get("/admin", (_req: any, res: any) => res.redirect(302, "/review/"));
-  router.get("/admin/", (_req: any, res: any) => res.redirect(302, "/review/"));
+  router.get("/admin", (_req: any, res: any) => res.redirect(302, "/admin/"));
+  router.get("/admin/", (_req: any, res: any) => res.sendFile(join(publicRoot, "admin", "index.html")));
 
-  app.setGlobalPrefix(config.getOrThrow<string>("API_PREFIX"));
+  app.setGlobalPrefix(apiPrefix);
   app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }));
   app.useGlobalInterceptors(new EnvelopeInterceptor());
   app.useGlobalFilters(new HttpExceptionFilter());

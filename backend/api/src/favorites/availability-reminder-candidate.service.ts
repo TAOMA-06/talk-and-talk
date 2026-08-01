@@ -1,7 +1,5 @@
 import { Injectable } from "@nestjs/common";
 
-import { publicFavoriteCompanionWhere } from "./favorite-companion-eligibility";
-
 type CandidateWindow = {
   id: string;
   companionId: string;
@@ -12,42 +10,30 @@ type CandidateWindow = {
 };
 
 /**
- * Turns one owner-created or reactivated structured window into a bounded,
- * internal candidate set. It intentionally has no dependency on a delivery
- * worker, notification model, order details, conversation, or user profile.
- * The later delivery path must treat every row as a hint and recheck all live
- * eligibility, capacity, authorization, and frequency conditions.
+ * Records one durable fanout job for an owner-created or reactivated window.
+ * This method runs inside the owner calendar transaction, so its work must stay
+ * O(1): it never scans bookmarks or writes one row per recipient. The bounded
+ * fanout worker later expands the job into private candidates and all later
+ * stages still recheck live eligibility and authorization.
  */
 @Injectable()
 export class AvailabilityReminderCandidateService {
   async recordWindowBecameAvailable(db: any, window: CandidateWindow) {
-    if (!this.isFutureActiveWindow(window)) return { created: 0 };
+    if (!this.isFutureActiveWindow(window)) return { created: 0, queued: 0 };
 
-    const favorites = await db.companionFavorite.findMany({
-      where: {
-        companionId: window.companionId,
-        availabilityReminderEnabled: true,
-        availabilityReminderGrantId: { not: null },
-        companion: { is: publicFavoriteCompanionWhere() }
-      },
-      select: { id: true }
-    });
-    if (!favorites.length) return { created: 0 };
-
-    // The unique favorite/window/version key makes a repeated write or retry
-    // safe while still allowing a later true reactivation of the same window
-    // to become a separate candidate.
-    // No recipient-facing record, reminder schedule, or delivery is created.
-    const result = await db.availabilityReminderCandidate.createMany({
-      data: favorites.map((favorite: { id: string }) => ({
-        favoriteId: favorite.id,
+    // The unique window/version key makes repeated calendar writes idempotent,
+    // while a later real reactivation (and therefore a new updatedAt) becomes a
+    // separate event. This is still neither a notification nor delivery proof.
+    const result = await db.availabilityReminderFanoutJob.createMany({
+      data: [{
         companionId: window.companionId,
         availabilityWindowId: window.id,
-        availabilityWindowUpdatedAt: window.updatedAt
-      })),
+        availabilityWindowUpdatedAt: window.updatedAt,
+        audienceCutoffAt: new Date()
+      }],
       skipDuplicates: true
     });
-    return { created: result.count };
+    return { created: 0, queued: result.count };
   }
 
   private isFutureActiveWindow(window: CandidateWindow) {

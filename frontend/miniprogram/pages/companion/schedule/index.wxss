@@ -1,0 +1,21 @@
+.hero { padding: 34rpx 30rpx; border-radius: 28rpx; background: linear-gradient(135deg, #fff, #eaf4ff); box-shadow: 0 10rpx 28rpx rgba(50, 78, 96, 0.08); }
+.eyebrow { color: #447ca7; font-size: 24rpx; font-weight: 700; }
+.hero-title { margin-top: 10rpx; font-size: 38rpx; font-weight: 700; }
+.hero-copy { margin-top: 14rpx; color: #587083; font-size: 25rpx; line-height: 1.6; }
+.suspended { margin-top: 20rpx; padding: 18rpx; border-radius: 16rpx; background: #ffeadf; color: #8c4526; font-size: 24rpx; line-height: 1.55; }
+.inline-error { margin-top: 20rpx; padding: 18rpx; border-radius: 16rpx; background: #fff0f0; color: #a43f3f; font-size: 24rpx; }
+.section-title { margin: 34rpx 4rpx 16rpx; font-size: 30rpx; font-weight: 700; }
+.form-card { padding: 26rpx; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14rpx; margin-bottom: 20rpx; }
+.picker-field { box-sizing: border-box; min-height: 76rpx; padding: 18rpx; border: 2rpx solid #dce8ee; border-radius: 15rpx; background: #f8fcff; color: #445d70; font-size: 24rpx; line-height: 38rpx; }
+.row-card { display: flex; align-items: center; gap: 18rpx; padding: 24rpx; }
+.row-main { flex: 1; min-width: 0; }
+.row-title { color: #364d5d; font-size: 27rpx; font-weight: 700; line-height: 1.45; }
+.row-note { margin-top: 8rpx; color: #8295a3; font-size: 22rpx; line-height: 1.5; }
+.small-button { flex: none; margin: 0; padding: 0 18rpx; background: #f0f6fa; color: #4c7897; font-size: 23rpx; line-height: 62rpx; }
+.small-button.approve { background: #e4f4ea; color: #2d7547; }
+.empty-card { color: #7f929f; font-size: 24rpx; line-height: 1.6; }
+.draft-control { padding: 26rpx; }
+.secondary-button { margin-top: 18rpx; background: #edf5fa; color: #3f759b; }
+.empty-title { margin-bottom: 14rpx; color: #4b353a; font-size: 34rpx; font-weight: 700; }
+.retry { margin-top: 28rpx; }

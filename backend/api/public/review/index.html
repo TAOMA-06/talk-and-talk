@@ -69,6 +69,9 @@
           <button class="nav-item" data-view-target="labels" type="button">
             <span class="nav-icon" aria-hidden="true">◇</span><span>样本标注</span>
           </button>
+          <button id="staffOffboardingNav" class="nav-item lead-only" data-view-target="staff" type="button">
+            <span class="nav-icon" aria-hidden="true">⇄</span><span>人员交接</span>
+          </button>
         </nav>
         <div class="sidebar-bottom">
           <div class="reviewer-card">
@@ -86,6 +89,7 @@
             <h1 id="pageTitle">审核工作台</h1>
           </div>
           <div class="header-actions">
+            <span id="sessionRemaining" class="session-chip" aria-live="polite">会话：—</span>
             <span id="lastUpdated" class="last-updated">尚未加载</span>
             <button id="refreshButton" class="button quiet" type="button">刷新队列</button>
           </div>
@@ -150,10 +154,44 @@
                 <label><span>实际判断</span><select id="actualDecision"><option value="allow">放行 allow</option><option value="review">复核 review</option><option value="warn">提醒 warn</option><option value="block">拦截 block</option></select></label>
               </div>
               <label><span>备注（可选）</span><input id="labelNote" maxlength="1000" placeholder="说明策略边界或上下文" /></label>
-              <div class="form-actions"><button class="button primary" type="submit">保存样本</button><button id="exportLabelsButton" class="button quiet" type="button">导出 JSON</button></div>
+              <div class="form-actions"><button class="button primary" type="submit">保存样本</button><button id="exportLabelsButton" class="button quiet lead-only" type="button">开始分批导出 JSON（负责人）</button></div>
+              <p id="exportPolicyNote" class="policy-note">审核样本导出仅限审核负责人，导出动作会写入独立审计轨迹。</p>
               <p id="labelMessage" class="form-message" role="alert"></p>
             </form>
           </div>
+        </section>
+
+        <section id="staffView" class="view-panel hidden">
+          <article class="panel-surface staff-offboarding-shell">
+            <div class="staff-offboarding-heading">
+              <div>
+                <p class="eyebrow">SECURE OFFBOARDING</p>
+                <h2>审核人员安全离职</h2>
+                <p>仅 active 审核负责人可执行。操作会停用独立审核身份、撤销全部审核会话，并将未结案件明确转派或交回未分配队列。</p>
+              </div>
+              <span class="policy-chip">历史审计与处置记录永久保留</span>
+            </div>
+            <div class="offboarding-rules" role="note">
+              <span>禁止自停用</span><span>禁止停用最后一名 active lead</span><span>不删除 ReviewAuditLog / ModerationActionLog</span>
+            </div>
+            <form id="staffOffboardingFilterForm" class="staff-directory-filters">
+              <input id="staffOffboardingKeyword" maxlength="120" placeholder="姓名或审核账号" aria-label="搜索审核人员" />
+              <select id="staffOffboardingStatus" aria-label="审核身份状态"><option value="">全部状态</option><option value="active">active</option><option value="suspended">已停用</option></select>
+              <select id="staffOffboardingRole" aria-label="审核身份角色"><option value="">全部角色</option><option value="lead">负责人 lead</option><option value="reviewer">审核员 reviewer</option></select>
+              <button class="button quiet" type="submit">筛选目录</button>
+            </form>
+            <form id="staffHandoffReviewerFilterForm" class="staff-directory-filters handoff-search">
+              <input id="staffHandoffReviewerKeyword" maxlength="120" placeholder="查找 active 交接人" aria-label="搜索 active 交接审核员" />
+              <select id="staffHandoffReviewerRole" aria-label="交接审核员角色"><option value="">全部 active 角色</option><option value="lead">负责人 lead</option><option value="reviewer">审核员 reviewer</option></select>
+              <button class="button quiet" type="submit">查找交接人</button>
+              <button id="staffHandoffReviewerMore" class="button quiet" type="button">加载更多交接人</button>
+            </form>
+            <p id="staffHandoffReviewerStatus" class="directory-status" aria-live="polite"></p>
+            <div id="staffOffboardingList" class="staff-offboarding-list" aria-live="polite"></div>
+            <div id="staffOffboardingPagination" class="pagination"></div>
+            <p id="staffOffboardingStatusMessage" class="directory-status" aria-live="polite"></p>
+            <p id="staffOffboardingMessage" class="form-message" role="alert"></p>
+          </article>
         </section>
       </main>
     </div>

@@ -7,6 +7,12 @@ import { VoiceModule } from "../voice/voice.module";
 import { PaymentsController } from "./payments.controller";
 import { PaymentsReconciliationWorker } from "./payments-reconciliation.worker";
 import { PaymentsService } from "./payments.service";
+import { WeChatDailyReconciliationService } from "./wechat-daily-reconciliation.service";
+import { WeChatDailyReconciliationWorker } from "./wechat-daily-reconciliation.worker";
+import { AdminPaymentDisputesController } from "./admin-payment-disputes.controller";
+import { PaymentDisputesController } from "./payment-disputes.controller";
+import { PaymentDisputesService } from "./payment-disputes.service";
+import { PaymentDisputesWorker } from "./payment-disputes.worker";
 import { DisabledWeChatPayProvider } from "./wechat/disabled-wechat-pay.provider";
 import { MockWeChatPayProvider } from "./wechat/mock-wechat-pay.provider";
 import { RealWeChatPayProvider, isWeChatConfigured } from "./wechat/real-wechat-pay.provider";
@@ -14,10 +20,14 @@ import { WECHAT_PAY_PROVIDER } from "./wechat/wechat-pay.provider";
 
 @Module({
   imports: [forwardRef(() => OrdersModule), NotificationsModule, VoiceModule],
-  controllers: [PaymentsController],
+  controllers: [PaymentsController, PaymentDisputesController, AdminPaymentDisputesController],
   providers: [
     PaymentsService,
     PaymentsReconciliationWorker,
+    WeChatDailyReconciliationService,
+    WeChatDailyReconciliationWorker,
+    PaymentDisputesService,
+    PaymentDisputesWorker,
     {
       provide: WECHAT_PAY_PROVIDER,
       useFactory: (config: ConfigService) => {
@@ -66,6 +76,6 @@ import { WECHAT_PAY_PROVIDER } from "./wechat/wechat-pay.provider";
       inject: [ConfigService]
     }
   ],
-  exports: [PaymentsService, WECHAT_PAY_PROVIDER]
+  exports: [PaymentsService, PaymentDisputesService, WeChatDailyReconciliationService, WECHAT_PAY_PROVIDER]
 })
 export class PaymentsModule {}

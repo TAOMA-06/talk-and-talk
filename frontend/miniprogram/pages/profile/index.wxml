@@ -1,72 +1,142 @@
 <view class="page">
   <view wx:if="{{profileLoading}}" class="empty">正在加载…</view>
+  <view wx:elif="{{profileError}}" class="empty" aria-live="polite">
+    <view>{{profileError}}</view>
+    <button class="resource-retry" bindtap="load" aria-label="重新加载个人中心">重新加载个人中心</button>
+  </view>
   <view wx:else>
     <view class="card" wx:if="{{user}}">
       <view class="title">{{user.profile.displayName || '微信用户'}}</view>
       <view class="muted">{{user.role === 'companion' ? '陪伴者' : '普通用户'}} · 平台内沟通</view>
       <input value="{{displayName}}" bindinput="setDisplayName" placeholder="显示名称" maxlength="30" />
-      <picker mode="selector" range="{{genderLabels}}" bindchange="setGender"><view class="picker">性别：{{genderLabel}}</view></picker>
+      <picker mode="selector" range="{{genderLabels}}" value="{{genderIndex}}" bindchange="setGender" aria-label="选择性别，当前为{{genderLabel}}"><view class="picker">性别：{{genderLabel}}</view></picker>
+      <view class="profile-field-copy">选择“暂不透露”会把已保存的性别清空为未提供，不会写入虚构类别。</view>
       <button class="primary-button" loading="{{saving}}" bindtap="saveProfile">保存资料</button>
     </view>
-    <view class="card" wx:if="{{recommendationPreferences}}">
-      <view class="recommendation-header"><view><view class="title small">个性化推荐</view><view class="muted">只使用你主动填写的偏好、卡片互动和订单主题，不读取聊天内容。</view></view><switch checked="{{recommendationPreferences.personalizationEnabled}}" color="#B94A68" bindchange="setPersonalization" /></view>
+    <view class="profile-hub">
+      <view class="profile-hub-item" bindtap="openAccountCenter" aria-role="button" aria-label="打开账户与隐私：安全、账单、数据权利" tabindex="0"><view class="profile-hub-title">账户与隐私</view><view class="profile-hub-copy">安全、账单、数据权利</view></view>
+      <view class="profile-hub-item" bindtap="openNotificationCenter" aria-role="button" aria-label="打开通知中心" tabindex="0"><view class="profile-hub-title">通知中心</view><view class="profile-hub-copy">{{unreadNotificationState === 'available' ? unreadNotificationCount + ' 条未读' : '未读数待核对'}}</view></view>
+      <view class="profile-hub-item" bindtap="openSupportCenter" aria-role="button" aria-label="打开案件中心：安全与客服进度" tabindex="0"><view class="profile-hub-title">案件中心</view><view class="profile-hub-copy">安全与客服进度</view></view>
+    </view>
+    <view class="card resource-error-card" wx:if="{{recommendationSettingsState === 'error'}}" aria-live="polite">
+      <view class="title small">个性化推荐设置暂不可用</view>
+      <view class="muted">{{recommendationSettingsError}}</view>
+      <button class="resource-retry" bindtap="load" aria-label="重新读取个性化推荐设置">重新读取推荐设置</button>
+    </view>
+    <view class="card" wx:elif="{{recommendationSettingsState === 'available' && recommendationPreferences}}">
+      <view class="recommendation-header"><view><view class="title small">个性化推荐</view><view class="muted">只使用你主动填写的偏好、卡片互动和订单主题，不读取聊天内容。</view></view><switch checked="{{recommendationPreferences.personalizationEnabled}}" color="#B94A68" bindchange="setPersonalization" aria-label="{{recommendationPreferences.personalizationEnabled ? '关闭' : '开启'}}个性化推荐" /></view>
       <view wx:if="{{recommendationPreferences.personalizationEnabled}}">
         <view class="recommendation-label">感兴趣的主题</view>
-        <view class="choices"><view wx:for="{{recommendationTopics}}" wx:key="id" class="choice {{item.selected ? 'selected' : ''}}" bindtap="toggleRecommendationTopic" data-id="{{item.id}}">{{item.selected ? '✓ ' : ''}}{{item.name}}</view></view>
+        <view class="choices"><view wx:for="{{recommendationTopics}}" wx:key="id" class="choice {{item.selected ? 'selected' : ''}}" bindtap="toggleRecommendationTopic" data-id="{{item.id}}" aria-role="checkbox" aria-checked="{{item.selected}}" aria-label="推荐主题：{{item.name}}" tabindex="0">{{item.selected ? '✓ ' : ''}}{{item.name}}</view></view>
         <input value="{{recommendationCity}}" bindinput="setRecommendationCity" placeholder="常用城市（可选）" maxlength="40" />
         <input value="{{recommendationMaxPrice}}" bindinput="setRecommendationMaxPrice" placeholder="每 30 分钟预算上限（可选）" type="number" />
         <view class="recommendation-label">偏好的服务时段</view>
-        <view class="choices"><view wx:for="{{recommendationTimeOptions}}" wx:key="value" class="choice {{item.selected ? 'selected' : ''}}" bindtap="toggleRecommendationTime" data-value="{{item.value}}">{{item.selected ? '✓ ' : ''}}{{item.value}}</view></view>
+        <view class="choices"><view wx:for="{{recommendationTimeOptions}}" wx:key="value" class="choice {{item.selected ? 'selected' : ''}}" bindtap="toggleRecommendationTime" data-value="{{item.value}}" aria-role="checkbox" aria-checked="{{item.selected}}" aria-label="推荐时段：{{item.value}}" tabindex="0">{{item.selected ? '✓ ' : ''}}{{item.value}}</view></view>
         <button class="primary-button" loading="{{recommendationSaving}}" bindtap="saveRecommendations">保存推荐设置</button>
       </view>
       <view wx:else class="muted recommendation-off">已关闭个性化排序；发现页将仅按当前场景、可用状态和服务质量展示。</view>
-      <view wx:if="{{recommendationPreferences.behavioralTags.length}}" class="behavior-tags"><view class="recommendation-label">行为标签</view><view class="muted">可随时删除；删除后不会再用该主题的历史互动或订单做排序。</view><view class="choices"><view wx:for="{{recommendationPreferences.behavioralTags}}" wx:key="id" class="behavior-tag" bindtap="deleteRecommendationTag" data-id="{{item.id}}">{{item.name}} ×</view></view></view>
+      <view wx:if="{{recommendationPreferences.behavioralTags.length}}" class="behavior-tags"><view class="recommendation-label">行为标签</view><view class="muted">可随时删除；删除后不会再用该主题的历史互动或订单做排序。</view><view class="choices"><view wx:for="{{recommendationPreferences.behavioralTags}}" wx:key="id" class="behavior-tag" bindtap="deleteRecommendationTag" data-id="{{item.id}}" aria-role="button" aria-label="删除行为标签：{{item.name}}" tabindex="0">{{item.name}} ×</view></view></view>
+    </view>
+    <view wx:if="{{user && user.role === 'user'}}" class="card recommendation-exclusions">
+      <view class="title small">不再推荐的陪伴者</view>
+      <view class="muted">这是私人推荐偏好，不是拉黑或举报；公开资料仍可手动搜索，订单、会话和书签不受影响。</view>
+      <view wx:if="{{recommendationExclusionsUnavailable}}" class="recommendation-exclusion-empty" aria-live="polite">
+        <view>推荐排除列表暂时无法读取；当前状态不会被当作“没有设置”。</view>
+        <button class="resource-retry" bindtap="load" aria-label="重新读取停止推荐列表">重新读取列表</button>
+      </view>
+      <view wx:elif="{{excludedRecommendationCompanions.length}}" class="recommendation-exclusion-list">
+        <view wx:for="{{excludedRecommendationCompanions}}" wx:key="companionId" class="recommendation-exclusion-item">
+          <view class="recommendation-exclusion-main">
+            <view class="recommendation-exclusion-avatar">{{item.companion.initials}}</view>
+            <view class="recommendation-exclusion-copy"><view class="recommendation-exclusion-name">{{item.companion.name}} · {{item.companion.role}}</view><view class="recommendation-exclusion-state">{{item.companion.currentlyPublic ? '仍可手动查看公开资料' : '当前不可公开查看'}}</view></view>
+          </view>
+          <view class="recommendation-exclusion-actions">
+            <button wx:if="{{item.companion.currentlyPublic}}" class="recommendation-exclusion-secondary" data-id="{{item.companionId}}" bindtap="openExcludedRecommendationCompanion">查看资料</button>
+            <button class="recommendation-exclusion-restore" data-id="{{item.companionId}}" bindtap="restoreExcludedRecommendationCompanion" loading="{{recommendationExclusionSavingId === item.companionId}}" disabled="{{recommendationExclusionSavingId !== ''}}">恢复推荐</button>
+          </view>
+        </view>
+        <view class="recommendation-exclusion-pagination">已显示 {{excludedRecommendationCompanions.length}} / {{recommendationExclusionsTotal}} 位</view>
+        <view wx:if="{{recommendationExclusionsLoadMoreError}}" class="favorite-pagination-error" aria-live="polite">{{recommendationExclusionsLoadMoreError}}</view>
+        <button wx:if="{{recommendationExclusionsPage < recommendationExclusionsTotalPages}}" class="resource-retry" loading="{{recommendationExclusionsLoadingMore}}" disabled="{{recommendationExclusionsLoadingMore}}" bindtap="loadMoreRecommendationExclusions">{{recommendationExclusionsLoadMoreError ? '重试加载更多' : '加载更多停止推荐记录'}}</button>
+      </view>
+      <view wx:else class="recommendation-exclusion-empty">目前没有停止推荐的陪伴者。</view>
     </view>
     <view wx:if="{{user && user.role === 'user'}}" class="card favorites-card">
       <view class="favorites-heading"><view><view class="title small">我的书签</view><view class="muted">仅你可见；只显示当前仍可公开查看的陪伴者。</view></view><view class="favorites-private">私人</view></view>
-      <view wx:if="{{favoriteCompanions.length}}" class="favorite-list">
-        <view wx:for="{{favoriteCompanions}}" wx:key="id" class="favorite-item" bindtap="openFavoriteCompanion" data-id="{{item.id}}">
+      <view wx:if="{{favoriteCompanionsState === 'error'}}" class="private-resource-error" aria-live="polite">
+        <view>{{favoriteCompanionsError}}</view>
+        <button class="resource-retry" bindtap="load" aria-label="重新读取私人书签">重新读取书签</button>
+      </view>
+      <view wx:elif="{{favoriteCompanionsState === 'available'}}" class="favorite-list">
+        <view wx:if="{{availabilityReminderChannelState === 'error'}}" class="private-resource-error">可约提醒通道状态暂时无法核对；为避免误导，新的开启操作已关闭，书签仍可使用。</view>
+        <view wx:elif="{{!availabilityReminderChannel.available}}" class="private-resource-error">{{availabilityReminderChannel.message}}</view>
+        <view wx:for="{{favoriteCompanions}}" wx:key="id" class="favorite-item" bindtap="openFavoriteCompanion" data-id="{{item.id}}" aria-role="button" aria-label="查看已收藏陪伴者：{{item.name}}" tabindex="0">
           <view class="favorite-item-main"><view class="favorite-item-name">{{item.name}} · {{item.role}}</view><view class="favorite-item-status">查看</view></view>
           <view class="favorite-item-meta">私人书签，不代表当前在售 · 进入资料页查看当前商品与可约时间</view>
-          <view class="favorite-reminder" catchtap="stopFavoriteReminderTap">
-            <view class="favorite-reminder-copy"><view class="favorite-reminder-title">可约提醒 <text class="favorite-reminder-state">{{item.availabilityReminderEnabled ? '已开启' : '未开启'}}</text></view><view class="favorite-reminder-description">{{item.availabilityReminderEnabled ? '已记录你的提醒意愿；不会立即发送提醒，实际可约仍以资料页为准。' : '开启时会请求一次微信订阅授权；不会通知陪伴者或改变订单。'}}</view><view class="favorite-reminder-limit">同一对象最多每 {{item.availabilityReminderMinimumIntervalHours}} 小时一次</view></view>
-            <switch data-id="{{item.id}}" checked="{{item.availabilityReminderEnabled}}" disabled="{{favoriteReminderSavingId !== ''}}" color="#55748F" catchchange="setFavoriteAvailabilityReminder" />
+          <view class="favorite-reminder" catchtap="stopFavoriteReminderTap" aria-role="group" aria-label="{{item.name}}的可约提醒设置">
+            <view class="favorite-reminder-copy"><view class="favorite-reminder-title">可约提醒 <text class="favorite-reminder-state">{{item.availabilityReminderEnabled ? '已开启' : availabilityReminderChannel.available ? '未开启' : '暂不可用'}}</text></view><view class="favorite-reminder-description">{{item.availabilityReminderEnabled ? '已记录你的提醒意愿；不会立即发送提醒，实际可约仍以资料页为准。' : availabilityReminderChannel.available ? '开启时会请求一次微信订阅授权；不会通知陪伴者或改变订单。' : '平台提醒通道尚未正式启用；收藏和手动查看不受影响。'}}</view><view class="favorite-reminder-limit">同一对象最多每 {{item.availabilityReminderMinimumIntervalHours}} 小时一次</view></view>
+            <switch data-id="{{item.id}}" checked="{{item.availabilityReminderEnabled}}" disabled="{{favoriteReminderSavingId !== '' || (!item.availabilityReminderEnabled && !availabilityReminderChannel.available)}}" color="#55748F" catchchange="setFavoriteAvailabilityReminder" aria-label="{{item.availabilityReminderEnabled ? '关闭' : '开启'}}{{item.name}}的可约提醒" />
           </view>
         </view>
+        <view class="favorite-pagination">
+          <view>已显示 {{favoriteCompanions.length}} / {{favoriteCompanionsTotal}} 个私人书签</view>
+          <view wx:if="{{favoriteCompanionsLoadMoreError}}" class="favorite-pagination-error">{{favoriteCompanionsLoadMoreError}}</view>
+          <button wx:if="{{favoriteCompanionsPage < favoriteCompanionsTotalPages}}" class="resource-retry" loading="{{favoriteCompanionsLoadingMore}}" disabled="{{favoriteCompanionsLoadingMore}}" bindtap="loadMoreFavoriteCompanions">{{favoriteCompanionsLoadMoreError ? '重试加载更多' : '加载更多书签'}}</button>
+          <view wx:else class="muted">已显示全部私人书签</view>
+        </view>
       </view>
-      <view wx:else class="favorites-empty">还没有保存的陪伴者。遇到想以后再看的资料，可以在资料页保存到这里。</view>
+      <view wx:elif="{{favoriteCompanionsState === 'empty'}}" class="favorites-empty">还没有保存的陪伴者。遇到想以后再看的资料，可以在资料页保存到这里。</view>
     </view>
     <view wx:if="{{user && user.role === 'user'}}" class="card recent-views-card">
       <view class="recent-views-heading"><view><view class="title small">最近浏览</view><view class="muted">仅你可见，最多保留 20 条；不用于推荐，也不会提示陪伴者。</view></view><view class="recent-views-private">私人</view></view>
-      <view wx:if="{{recentlyViewedCompanions.length}}" class="recent-views-list">
-        <view wx:for="{{recentlyViewedCompanions}}" wx:key="id" class="recent-view-item" bindtap="openRecentlyViewedCompanion" data-id="{{item.id}}">
+      <view wx:if="{{recentViewsState === 'error'}}" class="private-resource-error" aria-live="polite">
+        <view>{{recentViewsError}}</view>
+        <button class="resource-retry" bindtap="load" aria-label="重新读取最近浏览">重新读取最近浏览</button>
+      </view>
+      <view wx:elif="{{recentViewsState === 'available'}}" class="recent-views-list">
+        <view wx:for="{{recentlyViewedCompanions}}" wx:key="id" class="recent-view-item" bindtap="openRecentlyViewedCompanion" data-id="{{item.id}}" aria-role="button" aria-label="查看最近浏览陪伴者：{{item.name}}" tabindex="0">
           <view class="recent-view-item-main"><view class="recent-view-item-name">{{item.name}} · {{item.role}}</view><view class="recent-view-item-status">回看资料</view></view>
           <view class="recent-view-item-meta">历史回看，不代表当前在售 · 进入资料页查看当前商品与可约时间</view>
         </view>
         <button class="recent-views-clear" loading="{{clearingRecentViews}}" disabled="{{clearingRecentViews}}" bindtap="clearRecentlyViewedCompanions">清空最近浏览</button>
       </view>
-      <view wx:else class="recent-views-empty">打开过的、当前仍公开的陪伴者资料会出现在这里，方便你之后回看。</view>
+      <view wx:elif="{{recentViewsState === 'empty'}}" class="recent-views-empty">打开过的、当前仍公开的陪伴者资料会出现在这里，方便你之后回看。</view>
     </view>
     <view wx:if="{{user && user.role === 'user'}}" class="card safety-entry">
       <view class="title small">安全与支持</view>
       <view class="muted">了解资料核验、平台内沟通、举报/复核和订单售后；遇到不适时先停止互动。</view>
       <button class="safety-entry-button" bindtap="openSafetyCenter">查看安全与支持</button>
     </view>
-    <view wx:if="{{user && (user.role === 'companion' || hasCompanionProfile)}}" class="card companion-workbench">
+    <view wx:if="{{user && companionProfileState === 'error'}}" class="card resource-error-card" aria-live="polite">
+      <view class="title small">陪伴者身份状态暂不可用</view>
+      <view class="muted">{{companionProfileError}}</view>
+      <button class="resource-retry" bindtap="load" aria-label="重新核对陪伴者身份状态">重新核对身份状态</button>
+    </view>
+    <view wx:elif="{{user && (user.role === 'companion' || hasCompanionProfile)}}" class="card companion-workbench">
       <view class="title small">陪伴者工作台</view>
       <view class="muted">服务商品、可约时段、待确认预约和可结算收入集中在这里查看与处理。</view>
       <button class="primary-button workbench-button" bindtap="openCompanionWorkbench">进入工作台</button>
     </view>
-    <view wx:else class="card">
+    <view wx:elif="{{user && companionProfileState === 'available'}}" class="card">
       <view class="title small">陪伴者入驻</view>
-      <view class="muted">首发阶段仅开放平台已完成实名与资质审核的预配置陪伴者，暂不接受小程序内自助申请。</view>
+      <view class="muted">可在小程序内提交基础资料并查看实名、培训、协议与收款资质进度；提交申请不代表已获准接单。</view>
+      <button class="primary-button workbench-button" bindtap="openCompanionOnboarding">开始或继续入驻</button>
     </view>
     <view class="notification-header">
-      <view class="title section-title">通知<text wx:if="{{unreadNotificationCount}}">（{{unreadNotificationCount}} 未读）</text></view>
-      <button wx:if="{{unreadNotificationCount}}" class="text-button" loading="{{markingNotificationsRead}}" bindtap="markAllNotificationsRead">全部已读</button>
+      <view class="title section-title">最近通知<text wx:if="{{unreadNotificationState === 'available' && unreadNotificationCount}}">（{{unreadNotificationCount}} 未读）</text><text wx:elif="{{unreadNotificationState === 'error'}}">（未读数待核对）</text></view>
+      <button wx:if="{{notificationState === 'available' && unreadNotificationState === 'available' && unreadNotificationCount}}" class="text-button" loading="{{markingNotificationsRead}}" bindtap="markAllNotificationsRead">全部已读</button>
     </view>
-    <view wx:if="{{!notifications.length}}" class="empty compact">暂无新通知</view>
-    <view wx:for="{{notifications}}" wx:key="id" class="card notification {{!item.readAt ? 'unread' : ''}}" bindtap="openNotification" data-id="{{item.id}}"><view class="name">{{item.title}}</view><view class="muted">{{item.body}}</view><view wx:if="{{!item.readAt}}" class="unread-marker">未读</view></view>
+    <view wx:if="{{unreadNotificationState === 'error' && notificationState !== 'error'}}" class="private-resource-error" aria-live="polite">
+      <view>{{unreadNotificationError}}</view>
+      <button class="resource-retry" bindtap="load" aria-label="重新读取通知未读数量">重新读取未读数</button>
+    </view>
+    <view wx:if="{{notificationState === 'error'}}" class="private-resource-error" aria-live="polite">
+      <view>{{notificationError}}</view>
+      <button class="resource-retry" bindtap="load" aria-label="重新读取最近通知">重新读取通知</button>
+    </view>
+    <view wx:elif="{{notificationState === 'empty'}}" class="empty compact">暂无新通知</view>
+    <view wx:elif="{{notificationState === 'available'}}" wx:for="{{notifications}}" wx:key="id" class="card notification {{!item.readAt ? 'unread' : ''}}" bindtap="openNotification" data-id="{{item.id}}" aria-role="button" aria-label="{{item.readAt ? '已读通知' : '未读通知'}}：{{item.title}}" tabindex="0"><view class="name">{{item.title}}</view><view class="muted">{{item.body}}</view><view wx:if="{{!item.readAt}}" class="unread-marker">未读</view></view>
+    <button class="notification-center-entry" bindtap="openNotificationCenter">查看全部通知与关联页面</button>
     <view class="legal-links">
       <button class="legal" bindtap="openTerms">用户协议</button>
       <button class="legal" bindtap="openPrivacy">Talk&amp;Talk 隐私政策</button>

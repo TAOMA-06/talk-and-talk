@@ -1,9 +1,10 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, UseGuards } from "@nestjs/common";
 
 import { AuthenticatedUser } from "../auth/auth.service";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import {
+  ListCompanionRecommendationExclusionsDto,
   ListRecommendedCompanionsDto,
   RecordRecommendationEventsDto,
   UpdateRecommendationPreferencesDto
@@ -33,6 +34,24 @@ export class RecommendationsController {
   @Delete("me/tags/:id")
   deleteBehavioralTag(@CurrentUser() user: AuthenticatedUser, @Param("id") id: string) {
     return this.recommendations.deleteBehavioralTag(user.id, id);
+  }
+
+  @Get("me/companion-exclusions")
+  companionExclusions(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: ListCompanionRecommendationExclusionsDto
+  ) {
+    return this.recommendations.listCompanionExclusions(user.id, query.page, query.pageSize);
+  }
+
+  @Put("me/companion-exclusions/:id")
+  excludeCompanion(@CurrentUser() user: AuthenticatedUser, @Param("id") companionId: string) {
+    return this.recommendations.excludeCompanion(user.id, companionId);
+  }
+
+  @Delete("me/companion-exclusions/:id")
+  restoreCompanion(@CurrentUser() user: AuthenticatedUser, @Param("id") companionId: string) {
+    return this.recommendations.restoreCompanionRecommendations(user.id, companionId);
   }
 
   @Get("companions")

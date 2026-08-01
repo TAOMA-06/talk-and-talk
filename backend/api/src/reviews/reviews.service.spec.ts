@@ -4,7 +4,7 @@ describe("ReviewsService", () => {
   const prisma = {
     order: { findUnique: jest.fn() },
     companionProfile: { findFirst: jest.fn() },
-    review: { findMany: jest.fn() },
+    review: { findMany: jest.fn(), findFirst: jest.fn() },
     $transaction: jest.fn()
   } as any;
   const moderation = { moderateAsync: jest.fn() } as any;
@@ -16,7 +16,7 @@ describe("ReviewsService", () => {
     moderation.moderateAsync.mockResolvedValue({ decision: "allow" });
   });
 
-  it("creates a review only for the user's completed order and refreshes the companion aggregate", async () => {
+  it("creates a review without scanning or double-writing the database-owned rating projection", async () => {
     prisma.order.findUnique.mockResolvedValue({ id: "order-1", userId: "user-1", companionId: "companion-1", status: "completed" });
     const db = {
       $queryRaw: jest.fn().mockResolvedValue([]),
@@ -30,19 +30,23 @@ describe("ReviewsService", () => {
           id: "review-1", orderId: "order-1", companionId: "companion-1", rating: 5, content: "很耐心", createdAt: new Date(),
           user: { profile: { displayName: "小安" } }
         }),
-        aggregate: jest.fn().mockResolvedValue({ _avg: { rating: 5 }, _count: 1 })
+        aggregate: jest.fn()
       },
-      companionProfile: { update: jest.fn().mockResolvedValue({}) }
+      companionProfile: { update: jest.fn() },
+      $executeRawUnsafe: jest.fn()
     };
     prisma.$transaction.mockImplementation((work: any) => work(db));
 
     const result = await service.create("user-1", { orderId: "order-1", rating: 5, content: "很耐心" });
 
     expect(result).toEqual(expect.objectContaining({ id: "review-1", userName: "小安", rating: 5 }));
-    expect(db.companionProfile.update).toHaveBeenCalledWith({
-      where: { id: "companion-1" }, data: { rating: 5, reviewCount: 1 }
-    });
-    expect(db.$queryRaw).toHaveBeenCalledTimes(2);
+    expect(db.review.aggregate).not.toHaveBeenCalled();
+    expect(db.companionProfile.update).not.toHaveBeenCalled();
+    expect(db.$executeRawUnsafe).not.toHaveBeenCalled();
+    expect(db.$queryRaw).toHaveBeenCalledTimes(1);
+    const lockSql = Array.from(db.$queryRaw.mock.calls[0][0] as string[]).join("?");
+    expect(lockSql).toContain('FROM "Order"');
+    expect(lockSql).not.toContain('FROM "CompanionProfile"');
   });
 
   it("fails closed and records a case when review content is not publishable", async () => {
@@ -89,5 +93,64 @@ describe("ReviewsService", () => {
     await expect(service.list("companion-suspended"))
       .rejects.toMatchObject({ code: "COMPANION_NOT_FOUND", status: 404 });
     expect(prisma.review.findMany).not.toHaveBeenCalled();
+  });
+
+  it("returns only the authenticated customer's safe review fields for an owned order", async () => {
+    const createdAt = new Date("2026-08-01T09:00:00.000Z");
+    prisma.order.findUnique.mockResolvedValue({ id: "order-1", userId: "user-1" });
+    prisma.review.findFirst.mockResolvedValue({
+      id: "review-1",
+      orderId: "order-1",
+      companionId: "companion-1",
+      userId: "user-1",
+      rating: 5,
+      content: "很耐心",
+      createdAt,
+      internalModerationNote: "must-not-leak",
+      user: { profile: { displayName: "小安" } }
+    });
+
+    await expect(service.findOwnForOrder("user-1", "order-1")).resolves.toEqual({
+      review: {
+        id: "review-1",
+        orderId: "order-1",
+        companionId: "companion-1",
+        userName: "小安",
+        rating: 5,
+        content: "很耐心",
+        createdAt: "2026-08-01T09:00:00.000Z"
+      }
+    });
+    expect(prisma.review.findFirst).toHaveBeenCalledWith({
+      where: { orderId: "order-1", userId: "user-1" },
+      select: {
+        id: true,
+        orderId: true,
+        companionId: true,
+        rating: true,
+        content: true,
+        createdAt: true,
+        user: { select: { profile: { select: { displayName: true } } } }
+      }
+    });
+  });
+
+  it("returns an authoritative null when the owned order has not been reviewed", async () => {
+    prisma.order.findUnique.mockResolvedValue({ id: "order-1", userId: "user-1" });
+    prisma.review.findFirst.mockResolvedValue(null);
+
+    await expect(service.findOwnForOrder("user-1", "order-1")).resolves.toEqual({ review: null });
+  });
+
+  it("hides non-owned and missing orders before reading any review", async () => {
+    prisma.order.findUnique
+      .mockResolvedValueOnce({ id: "order-1", userId: "user-2" })
+      .mockResolvedValueOnce(null);
+
+    await expect(service.findOwnForOrder("user-1", "order-1"))
+      .rejects.toMatchObject({ code: "ORDER_NOT_FOUND", status: 404 });
+    await expect(service.findOwnForOrder("user-1", "missing-order"))
+      .rejects.toMatchObject({ code: "ORDER_NOT_FOUND", status: 404 });
+    expect(prisma.review.findFirst).not.toHaveBeenCalled();
   });
 });

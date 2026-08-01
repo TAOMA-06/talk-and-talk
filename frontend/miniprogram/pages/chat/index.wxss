@@ -7,12 +7,19 @@
 .message-notification-description { margin-top: 5rpx; color: #856871; font-size: 21rpx; line-height: 1.5; }
 .message-notification-action { flex: 0 0 auto; margin: 0; padding: 0 16rpx; border: 1rpx solid #e1c5cc; border-radius: 10rpx; background: #fffafa; color: #914158; font-size: 22rpx; line-height: 56rpx; }
 .message-notification-action::after { border: 0; }
+.future-booking-setting { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; margin-bottom: 20rpx; padding: 16rpx; border: 1rpx solid #dfd3c5; border-radius: 14rpx; background: #fffdf8; }
+.future-booking-copy { min-width: 0; flex: 1; }
+.future-booking-title { color: #654f39; font-size: 25rpx; font-weight: 700; }
+.future-booking-description { margin-top: 5rpx; color: #796956; font-size: 21rpx; line-height: 1.5; }
+.future-booking-action { flex: 0 0 auto; margin: 0; padding: 0 16rpx; border: 1rpx solid #d1b995; border-radius: 10rpx; background: #fff; color: #765732; font-size: 22rpx; line-height: 56rpx; }
+.future-booking-action::after { border: 0; }
 .safety-exit { border: 1rpx solid #ead8dc; background: #fffafa; color: #765b60; }
 .safety-exit-title { color: #7e334a; font-size: 26rpx; font-weight: 700; }
 .safety-exit-copy { margin-top: 8rpx; color: #795f66; font-size: 22rpx; line-height: 1.55; }
 .safety-exit-actions { display: flex; flex-wrap: wrap; gap: 12rpx; margin-top: 14rpx; }
 .safety-exit-action { flex: 1 1 180rpx; margin: 0; padding: 0 14rpx; border: 1rpx solid #e1c5cc; border-radius: 10rpx; background: #fff; color: #914158; font-size: 22rpx; line-height: 56rpx; }
 .safety-exit-report { border-color: #c8798c; color: #8d344d; }
+.safety-exit-emergency { border-color: #b95660; background: #a43c50; color: #fff; }
 .safety-exit-block { border-color: #b9966d; color: #805c32; }
 .safety-exit-action::after { border: 0; }
 .conversation-boundary { margin-bottom: 20rpx; padding: 20rpx; border: 1rpx solid #d9c8b9; border-radius: 14rpx; background: #fffaf4; }
@@ -28,6 +35,8 @@
 .bubble { display: inline-block; max-width: 88%; padding: 18rpx 22rpx; border-radius: 18rpx; background: #fff; line-height: 1.55; box-shadow: 0 4rpx 12rpx rgba(96, 50, 60, 0.06); }
 .message-content { white-space: pre-wrap; word-break: break-word; }
 .system .bubble { background: #f5e7ec; color: #7a4857; font-size: 26rpx; }
+.message-emergency-help { width: fit-content; margin: 10rpx 0 0; padding: 0 18rpx; border: 1rpx solid #bf7b88; background: #fff; color: #8c3f52; font-size: 22rpx; line-height: 58rpx; }
+.message-emergency-help::after { border: 0; }
 .held .bubble { background: #f6f1f2; color: #8a6871; }
 .delivery-status { margin-top: 7rpx; color: #9a7480; font-size: 22rpx; }
 .delivery-status.blocked { color: #b24b64; }

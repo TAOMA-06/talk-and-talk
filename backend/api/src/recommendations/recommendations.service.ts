@@ -25,6 +25,7 @@ const ALGORITHM_VERSION = "companion-ranking-v1";
 const REQUEST_TTL_MS = 15 * 60 * 1000;
 const ATTRIBUTION_WINDOW_MS = 24 * 60 * 60 * 1000;
 const BEHAVIOR_LOOKBACK_DAYS = 90;
+export const MAX_BEHAVIOR_ORDER_FACTS = 1_000;
 const HALF_LIFE_DAYS = 30;
 const MAX_CANDIDATES = 200;
 
@@ -110,7 +111,9 @@ export class RecommendationsService {
           createdAt: { gte: this.daysAgo(BEHAVIOR_LOOKBACK_DAYS) },
           status: { in: ["pending", "paying", "paid", "inService", "completed"] }
         },
-        select: { themeId: true, status: true, createdAt: true }
+        select: { themeId: true, status: true, createdAt: true },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: MAX_BEHAVIOR_ORDER_FACTS
       } as any)
     ]);
     const preference = this.asPreference(stored);
@@ -204,6 +207,72 @@ export class RecommendationsService {
     return { deleted: true, topicId: tag.topicId };
   }
 
+  async listCompanionExclusions(userId: string, page = 1, pageSize = 20) {
+    const where = { userId };
+    const [items, total] = await Promise.all([
+      this.prisma.userCompanionRecommendationExclusion.findMany({
+        where,
+        include: this.exclusionCompanionInclude(),
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        skip: (page - 1) * pageSize,
+        take: pageSize
+      } as any),
+      this.prisma.userCompanionRecommendationExclusion.count({ where })
+    ]);
+    return {
+      items: (items as any[]).map((item) => this.companionExclusionDto(item)),
+      pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) }
+    };
+  }
+
+  async excludeCompanion(userId: string, companionId: string) {
+    const normalizedId = this.normalizeCompanionId(companionId);
+    // Creation is allowed only from a profile the caller could currently open.
+    // This does not require a conversation, order, block, report, or reason.
+    const publishedCompanion = await this.companions.getPublished(normalizedId);
+    const item = await this.prisma.$transaction(async (tx) => {
+      const db = tx as any;
+      const expiredAt = new Date();
+      const exclusion = await db.userCompanionRecommendationExclusion.upsert({
+        where: { userId_companionId: { userId, companionId: normalizedId } },
+        create: {
+          userId,
+          companionId: normalizedId,
+          companionNameSnapshot: publishedCompanion.name,
+          companionRoleSnapshot: publishedCompanion.role,
+          companionInitialsSnapshot: publishedCompanion.initials
+        },
+        update: {},
+        include: this.exclusionCompanionInclude()
+      });
+      // Existing cursor snapshots must not re-surface a companion after this
+      // preference changes. Historic impressions and order attribution remain.
+      await db.recommendationRequest.updateMany({
+        where: { userId, expiresAt: { gt: expiredAt } },
+        data: { expiresAt: expiredAt }
+      });
+      return exclusion;
+    });
+    return { excluded: true, item: this.companionExclusionDto(item) };
+  }
+
+  async restoreCompanionRecommendations(userId: string, companionId: string) {
+    const normalizedId = this.normalizeCompanionId(companionId);
+    const removed = await this.prisma.$transaction(async (tx) => {
+      const db = tx as any;
+      const expiredAt = new Date();
+      const result = await db.userCompanionRecommendationExclusion.deleteMany({
+        where: { userId, companionId: normalizedId }
+      });
+      await db.recommendationRequest.updateMany({
+        where: { userId, expiresAt: { gt: expiredAt } },
+        data: { expiresAt: expiredAt }
+      });
+      return result.count;
+    });
+    return { excluded: false, removed: removed > 0, companionId: normalizedId };
+  }
+
   async listCompanions(userId: string, query: ListRecommendedCompanionsDto) {
     const pageSize = query.pageSize ?? 20;
     if (query.cursor) {
@@ -218,9 +287,17 @@ export class RecommendationsService {
     const now = new Date();
     const sellableMatches = await this.companions.findSellableCompanions(
       query.themeId ? { topicId: query.themeId } : {},
-      7
+      7,
+      undefined,
+      MAX_CANDIDATES
     );
-    const sellableById = new Map(sellableMatches.map((match) => [match.id, match]));
+    const candidateIds = sellableMatches.map((match) => match.id);
+    const excludedCompanionIds = await this.privateUnavailableCompanionIds(userId, candidateIds);
+    const sellableById = new Map(
+      sellableMatches
+        .filter((match) => !excludedCompanionIds.has(match.id))
+        .map((match) => [match.id, match])
+    );
     const candidates = await this.loadEligibleCandidates(placement, sellableById);
     if (candidates.length === 0) {
       return this.emptyPage(personalized, pageSize);
@@ -238,7 +315,9 @@ export class RecommendationsService {
               createdAt: { gte: this.daysAgo(BEHAVIOR_LOOKBACK_DAYS) },
               status: { in: ["pending", "paying", "paid", "inService", "completed"] }
             },
-            select: { themeId: true, status: true, createdAt: true }
+            select: { themeId: true, status: true, createdAt: true },
+            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+            take: MAX_BEHAVIOR_ORDER_FACTS
           } as any)
         : Promise.resolve([])
     ]);
@@ -259,25 +338,42 @@ export class RecommendationsService {
       return this.emptyPage(personalized, pageSize);
     }
 
-    const request = await this.prisma.recommendationRequest.create({
-      data: {
+    const request = await this.prisma.$transaction(async (tx) => {
+      const db = tx as any;
+      // Serialize only the final private-boundary recheck and immutable request
+      // snapshot. If the companion's change commits first, it is observed here;
+      // if this snapshot commits first, that change expires it before later use.
+      await db.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${userId} FOR UPDATE`;
+      const unavailableNow = await this.privateUnavailableCompanionIds(
         userId,
-        placement: placement as any,
-        context: { themeId: query.themeId ?? null },
-        algorithmVersion: ALGORITHM_VERSION,
-        personalized,
-        expiresAt: new Date(now.getTime() + REQUEST_TTL_MS)
-      }
-    } as any);
-    await this.prisma.recommendationImpression.createMany({
-      data: ranked.map((item, index) => ({
-        requestId: request.id,
-        companionId: item.companion.id,
-        position: index + 1,
-        score: item.score,
-        reasonCodes: item.reasonCodes
-      }))
-    } as any);
+        ranked.map((item) => item.companion.id),
+        db
+      );
+      const snapshot = ranked.filter((item) => !unavailableNow.has(item.companion.id));
+      if (snapshot.length === 0) return null;
+
+      const created = await db.recommendationRequest.create({
+        data: {
+          userId,
+          placement: placement as any,
+          context: { themeId: query.themeId ?? null },
+          algorithmVersion: ALGORITHM_VERSION,
+          personalized,
+          expiresAt: new Date(now.getTime() + REQUEST_TTL_MS)
+        }
+      });
+      await db.recommendationImpression.createMany({
+        data: snapshot.map((item, index) => ({
+          requestId: created.id,
+          companionId: item.companion.id,
+          position: index + 1,
+          score: item.score,
+          reasonCodes: item.reasonCodes
+        }))
+      });
+      return created;
+    });
+    if (!request) return this.emptyPage(personalized, pageSize);
 
     return this.getRequestPage(userId, request.id, 0, pageSize);
   }
@@ -359,7 +455,10 @@ export class RecommendationsService {
     if (!(["discoverHome", "communityRelated", "orderFollowup"] as string[]).includes(placement)) {
       throw new AppException("INVALID_RECOMMENDATION_PLACEMENT", "Invalid recommendation placement", HttpStatus.BAD_REQUEST);
     }
-    const companion = await this.prisma.companionProfile.findUnique({ where: { id: companionId }, select: { id: true } });
+    const companion = await this.prisma.companionProfile.findUnique({
+      where: { id: companionId },
+      select: { id: true, ownerUserId: true }
+    });
     if (!companion) {
       throw new AppException("COMPANION_NOT_FOUND", "Companion not found", HttpStatus.NOT_FOUND);
     }
@@ -368,7 +467,7 @@ export class RecommendationsService {
     if (startsAt && endsAt && endsAt.getTime() <= startsAt.getTime()) {
       throw new AppException("INVALID_RECOMMENDATION_WINDOW", "endsAt must be after startsAt", HttpStatus.BAD_REQUEST);
     }
-    return this.prisma.companionRecommendationPolicy.upsert({
+    const policy = await this.prisma.companionRecommendationPolicy.upsert({
       where: { companionId_placement: { companionId, placement: placement as any } },
       create: {
         companionId,
@@ -387,6 +486,7 @@ export class RecommendationsService {
         ...(endsAt !== undefined ? { endsAt } : {})
       }
     } as any);
+    return { policy, subjectUserId: companion.ownerUserId };
   }
 
   async metrics(query: RecommendationMetricsQueryDto) {
@@ -417,7 +517,7 @@ export class RecommendationsService {
           }
         }
       },
-      orderBy: { servedAt: "desc" },
+      orderBy: [{ servedAt: "desc" }, { id: "desc" }],
       take: 5001
     } as any);
     const truncated = impressions.length > 5000;
@@ -492,11 +592,26 @@ export class RecommendationsService {
       throw new AppException("RECOMMENDATION_CURSOR_EXPIRED", "Recommendation result has expired", HttpStatus.GONE);
     }
     const themeId = typeof (request as any).context?.themeId === "string" ? (request as any).context.themeId : undefined;
+    const requestCompanions = await this.prisma.recommendationImpression.findMany({
+      where: { requestId },
+      select: { companionId: true },
+      orderBy: { position: "asc" },
+      take: MAX_CANDIDATES
+    } as any) as Array<{ companionId: string }>;
+    const requestCompanionIds = requestCompanions.map((item) => item.companionId);
     const sellableMatches = await this.companions.findSellableCompanions(
       themeId ? { topicId: themeId } : {},
-      7
+      7,
+      requestCompanionIds,
+      MAX_CANDIDATES
     );
-    const sellableById = new Map(sellableMatches.map((match) => [match.id, match]));
+    const sellableIds = sellableMatches.map((match) => match.id);
+    const excludedCompanionIds = await this.privateUnavailableCompanionIds(userId, sellableIds);
+    const sellableById = new Map(
+      sellableMatches
+        .filter((match) => !excludedCompanionIds.has(match.id))
+        .map((match) => [match.id, match])
+    );
     const currentEligibility = this.eligibleCompanionWhere([...sellableById.keys()]);
     const [impressions, total] = await Promise.all([
       this.prisma.recommendationImpression.findMany({
@@ -545,13 +660,42 @@ export class RecommendationsService {
         serviceTags: { include: { tag: true }, orderBy: { tag: { name: "asc" } } },
         recommendationPolicies: { where: { placement: placement as any } }
       },
-      orderBy: [{ isOnline: "desc" }, { rating: "desc" }, { reviewCount: "desc" }],
+      orderBy: [
+        { isOnline: "desc" },
+        { rating: "desc" },
+        { reviewCount: "desc" },
+        { id: "asc" }
+      ],
       take: MAX_CANDIDATES
     } as any) as any[];
     return companions.map((companion) => ({
       ...companion,
       catalog: sellableById.get(companion.id)!
     }));
+  }
+
+  private async privateUnavailableCompanionIds(
+    userId: string,
+    companionIds: string[],
+    db: any = this.prisma
+  ): Promise<Set<string>> {
+    if (companionIds.length === 0) return new Set();
+    const [customerExclusions, companionBoundaries] = await Promise.all([
+      db.userCompanionRecommendationExclusion.findMany({
+        // Both preference directions are private and potentially long-lived.
+        // Restrict reads to this bounded candidate set and return only ids.
+        where: { userId, companionId: { in: companionIds } },
+        select: { companionId: true }
+      } as any),
+      db.companionCustomerFutureBoundary.findMany({
+        where: { customerUserId: userId, companionId: { in: companionIds } },
+        select: { companionId: true }
+      } as any)
+    ]);
+    return new Set(
+      [...customerExclusions, ...companionBoundaries]
+        .map((item: { companionId: string }) => item.companionId)
+    );
   }
 
   private eligibleCompanionWhere(companionIds?: string[]) {
@@ -561,7 +705,11 @@ export class RecommendationsService {
       isVerified: true,
       ownerUserId: { not: null },
       owner: { accountStatus: "active", profile: { isVerified: true } },
-      commercialProfile: { status: "verified" }
+      commercialProfile: {
+        status: "verified",
+        adultEligibilityVerdict: "adult",
+        adultEligibilityValidUntil: { gt: new Date() }
+      }
     } as const;
   }
 
@@ -570,18 +718,29 @@ export class RecommendationsService {
     const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     const dayStart = new Date(now);
     dayStart.setHours(0, 0, 0, 0);
-    const [views, servedToday] = await Promise.all([
-      this.prisma.recommendationImpression.findMany({
+    const [viewsSevenDays, viewsTwentyFourHours, servedToday] = await Promise.all([
+      this.prisma.recommendationImpression.groupBy({
+        by: ["companionId"],
         where: {
           companionId: { in: companionIds },
           viewedAt: { gte: sevenDaysAgo },
           request: { userId }
         },
-        select: { companionId: true, viewedAt: true }
+        _count: { _all: true }
       } as any),
-      this.prisma.recommendationImpression.findMany({
+      this.prisma.recommendationImpression.groupBy({
+        by: ["companionId"],
+        where: {
+          companionId: { in: companionIds },
+          viewedAt: { gte: twentyFourHoursAgo },
+          request: { userId }
+        },
+        _count: { _all: true }
+      } as any),
+      this.prisma.recommendationImpression.groupBy({
+        by: ["companionId"],
         where: { companionId: { in: companionIds }, servedAt: { gte: dayStart } },
-        select: { companionId: true }
+        _count: { _all: true }
       } as any)
     ]);
     const exposure = new Map<string, Exposure>(companionIds.map((id) => [id, {
@@ -589,15 +748,17 @@ export class RecommendationsService {
       views7Days: 0,
       servedToday: 0
     }]));
-    for (const view of views as any[]) {
-      const entry = exposure.get(view.companionId);
-      if (!entry) continue;
-      entry.views7Days += 1;
-      if (view.viewedAt && view.viewedAt.getTime() >= twentyFourHoursAgo.getTime()) entry.views24Hours += 1;
+    for (const row of viewsSevenDays as any[]) {
+      const entry = exposure.get(row.companionId);
+      if (entry) entry.views7Days = Number(row._count?._all ?? 0);
     }
-    for (const served of servedToday as any[]) {
-      const entry = exposure.get(served.companionId);
-      if (entry) entry.servedToday += 1;
+    for (const row of viewsTwentyFourHours as any[]) {
+      const entry = exposure.get(row.companionId);
+      if (entry) entry.views24Hours = Number(row._count?._all ?? 0);
+    }
+    for (const row of servedToday as any[]) {
+      const entry = exposure.get(row.companionId);
+      if (entry) entry.servedToday = Number(row._count?._all ?? 0);
     }
     return exposure;
   }
@@ -764,6 +925,68 @@ export class RecommendationsService {
       city: value?.city ?? null,
       maxPricePerHalfHour: value?.maxPricePerHalfHour ?? null,
       preferredTimeSlots: value?.preferredTimeSlots ?? []
+    };
+  }
+
+  private normalizeCompanionId(value: string): string {
+    const normalized = value.trim();
+    if (!normalized || normalized.length > 191 || /[\u0000-\u001f\u007f]/.test(normalized)) {
+      throw new AppException("INVALID_COMPANION_ID", "Companion id is invalid", HttpStatus.BAD_REQUEST);
+    }
+    return normalized;
+  }
+
+  private exclusionCompanionInclude() {
+    return {
+      companion: {
+        select: {
+          id: true,
+          isPublished: true,
+          isVerified: true,
+          ownerUserId: true,
+          owner: {
+            select: {
+              accountStatus: true,
+              profile: { select: { isVerified: true } }
+            }
+          },
+          commercialProfile: {
+            select: {
+              status: true,
+              adultEligibilityVerdict: true,
+              adultEligibilityValidUntil: true
+            }
+          }
+        }
+      }
+    } as const;
+  }
+
+  private companionExclusionDto(item: any) {
+    const companion = item.companion;
+    const currentlyPublic = Boolean(
+      companion?.isPublished
+      && companion.isVerified
+      && companion.ownerUserId
+      && companion.owner?.accountStatus === "active"
+      && companion.owner?.profile?.isVerified === true
+      && companion.commercialProfile?.status === "verified"
+      && companion.commercialProfile.adultEligibilityVerdict === "adult"
+      && companion.commercialProfile.adultEligibilityValidUntil instanceof Date
+      && companion.commercialProfile.adultEligibilityValidUntil.getTime() > Date.now()
+    );
+    return {
+      companionId: item.companionId,
+      excludedAt: item.createdAt.toISOString(),
+      companion: {
+        id: companion.id,
+        // These values were public when the user made the choice. Do not read
+        // later unpublished edits into this private settings surface.
+        name: item.companionNameSnapshot,
+        role: item.companionRoleSnapshot,
+        initials: item.companionInitialsSnapshot,
+        currentlyPublic
+      }
     };
   }
 

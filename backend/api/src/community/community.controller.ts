@@ -1,10 +1,10 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from "@nestjs/common";
 
 import { AuthenticatedUser } from "../auth/auth.service";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CommunityService } from "./community.service";
-import { CreateCommunityPostDto, CreateCommunityPostReportDto, SetCommunityLikeDto } from "./dto/community.dto";
+import { CreateCommunityPostDto, CreateCommunityPostReportDto, ListCommunityItemsDto, SetCommunityLikeDto } from "./dto/community.dto";
 
 @Controller("community/posts")
 @UseGuards(JwtAuthGuard)
@@ -12,7 +12,9 @@ export class CommunityController {
   constructor(private readonly community: CommunityService) {}
 
   @Get()
-  list(@CurrentUser() user: AuthenticatedUser) { return this.community.list(user.id); }
+  list(@CurrentUser() user: AuthenticatedUser, @Query() query: ListCommunityItemsDto) {
+    return this.community.list(user.id, query);
+  }
 
   @Post()
   create(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateCommunityPostDto) {

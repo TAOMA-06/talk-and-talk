@@ -1,13 +1,11 @@
 import { api, ApiError, ensureSession } from "../../../utils/api";
 import {
   CompanionTodayServiceEntry,
-  CompanionTodayServiceSchedule,
-  OwnAvailabilityWindow,
-  OwnServiceOffering
+  CompanionTodayServiceSchedule
 } from "../../../utils/models";
+import { companionCommercialApi } from "../../../utils/companion-commercial-api";
 
 type AccessState = "loading" | "ready" | "ineligible" | "error";
-type CompanionEarning = { id: string; payableCents: number; status: string; availableAt: string };
 type DisplayTodayService = CompanionTodayServiceEntry & {
   scheduledAtText: string;
   statusText: string;
@@ -43,11 +41,6 @@ function formatShanghaiDateTime(value?: string): string {
   // Shift then read UTC to make the display stable on devices outside China.
   const date = new Date(source.getTime() + SHANGHAI_OFFSET_MS);
   return `${date.getUTCFullYear()}年${pad(date.getUTCMonth() + 1)}月${pad(date.getUTCDate())}日 ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`;
-}
-
-function windowStartTimestamp(window: OwnAvailabilityWindow): number {
-  const timestamp = Date.parse(window.startsAt);
-  return Number.isNaN(timestamp) ? Number.POSITIVE_INFINITY : timestamp;
 }
 
 function formatShanghaiTime(value: string): string {
@@ -98,7 +91,12 @@ Page({
     availableEarningsText: "¥0.00",
     availableEarningCount: 0,
     earningsUnavailable: false,
-    updatedAtText: ""
+    updatedAtText: "",
+    lifecycleUnavailable: false,
+    commercialStatusText: "状态待同步",
+    trainingStatusText: "培训待同步",
+    activeAccountActions: 0,
+    openIncidentCount: 0
   },
   onShow() { void this.load(); },
   onPullDownRefresh() { void this.load(true); },
@@ -113,32 +111,36 @@ Page({
         api.ownServiceOfferings(),
         api.ownAvailabilityWindows()
       ]);
-      const [todayServiceSchedule, earnings] = await Promise.all([
+      const [todayServiceSchedule, earnings, lifecycle] = await Promise.all([
         api.companionTodayServiceSchedule()
           .then((schedule) => ({ schedule, unavailable: false }))
           .catch(() => ({ schedule: null as CompanionTodayServiceSchedule | null, unavailable: true })),
-        api.companionEarnings()
-          .then((result) => ({ items: result.items || ([] as CompanionEarning[]), unavailable: false }))
-          .catch(() => ({ items: [] as CompanionEarning[], unavailable: true }))
+        companionCommercialApi.earnings({ page: 1, pageSize: 1 })
+          .then((result) => ({ summary: result.summary, unavailable: false }))
+          .catch(() => ({ summary: null, unavailable: true })),
+        companionCommercialApi.overview()
+          .then((overview) => ({ overview, unavailable: false }))
+          .catch(() => ({ overview: null, unavailable: true }))
       ]);
 
-      const now = Date.now();
-      const offerings = catalog.items || ([] as OwnServiceOffering[]);
-      const futureWindows = (availability.items || ([] as OwnAvailabilityWindow[]))
-        .filter((window) => window.isActive && windowStartTimestamp(window) > now)
-        .sort((left, right) => windowStartTimestamp(left) - windowStartTimestamp(right));
       const schedule = todayServiceSchedule.schedule;
-      const availableEarnings = earnings.items.filter((earning) => earning.status === "available");
-      const availableEarningsCents = availableEarnings.reduce((total, earning) => total + earning.payableCents, 0);
+      const availableEarningsCents = earnings.summary?.availableCents ?? 0;
+      const lifecycleOverview = lifecycle.overview;
+      const commercialStatuses: Record<string, string> = {
+        notSubmitted: "商业资料未提交",
+        pendingReview: "商业资料审核中",
+        verified: "商业资格有效",
+        suspended: "商业资格已暂停"
+      };
 
       this.setData({
         loading: false,
         accessState: "ready",
-        activeOfferingCount: offerings.filter((offering) => offering.isActive).length,
-        totalOfferingCount: offerings.length,
-        futureWindowCount: futureWindows.length,
-        nextWindowText: futureWindows[0]
-          ? formatShanghaiDateTime(futureWindows[0].startsAt)
+        activeOfferingCount: catalog.summary.active,
+        totalOfferingCount: catalog.summary.total,
+        futureWindowCount: availability.summary.futureActiveCount,
+        nextWindowText: availability.summary.nextFutureActiveStartsAt
+          ? formatShanghaiDateTime(availability.summary.nextFutureActiveStartsAt)
           : "还没有开放的可约时段",
         pendingConfirmationCount: schedule?.pendingConfirmationCount ?? 0,
         todayServiceDateText: schedule ? formatScheduleDate(schedule.date) : "今天",
@@ -146,8 +148,17 @@ Page({
         todayServiceOrdersUnavailable: todayServiceSchedule.unavailable,
         availableEarningsCents,
         availableEarningsText: formatCny(availableEarningsCents),
-        availableEarningCount: availableEarnings.length,
+        availableEarningCount: earnings.summary?.byStatus.available.count ?? 0,
         earningsUnavailable: earnings.unavailable,
+        lifecycleUnavailable: lifecycle.unavailable,
+        commercialStatusText: lifecycleOverview
+          ? commercialStatuses[lifecycleOverview.commercialProfile.status] || lifecycleOverview.commercialProfile.status
+          : "状态暂无法同步",
+        trainingStatusText: lifecycleOverview
+          ? lifecycleOverview.training.complete ? "必修培训有效" : "培训未完成或已到期"
+          : "培训暂无法同步",
+        activeAccountActions: lifecycleOverview?.operationalSummary.activeRestrictionCount ?? 0,
+        openIncidentCount: lifecycleOverview?.operationalSummary.openIncidentCount ?? 0,
         updatedAtText: formatShanghaiDateTime(new Date().toISOString())
       });
     } catch (error) {
@@ -165,5 +176,15 @@ Page({
   retry() { void this.load(); },
   openServiceOfferings() { wx.navigateTo({ url: "/pages/companion/services/index" }); },
   openAvailabilityWindows() { wx.navigateTo({ url: "/pages/companion/availability/index" }); },
+  openOnboarding() { wx.navigateTo({ url: "/pages/companion/onboarding/index" }); },
+  openSchedule() { wx.navigateTo({ url: "/pages/companion/schedule/index" }); },
+  openDevelopment() { wx.navigateTo({ url: "/pages/companion/development/index" }); },
+  openEarnings() { wx.navigateTo({ url: "/pages/companion/earnings/index" }); },
+  openSafety() { wx.navigateTo({ url: "/pages/companion/safety/index" }); },
+  openTodayOrder(event: any) {
+    const id = String(event.currentTarget.dataset.id || "");
+    if (!id) return;
+    wx.navigateTo({ url: `/pages/order/detail?id=${encodeURIComponent(id)}` });
+  },
   openOrders() { wx.switchTab({ url: "/pages/orders/index" }); }
 });

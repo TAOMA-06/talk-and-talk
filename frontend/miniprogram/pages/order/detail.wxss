@@ -1,0 +1,58 @@
+.order-detail-page { padding-bottom: 64rpx; }
+.status-hero { margin-bottom: 22rpx; padding: 34rpx; border-radius: 28rpx; background: linear-gradient(135deg, #fff0f3, #fffaf7); }
+.status-paid, .status-inService, .status-completed { background: linear-gradient(135deg, #edf8f3, #f9fcfb); }
+.status-cancelled, .status-refunded { background: #f4f1f2; }
+.status-kicker { color: #a56a7a; font-size: 21rpx; word-break: break-all; }
+.status-title { margin-top: 10rpx; color: #443037; font-size: 42rpx; font-weight: 800; }
+.status-copy { margin-top: 14rpx; color: #715860; font-size: 25rpx; line-height: 1.7; }
+.section-title { margin-bottom: 14rpx; color: #49343a; font-size: 30rpx; font-weight: 800; }
+.detail-row { display: flex; justify-content: space-between; gap: 24rpx; padding: 14rpx 0; border-bottom: 1rpx solid #f0e5e7; color: #715a61; font-size: 25rpx; line-height: 1.55; }
+.detail-row text:first-child { flex: 0 0 120rpx; color: #998087; }
+.detail-row text:last-child { flex: 1; text-align: right; }
+.detail-row.total text:last-child { color: #b74665; font-size: 31rpx; font-weight: 800; }
+.snapshot-note { margin-top: 18rpx; color: #937c83; font-size: 22rpx; line-height: 1.6; }
+.refund-policy-card { border: 1rpx solid #ead9dd; background: linear-gradient(145deg, #fffdfd, #fff8f9); }
+.refund-policy-copy { margin-top: 17rpx; color: #715a61; font-size: 23rpx; line-height: 1.72; }
+.refund-policy-error { padding: 16rpx; border-left: 5rpx solid #b65a6e; background: #fff4f5; color: #8f4853; font-size: 23rpx; line-height: 1.65; }
+.refund-policy-link { width: 100%; margin-top: 16rpx; border: 1rpx solid #ddc8ce; background: #fff; color: #8a4358; font-size: 24rpx; }
+.refund-card { border-left: 7rpx solid #b07b49; }
+.refund-copy { margin-top: 16rpx; color: #755e65; font-size: 24rpx; line-height: 1.65; }
+.payment-dispute-card { border: 1rpx solid #dbe4df; background: linear-gradient(145deg, #fbfdfc, #fffaf8); }
+.payment-dispute-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18rpx; }
+.payment-dispute-kicker { color: #8f7a81; font-size: 20rpx; line-height: 1.5; }
+.payment-dispute-badge { flex: 0 0 auto; max-width: 220rpx; padding: 7rpx 12rpx; border-radius: 999rpx; background: #f2ecee; color: #775b64; font-size: 20rpx; font-weight: 800; text-align: center; }
+.payment-dispute-waiting { background: #fff2dc; color: #8c6333; }
+.payment-dispute-active { background: #eaf2f8; color: #486e8a; }
+.payment-dispute-resolved { background: #e8f4ee; color: #3f765d; }
+.payment-dispute-attention { background: #fff0f0; color: #9a4653; }
+.payment-dispute-copy, .payment-dispute-summary { margin-top: 20rpx; color: #715d64; font-size: 23rpx; line-height: 1.7; }
+.payment-dispute-error { color: #8f4853; }
+.timeline-resource-state { color: #806970; font-size: 23rpx; line-height: 1.65; }
+.timeline-resource-error { padding: 16rpx; border-left: 5rpx solid #b65a6e; background: #fff6f7; color: #8f4853; }
+.resource-retry { width: 100%; margin: 14rpx 0 0; padding: 10rpx 14rpx; border: 1rpx solid #d6b9c1; background: #fff; color: #8c4056; font-size: 24rpx; line-height: 1.5; }
+.payment-dispute-boundary { margin-top: 18rpx; padding: 15rpx 17rpx; border-radius: 13rpx; background: #f4f1f2; color: #806c73; font-size: 21rpx; line-height: 1.65; }
+.payment-dispute-guide { width: 100%; margin-top: 16rpx; border: 1rpx solid #cbdcd3; background: #f8fcfa; color: #416d58; font-size: 24rpx; }
+.attendance-dispute-card { border: 1rpx solid #ecd7b8; background: linear-gradient(145deg, #fffaf1, #fffdf9); }
+.attendance-dispute-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18rpx; }
+.attendance-dispute-copy { color: #735d42; font-size: 24rpx; line-height: 1.6; }
+.attendance-dispute-badge { flex: 0 0 auto; padding: 7rpx 13rpx; border-radius: 999rpx; background: #fff0d6; color: #8a6131; font-size: 20rpx; font-weight: 800; }
+.action-card { background: #fffdfc; }
+.replacement-notice { margin: 4rpx 0 18rpx; padding: 18rpx; border-left: 6rpx solid #9a7b4f; background: #fcfaf5; }
+.replacement-title { color: #6f5738; font-size: 26rpx; font-weight: 800; }
+.replacement-copy { margin-top: 8rpx; color: #75664f; font-size: 23rpx; line-height: 1.65; }
+.replacement-action { width: 100%; margin: 14rpx 0 0; border: 1rpx solid #d4c4a7; background: #fff; color: #725938; font-size: 24rpx; }
+.replacement-action::after { border: 0; }
+.action-button { width: 100%; margin-top: 14rpx; border-radius: 14rpx; font-size: 26rpx; }
+.service-action-notice { margin-top: 14rpx; padding: 14rpx 16rpx; border-radius: 12rpx; background: #f6f1f2; color: #7c626a; font-size: 23rpx; line-height: 1.6; }
+.secondary-button { border: 1rpx solid #ddc8ce; background: #fff; color: #8a4358; }
+.danger-button { border: 1rpx solid #d3aab2; background: #fff5f5; color: #9a3e50; }
+.safety-button { background: #8f3e51; color: #fff; }
+.timeline-item { display: flex; gap: 18rpx; padding: 14rpx 0; }
+.timeline-dot { width: 14rpx; height: 14rpx; flex: 0 0 14rpx; margin-top: 11rpx; border: 5rpx solid #f3dce2; border-radius: 50%; background: #b94a68; }
+.timeline-copy { min-width: 0; flex: 1; padding-bottom: 18rpx; border-bottom: 1rpx solid #f0e4e7; }
+.timeline-heading { display: flex; justify-content: space-between; gap: 14rpx; color: #503940; font-size: 25rpx; font-weight: 700; }
+.timeline-heading text:last-child { flex: 0 0 auto; color: #a18a91; font-size: 20rpx; font-weight: 400; }
+.timeline-description { margin-top: 8rpx; color: #806970; font-size: 23rpx; line-height: 1.6; }
+.order-meta { color: #9c858c; font-size: 21rpx; text-align: center; }
+.retry-button { margin-top: 24rpx; background: #b94a68; color: #fff; font-size: 25rpx; }
+.secondary-button::after, .danger-button::after, .safety-button::after, .retry-button::after, .payment-dispute-guide::after, .resource-retry::after, .refund-policy-link::after { border: 0; }

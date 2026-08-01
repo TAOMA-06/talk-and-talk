@@ -49,6 +49,32 @@ describe("NotificationsService", () => {
     expect(result.updated).toBe(3);
   });
 
+  it("returns a bounded unread page with a deterministic id tie-breaker", async () => {
+    const createdAt = new Date("2026-08-01T08:00:00.000Z");
+    prisma.notification.findMany.mockResolvedValue([{
+      id: "n-page",
+      userId: "u1",
+      type: "supportUpdate",
+      title: "客服状态更新",
+      body: "请查看最新处理进度。",
+      data: null,
+      readAt: null,
+      createdAt
+    }]);
+    prisma.notification.count.mockResolvedValue(6);
+
+    const result = await service.list("u1", { page: 2, pageSize: 5, unreadOnly: true });
+
+    expect(prisma.notification.findMany).toHaveBeenCalledWith({
+      where: { userId: "u1", readAt: null },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      skip: 5,
+      take: 5
+    });
+    expect(result.pagination).toEqual({ page: 2, pageSize: 5, total: 6, totalPages: 2 });
+    expect(result.items).toHaveLength(1);
+  });
+
   it("persists an idempotent delivery intent with the notification transaction", async () => {
     prisma.notification.upsert.mockResolvedValue({
       id: "n-outbox", userId: "u1", type: "orderStatus", title: "预约已确认", body: "请支付",

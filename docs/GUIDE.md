@@ -27,7 +27,7 @@ AI 内容识别是平台内容安全员，不是陪用户聊天的机器人。
 | `warn` | 轻度越界 | 发出并提醒 |
 | `block` | 高风险 | 拦截并生成安全提醒 |
 
-正式后端已提供聊天与审核 API。`c1`–`c3` 聊天发送以服务端 `decision` 为准；客户端不保存或直连任何 AI API key。本地与 staging 可选 DeepSeek，生产必须配置真实文本审核提供方并在故障时失败关闭。
+正式后端已提供聊天与审核 API。`c1`–`c3` 聊天发送以服务端 `decision` 为准；客户端不保存或直连任何 AI API key。当前版本只使用服务端本地规则与授权人工复核，所有环境都禁止把用户原文发送给 DeepSeek 或其他外部生成式 AI 服务。
 
 ## 3. 当前架构
 
@@ -51,7 +51,7 @@ talk-and-talk/
 | iOS App | SwiftUI, iOS 18+ | 历史/后续工程，可本地运行但不属于当前发行或验收范围 |
 | 正式 API | NestJS, TypeScript | Auth、供给、商品、容量、推荐、订单、支付、会话、审核、退款、结算与运营控制 |
 | 数据依赖 | Postgres, Redis | Docker Compose 已配置 |
-| 内容审核 | 服务端 RuleEngine + 生产必配 DeepSeek-compatible provider | 聊天、社区、公开昵称、评价和陪伴者资料均以服务端为准 |
+| 内容审核 | 服务端 RuleEngine + 独立人工复核；外部用户原文传输关闭 | 聊天、社区、公开昵称、评价和陪伴者资料均以服务端为准 |
 
 ## 4. App 与后端怎么协作
 
@@ -64,7 +64,7 @@ talk-and-talk/
 - 正式聊天与审核 API 已接入微信小程序：`POST /conversations/:id/messages`、媒体直传预留/完成、`POST /moderation/appeals`、`GET /conversations/:id/status` 与 staff 审核接口。
 - 文本、图片、短语音统一走 `queued → pendingReview/published/blocked → 人工复核 → 处置/申诉`；接收方不会看到待审文本或未获批准媒体。
 - 聊天响应只返回用户可理解的审核决定与风险等级，举报响应只返回回执；规则命中、AI 原因和完整案件仅 staff API 可见。
-- 审核流水线：RuleEngine →（高风险 block 跳过）生产文本审核提供方 → Case/Evidence/ActionLog；提供方故障时不会降级公开。
+- 审核流水线：本地 RuleEngine → Case/Evidence/ActionLog → 必要的授权人工复核；高风险或待复核内容不会自动公开。当前 provider 边界会拒绝所有用户原文，DeepSeek 或其他外部生成式 AI 不是生产依赖。
 - Review Department：概览、筛选队列、详情、会话证据、人工处置、样本标注/导出；审核员使用独立 `ReviewStaff`，动作写 `ModerationActionLog`、`AuditLog` 与 `ReviewAuditLog`。
 - 用户举报、广场举报和订单客服均只返回权限内的收讫/状态，不向用户泄漏另一方或内部案件细节。
 - Web 审核部门与普通用户/陪伴者客户端完全分离：本地工具入口为 `http://localhost:3000/review/`，生产部署需独立访问控制。
@@ -122,7 +122,7 @@ DEPLOY_ENV_FILE=../backend/api/.env.staging \
 
 环境变量：`APP_ENV`（development/staging/production）控制 mock 支付与 seed；`GET /api/v1/health` 只返回依赖状态，metrics 需携带 `Authorization: Bearer $METRICS_TOKEN` 请求 `/api/v1/metrics`。
 
-微信小程序的本地结构、运行冒烟和真机联调见 [miniprogram-verification.md](./miniprogram-verification.md) 与 [staging-acceptance.md](./staging-acceptance.md)。历史 iOS 若需单独维护，再按 `frontend/ios` 内配置运行；它不进入本节首发步骤。
+微信小程序的当前本地结构与运行冒烟见 [小程序 README](../frontend/miniprogram/README.md)，真实环境联调见 [staging-acceptance.md](./staging-acceptance.md)，商用闭环证据见 [commercial-interface-closure.md](./commercial-interface-closure.md)。[miniprogram-verification.md](./miniprogram-verification.md) 只保留 2026-07-13 的历史双端验证记录。历史 iOS 若需单独维护，再按 `frontend/ios` 内配置运行；它不进入本节首发步骤。
 
 ## 6. 测试
 
@@ -175,7 +175,7 @@ xcodebuild test \
 | iOS 后端地址与开关 | `frontend/ios/Sources/Data/API/BackendConfig.swift` |
 | iOS API client | `frontend/ios/Sources/Data/API/BackendClient.swift` |
 | 本地内容审核规则（DEBUG/非后端会话） | `frontend/ios/Sources/Data/Moderation/RuleBasedModerationEngine.swift` |
-| 正式审核 API（RuleEngine + DeepSeek） | `backend/api/src/moderation` |
+| 正式审核 API（RuleEngine + 独立人工复核） | `backend/api/src/moderation` |
 | 审核部门 API / 处置 / 样本 | `backend/api/src/review`（包括独立的受控案件决策服务） |
 | Web 审核工作台 | `backend/api/public/review` |
 | Admin 审核契约 | `docs/admin-moderation-api.md` |

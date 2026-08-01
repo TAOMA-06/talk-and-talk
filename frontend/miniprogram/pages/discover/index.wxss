@@ -1,6 +1,11 @@
 .hero { margin: 8rpx 0 28rpx; padding: 34rpx; border-radius: 28rpx; background: linear-gradient(135deg, #fce8ed, #fff7f0); }
 .hero-title { font-size: 44rpx; font-weight: 700; }
 .hero-copy { margin-top: 12rpx; color: #765b60; font-size: 27rpx; }
+.recovery-notice { margin: 0 2rpx 24rpx; padding: 20rpx 22rpx; border-left: 7rpx solid #9a7b4f; border-radius: 16rpx; background: #fcfaf5; }
+.recovery-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18rpx; color: #6e573a; font-size: 24rpx; font-weight: 800; word-break: break-all; }
+.recovery-heading button { flex: 0 0 auto; min-height: 44rpx; margin: 0; padding: 0 12rpx; border: 0; background: transparent; color: #8a7659; font-size: 21rpx; line-height: 44rpx; }
+.recovery-heading button::after { border: 0; }
+.recovery-copy { margin-top: 9rpx; color: #75664f; font-size: 23rpx; line-height: 1.65; }
 .filter-panel { margin: 0 2rpx 24rpx; padding: 24rpx; border: 1rpx solid #eadfe1; border-radius: 22rpx; background: #fffdfc; }
 .search-heading { color: #3e2b30; font-size: 30rpx; font-weight: 700; }
 .search-row { display: flex; margin-top: 14rpx; align-items: center; gap: 12rpx; }
@@ -15,6 +20,10 @@
 .filter-label { margin-bottom: 12rpx; color: #72575d; font-size: 23rpx; font-weight: 600; }
 .sort-copy { margin-top: 12rpx; color: #8a7679; font-size: 21rpx; line-height: 1.5; }
 .filter-scroll { width: 100%; white-space: nowrap; }
+.filter-resource-state { color: #8a7679; font-size: 22rpx; line-height: 1.6; }
+.filter-resource-error { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; padding: 14rpx 16rpx; border: 1rpx solid #e5c7cd; border-radius: 14rpx; background: #fff7f8; color: #8c3f53; font-size: 22rpx; line-height: 1.5; }
+.filter-resource-retry { flex: 0 0 auto; min-height: 50rpx; margin: 0; padding: 0 16rpx; border: 1rpx solid #c96d86; border-radius: 999rpx; background: #fff; color: #9f3655; font-size: 21rpx; line-height: 48rpx; }
+.filter-resource-retry::after { border: 0; }
 .filter-options { display: flex; gap: 12rpx; width: max-content; }
 .filter-chip { display: inline-flex; min-height: 56rpx; margin: 0; padding: 0 20rpx; align-items: center; justify-content: center; border: 1rpx solid #e5d8da; border-radius: 999rpx; background: #fff; color: #6f565c; font-size: 23rpx; line-height: 54rpx; }
 .filter-chip::after, .filter-clear::after, .empty-clear::after { border: 0; }
@@ -34,3 +43,7 @@
 .bio { display: -webkit-box; margin: 12rpx 0; overflow: hidden; color: #584147; font-size: 27rpx; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .reason { display: inline-block; margin-top: 10rpx; padding: 4rpx 10rpx; border-radius: 8rpx; background: #fff1d9; color: #a36519; font-size: 22rpx; }
 .footer { color: #8d6e73; font-size: 24rpx; }
+.emergency-entry { display: flex; align-items: center; justify-content: space-between; gap: 18rpx; margin: 18rpx 0 24rpx; padding: 22rpx 24rpx; border: 2rpx solid #dfb5ac; border-radius: 20rpx; background: #fff7f2; }
+.emergency-title { color: #853e43; font-size: 25rpx; font-weight: 800; }
+.emergency-copy { margin-top: 6rpx; color: #8a6762; font-size: 21rpx; line-height: 1.5; }
+.emergency-arrow { color: #9f4b55; font-size: 42rpx; }

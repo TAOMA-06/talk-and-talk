@@ -3,17 +3,70 @@ import { SupportService } from "./support.service";
 describe("SupportService", () => {
   const prisma = {
     order: { findUnique: jest.fn() },
+    supportTicket: { findFirst: jest.fn() },
     $transaction: jest.fn()
   } as any;
   const config = { get: jest.fn().mockReturnValue(24) } as any;
   const commercial = { holdForOrder: jest.fn().mockResolvedValue(1) } as any;
   const audit = { record: jest.fn().mockResolvedValue(undefined) } as any;
   const notifications = { createTransactional: jest.fn().mockResolvedValue(undefined) } as any;
+  const caseEvidence = {
+    attachmentInclude: jest.fn().mockReturnValue({ evidenceAttachments: { include: { mediaAsset: true } } }),
+    attachmentDtos: jest.fn().mockReturnValue([]),
+    bindSupportFact: jest.fn().mockResolvedValue([])
+  } as any;
   let service: SupportService;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new SupportService(prisma, config, commercial, audit, notifications);
+    service = new SupportService(prisma, config, commercial, audit, notifications, caseEvidence);
+  });
+
+  it("scopes canonical staff detail to the support assignee while allowing audited admin access", async () => {
+    const ticket = {
+      id: "ticket-detail",
+      userId: "customer-1",
+      orderId: null,
+      category: "other",
+      priority: "normal",
+      status: "inProgress",
+      subject: "需要帮助",
+      body: "请查看工单详情",
+      assignedToUserId: "support-1",
+      dueAt: new Date("2026-08-02T00:00:00.000Z"),
+      resolution: null,
+      resolutionCode: null,
+      resolvedAt: null,
+      createdAt: new Date("2026-08-01T00:00:00.000Z"),
+      updatedAt: new Date("2026-08-01T01:00:00.000Z"),
+      requester: { id: "customer-1", profile: { displayName: "用户" } },
+      assignedTo: { id: "support-1", profile: { displayName: "客服一" } },
+      order: null,
+      orderFacts: []
+    };
+    prisma.supportTicket.findFirst
+      .mockResolvedValueOnce(ticket)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(ticket);
+
+    await expect(service.getAdmin({ id: "support-1", role: "support" } as any, ticket.id))
+      .resolves.toMatchObject({ id: ticket.id, body: ticket.body });
+    expect(prisma.supportTicket.findFirst).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      where: { id: ticket.id, assignedToUserId: "support-1" },
+      include: expect.objectContaining({
+        requester: { select: { id: true, profile: { select: { displayName: true } } } },
+        assignedTo: { select: { id: true, profile: { select: { displayName: true } } } }
+      })
+    }));
+
+    await expect(service.getAdmin({ id: "support-2", role: "support" } as any, ticket.id))
+      .rejects.toMatchObject({ code: "SUPPORT_TICKET_NOT_FOUND", status: 404 });
+
+    await expect(service.getAdmin({ id: "admin-1", role: "admin" } as any, ticket.id))
+      .resolves.toMatchObject({ id: ticket.id });
+    expect(prisma.supportTicket.findFirst).toHaveBeenNthCalledWith(3, expect.objectContaining({
+      where: { id: ticket.id }
+    }));
   });
 
   it("creates an order dispute and freezes its earning in the same transaction", async () => {
@@ -160,6 +213,15 @@ describe("SupportService", () => {
           submittedByUserId: "customer-1",
           statement: "我在约定时间进入平台会话，服务没有开始。",
           createdAt
+        }),
+        findUniqueOrThrow: jest.fn().mockResolvedValue({
+          id: "fact-1",
+          supportTicketId: "ticket-1",
+          orderId: "order-1",
+          submittedByUserId: "customer-1",
+          statement: "我在约定时间进入平台会话，服务没有开始。",
+          evidenceAttachments: [],
+          createdAt
         })
       }
     };
@@ -196,6 +258,7 @@ describe("SupportService", () => {
     expect(result).toEqual({
       id: "fact-1",
       statement: "我在约定时间进入平台会话，服务没有开始。",
+      evidenceAttachments: [],
       createdAt: createdAt.toISOString()
     });
   });
@@ -299,22 +362,84 @@ describe("SupportService", () => {
         createdAt
       }]
     }]);
-    prisma.supportTicket = { findMany };
+    prisma.supportTicket = { findMany, count: jest.fn().mockResolvedValue(1) };
 
     const listed = await service.listMine("customer-1");
     expect(findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: { userId: "customer-1" },
       include: expect.objectContaining({
-        orderFacts: { where: { submittedByUserId: "customer-1" }, orderBy: { createdAt: "asc" } }
+        orderFacts: expect.objectContaining({
+          where: { submittedByUserId: "customer-1" },
+          orderBy: { createdAt: "asc" }
+        })
       })
     }));
     const listedOrderFacts = (listed.items[0] as any).orderFacts;
     expect(listedOrderFacts).toEqual([{
       id: "fact-own",
       statement: "我已核对到账记录。",
+      evidenceAttachments: [],
       createdAt: createdAt.toISOString()
     }]);
     expect(listedOrderFacts[0]).not.toHaveProperty("submittedByUserId");
+  });
+
+  it("provides stable requester-owned detail and paginated by-order tickets without operational identities", async () => {
+    const createdAt = new Date("2026-08-01T08:00:00.000Z");
+    const ticket = {
+      id: "ticket-owned",
+      userId: "customer-1",
+      orderId: "order-1",
+      category: "orderIssue",
+      priority: "normal",
+      status: "open",
+      subject: "订单状态核对",
+      body: "请核对订单当前处理状态。",
+      dueAt: null,
+      resolution: null,
+      resolutionCode: null,
+      resolvedAt: null,
+      createdAt,
+      updatedAt: createdAt,
+      order: null,
+      requester: { id: "customer-1" },
+      assignedTo: { id: "support-private" },
+      orderFacts: []
+    };
+    const findMany = jest.fn().mockResolvedValue([ticket]);
+    const findFirst = jest.fn().mockResolvedValue(ticket);
+    prisma.supportTicket = {
+      findMany,
+      findFirst,
+      count: jest.fn().mockResolvedValue(6)
+    };
+
+    const page = await service.listMine(
+      "customer-1",
+      { page: 2, pageSize: 5, status: "open" },
+      "order-1"
+    );
+    const detail = await service.getMine("customer-1", "ticket-owned");
+
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { userId: "customer-1", orderId: "order-1", status: "open" },
+      orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+      skip: 5,
+      take: 5
+    }));
+    expect(findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "ticket-owned", userId: "customer-1" },
+      include: expect.objectContaining({
+        orderFacts: expect.objectContaining({
+          where: { submittedByUserId: "customer-1" },
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }]
+        })
+      })
+    }));
+    expect(page.pagination).toEqual({ page: 2, pageSize: 5, total: 6, totalPages: 2 });
+    expect(detail).toMatchObject({ id: "ticket-owned", orderId: "order-1" });
+    expect(detail).not.toHaveProperty("requester");
+    expect(detail).not.toHaveProperty("assignedTo");
   });
 
   it("caps repeated facts on one private support ticket without creating a new dispute", async () => {
@@ -350,6 +475,249 @@ describe("SupportService", () => {
     expect(commercial.holdForOrder).not.toHaveBeenCalled();
   });
 
+  it("limits a support operator's queue to tickets assigned to that operator", async () => {
+    const findMany = jest.fn().mockResolvedValue([]);
+    const count = jest.fn().mockResolvedValue(0);
+    prisma.supportTicket = { findMany, count };
+
+    await service.listAdmin(
+      { id: "support-1", role: "support" } as any,
+      { page: 1, pageSize: 50, status: "inProgress" }
+    );
+
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        status: "inProgress",
+        assignedToUserId: "support-1"
+      }
+    }));
+    expect(count).toHaveBeenCalledWith({
+      where: {
+        status: "inProgress",
+        assignedToUserId: "support-1"
+      }
+    });
+  });
+
+  it("lets an administrator request the assigned queue independently from claimable tickets", async () => {
+    const findMany = jest.fn().mockResolvedValue([]);
+    const count = jest.fn().mockResolvedValue(0);
+    prisma.supportTicket = { findMany, count };
+
+    await service.listAdmin(
+      { id: "admin-1", role: "admin" } as any,
+      { page: 3, pageSize: 25, assignedOnly: true }
+    );
+
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { assignedToUserId: { not: null } },
+      orderBy: [{ priority: "desc" }, { dueAt: "asc" }, { createdAt: "asc" }, { id: "asc" }],
+      skip: 50,
+      take: 25
+    }));
+    expect(count).toHaveBeenCalledWith({ where: { assignedToUserId: { not: null } } });
+  });
+
+  it("returns only a minimal anonymous summary for unassigned claimable tickets", async () => {
+    const dueAt = new Date("2026-08-01T08:00:00.000Z");
+    const findMany = jest.fn().mockResolvedValue([{
+      id: "ticket-claimable",
+      category: "refund",
+      priority: "high",
+      dueAt,
+      orderId: "order-1",
+      subject: "must-not-leak",
+      body: "must-not-leak",
+      requester: { id: "customer-1" }
+    }]);
+    const count = jest.fn().mockResolvedValue(1);
+    prisma.supportTicket = { findMany, count };
+
+    const result = await service.listClaimable({ page: 1, pageSize: 50 });
+
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        assignedToUserId: null,
+        status: { in: ["open", "inProgress"] }
+      },
+      select: {
+        id: true,
+        category: true,
+        priority: true,
+        dueAt: true,
+        orderId: true
+      }
+    }));
+    expect(result.items).toEqual([{
+      id: "ticket-claimable",
+      category: "refund",
+      priority: "high",
+      dueAt: dueAt.toISOString(),
+      hasOrder: true
+    }]);
+    expect(JSON.stringify(result)).not.toContain("must-not-leak");
+    expect(JSON.stringify(result)).not.toContain("customer-1");
+    expect(JSON.stringify(result)).not.toContain("order-1");
+  });
+
+  it("claims an anonymous ticket with a compare-and-set update before returning its details", async () => {
+    const createdAt = new Date("2026-07-31T08:00:00.000Z");
+    const updated = {
+      id: "ticket-1",
+      userId: "customer-1",
+      orderId: null,
+      category: "general",
+      priority: "normal",
+      status: "inProgress",
+      subject: "需要帮助",
+      body: "请协助处理。",
+      assignedToUserId: "support-1",
+      assignedTo: { id: "support-1", profile: { displayName: "客服一" } },
+      requester: { id: "customer-1", profile: { displayName: "用户" } },
+      orderFacts: [],
+      order: null,
+      dueAt: null,
+      resolution: null,
+      resolutionCode: null,
+      resolvedAt: null,
+      createdAt,
+      updatedAt: createdAt
+    };
+    const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      user: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "support-1",
+          role: "support",
+          accountStatus: "active"
+        })
+      },
+      supportTicket: {
+        findUnique: jest.fn().mockResolvedValue({ orderId: null }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        findUniqueOrThrow: jest.fn().mockResolvedValue(updated)
+      }
+    };
+    prisma.$transaction.mockImplementation(async (callback: (db: any) => Promise<unknown>) => callback(tx));
+
+    await expect(service.claim("support-1", "ticket-1")).resolves.toMatchObject({
+      id: "ticket-1",
+      status: "inProgress",
+      body: "请协助处理。"
+    });
+    expect(tx.supportTicket.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: "ticket-1",
+        assignedToUserId: null,
+        status: { in: ["open", "inProgress"] }
+      },
+      data: { assignedToUserId: "support-1", status: "inProgress" }
+    });
+    expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({
+      actorId: "support-1",
+      action: "support.ticket_claimed"
+    }), tx);
+  });
+
+  it("allows an administrator to assign a ticket to active support staff and audits the ownership change", async () => {
+    const createdAt = new Date("2026-07-31T08:00:00.000Z");
+    const ticket = {
+      id: "ticket-1",
+      userId: "customer-1",
+      orderId: null,
+      category: "general",
+      priority: "normal",
+      status: "open",
+      subject: "需要帮助",
+      body: "请协助处理。",
+      assignedToUserId: null,
+      dueAt: null,
+      resolution: null,
+      resolutionCode: null,
+      resolvedAt: null,
+      createdAt,
+      updatedAt: createdAt
+    };
+    const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      supportTicket: {
+        findUnique: jest.fn()
+          .mockResolvedValueOnce({ orderId: null })
+          .mockResolvedValueOnce(ticket),
+        update: jest.fn().mockResolvedValue({
+          ...ticket,
+          assignedToUserId: "support-1",
+          status: "inProgress"
+        })
+      },
+      user: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "support-1",
+          role: "support",
+          accountStatus: "active"
+        })
+      }
+    };
+    prisma.$transaction.mockImplementation(async (callback: (db: any) => Promise<unknown>) => callback(tx));
+
+    await expect(service.assign(
+      { id: "admin-1", role: "admin" } as any,
+      "ticket-1",
+      "support-1"
+    )).resolves.toMatchObject({ id: "ticket-1", status: "inProgress" });
+
+    expect(tx.supportTicket.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "ticket-1" },
+      data: { assignedToUserId: "support-1", status: "inProgress" }
+    }));
+    expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({
+      actorId: "admin-1",
+      action: "support.ticket_assigned",
+      metadata: {
+        actorRole: "admin",
+        previousAssignedToUserId: null,
+        assignedToUserId: "support-1"
+      }
+    }), tx);
+  });
+
+  it("prevents support staff from assigning a ticket to another operator", async () => {
+    await expect(service.assign(
+      { id: "support-1", role: "support" } as any,
+      "ticket-1",
+      "support-2"
+    )).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("does not let support staff steal a ticket already assigned to another operator", async () => {
+    const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      supportTicket: {
+        findUnique: jest.fn()
+          .mockResolvedValueOnce({ orderId: null })
+          .mockResolvedValueOnce({
+            status: "inProgress",
+            assignedToUserId: "support-2"
+          }),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+        findUniqueOrThrow: jest.fn()
+      },
+      user: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "support-1",
+          role: "support",
+          accountStatus: "active"
+        })
+      }
+    };
+    prisma.$transaction.mockImplementation(async (callback: (db: any) => Promise<unknown>) => callback(tx));
+
+    await expect(service.claim("support-1", "ticket-1"))
+      .rejects.toMatchObject({ code: "SUPPORT_TICKET_ALREADY_ASSIGNED" });
+    expect(tx.supportTicket.findUniqueOrThrow).not.toHaveBeenCalled();
+  });
+
   it("rejects assigning a commercial support ticket to a content-only moderator", async () => {
     const tx = {
       $queryRaw: jest.fn().mockResolvedValue([]),
@@ -365,7 +733,11 @@ describe("SupportService", () => {
     };
     prisma.$transaction.mockImplementation(async (callback: (db: any) => Promise<unknown>) => callback(tx));
 
-    await expect(service.assign("admin-1", "ticket-1", "moderator-1"))
+    await expect(service.assign(
+      { id: "admin-1", role: "admin" } as any,
+      "ticket-1",
+      "moderator-1"
+    ))
       .rejects.toMatchObject({ code: "SUPPORT_ASSIGNEE_INVALID" });
     expect(tx.supportTicket.update).not.toHaveBeenCalled();
   });
@@ -433,5 +805,31 @@ describe("SupportService", () => {
       eventKey: "support:ticket-1:resolved"
     }));
     expect(result).toEqual(expect.objectContaining({ id: "ticket-1", status: "resolved" }));
+  });
+
+  it("keeps resolution restricted to the current assignee after the ticket lock", async () => {
+    const tx = {
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      supportTicket: {
+        findUnique: jest.fn()
+          .mockResolvedValueOnce({ orderId: "order-1" })
+          .mockResolvedValueOnce({
+            id: "ticket-1",
+            orderId: "order-1",
+            status: "inProgress",
+            assignedToUserId: "support-2",
+            order: { id: "order-1" }
+          }),
+        update: jest.fn()
+      }
+    };
+    prisma.$transaction.mockImplementation(async (callback: (db: any) => Promise<unknown>) => callback(tx));
+
+    await expect(service.resolve("support-1", "ticket-1", {
+      status: "resolved",
+      resolution: "已完成核验",
+      resolutionCode: "noRefund"
+    })).rejects.toMatchObject({ code: "SUPPORT_TICKET_ASSIGNEE_REQUIRED" });
+    expect(tx.supportTicket.update).not.toHaveBeenCalled();
   });
 });

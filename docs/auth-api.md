@@ -174,6 +174,8 @@ Talk&Talk 正式账号体系 API，前缀均为 `/api/v1`。所有 JSON 响应�
 | `INVALID_WECHAT_CODE` | 401 | 小程序登录凭证无效或过期 |
 | `WECHAT_LOGIN_UNAVAILABLE` | 502 | 无法连接微信登录服务 |
 | `WECHAT_MINIPROGRAM_LOGIN_UNAVAILABLE` | 503 | 未配置小程序登录凭证 |
+| `LOGIN_IDENTITY_UNAVAILABLE` | 409 | 已重新核验的外部登录标识暂不可用；统一响应，不披露旧账号、注销状态、日期或可重新注册时间 |
+| `AUTH_IDENTITY_TOMBSTONE_KEY_COVERAGE_UNKNOWN` | 503 | 存在仍生效但当前服务无法验证的身份墓碑密钥；注册链路按失败关闭处理 |
 | `UNAUTHORIZED` | 401 | JWT 缺失/无效/refresh 已撤销 |
 | `FORBIDDEN` | 403 | RBAC 权限不足 |
 
@@ -190,8 +192,15 @@ Talk&Talk 正式账号体系 API，前缀均为 `/api/v1`。所有 JSON 响应�
 | `APPLE_SIGN_IN_BUNDLE_ID` | Apple 登录 bundle id |
 | `WECHAT_MINIPROGRAM_APP_ID` | 小程序 AppID；同时用于 JSAPI 支付 |
 | `WECHAT_MINIPROGRAM_APP_SECRET` | 小程序 AppSecret，只能保存在 API 部署环境 |
+| `AUTH_IDENTITY_TOMBSTONE_HMAC_KEYS` | JSON 密钥环，格式为 `{ "key-id": "base64-key" }`；每把密钥解码后至少 32 字节，只能放在部署密钥管理中 |
+| `AUTH_IDENTITY_TOMBSTONE_ACTIVE_KEY_ID` | 新建身份墓碑使用的密钥 ID，必须存在于上述密钥环 |
+| `AUTH_IDENTITY_REREGISTRATION_POLICY` | 固定为 `after_tombstone_expiry`；墓碑到期前禁止同一外部身份静默注册新账号 |
 
 开发环境 `SMS_PROVIDER=mock` 时，验证码会输出到 API 日志。
+
+### 身份墓碑密钥轮换
+
+先把新密钥加入密钥环并部署，确认商用就绪度中的 `accountDeletionAuthTombstoneUnknownKeys=0`；再把 `AUTH_IDENTITY_TOMBSTONE_ACTIVE_KEY_ID` 切到新密钥并二次部署。旧密钥必须一直保留到所有使用它的墓碑已到期并由保留期任务清理，且覆盖缺口、未知密钥积压均为 0 后才能移除。提前删除旧密钥会让无现存身份的消费者登录按设计返回 503，不能通过关闭检查或清空墓碑规避。
 
 ## iOS 配置
 

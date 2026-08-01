@@ -14,17 +14,23 @@ function createService() {
     companionAvailabilityBlackout: { findMany: jest.fn() },
     companionAvailabilityWindow: {
       findMany: jest.fn(),
+      count: jest.fn(),
       create: jest.fn()
     },
     order: { findMany: jest.fn() }
   } as any;
   prisma.$transaction.mockImplementation(async (callback: (db: typeof prisma) => unknown) => callback(prisma));
-  prisma.$queryRaw.mockResolvedValue([]);
+  prisma.$queryRaw.mockImplementation(async (strings: TemplateStringsArray) => {
+    const sql = Array.from(strings).join("");
+    return sql.includes('AS "blackout"')
+      ? [{ blackout: false, window: false, order: false }]
+      : [];
+  });
   prisma.companionProfile.findUnique.mockResolvedValue({ id: "c1" });
   prisma.companionRecurringAvailabilityRule.findMany.mockResolvedValue([]);
   prisma.companionAvailabilityBlackout.findMany.mockResolvedValue([]);
   prisma.companionAvailabilityWindow.findMany.mockResolvedValue([]);
-  prisma.order.findMany.mockResolvedValue([]);
+  prisma.companionAvailabilityWindow.count.mockResolvedValue(0);
   prisma.companionAvailabilityWindow.create.mockImplementation(async ({ data }: any) => ({ id: "draft", ...data }));
   return { prisma, service: new CompanionRecurringAvailabilityDraftMaterializerService(prisma) };
 }
@@ -48,7 +54,8 @@ describe("CompanionRecurringAvailabilityDraftMaterializerService", () => {
       skippedByBlackout: 0,
       skippedByExistingWindow: 0,
       skippedByOrder: 0,
-      skippedOutsideHorizon: 0
+      skippedOutsideHorizon: 0,
+      skippedByDraftLimit: 0
     });
 
     expect(prisma.$queryRaw).toHaveBeenCalled();
@@ -70,9 +77,12 @@ describe("CompanionRecurringAvailabilityDraftMaterializerService", () => {
         recurringOccurrenceStartsAt: new Date("2026-07-28T02:00:00.000Z")
       })
     });
-    const range = prisma.companionAvailabilityWindow.findMany.mock.calls[0][0].where;
-    expect(range.startsAt).toEqual({ lt: new Date("2026-08-04T00:00:00.000Z") });
-    expect(range.endsAt).toEqual({ gt: NOW });
+    expect(prisma.companionAvailabilityWindow.count).toHaveBeenCalledWith({
+      where: { companionId: "c1", isActive: false }
+    });
+    const sql = prisma.$queryRaw.mock.calls[1][0].join(" ");
+    expect(sql).toContain('reservation."scheduledAt"');
+    expect(sql).toContain("EXISTS");
     expect(COMPANION_RECURRING_AVAILABILITY_DRAFT_HORIZON_DAYS).toBe(14);
     expect(prisma).not.toHaveProperty("availabilityReminderCandidate");
   });
@@ -83,20 +93,12 @@ describe("CompanionRecurringAvailabilityDraftMaterializerService", () => {
       { id: "tuesday-rule", weekday: 2, startsAtMinute: 600, endsAtMinute: 660, capacity: 1 },
       { id: "wednesday-rule", weekday: 3, startsAtMinute: 600, endsAtMinute: 660, capacity: 1 }
     ]);
-    prisma.companionAvailabilityBlackout.findMany.mockResolvedValue([{
-      startsAt: new Date("2026-07-21T01:30:00.000Z"),
-      endsAt: new Date("2026-07-21T03:30:00.000Z")
-    }]);
-    prisma.companionAvailabilityWindow.findMany.mockResolvedValue([{
-      startsAt: new Date("2026-07-28T01:30:00.000Z"),
-      endsAt: new Date("2026-07-28T03:30:00.000Z"),
-      recurringAvailabilityRuleId: null,
-      recurringOccurrenceStartsAt: null
-    }]);
-    prisma.order.findMany.mockResolvedValue([{
-      scheduledAt: new Date("2026-07-22T02:00:00.000Z"),
-      durationMinutes: 60
-    }]);
+    prisma.$queryRaw
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ blackout: true, window: false, order: false }])
+      .mockResolvedValueOnce([{ blackout: false, window: true, order: false }])
+      .mockResolvedValueOnce([{ blackout: false, window: false, order: true }])
+      .mockResolvedValueOnce([{ blackout: false, window: false, order: false }]);
 
     await expect(service.materialize("c1", NOW)).resolves.toEqual({
       evaluatedRules: 2,
@@ -106,7 +108,8 @@ describe("CompanionRecurringAvailabilityDraftMaterializerService", () => {
       skippedByBlackout: 1,
       skippedByExistingWindow: 1,
       skippedByOrder: 1,
-      skippedOutsideHorizon: 0
+      skippedOutsideHorizon: 0,
+      skippedByDraftLimit: 0
     });
 
     expect(prisma.companionAvailabilityWindow.create).toHaveBeenCalledWith({
@@ -120,25 +123,36 @@ describe("CompanionRecurringAvailabilityDraftMaterializerService", () => {
     expect(prisma.companionAvailabilityWindow).not.toHaveProperty("delete");
   });
 
+  it("preserves a legacy order longer than the current API maximum when its true end overlaps", async () => {
+    const { prisma, service } = createService();
+    prisma.companionRecurringAvailabilityRule.findMany.mockResolvedValue([{
+      id: "tuesday-rule",
+      weekday: 2,
+      startsAtMinute: 10 * 60,
+      endsAtMinute: 11 * 60,
+      capacity: 1
+    }]);
+    prisma.$queryRaw
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ blackout: false, window: false, order: true }])
+      .mockResolvedValueOnce([{ blackout: false, window: false, order: false }]);
+
+    await expect(service.materialize("c1", NOW)).resolves.toMatchObject({
+      skippedByOrder: 1,
+      created: 1
+    });
+    expect(prisma.companionAvailabilityWindow.create).toHaveBeenCalledTimes(1);
+  });
+
   it("is idempotent when a repeated pass already sees its drafts or loses a source-key race", async () => {
     const { prisma, service } = createService();
     const rule = { id: "tuesday-rule", weekday: 2, startsAtMinute: 600, endsAtMinute: 660, capacity: 1 };
     prisma.companionRecurringAvailabilityRule.findMany.mockResolvedValue(rule ? [rule] : []);
-    prisma.companionAvailabilityWindow.findMany
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([{
-        startsAt: new Date("2026-07-21T02:00:00.000Z"),
-        endsAt: new Date("2026-07-21T03:00:00.000Z"),
-        recurringAvailabilityRuleId: "tuesday-rule",
-        recurringOccurrenceStartsAt: new Date("2026-07-21T02:00:00.000Z")
-      }, {
-        startsAt: new Date("2026-07-28T02:00:00.000Z"),
-        endsAt: new Date("2026-07-28T03:00:00.000Z"),
-        recurringAvailabilityRuleId: "tuesday-rule",
-        recurringOccurrenceStartsAt: new Date("2026-07-28T02:00:00.000Z")
-      }]);
-
     await service.materialize("c1", NOW);
+    prisma.$queryRaw
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ blackout: false, window: true, order: false }])
+      .mockResolvedValueOnce([{ blackout: false, window: true, order: false }]);
     await expect(service.materialize("c1", NOW)).resolves.toEqual(expect.objectContaining({
       created: 0,
       skippedByExistingWindow: 2
@@ -158,6 +172,20 @@ describe("CompanionRecurringAvailabilityDraftMaterializerService", () => {
     prisma.companionProfile.findUnique.mockResolvedValue(null);
 
     await expect(service.materialize("missing", NOW)).rejects.toMatchObject({ code: "COMPANION_NOT_FOUND" });
+    expect(prisma.companionAvailabilityWindow.create).not.toHaveBeenCalled();
+  });
+
+  it("stops materializing when the durable inactive-window cap is reached", async () => {
+    const { prisma, service } = createService();
+    prisma.companionRecurringAvailabilityRule.findMany.mockResolvedValue([{
+      id: "tuesday-rule", weekday: 2, startsAtMinute: 600, endsAtMinute: 660, capacity: 1
+    }]);
+    prisma.companionAvailabilityWindow.count.mockResolvedValue(500);
+
+    await expect(service.materialize("c1", NOW)).resolves.toMatchObject({
+      created: 0,
+      skippedByDraftLimit: 2
+    });
     expect(prisma.companionAvailabilityWindow.create).not.toHaveBeenCalled();
   });
 });

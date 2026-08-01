@@ -4,8 +4,14 @@ import { ModerationResult } from "./moderation.service";
 describe("ModerationCaseService", () => {
   const create = jest.fn();
   const prisma = {
-    moderationCase: { create, findUnique: jest.fn() },
-    moderationEvidence: { create: jest.fn() },
+    moderationCase: {
+      create,
+      findUnique: jest.fn(),
+      findMany: jest.fn(),
+      findFirst: jest.fn(),
+      count: jest.fn()
+    },
+    moderationEvidence: { create: jest.fn(), count: jest.fn() },
     moderationActionLog: { create: jest.fn() },
     $transaction: jest.fn()
   } as any;
@@ -256,6 +262,7 @@ describe("ModerationCaseService", () => {
       reportId: "receipt-2",
       postId: "post-1",
       reporterUserId: "reporter-2",
+      subjectUserId: "post-author-1",
       reason: "疑似重复引流",
       result,
       db: tx
@@ -285,13 +292,160 @@ describe("ModerationCaseService", () => {
     expect(notifications.create).not.toHaveBeenCalled();
   });
 
+  it("returns bounded reporter-safe summaries without nesting follow-up evidence in the list", async () => {
+    prisma.moderationCase.count.mockResolvedValue(1);
+    prisma.moderationCase.findMany.mockResolvedValue([{
+      id: "report-1",
+      category: "用户举报",
+      riskLevel: "high",
+      priority: "high",
+      status: "resolved",
+      content: "举报原因：对方反复要求站外转账\n[会话上下文] 这段内容不能返回给举报回执",
+      dueAt: new Date("2026-07-31T08:00:00.000Z"),
+      resolvedAt: new Date("2026-07-31T07:00:00.000Z"),
+      createdAt: new Date("2026-07-31T06:00:00.000Z"),
+      actionLogs: [{ action: "confirmViolation", note: "internal-only" }],
+      _count: { actionLogs: 1, evidences: 1 },
+      evidences: [{
+        id: "follow-up-1",
+        type: "reporter_follow_up",
+        payload: { statement: "补充说明：对方再次尝试站外联系。" },
+        createdAt: new Date("2026-07-31T06:30:00.000Z")
+      }],
+      subjectUserId: "must-not-leak",
+      aiReason: "must-not-leak"
+    }]);
+
+    await expect(service.listReporterCases("reporter-1")).resolves.toEqual({
+      items: [expect.objectContaining({
+        id: "report-1",
+        outcome: "actionTaken",
+        outcomeSummary: expect.stringContaining("采取相应处置"),
+        submittedSummary: "对方反复要求站外转账",
+        followUpCount: 1,
+        actionHistoryWindow: {
+          limit: 20,
+          total: 1,
+          hasMore: false,
+          purpose: "outcomeSummaryOnly"
+        }
+      })],
+      pagination: { page: 1, pageSize: 20, total: 1, totalPages: 1 }
+    });
+    const result = await service.listReporterCases("reporter-1");
+    expect(result.items[0]).not.toHaveProperty("subjectUserId");
+    expect(result.items[0]).not.toHaveProperty("aiReason");
+    expect(result.items[0]).not.toHaveProperty("actionLogs");
+    expect(result.items[0]).not.toHaveProperty("followUps");
+    expect(prisma.moderationCase.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      include: expect.objectContaining({
+        actionLogs: expect.objectContaining({ take: 1 }),
+        _count: {
+          select: {
+            actionLogs: true,
+            evidences: { where: { type: "reporter_follow_up" } }
+          }
+        }
+      })
+    }));
+    expect(prisma.moderationCase.findMany.mock.calls.at(-1)?.[0]?.include).not.toHaveProperty("evidences");
+  });
+
+  it("returns reporter follow-up statements only from the owner-scoped detail endpoint", async () => {
+    prisma.moderationCase.findFirst.mockResolvedValue({
+      id: "report-1",
+      category: "用户举报",
+      riskLevel: "high",
+      priority: "high",
+      status: "humanReview",
+      content: "举报原因：对方再次尝试站外联系\n[会话上下文] private context",
+      dueAt: null,
+      resolvedAt: null,
+      createdAt: new Date("2026-07-31T06:00:00.000Z"),
+      actionLogs: [],
+      _count: { actionLogs: 0 },
+      evidences: [{
+        id: "follow-up-1",
+        type: "reporter_follow_up",
+        payload: { statement: "补充说明：对方再次尝试站外联系。" },
+        createdAt: new Date("2026-07-31T06:30:00.000Z")
+      }]
+    });
+
+    await expect(service.getReporterCase("reporter-1", "report-1")).resolves.toMatchObject({
+      id: "report-1",
+      submittedSummary: "对方再次尝试站外联系",
+      followUpCount: 1,
+      followUps: [{
+        id: "follow-up-1",
+        statement: "补充说明：对方再次尝试站外联系。",
+        createdAt: "2026-07-31T06:30:00.000Z"
+      }]
+    });
+    expect(prisma.moderationCase.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "report-1", source: "report", reporterUserId: "reporter-1" },
+      include: expect.objectContaining({
+        evidences: expect.objectContaining({ where: { type: "reporter_follow_up" } })
+      })
+    }));
+  });
+
+  it("adds a bounded private follow-up to an open report", async () => {
+    const db = {
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      moderationCase: {
+        findFirst: jest.fn().mockResolvedValue({ id: "report-1", status: "humanReview" })
+      },
+      moderationEvidence: {
+        count: jest.fn().mockResolvedValue(1),
+        create: jest.fn().mockResolvedValue({
+          id: "follow-up-2",
+          createdAt: new Date("2026-07-31T07:30:00.000Z")
+        })
+      },
+      moderationActionLog: { create: jest.fn().mockResolvedValue({}) }
+    };
+    prisma.$transaction.mockImplementation(async (callback: any) => callback(db));
+
+    await expect(service.addReporterFollowUp(
+      "reporter-1",
+      "report-1",
+      "  对方随后又发来了站外联系方式。  "
+    )).resolves.toEqual({
+      id: "follow-up-2",
+      statement: "对方随后又发来了站外联系方式。",
+      createdAt: "2026-07-31T07:30:00.000Z"
+    });
+    expect(db.moderationEvidence.create).toHaveBeenCalledWith({
+      data: {
+        caseId: "report-1",
+        type: "reporter_follow_up",
+        payload: { statement: "对方随后又发来了站外联系方式。" }
+      }
+    });
+    expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({
+      action: "moderation.report_follow_up_added",
+      resourceId: "report-1"
+    }), db);
+  });
+
+  it("rejects whitespace-only reporter follow-up before opening a transaction", async () => {
+    await expect(service.addReporterFollowUp("reporter-1", "report-1", "     "))
+      .rejects.toMatchObject({ code: "REPORT_FOLLOW_UP_INVALID" });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
   it("allows one appeal after an auditor confirms a violation", async () => {
+    const appealDeadlineAt = new Date("2099-08-18T00:00:00.000Z");
     prisma.moderationCase.findUnique.mockResolvedValue({
       id: "case-confirmed",
       subjectUserId: "user-1",
       decision: "warn",
+      createdAt: new Date("2099-07-18T00:00:00.000Z"),
+      resolvedAt: new Date("2099-07-19T00:00:00.000Z"),
+      appealDeadlineAt,
       restrictions: [],
-      actionLogs: [{ action: "confirmViolation" }]
+      actionLogs: [{ action: "confirmViolation", reviewerId: "reviewer-original" }]
     });
     const appeal = {
       id: "appeal-1",
@@ -302,18 +456,106 @@ describe("ModerationCaseService", () => {
     };
     const db = {
       moderationAppeal: { create: jest.fn().mockResolvedValue(appeal) },
+      moderationCase: { update: jest.fn().mockResolvedValue({}) },
       moderationActionLog: { create: jest.fn().mockResolvedValue({}) },
       auditLog: { create: jest.fn().mockResolvedValue({}) }
     };
     prisma.$transaction.mockImplementation(async (callback: any) => callback(db));
 
-    await expect(service.createAppeal({
+    const result = await service.createAppeal({
       caseId: "case-confirmed",
       subjectUserId: "user-1",
       reason: "审核结论与实际情况不符"
-    })).resolves.toEqual(appeal);
+    });
+    expect(result).toEqual({ ...appeal, appealDeadlineAt });
     expect(db.moderationAppeal.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ caseId: "case-confirmed", subjectUserId: "user-1" })
+      data: expect.objectContaining({
+        caseId: "case-confirmed",
+        subjectUserId: "user-1",
+        originalReviewerId: "reviewer-original",
+        policyVersion: "2026.1",
+        reviewDueAt: expect.any(Date)
+      })
+    }));
+    expect(db.moderationCase.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "case-confirmed" },
+      data: expect.objectContaining({
+        status: "humanReview",
+        assignedToUserId: null,
+        appealDeadlineAt
+      })
+    }));
+    expect(notifications.create).toHaveBeenCalledWith(
+      "user-1",
+      "moderationAlert",
+      "内容申诉已进入独立复核",
+      expect.any(String),
+      expect.objectContaining({ status: "pending" }),
+      db
+    );
+  });
+
+  it("rejects an appeal after the published submission deadline", async () => {
+    const appealDeadlineAt = new Date("2020-01-01T00:00:00.000Z");
+    prisma.moderationCase.findUnique.mockResolvedValue({
+      id: "case-expired",
+      subjectUserId: "user-1",
+      decision: "block",
+      createdAt: new Date("2019-12-01T00:00:00.000Z"),
+      resolvedAt: new Date("2019-12-02T00:00:00.000Z"),
+      appealDeadlineAt,
+      restrictions: [],
+      actionLogs: []
+    });
+
+    await expect(service.createAppeal({
+      caseId: "case-expired",
+      subjectUserId: "user-1",
+      reason: "希望重新核对"
+    })).rejects.toMatchObject({
+      code: "MODERATION_APPEAL_WINDOW_CLOSED",
+      details: { appealDeadlineAt: appealDeadlineAt.toISOString() }
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("lists only unappealed cases whose public submission window remains open", async () => {
+    prisma.moderationCase.findMany.mockResolvedValue([
+      {
+        id: "case-open",
+        decision: "block",
+        source: "chat",
+        content: "这是一条被拦截的消息",
+        createdAt: new Date("2099-07-01T00:00:00.000Z"),
+        resolvedAt: new Date("2099-07-02T00:00:00.000Z"),
+        appealDeadlineAt: new Date("2099-08-01T00:00:00.000Z"),
+        appealPolicyVersion: "2026.1",
+        appeals: [],
+        restrictions: [],
+        actionLogs: []
+      }
+    ]);
+    prisma.moderationCase.count.mockResolvedValue(1);
+
+    await expect(service.listAppealableCasesForUser("user-1")).resolves.toEqual({
+      items: [expect.objectContaining({
+        caseId: "case-open",
+        kind: "contentAction",
+        summary: "内容未送达或已被移除",
+        appealDeadlineAt: "2099-08-01T00:00:00.000Z",
+        policyVersion: "2026.1"
+      })],
+      pagination: { page: 1, pageSize: 20, total: 1, totalPages: 1 }
+    });
+    expect(prisma.moderationCase.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        subjectUserId: "user-1",
+        appeals: { none: {} },
+        AND: expect.any(Array)
+      }),
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      skip: 0,
+      take: 20
     }));
   });
 });

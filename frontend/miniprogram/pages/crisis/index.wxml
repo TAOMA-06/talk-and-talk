@@ -1,0 +1,35 @@
+<view class="page crisis-page">
+  <view class="crisis-hero">
+    <view class="crisis-kicker">即时安全优先</view>
+    <view class="crisis-title">如果你或他人正处在危险中，请现在联系紧急服务</view>
+    <view class="crisis-copy">{{platformCannotDispatchText}}</view>
+    <view class="crisis-copy strong">普通客服工单不是紧急服务，不能保证即时响应。</view>
+  </view>
+
+  <view class="coverage-card">
+    <view class="coverage-label">当前地区：{{region}}</view>
+    <view class="coverage-copy">{{coverageStatement}}</view>
+    <view wx:if="{{loadNotice}}" class="load-notice">{{loadNotice}}</view>
+  </view>
+
+  <view class="resource-card" wx:for="{{resources}}" wx:key="code">
+    <view class="resource-heading">
+      <view>
+        <view class="resource-name">{{item.name}}</view>
+        <view class="resource-phone">{{item.phone}}</view>
+      </view>
+      <button class="call-button" bindtap="callResource" data-phone="{{item.phone}}" aria-label="拨打{{item.name}}{{item.phone}}">一键拨号</button>
+    </view>
+    <view class="resource-copy">{{item.availability}}</view>
+    <view class="source-box">
+      <view>官方来源：{{item.officialSourceOrganization}}</view>
+      <view>{{item.officialSourceTitle}}</view>
+      <view>核验日期：{{item.lastVerifiedOn}}</view>
+      <button class="source-button" bindtap="copyOfficialSource" data-url="{{item.officialSourceUrl}}">复制官方来源链接</button>
+    </view>
+  </view>
+
+  <view class="safety-note">如果通话不安全，请先移动到可离开的公共区域，或请身边可信的人代为联系紧急服务。平台不能定位你，也不会自动报警或派出救援。</view>
+  <view wx:if="{{completionError}}" class="completion-error">{{completionError}}</view>
+  <button class="complete-button" loading="{{completing}}" bindtap="completeResourceView">我已查看这些资源</button>
+</view>

@@ -11,7 +11,14 @@ import {
   WeChatNativePrepayResult,
   WeChatRefundInput,
   WeChatRefundNotifyPayload,
-  WeChatRefundResult
+  WeChatRefundResult,
+  WeChatComplaintNotifyPayload,
+  WeChatComplaintDetail,
+  WeChatComplaintListResult,
+  WeChatComplaintNegotiationResult,
+  WeChatProviderOperationResult,
+  WeChatDailyStatementInput,
+  WeChatDailyStatementResult
 } from "./wechat-pay.provider";
 
 /**
@@ -59,6 +66,13 @@ export class DisabledWeChatPayProvider implements WeChatPayProvider {
   async createRefund(_input: WeChatRefundInput): Promise<WeChatRefundResult> { return this.unavailable(); }
   async queryRefund(_outRefundNo: string): Promise<WeChatRefundResult> { return this.unavailable(); }
   parseRefundNotifyPayload(_rawBody: string): WeChatRefundNotifyPayload { return this.unavailable(); }
+  parseComplaintNotifyPayload(_rawBody: string): WeChatComplaintNotifyPayload { return this.unavailable(); }
+  async listComplaints(_input: { beginDate: string; endDate: string; limit: number; offset: number }): Promise<WeChatComplaintListResult> { return this.unavailable(); }
+  async queryComplaint(_complaintId: string): Promise<WeChatComplaintDetail> { return this.unavailable(); }
+  async listComplaintNegotiationHistory(_input: { complaintId: string; limit: number; offset: number }): Promise<WeChatComplaintNegotiationResult> { return this.unavailable(); }
+  async replyComplaint(_input: { complaintId: string; responseContent: string; responseImages?: string[] }): Promise<WeChatProviderOperationResult> { return this.unavailable(); }
+  async completeComplaint(_complaintId: string): Promise<WeChatProviderOperationResult> { return this.unavailable(); }
+  async downloadDailyStatement(_input: WeChatDailyStatementInput): Promise<WeChatDailyStatementResult> { return this.unavailable(); }
 
   private unavailable(): never {
     throw new AppException("WECHAT_PAY_NOT_CONFIGURED", "WeChat Pay is not configured for this environment", HttpStatus.SERVICE_UNAVAILABLE);

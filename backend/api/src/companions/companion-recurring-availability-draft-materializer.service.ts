@@ -5,6 +5,7 @@ import { PrismaService } from "../database/prisma.service";
 import { COMPANION_AVAILABILITY_SCHEDULE_TIMEZONE } from "./companion-availability-schedule-rule.service";
 
 export const COMPANION_RECURRING_AVAILABILITY_DRAFT_HORIZON_DAYS = 14;
+export const COMPANION_MAX_INACTIVE_AVAILABILITY_WINDOWS = 500;
 
 const DAY_MS = 24 * 60 * 60_000;
 const SHANGHAI_OFFSET_MS = 8 * 60 * 60_000;
@@ -18,8 +19,6 @@ type RecurringRule = {
   capacity: number;
 };
 
-type AvailabilityRange = { startsAt: Date; endsAt: Date };
-
 export type CompanionRecurringAvailabilityDraftMaterializationResult = {
   evaluatedRules: number;
   consideredOccurrences: number;
@@ -29,6 +28,7 @@ export type CompanionRecurringAvailabilityDraftMaterializationResult = {
   skippedByExistingWindow: number;
   skippedByOrder: number;
   skippedOutsideHorizon: number;
+  skippedByDraftLimit: number;
 };
 
 /**
@@ -53,7 +53,7 @@ export class CompanionRecurringAvailabilityDraftMaterializerService {
       const db = transaction as any;
       await this.lockAndFindCompanion(db, normalizedCompanionId);
 
-      const [rules, blackouts, windows, orders] = await Promise.all([
+      const [rules, inactiveWindowCount] = await Promise.all([
         db.companionRecurringAvailabilityRule.findMany({
           where: {
             companionId: normalizedCompanionId,
@@ -69,39 +69,9 @@ export class CompanionRecurringAvailabilityDraftMaterializerService {
           },
           orderBy: [{ weekday: "asc" }, { startsAtMinute: "asc" }, { id: "asc" }]
         }) as Promise<RecurringRule[]>,
-        db.companionAvailabilityBlackout.findMany({
-          where: {
-            companionId: normalizedCompanionId,
-            isActive: true,
-            startsAt: { lt: rangeEnd },
-            endsAt: { gt: evaluatedAt }
-          },
-          select: { startsAt: true, endsAt: true }
-        }) as Promise<AvailabilityRange[]>,
-        db.companionAvailabilityWindow.findMany({
-          where: {
-            companionId: normalizedCompanionId,
-            startsAt: { lt: rangeEnd },
-            endsAt: { gt: evaluatedAt }
-          },
-          select: {
-            startsAt: true,
-            endsAt: true,
-            recurringAvailabilityRuleId: true,
-            recurringOccurrenceStartsAt: true
-          }
-        }) as Promise<Array<AvailabilityRange & {
-          recurringAvailabilityRuleId: string | null;
-          recurringOccurrenceStartsAt: Date | null;
-        }>>,
-        db.order.findMany({
-          where: {
-            companionId: normalizedCompanionId,
-            status: { in: OCCUPIED_ORDER_STATUSES },
-            scheduledAt: { lt: rangeEnd }
-          },
-          select: { scheduledAt: true, durationMinutes: true }
-        }) as Promise<Array<{ scheduledAt: Date; durationMinutes: number }>>
+        db.companionAvailabilityWindow.count({
+          where: { companionId: normalizedCompanionId, isActive: false }
+        }) as Promise<number>
       ]);
 
       const result: CompanionRecurringAvailabilityDraftMaterializationResult = {
@@ -112,12 +82,13 @@ export class CompanionRecurringAvailabilityDraftMaterializerService {
         skippedByBlackout: 0,
         skippedByExistingWindow: 0,
         skippedByOrder: 0,
-        skippedOutsideHorizon: 0
+        skippedOutsideHorizon: 0,
+        skippedByDraftLimit: 0
       };
-      const occupiedOrders = orders.map((order) => ({
-        startsAt: order.scheduledAt,
-        endsAt: new Date(order.scheduledAt.getTime() + order.durationMinutes * 60_000)
-      }));
+      let remainingDraftCapacity = Math.max(
+        0,
+        COMPANION_MAX_INACTIVE_AVAILABILITY_WINDOWS - inactiveWindowCount
+      );
 
       for (const rule of rules) {
         for (const occurrence of this.occurrencesWithinHorizon(rule, evaluatedAt)) {
@@ -126,15 +97,25 @@ export class CompanionRecurringAvailabilityDraftMaterializerService {
             result.skippedOutsideHorizon += 1;
             continue;
           }
-          if (blackouts.some((blackout) => this.overlaps(blackout, occurrence))) {
+          if (remainingDraftCapacity === 0) {
+            result.skippedByDraftLimit += 1;
+            continue;
+          }
+          const conflicts = await this.findOccurrenceConflicts(
+            db,
+            normalizedCompanionId,
+            occurrence.startsAt,
+            occurrence.endsAt
+          );
+          if (conflicts.blackout) {
             result.skippedByBlackout += 1;
             continue;
           }
-          if (windows.some((window) => this.overlaps(window, occurrence))) {
+          if (conflicts.window) {
             result.skippedByExistingWindow += 1;
             continue;
           }
-          if (occupiedOrders.some((order) => this.overlaps(order, occurrence))) {
+          if (conflicts.order) {
             result.skippedByOrder += 1;
             continue;
           }
@@ -151,12 +132,8 @@ export class CompanionRecurringAvailabilityDraftMaterializerService {
                 recurringOccurrenceStartsAt: occurrence.startsAt
               }
             });
-            windows.push({
-              ...occurrence,
-              recurringAvailabilityRuleId: rule.id,
-              recurringOccurrenceStartsAt: occurrence.startsAt
-            });
             result.created += 1;
+            remainingDraftCapacity -= 1;
           } catch (error) {
             if (!this.isUniqueConstraintError(error)) throw error;
             result.alreadyMaterialized += 1;
@@ -194,8 +171,40 @@ export class CompanionRecurringAvailabilityDraftMaterializerService {
     }
   }
 
-  private overlaps(left: AvailabilityRange, right: AvailabilityRange) {
-    return left.startsAt < right.endsAt && left.endsAt > right.startsAt;
+  private async findOccurrenceConflicts(
+    db: any,
+    companionId: string,
+    startsAt: Date,
+    endsAt: Date
+  ): Promise<{ blackout: boolean; window: boolean; order: boolean }> {
+    // Each predicate is an indexed EXISTS against one bounded occurrence. No
+    // growing schedule/order collection is materialized in the application.
+    const rows = await db.$queryRaw<Array<{ blackout: boolean; window: boolean; order: boolean }>>`
+      SELECT
+        EXISTS (
+          SELECT 1 FROM "CompanionAvailabilityBlackout" blackout
+          WHERE blackout."companionId" = ${companionId}
+            AND blackout."isActive" = TRUE
+            AND blackout."startsAt" < ${endsAt}
+            AND blackout."endsAt" > ${startsAt}
+        ) AS "blackout",
+        EXISTS (
+          SELECT 1 FROM "CompanionAvailabilityWindow" availability_window
+          WHERE availability_window."companionId" = ${companionId}
+            AND availability_window."startsAt" < ${endsAt}
+            AND availability_window."endsAt" > ${startsAt}
+        ) AS "window",
+        EXISTS (
+          SELECT 1 FROM "Order" reservation
+          WHERE reservation."companionId" = ${companionId}
+            AND reservation."status"::text IN ('pending', 'paying', 'paid', 'inService', 'completed')
+            AND reservation."durationMinutes" > 0
+            AND reservation."scheduledAt" < ${endsAt}
+            AND reservation."scheduledAt"
+                + (reservation."durationMinutes" * INTERVAL '1 minute') > ${startsAt}
+        ) AS "order"
+    `;
+    return rows[0] ?? { blackout: false, window: false, order: false };
   }
 
   private isUniqueConstraintError(error: unknown) {

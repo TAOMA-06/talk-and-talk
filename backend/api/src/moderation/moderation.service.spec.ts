@@ -54,6 +54,41 @@ describe("ModerationService orchestration", () => {
     expect(result.reasons).toContain("AI 判定风险偏高");
   });
 
+  it("keeps privacy-refused content on the local rule path without treating it as an outage", async () => {
+    appEnv = "production";
+    ai.next = {
+      score: 0.05,
+      reasons: [],
+      provider: "deepseek",
+      available: false,
+      skippedForPrivacy: true
+    };
+
+    const result = await service.moderateAsync("今天有点累", "chat");
+
+    expect(result.decision).toBe("allow");
+    expect(result.provider).toBe("rule-engine");
+    expect(result.matchedRules).not.toContain("provider.unavailable");
+    expect(result.usedAI).toBe(false);
+  });
+
+  it("preserves the local critical self-harm result when external processing is privacy-refused", async () => {
+    ai.next = {
+      score: 0.05,
+      reasons: [],
+      provider: "deepseek",
+      available: false,
+      skippedForPrivacy: true
+    };
+
+    const result = await service.moderateAsync("我想自杀", "chat");
+
+    expect(result.categories).toContain("selfHarm");
+    expect(result.priority).toBe("critical");
+    expect(result.provider).toBe("rule-engine");
+    expect(result.usedAI).toBe(false);
+  });
+
   it("holds chat content for staff review when the production provider is unavailable", async () => {
     appEnv = "production";
     ai.next = { score: 0.05, reasons: [], provider: "deepseek", available: false };

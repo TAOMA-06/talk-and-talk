@@ -1,14 +1,31 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
 
 import { AppException } from "../common/errors/app.exception";
+import {
+  MODERATION_APPEAL_POLICY_VERSION,
+  MODERATION_APPEAL_SUBMISSION_DAYS,
+  MODERATION_APPEALABLE_ACTIONS,
+  moderationAppealDeadline
+} from "../common/moderation-appeal-policy";
 import { PrismaService } from "../database/prisma.service";
 import { ChatRestrictionService } from "../moderation/chat-restriction.service";
 import { MediaAssetService } from "../moderation/media/media-asset.service";
+import { NotificationsService } from "../notifications/notifications.service";
 import { CreateReviewLabelDto } from "./dto/create-review-label.dto";
+import { ExportReviewLabelsDto } from "./dto/export-review-labels.dto";
 import { ReviewCaseAction } from "./dto/review-case-action.dto";
 import { ListReviewCasesQueryDto } from "./dto/list-review-cases.dto";
+import { ListReviewConversationEvidenceDto } from "./dto/list-review-conversation-evidence.dto";
+import { ListActiveReviewStaffQueryDto } from "./dto/list-review-staff.dto";
 
 const OPEN_STATUSES = ["pending", "autoReviewing", "humanReview"] as const;
+const MESSAGE_EVIDENCE_REQUIRED_ACTIONS = new Set<ReviewCaseAction>([
+  "confirmViolation",
+  "rejectMessage",
+  "restrict24h",
+  "restrict7d",
+  "upholdAppeal"
+]);
 
 export type ReviewDecisionActor = {
   id: string;
@@ -22,37 +39,50 @@ export class ReviewCaseService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly chatRestrictions: ChatRestrictionService,
-    private readonly mediaAssets: MediaAssetService
+    private readonly mediaAssets: MediaAssetService,
+    private readonly notifications: NotificationsService
   ) {}
 
   async overview() {
-    const [cases, conversationCount, labelCount, queue] = await Promise.all([
-      this.prisma.moderationCase.findMany({
-        select: {
-          id: true,
-          title: true,
-          category: true,
-          riskLevel: true,
-          status: true,
-          source: true,
-          decision: true,
-          content: true,
-          aiScore: true,
-          createdAt: true
-        },
-        orderBy: { createdAt: "desc" }
-      } as any),
+    const [
+      totalCases,
+      conversationCount,
+      labelCount,
+      queue,
+      statusGroups,
+      decisionGroups,
+      sourceGroups,
+      riskGroups
+    ] = await Promise.all([
+      this.prisma.moderationCase.count(),
       this.prisma.conversation.count(),
       this.prisma.moderationLabel.count(),
       this.prisma.moderationCase.findMany({
         where: { status: { in: [...OPEN_STATUSES] } },
-        orderBy: [{ priority: "desc" }, { dueAt: "asc" }, { createdAt: "desc" }],
+        orderBy: [
+          { priority: "desc" },
+          { dueAt: "asc" },
+          { createdAt: "desc" },
+          { id: "asc" }
+        ],
         take: 8
-      } as any)
+      } as any),
+      this.prisma.moderationCase.groupBy({ by: ["status"], _count: { _all: true } } as any),
+      this.prisma.moderationCase.groupBy({ by: ["decision"], _count: { _all: true } } as any),
+      this.prisma.moderationCase.groupBy({ by: ["source"], _count: { _all: true } } as any),
+      this.prisma.moderationCase.groupBy({ by: ["riskLevel"], _count: { _all: true } } as any)
     ]);
 
     return {
-      overview: this.buildOverviewStats(cases, conversationCount, labelCount),
+      overview: this.buildOverviewStats(
+        totalCases,
+        statusGroups as any[],
+        decisionGroups as any[],
+        sourceGroups as any[],
+        riskGroups as any[],
+        conversationCount,
+        labelCount
+      ),
       queue: queue.map((item: any) => this.toCaseSummary(item))
     };
   }
@@ -66,7 +96,7 @@ export class ReviewCaseService {
       this.prisma.moderationCase.count({ where } as any),
       this.prisma.moderationCase.findMany({
         where,
-        orderBy: { createdAt: "desc" },
+        orderBy: [{ priority: "desc" }, { dueAt: "asc" }, { createdAt: "asc" }, { id: "asc" }],
         skip: (page - 1) * pageSize,
         take: pageSize
       } as any)
@@ -87,10 +117,10 @@ export class ReviewCaseService {
     const item: any = await this.prisma.moderationCase.findUnique({
       where: { id },
       include: {
-        evidences: { orderBy: { createdAt: "asc" } },
-        actionLogs: { orderBy: { createdAt: "desc" } },
-        appeals: true,
-        restrictions: { orderBy: { createdAt: "desc" } }
+        evidences: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] },
+        actionLogs: { orderBy: [{ createdAt: "desc" }, { id: "desc" }] },
+        appeals: { orderBy: [{ createdAt: "desc" }, { id: "desc" }] },
+        restrictions: { orderBy: [{ createdAt: "desc" }, { id: "desc" }] }
       }
     } as any);
 
@@ -114,27 +144,170 @@ export class ReviewCaseService {
     };
   }
 
-  async conversationEvidence(caseId: string, limit = 100) {
+  async conversationEvidence(caseId: string, query: ListReviewConversationEvidenceDto = {}) {
+    if (query.before && query.after) {
+      throw new AppException(
+        "REVIEW_EVIDENCE_CURSOR_CONFLICT",
+        "Use either before or after, not both",
+        HttpStatus.BAD_REQUEST
+      );
+    }
+    const pageSize = Math.min(Math.max(query.pageSize ?? 50, 5), 100);
     const item = await this.prisma.moderationCase.findUnique({ where: { id: caseId } } as any);
     if (!item) {
       throw new AppException("NOT_FOUND", `Moderation case ${caseId} was not found`, HttpStatus.NOT_FOUND);
     }
 
-    const conversation = await this.resolveConversation(item);
+    const anchorMessage: any = item.messageId
+      ? await this.prisma.message.findUnique({
+          where: { id: item.messageId },
+          include: {
+            attachments: true,
+            conversation: { include: { companion: true } }
+          }
+        } as any)
+      : null;
+    if (item.messageId && (!anchorMessage || !anchorMessage.conversation)) {
+      throw new AppException(
+        "REVIEW_MESSAGE_EVIDENCE_UNAVAILABLE",
+        "The reported message evidence is unavailable; retry before taking an adverse action",
+        HttpStatus.CONFLICT,
+        { messageId: item.messageId }
+      );
+    }
+    if (
+      item.messageId
+      && item.conversationId
+      && anchorMessage?.conversationId !== item.conversationId
+    ) {
+      throw new AppException(
+        "REVIEW_MESSAGE_EVIDENCE_UNAVAILABLE",
+        "The reported message does not belong to the case conversation; retry before taking an adverse action",
+        HttpStatus.CONFLICT,
+        { messageId: item.messageId }
+      );
+    }
+    const conversation = anchorMessage?.conversation ?? await this.resolveConversation(item);
     if (!conversation) {
       return {
         caseId,
         conversation: null,
-        messages: []
+        anchorMessageId: item.messageId ?? null,
+        anchorMessage: null,
+        messages: [],
+        pagination: {
+          pageSize,
+          beforeCursor: null,
+          afterCursor: null,
+          hasMoreBefore: false,
+          hasMoreAfter: false
+        }
       };
     }
 
-    const messages = await this.prisma.message.findMany({
-      where: { conversationId: conversation.id },
-      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-      take: Math.min(Math.max(limit, 1), 200),
-      include: { attachments: true }
-    } as any);
+    const cursorId = query.before ?? query.after;
+    const cursorMessage: any = cursorId
+      ? await this.prisma.message.findUnique({
+          where: { id: cursorId },
+          select: { id: true, conversationId: true, createdAt: true }
+        } as any)
+      : null;
+    if (cursorId && cursorMessage?.conversationId !== conversation.id) {
+      throw new AppException(
+        "REVIEW_EVIDENCE_CURSOR_INVALID",
+        "Conversation evidence cursor is invalid",
+        HttpStatus.BAD_REQUEST
+      );
+    }
+
+    let messages: any[] = [];
+    let hasMoreBefore = false;
+    let hasMoreAfter = false;
+    if (query.before && cursorMessage) {
+      const rows = await this.prisma.message.findMany({
+        where: {
+          conversationId: conversation.id,
+          OR: [
+            { createdAt: { lt: cursorMessage.createdAt } },
+            { createdAt: cursorMessage.createdAt, id: { lt: cursorMessage.id } }
+          ]
+        },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: pageSize + 1,
+        include: { attachments: true }
+      } as any) as any[];
+      hasMoreBefore = rows.length > pageSize;
+      hasMoreAfter = true;
+      messages = rows.slice(0, pageSize).reverse();
+    } else if (query.after && cursorMessage) {
+      const rows = await this.prisma.message.findMany({
+        where: {
+          conversationId: conversation.id,
+          OR: [
+            { createdAt: { gt: cursorMessage.createdAt } },
+            { createdAt: cursorMessage.createdAt, id: { gt: cursorMessage.id } }
+          ]
+        },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        take: pageSize + 1,
+        include: { attachments: true }
+      } as any) as any[];
+      hasMoreBefore = true;
+      hasMoreAfter = rows.length > pageSize;
+      messages = rows.slice(0, pageSize);
+    } else if (anchorMessage) {
+      const earlierLimit = Math.floor((pageSize - 1) / 2);
+      const laterLimit = pageSize - 1 - earlierLimit;
+      const [earlier, later] = await Promise.all([
+        this.prisma.message.findMany({
+          where: {
+            conversationId: conversation.id,
+            OR: [
+              { createdAt: { lt: anchorMessage.createdAt } },
+              { createdAt: anchorMessage.createdAt, id: { lt: anchorMessage.id } }
+            ]
+          },
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+          take: earlierLimit + 1,
+          include: { attachments: true }
+        } as any),
+        this.prisma.message.findMany({
+          where: {
+            conversationId: conversation.id,
+            OR: [
+              { createdAt: { gt: anchorMessage.createdAt } },
+              { createdAt: anchorMessage.createdAt, id: { gt: anchorMessage.id } }
+            ]
+          },
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+          take: laterLimit + 1,
+          include: { attachments: true }
+        } as any)
+      ]) as [any[], any[]];
+      hasMoreBefore = earlier.length > earlierLimit;
+      hasMoreAfter = later.length > laterLimit;
+      messages = [
+        ...earlier.slice(0, earlierLimit).reverse(),
+        anchorMessage,
+        ...later.slice(0, laterLimit)
+      ];
+    } else {
+      const rows = await this.prisma.message.findMany({
+        where: { conversationId: conversation.id },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        take: pageSize + 1,
+        include: { attachments: true }
+      } as any) as any[];
+      hasMoreAfter = rows.length > pageSize;
+      messages = rows.slice(0, pageSize);
+    }
+
+    const messageDtos = await Promise.all(messages.map((message) =>
+      this.toEvidenceMessageDto(message, conversation.externalId)
+    ));
+    const anchorDto = anchorMessage
+      ? await this.toEvidenceMessageDto(anchorMessage, conversation.externalId)
+      : null;
 
     return {
       caseId,
@@ -146,22 +319,17 @@ export class ReviewCaseService {
         userId: conversation.userId,
         updatedAt: conversation.updatedAt.toISOString()
       },
-      messages: await Promise.all(messages.map(async (message: any) => ({
-        id: message.id,
-        conversationId: conversation.externalId,
-        senderId: message.senderId,
-        senderName: message.senderName,
-        content: message.content,
-        type: message.type,
-        moderationStatus: message.moderationStatus,
-        visibility: message.visibility,
-        attachments: await Promise.all((message.attachments ?? []).map(async (asset: any) => ({
-          ...(await this.mediaAssets.toAttachmentDto(asset)),
-          extractedText: asset.extractedText ?? null,
-          analysis: asset.analysis ?? null
-        }))),
-        timestamp: message.createdAt.toISOString()
-      })))
+      anchorMessageId: item.messageId ?? null,
+      anchorMessage: anchorDto,
+      anchorInPage: Boolean(item.messageId && messages.some((message) => message.id === item.messageId)),
+      messages: messageDtos,
+      pagination: {
+        pageSize,
+        beforeCursor: hasMoreBefore ? messages[0]?.id ?? null : null,
+        afterCursor: hasMoreAfter ? messages[messages.length - 1]?.id ?? null : null,
+        hasMoreBefore,
+        hasMoreAfter
+      }
     };
   }
 
@@ -175,10 +343,21 @@ export class ReviewCaseService {
       throw new AppException("NOT_FOUND", `Moderation case ${caseId} was not found`, HttpStatus.NOT_FOUND);
     }
     this.assertActionAllowed(existing, action);
+    this.assertIndependentAppealReviewer(existing, action, actorId);
 
     const statusUpdate = this.statusForAction(action);
     const result = await this.prisma.$transaction(async (tx) => {
       const db = tx as any;
+      // ReviewStaff -> ModerationCase is the canonical lock order shared with
+      // offboarding. Holding a key-share lock makes a concurrent suspension
+      // wait for an already-authorized decision, while a suspension that won
+      // the race makes this request fail before it can mutate case state.
+      const staffById = await this.lockReviewStaffRows(db, [actorId]);
+      this.assertActiveReviewStaff(staffById, actorId, {
+        code: "REVIEW_STAFF_INACTIVE",
+        message: "This review staff account is no longer active",
+        status: HttpStatus.FORBIDDEN
+      });
       // Two moderators can open the same queue item. Serialize decisions and
       // re-read after the lock so a stale browser cannot overwrite a decision
       // that committed while it was waiting.
@@ -192,15 +371,53 @@ export class ReviewCaseService {
         throw new AppException("NOT_FOUND", `Moderation case ${caseId} was not found`, HttpStatus.NOT_FOUND);
       }
       this.assertActionAllowed(locked, action);
+      this.assertIndependentAppealReviewer(locked, action, actorId);
+      if (locked.assignedToUserId && locked.assignedToUserId !== actorId) {
+        throw new AppException(
+          "REVIEW_CASE_ASSIGNED_TO_ANOTHER_REVIEWER",
+          "This case is assigned to another reviewer",
+          HttpStatus.CONFLICT
+        );
+      }
+      if (locked.messageId && MESSAGE_EVIDENCE_REQUIRED_ACTIONS.has(action)) {
+        const evidenceMessage = typeof db.message?.findUnique === "function"
+          ? await db.message.findUnique({
+              where: { id: locked.messageId },
+              select: { id: true, conversationId: true }
+            })
+          : null;
+        if (
+          !evidenceMessage
+          || (locked.conversationId && evidenceMessage.conversationId !== locked.conversationId)
+        ) {
+          throw new AppException(
+            "REVIEW_MESSAGE_EVIDENCE_UNAVAILABLE",
+            "The reported message evidence is unavailable; no adverse action was applied",
+            HttpStatus.CONFLICT,
+            { messageId: locked.messageId }
+          );
+        }
+      }
+      const isAppealableAdverseAction = (MODERATION_APPEALABLE_ACTIONS as readonly string[]).includes(action);
+      const appealDeadlineAt = isAppealableAdverseAction && statusUpdate.resolvedAt
+        ? moderationAppealDeadline(statusUpdate.resolvedAt)
+        : undefined;
       const updated = await db.moderationCase.update({
         where: { id: caseId },
         data: {
           status: statusUpdate.status,
-          resolvedAt: statusUpdate.resolvedAt
+          resolvedAt: statusUpdate.resolvedAt,
+          assignedToUserId: locked.assignedToUserId ?? actorId,
+          ...(appealDeadlineAt
+            ? {
+                appealDeadlineAt,
+                appealPolicyVersion: MODERATION_APPEAL_POLICY_VERSION
+              }
+            : {})
         },
         include: {
           evidences: true,
-          actionLogs: { orderBy: { createdAt: "desc" } }
+          actionLogs: { orderBy: [{ createdAt: "desc" }, { id: "desc" }] }
         }
       });
 
@@ -214,20 +431,6 @@ export class ReviewCaseService {
         }
       });
 
-      await db.auditLog.create({
-        data: {
-          actorId,
-          action,
-          resourceType: "moderation_case",
-          resourceId: caseId,
-          metadata: {
-            previousStatus: locked.status,
-            nextStatus: statusUpdate.status,
-            note: note?.trim() || null,
-            actorKind: "reviewStaff"
-          }
-        }
-      });
       if (typeof db.reviewAuditLog?.create === "function") {
         await db.reviewAuditLog.create({
           data: {
@@ -285,15 +488,31 @@ export class ReviewCaseService {
         });
       }
       if (action === "upholdAppeal" || action === "overturnAppeal") {
+        const reviewedAt = new Date();
         await db.moderationAppeal.update({
           where: { caseId },
           data: {
             status: action === "overturnAppeal" ? "overturned" : "upheld",
             reviewerId: actorId,
             reviewNote: note?.trim() || null,
-            reviewedAt: new Date()
+            reviewedAt
           }
         });
+        if (locked.subjectUserId) {
+          const overturned = action === "overturnAppeal";
+          await this.notifications.create(
+            locked.subjectUserId,
+            "moderationAlert",
+            overturned ? "内容申诉复核已撤销原处置" : "内容申诉复核已完成",
+            overturned ? "独立复核确认申诉成立，相关内容处置已撤销。" : "独立复核已完成，原内容处置予以维持。",
+            {
+              caseId,
+              status: overturned ? "overturned" : "upheld",
+              reviewedAt: reviewedAt.toISOString()
+            },
+            db
+          );
+        }
       }
 
       const manualEscalation = action === "confirmViolation" && locked.subjectUserId
@@ -314,8 +533,42 @@ export class ReviewCaseService {
           actorId
         }, db);
       }
+      if (isAppealableAdverseAction && appealDeadlineAt && locked.subjectUserId) {
+        await this.notifications.create(
+          locked.subjectUserId,
+          "moderationAlert",
+          `内容处置已更新，可在${MODERATION_APPEAL_SUBMISSION_DAYS}日内申诉`,
+          `平台已作出人工内容处置。如有异议，请在${MODERATION_APPEAL_SUBMISSION_DAYS}日内（最晚 ${appealDeadlineAt.toISOString()}）通过安全中心提交申诉。点击本通知可进入安全中心查看处置与申诉入口。`,
+          {
+            caseId,
+            appealDeadlineAt: appealDeadlineAt.toISOString(),
+            policyVersion: MODERATION_APPEAL_POLICY_VERSION,
+            action
+          },
+          db
+        );
+      }
       if (action === "liftRestriction" || action === "overturnAppeal") {
         await this.chatRestrictions.liftForCase(caseId, actorId, note, db);
+      }
+      if (
+        locked.source === "report"
+        && locked.reporterUserId
+        && statusUpdate.resolvedAt
+      ) {
+        const publicOutcome = reportPublicOutcome(action);
+        await this.notifications.create(
+          locked.reporterUserId,
+          "moderationAlert",
+          "举报处理结果已更新",
+          publicOutcome.summary,
+          {
+            reportId: caseId,
+            status: statusUpdate.status,
+            outcome: publicOutcome.outcome
+          },
+          db
+        );
       }
 
       const finalCase = manualEscalation.escalated && typeof db.moderationCase.findUnique === "function"
@@ -323,7 +576,7 @@ export class ReviewCaseService {
             where: { id: caseId },
             include: {
               evidences: true,
-              actionLogs: { orderBy: { createdAt: "desc" } }
+              actionLogs: { orderBy: [{ createdAt: "desc" }, { id: "desc" }] }
             }
           })
         : updated;
@@ -366,20 +619,6 @@ export class ReviewCaseService {
         }
       });
 
-      await db.auditLog.create({
-        data: {
-          actorId,
-          action: "create_label",
-          resourceType: "moderation_label",
-          resourceId: created.id,
-          metadata: {
-            caseId: dto.caseId ?? null,
-            expectedDecision: dto.expectedDecision,
-            actualDecision: dto.actualDecision,
-            actorKind: "reviewStaff"
-          }
-        }
-      });
       if (typeof db.reviewAuditLog?.create === "function") {
         await db.reviewAuditLog.create({
           data: {
@@ -407,17 +646,276 @@ export class ReviewCaseService {
     };
   }
 
-  async exportLabels() {
-    const samples = await this.prisma.moderationLabel.findMany({
-      orderBy: { createdAt: "desc" }
-    } as any);
+  async claimCase(caseId: string, actor: ReviewDecisionActor) {
+    const item = await this.prisma.$transaction(async (tx) => {
+      const db = tx as any;
+      const staffById = await this.lockReviewStaffRows(db, [actor.id]);
+      this.assertActiveReviewStaff(staffById, actor.id, {
+        code: "REVIEW_STAFF_INACTIVE",
+        message: "This review staff account is no longer active",
+        status: HttpStatus.FORBIDDEN
+      });
+      if (typeof db.$queryRaw === "function") {
+        await db.$queryRaw`SELECT "id" FROM "ModerationCase" WHERE "id" = ${caseId} FOR UPDATE`;
+      }
+      const existing = await db.moderationCase.findUnique({
+        where: { id: caseId },
+        include: { appeals: true }
+      });
+      if (!existing) {
+        throw new AppException("NOT_FOUND", `Moderation case ${caseId} was not found`, HttpStatus.NOT_FOUND);
+      }
+      if (!(OPEN_STATUSES as readonly string[]).includes(existing.status)) {
+        throw new AppException("REVIEW_CASE_CLOSED", "A closed case cannot be claimed", HttpStatus.CONFLICT);
+      }
+      this.assertIndependentAppealAssignee(existing, actor.id);
+      if (existing.assignedToUserId && existing.assignedToUserId !== actor.id) {
+        throw new AppException(
+          "REVIEW_CASE_ALREADY_ASSIGNED",
+          "This case is already assigned to another reviewer",
+          HttpStatus.CONFLICT
+        );
+      }
+      const updated = await db.moderationCase.update({
+        where: { id: caseId },
+        data: { assignedToUserId: actor.id }
+      });
+      if (!existing.assignedToUserId) {
+        await db.reviewAuditLog.create({
+          data: {
+            reviewerId: actor.id,
+            action: "review.case.claimed",
+            resourceType: "moderation_case",
+            resourceId: caseId,
+            metadata: { reviewerName: actor.displayName ?? null }
+          }
+        });
+      }
+      return updated;
+    });
+    return { case: this.toCaseDto(item) };
+  }
 
-    return {
-      schemaVersion: 1,
-      exportedAt: new Date().toISOString(),
-      count: samples.length,
-      samples: samples.map((item: any) => this.toLabelDto(item))
+  async assignCase(caseId: string, actor: ReviewDecisionActor, reviewerId?: string) {
+    const item = await this.prisma.$transaction(async (tx) => {
+      const db = tx as any;
+      const staffById = await this.lockReviewStaffRows(db, [actor.id, reviewerId]);
+      this.assertActiveReviewStaff(staffById, actor.id, {
+        code: "REVIEW_STAFF_INACTIVE",
+        message: "This review lead account is no longer active",
+        status: HttpStatus.FORBIDDEN
+      });
+      if (reviewerId) {
+        this.assertActiveReviewStaff(staffById, reviewerId, {
+          code: "REVIEW_ASSIGNEE_INVALID",
+          message: "The assignee must be an active review staff member",
+          status: HttpStatus.BAD_REQUEST
+        });
+      }
+      if (typeof db.$queryRaw === "function") {
+        await db.$queryRaw`SELECT "id" FROM "ModerationCase" WHERE "id" = ${caseId} FOR UPDATE`;
+      }
+      const existing = await db.moderationCase.findUnique({
+        where: { id: caseId },
+        include: { appeals: true }
+      });
+      if (!existing) {
+        throw new AppException("NOT_FOUND", `Moderation case ${caseId} was not found`, HttpStatus.NOT_FOUND);
+      }
+      if (!(OPEN_STATUSES as readonly string[]).includes(existing.status)) {
+        throw new AppException("REVIEW_CASE_CLOSED", "A closed case cannot be reassigned", HttpStatus.CONFLICT);
+      }
+      if (reviewerId) this.assertIndependentAppealAssignee(existing, reviewerId);
+      const updated = await db.moderationCase.update({
+        where: { id: caseId },
+        data: { assignedToUserId: reviewerId ?? null }
+      });
+      await db.reviewAuditLog.create({
+        data: {
+          reviewerId: actor.id,
+          action: reviewerId ? "review.case.assigned" : "review.case.unassigned",
+          resourceType: "moderation_case",
+          resourceId: caseId,
+          metadata: {
+            previousReviewerId: existing.assignedToUserId ?? null,
+            nextReviewerId: reviewerId ?? null,
+            leadName: actor.displayName ?? null
+          }
+        }
+      });
+      return updated;
+    });
+    return { case: this.toCaseDto(item) };
+  }
+
+  async listActiveReviewers(query: ListActiveReviewStaffQueryDto) {
+    const keyword = query.keyword?.trim();
+    const where = {
+      status: "active",
+      ...(query.role ? { role: query.role } : {}),
+      ...(keyword
+        ? {
+            OR: [
+              { displayName: { contains: keyword, mode: "insensitive" } },
+              { username: { contains: keyword, mode: "insensitive" } }
+            ]
+          }
+        : {})
     };
+    const [items, total] = await Promise.all([
+      this.prisma.reviewStaff.findMany({
+        where,
+        select: { id: true, displayName: true, username: true, role: true, status: true },
+        orderBy: [
+          { role: "desc" },
+          { displayName: "asc" },
+          { username: "asc" },
+          { id: "asc" }
+        ],
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize
+      } as any),
+      this.prisma.reviewStaff.count({ where } as any)
+    ]);
+    return {
+      items,
+      pagination: {
+        page: query.page,
+        pageSize: query.pageSize,
+        total,
+        totalPages: Math.ceil(total / query.pageSize)
+      }
+    };
+  }
+
+  private async lockReviewStaffRows(
+    db: any,
+    reviewerIds: Array<string | undefined>
+  ): Promise<Map<string, { id: string; status: string }> | null> {
+    const ids = [...new Set(reviewerIds.filter((id): id is string => Boolean(id)))].sort();
+    if (typeof db.$queryRaw === "function") {
+      for (const id of ids) {
+        await db.$queryRaw`SELECT "id" FROM "ReviewStaff" WHERE "id" = ${id} FOR KEY SHARE`;
+      }
+    }
+    if (typeof db.reviewStaff?.findUnique !== "function") {
+      // A few isolated unit tests use deliberately minimal transaction doubles.
+      // The real Prisma transaction always exposes this model; fail closed if a
+      // non-test runtime is ever constructed without it.
+      if (process.env.NODE_ENV === "test") return null;
+      throw new AppException(
+        "REVIEW_STAFF_STATUS_UNAVAILABLE",
+        "Review staff status could not be verified",
+        HttpStatus.SERVICE_UNAVAILABLE
+      );
+    }
+    const staffById = new Map<string, { id: string; status: string }>();
+    for (const id of ids) {
+      const staff = await db.reviewStaff.findUnique({
+        where: { id },
+        select: { id: true, status: true }
+      });
+      if (staff) staffById.set(id, staff);
+    }
+    return staffById;
+  }
+
+  private assertActiveReviewStaff(
+    staffById: Map<string, { id: string; status: string }> | null,
+    reviewerId: string,
+    error: { code: string; message: string; status: number }
+  ): void {
+    if (staffById === null) return;
+    if (staffById.get(reviewerId)?.status !== "active") {
+      throw new AppException(error.code, error.message, error.status);
+    }
+  }
+
+  async exportLabels(actor: ReviewDecisionActor, query: ExportReviewLabelsDto = new ExportReviewLabelsDto()) {
+    const exportedAt = new Date();
+    if (query.cursor && !query.snapshotAt) {
+      throw new AppException(
+        "REVIEW_LABEL_EXPORT_SNAPSHOT_REQUIRED",
+        "snapshotAt is required when continuing a label export",
+        HttpStatus.UNPROCESSABLE_ENTITY
+      );
+    }
+    const snapshotAt = query.snapshotAt ? new Date(query.snapshotAt) : exportedAt;
+    if (Number.isNaN(snapshotAt.getTime()) || snapshotAt.getTime() > exportedAt.getTime() + 60_000) {
+      throw new AppException(
+        "REVIEW_LABEL_EXPORT_SNAPSHOT_INVALID",
+        "snapshotAt must be a valid time no later than the current export window",
+        HttpStatus.UNPROCESSABLE_ENTITY
+      );
+    }
+    const cursor = query.cursor ? this.decodeLabelExportCursor(query.cursor) : null;
+    const limit = Math.min(500, Math.max(1, Math.floor(query.limit ?? 500)));
+    return this.prisma.$transaction(async (tx) => {
+      const db = tx as any;
+      const samples = await db.moderationLabel.findMany({
+        where: {
+          createdAt: { lte: snapshotAt },
+          ...(cursor ? {
+            OR: [
+              { createdAt: { lt: cursor.createdAt } },
+              { createdAt: cursor.createdAt, id: { lt: cursor.id } }
+            ]
+          } : {})
+        },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: limit + 1
+      });
+      const page = samples.slice(0, limit);
+      const hasMore = samples.length > page.length;
+      const last = page[page.length - 1];
+      const nextCursor = hasMore && last
+        ? this.encodeLabelExportCursor(last.createdAt, last.id)
+        : null;
+      await db.reviewAuditLog.create({
+        data: {
+          reviewerId: actor.id,
+          action: "review.labels.exported",
+          resourceType: "moderation_label_export",
+          resourceId: exportedAt.toISOString(),
+          metadata: {
+            pageCount: page.length,
+            hasMore,
+            snapshotAt: snapshotAt.toISOString(),
+            reviewerName: actor.displayName ?? null,
+            reviewerRole: actor.role ?? null
+          }
+        }
+      });
+      return {
+        schemaVersion: 2,
+        exportedAt: exportedAt.toISOString(),
+        snapshotAt: snapshotAt.toISOString(),
+        pageCount: page.length,
+        hasMore,
+        nextCursor,
+        samples: page.map((item: any) => this.toLabelDto(item))
+      };
+    });
+  }
+
+  private encodeLabelExportCursor(createdAt: Date, id: string) {
+    return Buffer.from(JSON.stringify({ createdAt: createdAt.toISOString(), id }), "utf8").toString("base64url");
+  }
+
+  private decodeLabelExportCursor(value: string): { createdAt: Date; id: string } {
+    try {
+      const parsed = JSON.parse(Buffer.from(value, "base64url").toString("utf8"));
+      const createdAt = new Date(parsed?.createdAt);
+      const id = typeof parsed?.id === "string" ? parsed.id.trim() : "";
+      if (Number.isNaN(createdAt.getTime()) || !id || id.length > 80) throw new Error("invalid cursor");
+      return { createdAt, id };
+    } catch {
+      throw new AppException(
+        "REVIEW_LABEL_EXPORT_CURSOR_INVALID",
+        "Label export cursor is invalid",
+        HttpStatus.UNPROCESSABLE_ENTITY
+      );
+    }
   }
 
   buildCaseWhere(query: ListReviewCasesQueryDto) {
@@ -508,6 +1006,26 @@ export class ReviewCaseService {
     }
   }
 
+  private assertIndependentAppealReviewer(
+    existing: any,
+    action: ReviewCaseAction,
+    reviewerId: string
+  ): void {
+    if (action !== "upholdAppeal" && action !== "overturnAppeal") return;
+    this.assertIndependentAppealAssignee(existing, reviewerId);
+  }
+
+  private assertIndependentAppealAssignee(existing: any, reviewerId: string): void {
+    const pendingAppeal = (existing.appeals ?? []).find((appeal: any) => appeal.status === "pending");
+    if (pendingAppeal?.originalReviewerId && pendingAppeal.originalReviewerId === reviewerId) {
+      throw new AppException(
+        "MODERATION_APPEAL_INDEPENDENT_REVIEW_REQUIRED",
+        "The reviewer who made the original decision cannot review its appeal",
+        HttpStatus.CONFLICT
+      );
+    }
+  }
+
   private async resolveConversation(item: {
     messageId?: string | null;
     targetId?: string | null;
@@ -527,7 +1045,7 @@ export class ReviewCaseService {
     if (item.targetId) {
       const byExternal: any = await this.prisma.conversation.findFirst({
         where: { externalId: item.targetId },
-        orderBy: { updatedAt: "desc" },
+        orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
         include: { companion: true }
       } as any);
       if (byExternal) return byExternal;
@@ -542,39 +1060,57 @@ export class ReviewCaseService {
     return null;
   }
 
+  private async toEvidenceMessageDto(message: any, externalConversationId: string) {
+    return {
+      id: message.id,
+      conversationId: externalConversationId,
+      senderId: message.senderId,
+      senderName: message.senderName,
+      content: message.content,
+      type: message.type,
+      moderationStatus: message.moderationStatus,
+      visibility: message.visibility,
+      attachments: await Promise.all((message.attachments ?? []).map(async (asset: any) => ({
+        ...(await this.mediaAssets.toAttachmentDto(asset)),
+        extractedText: asset.extractedText ?? null,
+        analysis: asset.analysis ?? null
+      }))),
+      timestamp: message.createdAt.toISOString()
+    };
+  }
+
   private buildOverviewStats(
-    cases: Array<{
-      status: string;
-      decision: string;
-      riskLevel: string;
-      source: string;
-    }>,
+    totalCases: number,
+    statusGroups: Array<{ status: string; _count: { _all: number } }>,
+    decisionGroups: Array<{ decision: string; _count: { _all: number } }>,
+    sourceGroups: Array<{ source: string; _count: { _all: number } }>,
+    riskGroups: Array<{ riskLevel: string; _count: { _all: number } }>,
     conversationCount: number,
     labelCount: number
   ) {
-    const pendingCases = cases.filter((item) =>
-      (OPEN_STATUSES as readonly string[]).includes(item.status)
-    ).length;
-    const resolved = cases.filter(
-      (item) => item.status === "resolved" || item.status === "dismissed"
-    ).length;
-
-    const sources = ["chat", "community", "report", "profile"] as const;
+    const counts = <K extends string>(rows: Array<Record<K, string> & { _count: { _all: number } }>, key: K) =>
+      new Map(rows.map((row) => [row[key], Number(row._count?._all ?? 0)]));
+    const byStatus = counts(statusGroups, "status");
+    const byDecision = counts(decisionGroups, "decision");
+    const sources = counts(sourceGroups, "source");
+    const risks = counts(riskGroups, "riskLevel");
+    const pendingCases = OPEN_STATUSES.reduce((sum, status) => sum + (byStatus.get(status) ?? 0), 0);
+    const resolved = (byStatus.get("resolved") ?? 0) + (byStatus.get("dismissed") ?? 0);
     const bySource = Object.fromEntries(
-      sources.map((source) => [source, cases.filter((item) => item.source === source).length])
+      ["chat", "community", "report", "profile"].map((source) => [source, sources.get(source) ?? 0])
     );
     const byRisk = {
-      high: cases.filter((item) => item.riskLevel === "high").length,
-      medium: cases.filter((item) => item.riskLevel === "medium").length,
-      low: cases.filter((item) => item.riskLevel === "low").length
+      high: risks.get("high") ?? 0,
+      medium: risks.get("medium") ?? 0,
+      low: risks.get("low") ?? 0
     };
 
     return {
       pendingCases,
-      totalCases: cases.length,
-      blocked: cases.filter((item) => item.decision === "block").length,
-      warned: cases.filter((item) => item.decision === "warn").length,
-      reviewed: cases.filter((item) => item.decision === "review").length,
+      totalCases,
+      blocked: byDecision.get("block") ?? 0,
+      warned: byDecision.get("warn") ?? 0,
+      reviewed: byDecision.get("review") ?? 0,
       resolved,
       activeConversations: conversationCount,
       labels: labelCount,
@@ -626,6 +1162,8 @@ export class ReviewCaseService {
       matchedRules: item.matchedRules ?? [],
       usedAI: item.usedAI,
       resolvedAt: item.resolvedAt ? item.resolvedAt.toISOString() : null,
+      appealDeadlineAt: item.appealDeadlineAt ? item.appealDeadlineAt.toISOString() : null,
+      appealPolicyVersion: item.appealPolicyVersion ?? null,
       createdAt: item.createdAt.toISOString()
     };
   }
@@ -648,6 +1186,13 @@ export class ReviewCaseService {
       subjectUserId: appeal.subjectUserId,
       reason: appeal.reason,
       status: appeal.status,
+      originalReviewerId: appeal.originalReviewerId ?? null,
+      independentReviewRequired: Boolean(appeal.originalReviewerId),
+      reviewDueAt: appeal.reviewDueAt ? appeal.reviewDueAt.toISOString() : null,
+      overdue: appeal.status === "pending"
+        && Boolean(appeal.reviewDueAt)
+        && appeal.reviewDueAt.getTime() <= Date.now(),
+      policyVersion: appeal.policyVersion ?? MODERATION_APPEAL_POLICY_VERSION,
       reviewerId: appeal.reviewerId ?? null,
       reviewNote: appeal.reviewNote ?? null,
       reviewedAt: appeal.reviewedAt ? appeal.reviewedAt.toISOString() : null,
@@ -692,4 +1237,23 @@ function publishesMessage(action: ReviewCaseAction): boolean {
 
 function blocksMessage(action: ReviewCaseAction): boolean {
   return action === "confirmViolation" || action === "rejectMessage";
+}
+
+function reportPublicOutcome(action: ReviewCaseAction): {
+  outcome: "actionTaken" | "closed";
+  summary: string;
+} {
+  if (
+    ["confirmViolation", "rejectMessage", "restrict24h", "restrict7d", "upholdAppeal"]
+      .includes(action)
+  ) {
+    return {
+      outcome: "actionTaken",
+      summary: "平台已完成复核并采取相应处置。为保护双方隐私，不展示内部规则或对方账号信息。"
+    };
+  }
+  return {
+    outcome: "closed",
+    summary: "平台已完成复核，本案件现已关闭。"
+  };
 }

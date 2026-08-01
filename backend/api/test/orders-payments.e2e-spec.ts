@@ -15,6 +15,7 @@ import {
   WeChatPayProvider
 } from "../src/payments/wechat/wechat-pay.provider";
 import { PaymentsService } from "../src/payments/payments.service";
+import { issueSessionBoundAccessToken } from "./session-token-fixture";
 
 describe("Orders and payments (e2e)", () => {
   let app: INestApplication;
@@ -64,6 +65,11 @@ describe("Orders and payments (e2e)", () => {
 
   async function cleanup() {
     if (!prisma) return;
+    await prisma.paymentDisputeNegotiationEvent.deleteMany();
+    await prisma.paymentDisputeAttachment.deleteMany();
+    await prisma.paymentDisputeNotification.deleteMany();
+    await prisma.paymentDisputeReply.deleteMany();
+    await prisma.paymentDispute.deleteMany();
     await prisma.notification.deleteMany();
     await prisma.accountDeletionRequest.deleteMany();
     await prisma.refundTransaction.deleteMany();
@@ -89,7 +95,7 @@ describe("Orders and payments (e2e)", () => {
 
   async function createUser(
     phone = "+8613800138000",
-    role: "user" | "companion" | "moderator" | "admin" = "user"
+    role: "user" | "companion" | "moderator" | "support" | "finance" | "admin" = "user"
   ) {
     const user = await prisma.user.create({
       data: {
@@ -108,9 +114,9 @@ describe("Orders and payments (e2e)", () => {
     await prisma.legalConsentReceipt.create({
       data: {
         userId: user.id,
-        version: "2.0-2026-07-20",
-        privacyVersion: "2.0-2026-07-20",
-        termsVersion: "2.0-2026-07-20",
+        version: "2.2-2026-08-01",
+        privacyVersion: "2.2-2026-08-01",
+        termsVersion: "2.2-2026-08-01",
         privacyAccepted: true,
         termsAccepted: true,
         adultConfirmed: true,
@@ -121,10 +127,7 @@ describe("Orders and payments (e2e)", () => {
       }
     });
 
-    const token = jwt.sign(
-      { sub: user.id, role },
-      { secret: "e2e-access-secret", expiresIn: "15m" }
-    );
+    const token = await issueSessionBoundAccessToken(prisma, jwt, user);
     return { user, token };
   }
 
@@ -156,9 +159,9 @@ describe("Orders and payments (e2e)", () => {
       await prisma.legalConsentReceipt.create({
         data: {
           userId: owner.id,
-          version: "2.0-2026-07-20",
-          privacyVersion: "2.0-2026-07-20",
-          termsVersion: "2.0-2026-07-20",
+          version: "2.2-2026-08-01",
+          privacyVersion: "2.2-2026-08-01",
+          termsVersion: "2.2-2026-08-01",
           privacyAccepted: true,
           termsAccepted: true,
           adultConfirmed: true,
@@ -169,10 +172,7 @@ describe("Orders and payments (e2e)", () => {
         }
       });
     }
-    return jwt.sign(
-      { sub: owner.id, role: owner.role },
-      { secret: "e2e-access-secret", expiresIn: "15m" }
-    );
+    return issueSessionBoundAccessToken(prisma, jwt, owner);
   }
 
   async function confirmOrderForPayment(orderId: string): Promise<void> {
@@ -648,7 +648,8 @@ describe("Orders and payments (e2e)", () => {
         paymentId: payment.id,
         outRefundNo: `R-processing-${Date.now()}`,
         amountCents: payment.amountCents,
-        status: "processing"
+        status: "processing",
+        resolutionDueAt: new Date(Date.now() + 72 * 60 * 60_000)
       }
     });
 
@@ -1079,6 +1080,125 @@ describe("Orders and payments (e2e)", () => {
     const payment = await prisma.paymentTransaction.findUniqueOrThrow({ where: { outTradeNo } });
     expect(order.status).toBe("paid");
     expect(payment.status).toBe("success");
+  });
+
+  it("enforces role-scoped complaint visibility and closes a mock provider complaint idempotently", async () => {
+    const customer = await createUser("+8613800138021");
+    const support = await createUser("+8613800138022", "support");
+    const finance = await createUser("+8613800138023", "finance");
+    const order = await prisma.order.create({
+      data: {
+        userId: customer.user.id,
+        companionId: "c1",
+        themeId: "t1",
+        durationMinutes: 30,
+        amountCents: 6800,
+        status: "paid",
+        scheduledAt: new Date(Date.now() + 60 * 60_000),
+        companionNameSnapshot: "小暖",
+        companionRoleSnapshot: "倾听陪伴",
+        companionInitialsSnapshot: "XN",
+        themeNameSnapshot: "轻松聊天",
+        companionPayableCents: 5440,
+        paidAt: new Date()
+      }
+    });
+    const payment = await prisma.paymentTransaction.create({
+      data: {
+        orderId: order.id,
+        outTradeNo: `E2E_COMPLAINT_${Date.now()}`,
+        amountCents: 6800,
+        status: "success",
+        transactionId: `wx-e2e-${Date.now()}`,
+        paidAt: new Date(),
+        providerPaidAt: new Date()
+      }
+    });
+    const dispute = await prisma.paymentDispute.create({
+      data: {
+        channel: "wechat",
+        type: "consumer_complaint",
+        providerDisputeId: `complaint-e2e-${Date.now()}`,
+        idempotencyKey: `wechat:e2e:${Date.now()}`,
+        orderId: order.id,
+        paymentId: payment.id,
+        outTradeNo: payment.outTradeNo,
+        status: "open",
+        providerStatus: "PENDING",
+        problemType: "SERVICE_NOT_RECEIVED",
+        complaintDetail: "这是只允许受理客服读取的投诉正文",
+        complaintOccurredAt: new Date(),
+        firstResponseDueAt: new Date(Date.now() + 24 * 60 * 60_000),
+        resolutionDueAt: new Date(Date.now() + 72 * 60 * 60_000)
+      }
+    });
+
+    const mine = await request(app.getHttpServer())
+      .get("/api/v1/payments/disputes/me")
+      .set("Authorization", `Bearer ${customer.token}`)
+      .expect(200);
+    expect(mine.body.data.items[0]).toMatchObject({ id: dispute.id, orderId: order.id, status: "open" });
+    expect(JSON.stringify(mine.body.data)).not.toContain("投诉正文");
+    expect(JSON.stringify(mine.body.data)).not.toContain(dispute.providerDisputeId);
+
+    const supportQueue = await request(app.getHttpServer())
+      .get("/api/v1/admin/commercial/payment-disputes")
+      .set("Authorization", `Bearer ${support.token}`)
+      .expect(200);
+    expect(supportQueue.body.data.items[0]).toMatchObject({
+      id: dispute.id,
+      detailAvailable: false,
+      dataScope: "claimableSummary"
+    });
+    expect(JSON.stringify(supportQueue.body.data)).not.toContain("投诉正文");
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/admin/commercial/payment-disputes/${dispute.id}/replies`)
+      .set("Authorization", `Bearer ${support.token}`)
+      .send({
+        clientRequestId: "58da35d7-5660-4c2e-8858-734f9d65eaa9",
+        content: "我们正在核实本次服务。"
+      })
+      .expect(403);
+
+    const financeQueue = await request(app.getHttpServer())
+      .get("/api/v1/admin/commercial/payment-disputes")
+      .set("Authorization", `Bearer ${finance.token}`)
+      .expect(200);
+    expect(financeQueue.body.data.items[0]).toMatchObject({
+      id: dispute.id,
+      detailAvailable: false,
+      dataScope: "financial",
+      outTradeNo: payment.outTradeNo
+    });
+    expect(JSON.stringify(financeQueue.body.data)).not.toContain("投诉正文");
+
+    const claimed = await request(app.getHttpServer())
+      .post(`/api/v1/admin/commercial/payment-disputes/${dispute.id}/claims`)
+      .set("Authorization", `Bearer ${support.token}`)
+      .expect(200);
+    expect(claimed.body.data).toMatchObject({
+      id: dispute.id,
+      detailAvailable: true,
+      complaintDetail: "这是只允许受理客服读取的投诉正文"
+    });
+
+    const replied = await request(app.getHttpServer())
+      .post(`/api/v1/admin/commercial/payment-disputes/${dispute.id}/replies`)
+      .set("Authorization", `Bearer ${support.token}`)
+      .send({
+        clientRequestId: "3b4770e9-03f5-46f0-ab21-081ef98ea90c",
+        content: "我们已核实服务记录，并会继续跟进。"
+      })
+      .expect(200);
+    expect(replied.body.data.status).toBe("processing");
+
+    const completed = await request(app.getHttpServer())
+      .post(`/api/v1/admin/commercial/payment-disputes/${dispute.id}/completions`)
+      .set("Authorization", `Bearer ${support.token}`)
+      .send({ clientRequestId: "c71f9e78-e3be-4931-8fdc-aa28aba1123f" })
+      .expect(200);
+    expect(completed.body.data).toMatchObject({ status: "resolved", providerStatus: "PROCESSED" });
   });
 
   it("cancels a pending order", async () => {

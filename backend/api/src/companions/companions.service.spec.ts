@@ -1,4 +1,8 @@
-import { CompanionsService } from "./companions.service";
+import {
+  CompanionsService,
+  MAX_SERVICE_OFFERINGS_PER_COMPANION,
+  PUBLIC_CAPACITY_SCAN_BATCH_SIZE
+} from "./companions.service";
 
 const companionRecord = {
   id: "c1",
@@ -14,6 +18,11 @@ const companionRecord = {
   availableTimes: ["20:00"],
   languages: ["中文"],
   specialties: ["情绪倾听"],
+  livedExperience: "有长期异地生活与职场转型经验。",
+  serviceBoundaries: ["不提供医疗诊断", "仅平台内沟通"],
+  voiceIntroAssetRef: "asset://must-never-be-public",
+  voiceIntroDurationSeconds: 24,
+  voiceIntroStatus: "approved",
   completedOrders: 426,
   responseTime: "约30秒",
   distanceKm: 1.2,
@@ -22,11 +31,35 @@ const companionRecord = {
   isPublished: true,
   createdAt: new Date("2026-07-09T00:00:00.000Z"),
   updatedAt: new Date("2026-07-09T00:00:00.000Z"),
-  serviceTags: [{ tag: { id: "tag-1", name: "心理学背景" } }]
+  serviceTags: [{ tag: { id: "tag-1", name: "心理学背景" } }],
+  commercialProfile: {
+    verifiedAt: new Date("2026-07-01T00:00:00.000Z"),
+    nextReviewDueAt: new Date("2099-07-01T00:00:00.000Z"),
+    identityEvidenceRef: "kyc://must-never-be-public",
+    verifiedById: "admin-private"
+  },
+  trainingRecords: [
+    {
+      moduleCode: "service-boundaries", moduleVersion: "2026.1", status: "passed",
+      passedAt: new Date("2026-07-01T00:00:00.000Z"), expiresAt: new Date("2099-01-01T00:00:00.000Z"),
+      bestScore: 100, attemptCount: 2
+    },
+    {
+      moduleCode: "safety-escalation", moduleVersion: "2026.1", status: "passed",
+      passedAt: new Date("2026-07-01T00:00:00.000Z"), expiresAt: new Date("2099-02-01T00:00:00.000Z"),
+      bestScore: 100, attemptCount: 1
+    },
+    {
+      moduleCode: "privacy-refresh", moduleVersion: "2026.1", status: "passed",
+      passedAt: new Date("2026-07-01T00:00:00.000Z"), expiresAt: new Date("2099-03-01T00:00:00.000Z"),
+      bestScore: 100, attemptCount: 1
+    }
+  ]
 };
 
 const eligibleOwnCompanion = {
   id: "c1",
+  ownerUserId: "owner-1",
   isVerified: true,
   owner: { accountStatus: "active", profile: { isVerified: true } }
 };
@@ -72,6 +105,48 @@ function sellableCapacityRecord(input: {
     }],
     orders: []
   };
+}
+
+async function capacityRowsFromLatestCandidateBatch(prisma: any) {
+  const latest = prisma.companionProfile.findMany.mock.results.at(-1)?.value;
+  const companions = await Promise.resolve(latest ?? []);
+  const now = Date.now();
+  const step = 30 * 60_000;
+  return companions.flatMap((companion: any) => {
+    const sellable = (companion.serviceOfferings ?? []).flatMap((offering: any) => {
+      for (const window of companion.availabilityWindows ?? []) {
+        let startsAt = new Date(Math.ceil(Math.max(window.startsAt.getTime(), now + 15 * 60_000) / step) * step);
+        while (startsAt.getTime() + offering.durationMinutes * 60_000 <= window.endsAt.getTime()) {
+          const endsAt = new Date(startsAt.getTime() + offering.durationMinutes * 60_000);
+          const reserved = (companion.orders ?? []).filter((order: any) => {
+            const reserves = order.status !== "pending"
+              || Boolean(order.companionConfirmedAt)
+                && (!order.paymentReservationExpiresAt || order.paymentReservationExpiresAt.getTime() > now);
+            return reserves
+              && order.scheduledAt < endsAt
+              && new Date(order.scheduledAt.getTime() + order.durationMinutes * 60_000) > startsAt;
+          }).length;
+          if (reserved < window.capacity) return [{ offering, startsAt }];
+          startsAt = new Date(startsAt.getTime() + step);
+        }
+      }
+      return [];
+    });
+    if (sellable.length === 0) return [];
+    const starting = [...sellable].sort((left, right) =>
+      left.offering.priceCents - right.offering.priceCents
+      || left.offering.durationMinutes - right.offering.durationMinutes
+      || left.offering.id.localeCompare(right.offering.id)
+    )[0].offering;
+    return [{
+      id: companion.id,
+      earliestStartsAt: new Date(Math.min(...sellable.map((item: any) => item.startsAt.getTime()))),
+      startingPriceCents: starting.priceCents,
+      startingDurationMinutes: starting.durationMinutes,
+      currency: starting.currency,
+      deliveryModes: [...new Set<string>(sellable.map((item: any) => item.offering.deliveryMode))].sort()
+    }];
+  });
 }
 
 const availabilityWindowRecord = {
@@ -129,6 +204,9 @@ describe("CompanionsService", () => {
     user: {
       findUnique: jest.fn()
     },
+    accountDeletionRequest: {
+      findFirst: jest.fn()
+    },
     companionProfile: {
       findMany: jest.fn(),
       count: jest.fn(),
@@ -156,14 +234,17 @@ describe("CompanionsService", () => {
     },
     companionRecurringAvailabilityRule: {
       findMany: jest.fn(),
+      count: jest.fn(),
       findFirst: jest.fn()
     },
     companionAvailabilityBlackout: {
       findMany: jest.fn(),
+      count: jest.fn(),
       findFirst: jest.fn()
     },
     companionServiceOffering: {
       findMany: jest.fn(),
+      count: jest.fn(),
       findFirst: jest.fn(),
       create: jest.fn(),
       update: jest.fn()
@@ -193,8 +274,17 @@ describe("CompanionsService", () => {
     prisma.companionProfile.findMany.mockResolvedValue([]);
     prisma.companionProfile.count.mockResolvedValue(0);
     prisma.companionProfile.findFirst.mockResolvedValue(null);
+    prisma.companionAvailabilityWindow.count.mockResolvedValue(0);
+    prisma.companionRecurringAvailabilityRule.count.mockResolvedValue(0);
+    prisma.companionAvailabilityBlackout.count.mockResolvedValue(0);
+    prisma.companionServiceOffering.count.mockResolvedValue(0);
     prisma.$transaction.mockImplementation(async (callback: (db: typeof prisma) => unknown) => callback(prisma));
-    prisma.$queryRaw.mockResolvedValue([]);
+    prisma.$queryRaw.mockImplementation(async (strings: TemplateStringsArray) => {
+      const sql = Array.from(strings).join(" ");
+      if (sql.includes("WITH sellable_offerings")) return capacityRowsFromLatestCandidateBatch(prisma);
+      return [];
+    });
+    prisma.accountDeletionRequest.findFirst.mockResolvedValue(null);
     moderation.moderateAsync.mockResolvedValue({ decision: "allow" });
     availabilityReminderCandidates.recordWindowBecameAvailable.mockResolvedValue({ created: 0 });
     service = new CompanionsService(
@@ -214,7 +304,7 @@ describe("CompanionsService", () => {
     prisma.companionProfile.count.mockResolvedValue(1 as any);
 
     const result = await service.list({
-      page: 2,
+      page: 1,
       pageSize: 10,
       tag: "心理学背景",
       availability: "online",
@@ -222,7 +312,9 @@ describe("CompanionsService", () => {
       topicId: "t1",
       deliveryMode: "voice",
       maxServicePriceCents: 8_800,
-      keyword: "晚间"
+      keyword: "晚间",
+      language: "中文",
+      specialty: "情绪倾听"
     });
 
     expect(prisma.companionProfile.findMany).toHaveBeenCalledWith(
@@ -231,6 +323,8 @@ describe("CompanionsService", () => {
           isPublished: true,
           availability: "online",
           isOnline: true,
+          languages: { has: "中文" },
+          specialties: { has: "情绪倾听" },
           serviceTags: expect.any(Object),
           serviceOfferings: {
             some: {
@@ -259,8 +353,8 @@ describe("CompanionsService", () => {
             ])
           }]
         }),
-        skip: 10,
-        take: 10
+        skip: 0,
+        take: PUBLIC_CAPACITY_SCAN_BATCH_SIZE
       })
     );
     expect(result.items[0].id).toBe("c1");
@@ -271,7 +365,85 @@ describe("CompanionsService", () => {
       startingDurationMinutes: 60,
       deliveryModes: ["voice"]
     }));
+    expect(result.items[0]).toEqual(expect.objectContaining({
+      languages: ["中文"],
+      specialties: ["情绪倾听"],
+      livedExperience: "有长期异地生活与职场转型经验。",
+      serviceBoundaries: ["不提供医疗诊断", "仅平台内沟通"],
+      completedOrders: 426,
+      responseTime: "约30秒",
+      voiceIntro: {
+        available: true,
+        status: "approved",
+        durationSeconds: 24,
+        playbackStatus: "secureShortLivedUrlRequired",
+        playbackUrl: null
+      },
+      publicTrust: {
+        training: {
+          status: "current",
+          currentModules: 3,
+          requiredModules: 3,
+          validUntil: "2099-01-01T00:00:00.000Z"
+        },
+        platformReview: {
+          status: "current",
+          verifiedAt: "2026-07-01T00:00:00.000Z",
+          nextReviewDueAt: "2099-07-01T00:00:00.000Z"
+        }
+      }
+    }));
+    expect(JSON.stringify(result.items[0])).not.toMatch(/asset:\/\/|kyc:\/\/|verifiedById|bestScore|attemptCount/);
     expect(result.pagination.total).toBe(1);
+  });
+
+  it("reports expired public training and review truth without exposing private review or KYC material", async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date("2026-07-20T08:00:00.000Z"));
+    prisma.companionProfile.findMany
+      .mockResolvedValueOnce([sellableCapacityRecord()] as any)
+      .mockResolvedValueOnce([{
+        ...companionRecord,
+        voiceIntroStatus: "pendingReview",
+        commercialProfile: {
+          ...companionRecord.commercialProfile,
+          nextReviewDueAt: new Date("2026-07-19T00:00:00.000Z")
+        },
+        trainingRecords: companionRecord.trainingRecords.map((record, index) => index === 2
+          ? { ...record, expiresAt: new Date("2026-07-19T00:00:00.000Z") }
+          : record)
+      }] as any);
+    prisma.companionProfile.count.mockResolvedValue(1 as any);
+
+    const result = await service.list({ language: "中文", specialty: "情绪倾听" });
+
+    expect(result.items[0].voiceIntro).toEqual({
+      available: false,
+      status: "unavailable",
+      durationSeconds: null,
+      playbackStatus: "notAvailable",
+      playbackUrl: null
+    });
+    expect(result.items[0].publicTrust).toEqual(expect.objectContaining({
+      training: expect.objectContaining({ status: "renewalDue", currentModules: 2, requiredModules: 3 }),
+      platformReview: expect.objectContaining({ status: "reviewDue" })
+    }));
+    expect(prisma.companionProfile.findMany.mock.calls[1][0].include).toEqual(expect.objectContaining({
+      commercialProfile: {
+        select: { verifiedAt: true, nextReviewDueAt: true }
+      },
+      trainingRecords: {
+        select: {
+          moduleCode: true,
+          moduleVersion: true,
+          status: true,
+          passedAt: true,
+          expiresAt: true
+        }
+      }
+    }));
+    expect(JSON.stringify(result.items[0])).not.toMatch(/identityEvidence|reviewer|verifiedBy|bestScore|attemptCount/);
+    jest.useRealTimers();
   });
 
   it("defaults the public catalog to currently sellable companions while preserving a stable public order", async () => {
@@ -294,16 +466,22 @@ describe("CompanionsService", () => {
         isVerified: true,
         ownerUserId: { not: null },
         owner: { accountStatus: "active", profile: { isVerified: true } },
-        commercialProfile: { status: "verified" }
-      }),
-      orderBy: [
-        { isOnline: "desc" },
-        { rating: "desc" },
-        { reviewCount: "desc" },
-        { pricePerHalfHour: "asc" }
-      ]
+        commercialProfile: expect.objectContaining({
+          status: "verified",
+          adultEligibilityVerdict: "adult",
+          adultEligibilityValidUntil: { gt: expect.any(Date) }
+        })
+      })
     }));
   });
+
+  it.each([undefined, "online", "rating", "reviewCount", "priceAsc"] as const)(
+    "uses companion id as the final deterministic public-catalog tie-breaker for %s",
+    (sortBy) => {
+      const orderBy = (service as any).publicCatalogOrderBy(sortBy);
+      expect(orderBy[orderBy.length - 1]).toEqual({ id: "asc" });
+    }
+  );
 
   it("orders price-selected results by the current sellable offering rather than editable profile price", async () => {
     prisma.companionProfile.findMany
@@ -424,6 +602,31 @@ describe("CompanionsService", () => {
     }));
     expect(result.items).toHaveLength(1);
     jest.useRealTimers();
+  });
+
+  it("scans capacity candidates in stable bounded keyset batches without truncating matches", async () => {
+    const firstBatch = Array.from({ length: PUBLIC_CAPACITY_SCAN_BATCH_SIZE }, (_, index) =>
+      sellableCapacityRecord({ id: `c-${String(index).padStart(3, "0")}` })
+    );
+    const lastCandidate = sellableCapacityRecord({ id: "c-100" });
+    prisma.companionProfile.findMany
+      .mockResolvedValueOnce(firstBatch as any)
+      .mockResolvedValueOnce([lastCandidate] as any);
+
+    const result = await service.findSellableCompanions({}, 7);
+
+    expect(result).toHaveLength(PUBLIC_CAPACITY_SCAN_BATCH_SIZE + 1);
+    expect(result[0].id).toBe("c-000");
+    expect(result.at(-1)?.id).toBe("c-100");
+    expect(prisma.companionProfile.findMany).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      orderBy: { id: "asc" },
+      take: PUBLIC_CAPACITY_SCAN_BATCH_SIZE
+    }));
+    expect(prisma.companionProfile.findMany).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      where: expect.objectContaining({ id: { gt: "c-099" } }),
+      orderBy: { id: "asc" },
+      take: PUBLIC_CAPACITY_SCAN_BATCH_SIZE
+    }));
   });
 
   it("orders availability-priority results by each matching service's earliest structured candidate before paging", async () => {
@@ -607,9 +810,7 @@ describe("CompanionsService", () => {
 
     const result = await service.list({ availableWithinDays: 3 });
 
-    expect(prisma.companionProfile.findMany.mock.calls[1][0].where).toEqual(expect.objectContaining({
-      id: { in: [] }
-    }));
+    expect(prisma.companionProfile.findMany).toHaveBeenCalledTimes(1);
     expect(result).toEqual(expect.objectContaining({ items: [], pagination: expect.objectContaining({ total: 0 }) }));
     jest.useRealTimers();
   });
@@ -634,14 +835,23 @@ describe("CompanionsService", () => {
         priceCents: 3900,
         currency: "CNY",
         topicIds: ["t1"]
-      }]
+      }],
+      _count: { serviceOfferings: 1 }
     } as any);
 
-    const result = await service.listPublishedServiceOfferings("c1");
+    const result = await service.listPublishedServiceOfferings("c1", { page: 2, pageSize: 1 });
 
     expect(prisma.companionProfile.findFirst).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({ id: "c1", isPublished: true }),
-      select: expect.objectContaining({ serviceOfferings: expect.objectContaining({ where: { isActive: true } }) })
+      select: expect.objectContaining({
+        serviceOfferings: expect.objectContaining({
+          where: { isActive: true },
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }, { id: "asc" }],
+          skip: 1,
+          take: 1
+        }),
+        _count: { select: { serviceOfferings: { where: { isActive: true } } } }
+      })
     }));
     expect(result).toEqual({
       items: [{
@@ -654,7 +864,8 @@ describe("CompanionsService", () => {
         priceCents: 3900,
         currency: "CNY",
         topicIds: ["t1"]
-      }]
+      }],
+      pagination: { page: 2, pageSize: 1, total: 1, totalPages: 1 }
     });
   });
 
@@ -674,7 +885,8 @@ describe("CompanionsService", () => {
       serviceOfferings: [
         { ...serviceOfferingRecord, id: "offer-text", deliveryMode: "text" },
         { ...serviceOfferingRecord, id: "offer-voice", deliveryMode: "voice", title: "语音陪伴" }
-      ]
+      ],
+      _count: { serviceOfferings: 1 }
     } as any);
 
     await expect(disabledService.list({ deliveryMode: "voice" })).resolves.toEqual({
@@ -682,11 +894,14 @@ describe("CompanionsService", () => {
       pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 }
     });
     await expect(disabledService.listPublishedServiceOfferings("c1")).resolves.toEqual({
-      items: [expect.objectContaining({ id: "offer-text", deliveryMode: "text" })]
+      items: [expect.objectContaining({ id: "offer-text", deliveryMode: "text" })],
+      pagination: { page: 1, pageSize: 20, total: 1, totalPages: 1 }
     });
     expect(prisma.companionProfile.findMany).not.toHaveBeenCalled();
     expect(prisma.companionProfile.findFirst).toHaveBeenCalledWith(expect.objectContaining({
-      select: expect.objectContaining({ serviceOfferings: expect.objectContaining({ where: { isActive: true } }) })
+      select: expect.objectContaining({
+        serviceOfferings: expect.objectContaining({ where: { isActive: true, deliveryMode: "text" } })
+      })
     }));
   });
 
@@ -704,17 +919,25 @@ describe("CompanionsService", () => {
       serviceOfferingRecord,
       { ...serviceOfferingRecord, id: "offer-retired", code: "service-retired", isActive: false, sortOrder: 2 }
     ] as any);
+    prisma.companionServiceOffering.count
+      .mockResolvedValueOnce(2)
+      .mockResolvedValueOnce(1);
 
-    const result = await service.listOwnServiceOfferings("owner-1");
+    const result = await service.listOwnServiceOfferings("owner-1", { page: 2, pageSize: 1 });
 
     expect(prisma.companionServiceOffering.findMany).toHaveBeenCalledWith({
       where: { companionId: "c1" },
-      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }, { id: "asc" }],
+      skip: 1,
+      take: 1
     });
+    expect(prisma.companionServiceOffering.count).toHaveBeenCalledWith({ where: { companionId: "c1" } });
     expect(result.items).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: "offer-1", isActive: true, sortOrder: 1 }),
       expect.objectContaining({ id: "offer-retired", isActive: false, sortOrder: 2 })
     ]));
+    expect(result.pagination).toEqual({ page: 2, pageSize: 1, total: 2, totalPages: 2 });
+    expect(result.summary).toEqual({ total: 2, active: 1 });
   });
 
   it("requires both a verified companion profile and a verified active owner for catalog management", async () => {
@@ -731,6 +954,8 @@ describe("CompanionsService", () => {
 
   it("creates a moderated, normalized service offering for its verified owner", async () => {
     prisma.companionProfile.findUnique.mockResolvedValue(eligibleOwnCompanion as any);
+    prisma.$queryRaw.mockResolvedValue([{ id: "c1" }]);
+    prisma.companionServiceOffering.count.mockResolvedValue(3);
     prisma.companionServiceOffering.create.mockImplementation(async ({ data }: any) => ({
       ...serviceOfferingRecord,
       ...data,
@@ -749,6 +974,8 @@ describe("CompanionsService", () => {
     });
 
     expect(moderation.moderateAsync).toHaveBeenCalledWith(expect.stringContaining("晚间语音陪伴"), "profile");
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(prisma.companionServiceOffering.count).toHaveBeenCalledWith({ where: { companionId: "c1" } });
     expect(prisma.companionServiceOffering.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         id: expect.any(String),
@@ -771,6 +998,26 @@ describe("CompanionsService", () => {
       isActive: true,
       sortOrder: 3
     }));
+  });
+
+  it("serializes catalog creation on the profile row and rejects the fifty-first offering", async () => {
+    prisma.companionProfile.findUnique.mockResolvedValue(eligibleOwnCompanion as any);
+    prisma.$queryRaw.mockResolvedValue([{ id: "c1" }]);
+    prisma.companionServiceOffering.count.mockResolvedValue(MAX_SERVICE_OFFERINGS_PER_COMPANION);
+
+    await expect(service.createOwnServiceOffering("owner-1", {
+      title: "新的文字服务",
+      deliveryMode: "text",
+      durationMinutes: 30,
+      priceCents: 3900
+    })).rejects.toMatchObject({
+      code: "SERVICE_OFFERING_LIMIT_REACHED",
+      status: 409,
+      details: { limit: MAX_SERVICE_OFFERINGS_PER_COMPANION }
+    });
+
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(prisma.companionServiceOffering.create).not.toHaveBeenCalled();
   });
 
   it("rejects unknown topics before creating a service offering", async () => {
@@ -854,6 +1101,12 @@ describe("CompanionsService", () => {
       availabilityWindowRecord,
       { ...availabilityWindowRecord, id: "window-retired", isActive: false }
     ] as any);
+    prisma.companionAvailabilityWindow.count
+      .mockResolvedValueOnce(2)
+      .mockResolvedValueOnce(1);
+    prisma.companionAvailabilityWindow.findFirst.mockResolvedValue({
+      startsAt: availabilityWindowRecord.startsAt
+    });
 
     const result = await service.listOwnAvailabilityWindows("owner-1");
 
@@ -865,13 +1118,19 @@ describe("CompanionsService", () => {
           recurringOccurrenceStartsAt: { not: null }
         }
       },
-      orderBy: [{ startsAt: "asc" }, { createdAt: "asc" }],
-      take: 200
+      orderBy: [{ startsAt: "asc" }, { createdAt: "asc" }, { id: "asc" }],
+      skip: 0,
+      take: 50
     });
     expect(result.items).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: "window-1", capacity: 2, isActive: true }),
       expect.objectContaining({ id: "window-retired", isActive: false })
     ]));
+    expect(result.pagination).toEqual({ page: 1, pageSize: 50, total: 2, totalPages: 1 });
+    expect(result.summary).toEqual({
+      futureActiveCount: 1,
+      nextFutureActiveStartsAt: availabilityWindowRecord.startsAt.toISOString()
+    });
   });
 
   it("creates a future aligned window and serializes it against overlapping calendar writes", async () => {
@@ -1098,14 +1357,17 @@ describe("CompanionsService", () => {
         { isActive: "desc" },
         { weekday: "asc" },
         { startsAtMinute: "asc" },
-        { createdAt: "asc" }
+        { createdAt: "asc" },
+        { id: "asc" }
       ],
-      take: 200
+      skip: 0,
+      take: 50
     });
     expect(prisma.companionAvailabilityBlackout.findMany).toHaveBeenCalledWith({
       where: { companionId: "c1" },
-      orderBy: [{ isActive: "desc" }, { startsAt: "asc" }, { createdAt: "asc" }],
-      take: 200
+      orderBy: [{ isActive: "desc" }, { startsAt: "asc" }, { createdAt: "asc" }, { id: "asc" }],
+      skip: 0,
+      take: 50
     });
     expect(availabilityScheduleRules.createRecurringRule).toHaveBeenCalledWith("c1", {
       weekday: 1,
@@ -1156,6 +1418,7 @@ describe("CompanionsService", () => {
     jest.setSystemTime(now);
     prisma.companionProfile.findUnique.mockResolvedValue(eligibleOwnCompanion as any);
     prisma.companionAvailabilityWindow.findMany.mockResolvedValue([recurringAvailabilityDraftRecord] as any);
+    prisma.companionAvailabilityWindow.count.mockResolvedValue(1);
 
     const result = await service.listOwnRecurringAvailabilityDrafts("owner-1");
 
@@ -1168,8 +1431,9 @@ describe("CompanionsService", () => {
         startsAt: { gt: now },
         endsAt: { lte: new Date("2026-08-04T00:00:00.000Z") }
       },
-      orderBy: [{ startsAt: "asc" }, { createdAt: "asc" }],
-      take: 200
+      orderBy: [{ startsAt: "asc" }, { createdAt: "asc" }, { id: "asc" }],
+      skip: 0,
+      take: 50
     });
     expect(result).toEqual({
       horizonEndsAt: "2026-08-04T00:00:00.000Z",
@@ -1177,7 +1441,8 @@ describe("CompanionsService", () => {
         id: "draft-1",
         startsAt: "2026-07-22T02:00:00.000Z",
         recurringAvailabilityRuleId: "rule-1"
-      })]
+      })],
+      pagination: { page: 1, pageSize: 50, total: 1, totalPages: 1 }
     });
     expect(result.items[0]).not.toHaveProperty("companionId");
     jest.useRealTimers();
@@ -1356,6 +1621,13 @@ describe("CompanionsService", () => {
       companionConfirmedAt: new Date("2026-07-20T09:00:00.000Z"),
       paymentReservationExpiresAt: null
     }] as any);
+    prisma.$queryRaw.mockResolvedValueOnce([{
+      availabilityWindowId: "window-1",
+      startsAt,
+      endsAt: new Date(startsAt.getTime() + 60 * 60_000),
+      capacity: 2,
+      reservedCount: 1
+    }]);
 
     const result = await service.listPublishedAvailability("c1", {
       serviceOfferingId: "offer-voice",
@@ -1378,9 +1650,9 @@ describe("CompanionsService", () => {
       reservedCount: 1,
       availableCapacity: 1
     });
-    expect(prisma.companionAvailabilityWindow.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({ companionId: "c1", isActive: true })
-    }));
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(Array.from(prisma.$queryRaw.mock.calls[0][0] as string[]).join(""))
+      .toContain('reservation."scheduledAt" + make_interval');
     jest.useRealTimers();
   });
 
@@ -1429,6 +1701,254 @@ describe("CompanionsService", () => {
     expect(result.isPublished).toBe(false);
   });
 
+  it("publishes with the global User then CompanionProfile lock order", async () => {
+    const unpublished = {
+      ...companionRecord,
+      ownerUserId: "owner-1",
+      isPublished: false
+    };
+    prisma.companionProfile.findUnique
+      .mockResolvedValueOnce(unpublished as any)
+      .mockResolvedValueOnce({
+        id: "c1",
+        ownerUserId: "owner-1",
+        isVerified: true,
+        updatedAt: unpublished.updatedAt
+      } as any)
+      .mockResolvedValueOnce({ ...unpublished, isPublished: true } as any);
+    prisma.user.findUnique.mockResolvedValue({
+      id: "owner-1",
+      role: "companion",
+      accountStatus: "active",
+      profile: { isVerified: true }
+    } as any);
+    prisma.companionCommercialProfile.findUnique.mockResolvedValue({
+      status: "verified",
+      adultEligibilityVerdict: "adult",
+      adultEligibilityValidUntil: new Date(Date.now() + 24 * 60 * 60_000)
+    } as any);
+    prisma.companionProfile.update.mockResolvedValue({ ...unpublished, isPublished: true } as any);
+
+    await expect(service.publish("c1")).resolves.toEqual(expect.objectContaining({
+      id: "c1",
+      isPublished: true
+    }));
+
+    const lockStatements = prisma.$queryRaw.mock.calls.map((call: any[]) =>
+      Array.from(call[0] as readonly string[]).join("")
+    );
+    expect(lockStatements[0]).toContain('FROM "User"');
+    expect(lockStatements[1]).toContain('FROM "CompanionProfile"');
+    expect(prisma.user.findUnique).toHaveBeenCalledWith({
+      where: { id: "owner-1" },
+      include: { profile: true }
+    });
+    expect(prisma.companionProfile.update).toHaveBeenCalledWith({
+      where: { id: "c1" },
+      data: { isPublished: true }
+    });
+  });
+
+  it("rejects publication when the owner changes after the preflight read without reversing lock order", async () => {
+    const unpublished = {
+      ...companionRecord,
+      ownerUserId: "owner-1",
+      isPublished: false
+    };
+    prisma.companionProfile.findUnique
+      .mockResolvedValueOnce(unpublished as any)
+      .mockResolvedValueOnce({
+        id: "c1",
+        ownerUserId: "owner-2",
+        isVerified: true,
+        updatedAt: unpublished.updatedAt
+      } as any);
+    prisma.user.findUnique.mockResolvedValue({
+      id: "owner-1",
+      role: "companion",
+      accountStatus: "active",
+      profile: { isVerified: true }
+    } as any);
+
+    await expect(service.publish("c1"))
+      .rejects.toMatchObject({ code: "COMPANION_PROFILE_CHANGED" });
+
+    const lockStatements = prisma.$queryRaw.mock.calls.map((call: any[]) =>
+      Array.from(call[0] as readonly string[]).join("")
+    );
+    expect(lockStatements[0]).toContain('FROM "User"');
+    expect(lockStatements[1]).toContain('FROM "CompanionProfile"');
+    expect(prisma.companionCommercialProfile.findUnique).not.toHaveBeenCalled();
+    expect(prisma.companionProfile.update).not.toHaveBeenCalled();
+  });
+
+  it("does not let a stale publish request overwrite a committed KYC revocation", async () => {
+    const unpublished = {
+      ...companionRecord,
+      ownerUserId: "owner-1",
+      isPublished: false
+    };
+    prisma.companionProfile.findUnique
+      .mockResolvedValueOnce(unpublished as any)
+      .mockResolvedValueOnce({
+        id: "c1",
+        ownerUserId: "owner-1",
+        isVerified: true,
+        updatedAt: unpublished.updatedAt
+      } as any);
+    prisma.user.findUnique.mockResolvedValue({
+      id: "owner-1",
+      role: "companion",
+      accountStatus: "active",
+      profile: { isVerified: false }
+    } as any);
+    prisma.companionCommercialProfile.findUnique.mockResolvedValue({ status: "verified" } as any);
+
+    await expect(service.publish("c1"))
+      .rejects.toMatchObject({ code: "COMPANION_OWNER_NOT_ELIGIBLE" });
+    expect(prisma.companionProfile.update).not.toHaveBeenCalled();
+  });
+
+  it("applies the same locked eligibility recheck when an admin update would publish", async () => {
+    const unpublished = {
+      ...companionRecord,
+      ownerUserId: "owner-1",
+      isPublished: false
+    };
+    prisma.companionProfile.findUnique
+      .mockResolvedValueOnce(unpublished as any)
+      .mockResolvedValueOnce({
+        id: "c1",
+        ownerUserId: "owner-1",
+        isVerified: true,
+        isPublished: false,
+        updatedAt: unpublished.updatedAt
+      } as any);
+    prisma.user.findUnique.mockResolvedValue({
+      id: "owner-1",
+      role: "companion",
+      accountStatus: "active",
+      profile: { isVerified: false }
+    } as any);
+    prisma.companionCommercialProfile.findUnique.mockResolvedValue({ status: "verified" } as any);
+
+    await expect(service.update("c1", { isPublished: true }))
+      .rejects.toMatchObject({ code: "COMPANION_OWNER_NOT_ELIGIBLE" });
+    expect(prisma.companionProfile.update).not.toHaveBeenCalled();
+  });
+
+  it("blocks create-time owner assignment after account deletion completed under the user lock", async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: "owner-deleted",
+      role: "companion",
+      accountStatus: "active",
+      profile: { isVerified: true }
+    } as any);
+    prisma.accountDeletionRequest.findFirst.mockResolvedValue({
+      id: "deletion-completed",
+      status: "completed"
+    } as any);
+
+    await expect(service.create({
+      ownerUserId: "owner-deleted",
+      name: "待审核陪伴者",
+      role: "倾听者",
+      initials: "DH",
+      tags: ["情绪倾听"],
+      pricePerHalfHour: 39,
+      isOnline: false,
+      isVerified: false,
+      bio: "仅在平台内提供边界清晰的倾听服务。",
+      availableTimes: ["20:00"],
+      languages: ["中文"],
+      specialties: ["情绪倾听"],
+      distanceKm: 0,
+      availability: "busy",
+      cityDistrict: "南山区",
+      isPublished: false
+    })).rejects.toMatchObject({ code: "COMPANION_OWNER_ACCOUNT_DELETED" });
+
+    const lockSql = prisma.$queryRaw.mock.calls.map((call: any[]) =>
+      Array.from(call[0] as readonly string[]).join("")
+    );
+    expect(lockSql[0]).toContain('FROM "User"');
+    expect(prisma.accountDeletionRequest.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        userId: "owner-deleted",
+        status: { in: ["pending", "processing", "completed"] }
+      }
+    }));
+    expect(prisma.companionProfile.create).not.toHaveBeenCalled();
+  });
+
+  it("blocks an unpublished owner reassignment when deletion starts before the transactional check", async () => {
+    const unpublished = {
+      ...companionRecord,
+      ownerUserId: null,
+      isPublished: false
+    };
+    prisma.companionProfile.findUnique.mockResolvedValueOnce(unpublished as any);
+    prisma.user.findUnique.mockResolvedValue({
+      id: "owner-processing",
+      role: "user",
+      accountStatus: "active",
+      profile: { isVerified: true }
+    } as any);
+    prisma.accountDeletionRequest.findFirst.mockResolvedValue({
+      id: "deletion-processing",
+      status: "processing"
+    } as any);
+
+    await expect(service.update("c1", {
+      ownerUserId: "owner-processing",
+      isPublished: false
+    })).rejects.toMatchObject({ code: "COMPANION_OWNER_DELETION_IN_PROGRESS" });
+
+    const lockSql = prisma.$queryRaw.mock.calls.map((call: any[]) =>
+      Array.from(call[0] as readonly string[]).join("")
+    );
+    expect(lockSql[0]).toContain('FROM "User"');
+    expect(lockSql.some((sql: string) => sql.includes('FROM "CompanionProfile"'))).toBe(false);
+    expect(prisma.companionProfile.update).not.toHaveBeenCalled();
+  });
+
+  it("locks and rejects the old owner when reassignment races that owner's deletion", async () => {
+    const unpublished = {
+      ...companionRecord,
+      ownerUserId: "owner-deleting",
+      isPublished: false
+    };
+    prisma.companionProfile.findUnique.mockResolvedValueOnce(unpublished as any);
+    prisma.user.findUnique.mockResolvedValue({
+      id: "owner-deleting",
+      role: "companion",
+      accountStatus: "restricted",
+      profile: { isVerified: true }
+    } as any);
+    prisma.accountDeletionRequest.findFirst.mockImplementation(({ where }: any) =>
+      Promise.resolve(where.userId === "owner-deleting"
+        ? { id: "deletion-old-owner", status: "processing" }
+        : null));
+
+    await expect(service.update("c1", {
+      ownerUserId: "owner-new",
+      isPublished: false
+    })).rejects.toMatchObject({ code: "COMPANION_OWNER_DELETION_IN_PROGRESS" });
+
+    const lockSql = prisma.$queryRaw.mock.calls.map((call: any[]) =>
+      Array.from(call[0] as readonly string[]).join("")
+    );
+    expect(lockSql[0]).toContain('FROM "User"');
+    expect(lockSql.some((sql: string) => sql.includes('FROM "CompanionProfile"'))).toBe(false);
+    expect(prisma.accountDeletionRequest.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        userId: "owner-deleting",
+        status: { in: ["pending", "processing", "completed"] }
+      }
+    }));
+    expect(prisma.companionProfile.update).not.toHaveBeenCalled();
+  });
+
   it("lists unpublished profiles with owner eligibility for the admin review queue", async () => {
     prisma.companionProfile.findMany.mockResolvedValue([{
       ...companionRecord,
@@ -1444,7 +1964,7 @@ describe("CompanionsService", () => {
     const result = await service.listAdmin();
 
     expect(prisma.companionProfile.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      orderBy: [{ isPublished: "asc" }, { createdAt: "asc" }],
+      orderBy: [{ isPublished: "asc" }, { createdAt: "asc" }, { id: "asc" }],
       take: 50
     }));
     expect(result.items[0]).toEqual(expect.objectContaining({

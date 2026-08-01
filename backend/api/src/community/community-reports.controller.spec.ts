@@ -12,6 +12,9 @@ describe("CommunityReportsController", () => {
     await expect(controller.mine({ id: "reporter-1" } as any)).resolves.toEqual({
       items: [{ id: "receipt-1", submittedAt: "2026-07-21T00:00:00.000Z", status: "received" }]
     });
-    expect(community.listMyReportReceipts).toHaveBeenCalledWith("reporter-1");
+    expect(community.listMyReportReceipts).toHaveBeenCalledWith(
+      "reporter-1",
+      expect.objectContaining({ page: 1, pageSize: 20 })
+    );
   });
 });

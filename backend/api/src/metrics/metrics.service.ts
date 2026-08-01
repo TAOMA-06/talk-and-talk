@@ -127,7 +127,7 @@ export class MetricsService {
       "# HELP talk_http_request_duration_ms_p95 P95 HTTP request duration in milliseconds",
       "# TYPE talk_http_request_duration_ms_p95 gauge",
       `talk_http_request_duration_ms_p95{app_version="${appVersion}",app_env="${appEnv}"} ${metrics.p95LatencyMs}`,
-      "# HELP talk_ai_moderation_failures_total DeepSeek moderation failures",
+      "# HELP talk_ai_moderation_failures_total External AI moderation failures (legacy-compatible metric; user-content transmission is disabled)",
       "# TYPE talk_ai_moderation_failures_total counter",
       `talk_ai_moderation_failures_total{app_version="${appVersion}",app_env="${appEnv}"} ${metrics.aiFailures}`,
       "# HELP talk_wechat_notify_failures_total WeChat payment notify failures",

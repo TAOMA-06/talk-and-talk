@@ -1,3 +1,5 @@
+import transactionalTemplateManifest = require("../../config/transactional-template-manifest.js");
+
 type NodeEnv = "development" | "test" | "production";
 type AppEnv = "development" | "staging" | "production";
 type CommercialReleaseMode = "internal" | "paidPilot" | "commercial";
@@ -23,21 +25,25 @@ interface Environment {
   JWT_REFRESH_SECRET: string;
   JWT_ACCESS_TTL: string;
   JWT_REFRESH_TTL: string;
+  AUTH_IDENTITY_TOMBSTONE_HMAC_KEYS: string;
+  AUTH_IDENTITY_TOMBSTONE_ACTIVE_KEY_ID: string;
+  AUTH_IDENTITY_REREGISTRATION_POLICY: "after_tombstone_expiry";
   REVIEW_JWT_ACCESS_SECRET: string;
   REVIEW_JWT_REFRESH_SECRET: string;
   REVIEW_JWT_ACCESS_TTL: string;
   REVIEW_JWT_REFRESH_TTL: string;
   SMS_CODE_TTL_SECONDS: number;
-  DEEPSEEK_API_KEY: string;
-  DEEPSEEK_URL: string;
-  DEEPSEEK_MODEL: string;
+  EXTERNAL_AI_USER_CONTENT_ENABLED: boolean;
   MEDIA_FEATURE_ENABLED: boolean;
   MEDIA_PROVIDER: string;
   TRTC_ENABLED: boolean;
   TRTC_SDK_APP_ID: number;
   TRTC_SDK_SECRET_KEY: string;
+  TRTC_CALLBACK_SIGNING_KEY: string;
   TRTC_PRIVATE_MAP_KEY_ENABLED: boolean;
   TRTC_USER_SIG_TTL_SECONDS: number;
+  TRTC_PRIVACY_DISCLOSURE_APPROVED: boolean;
+  TRTC_PRIVACY_DISCLOSURE_REFERENCE: string;
   TRTC_ROOM_CONTROL_ENABLED: boolean;
   TRTC_EMERGENCY_STOP_ENABLED: boolean;
   TRTC_CONTROL_REGION: "ap-beijing" | "ap-guangzhou";
@@ -54,6 +60,9 @@ interface Environment {
   WECHAT_PAY_PRIVATE_KEY_PATH: string;
   WECHAT_PAY_CERT_SERIAL_NO: string;
   WECHAT_PAY_NOTIFY_BASE_URL: string;
+  WECHAT_PAY_COMPLAINTS_ENABLED: boolean;
+  WECHAT_PAY_COMPLAINT_POLL_INTERVAL_SECONDS: number;
+  WECHAT_PAY_COMPLAINT_BATCH_SIZE: number;
   WECHAT_MINIPROGRAM_APP_ID: string;
   WECHAT_MINIPROGRAM_APP_SECRET: string;
   APPLE_SIGN_IN_BUNDLE_ID: string;
@@ -66,6 +75,12 @@ interface Environment {
   PAYMENT_RECONCILIATION_ENABLED: boolean;
   PAYMENT_RECONCILIATION_INTERVAL_SECONDS: number;
   PAYMENT_RECONCILIATION_BATCH_SIZE: number;
+  WECHAT_DAILY_BILL_RECONCILIATION_ENABLED: boolean;
+  WECHAT_DAILY_BILL_RECONCILIATION_APPROVED: boolean;
+  WECHAT_DAILY_BILL_RECONCILIATION_APPROVAL_REFERENCE: string;
+  WECHAT_DAILY_BILL_RECONCILIATION_START_DATE: string;
+  WECHAT_DAILY_BILL_RECONCILIATION_HOUR: number;
+  WECHAT_DAILY_BILL_RECONCILIATION_BATCH_SIZE: number;
   ORDER_RESCHEDULE_EXPIRY_ENABLED: boolean;
   ORDER_RESCHEDULE_EXPIRY_INTERVAL_SECONDS: number;
   ORDER_RESCHEDULE_EXPIRY_BATCH_SIZE: number;
@@ -80,10 +95,26 @@ interface Environment {
   LEGAL_CONTACT_PHONE: string;
   LEGAL_COMPLAINT_CHANNEL: string;
   LEGAL_PRIVACY_RETENTION_DAYS: number;
+  ACCOUNT_DELETION_RETENTION_POLICY_APPROVED: boolean;
+  ACCOUNT_DELETION_RETENTION_POLICY_APPROVAL_REFERENCE: string;
+  ACCOUNT_DATA_RETENTION_LEGAL_HOLD_POLICY_APPROVED: boolean;
+  ACCOUNT_DATA_RETENTION_LEGAL_HOLD_POLICY_VERSION: string;
+  ACCOUNT_DATA_RETENTION_LEGAL_HOLD_POLICY_APPROVAL_REFERENCE: string;
+  ACCOUNT_DATA_RETENTION_LEGAL_HOLD_REASON_CODES_JSON: string;
+  CRISIS_RESOURCES_APPROVED: boolean;
+  CRISIS_RESOURCES_APPROVAL_REFERENCE: string;
   COMMERCIAL_RELEASE_MODE: CommercialReleaseMode;
+  COMPANION_VOICE_EVIDENCE_VIEWER_URL: string;
+  COMPANION_VOICE_EVIDENCE_SIGNING_SECRET: string;
+  COMPANION_VOICE_EVIDENCE_URL_TTL_SECONDS: number;
   PLATFORM_FEE_BPS: number;
   COMPANION_SETTLEMENT_HOLD_HOURS: number;
+  REFUND_POLICY_VERSION: string;
+  REFUND_POLICY_APPROVED: boolean;
+  REFUND_POLICY_APPROVAL_REFERENCE: string;
   REFUND_REQUEST_WINDOW_HOURS: number;
+  REFUND_REVIEW_SLA_HOURS: number;
+  REFUND_RESOLUTION_SLA_HOURS: number;
   ORDER_RESPONSE_WINDOW_MINUTES: number;
   ORDER_CHAT_PRE_SERVICE_WINDOW_MINUTES: number;
   ORDER_CHAT_POST_SERVICE_WINDOW_MINUTES: number;
@@ -96,12 +127,25 @@ interface Environment {
   PAYOUT_CLAIMS_ENABLED: boolean;
   SUPPORT_RESPONSE_HOURS: number;
   SUPPORT_MAX_OPEN_PER_USER: number;
+  SUPPORT_PUBLIC_SERVICE_HOURS: string;
+  SUPPORT_PUBLIC_STATUS_URL: string;
+  DATA_EXPORT_DELIVERY_BASE_URL: string;
+  DATA_EXPORT_DELIVERY_API_KEY: string;
+  DATA_EXPORT_DELIVERY_TIMEOUT_MS: number;
+  DATA_EXPORT_MAX_BYTES: number;
+  COMPANION_APPEAL_SUBMISSION_DAYS: number;
+  COMPANION_APPEAL_RESPONSE_HOURS: number;
   NOTIFICATION_DELIVERY_ENABLED: boolean;
   NOTIFICATION_DELIVERY_INTERVAL_SECONDS: number;
   NOTIFICATION_DELIVERY_BATCH_SIZE: number;
   AVAILABILITY_REMINDER_PREPARATION_ENABLED: boolean;
   AVAILABILITY_REMINDER_PREPARATION_INTERVAL_SECONDS: number;
   AVAILABILITY_REMINDER_PREPARATION_BATCH_SIZE: number;
+  AVAILABILITY_REMINDER_FANOUT_BATCH_SIZE: number;
+  AVAILABILITY_REMINDER_FANOUT_BATCHES_PER_RUN: number;
+  AVAILABILITY_REMINDER_FANOUT_LEASE_SECONDS: number;
+  AVAILABILITY_REMINDER_FANOUT_MAX_FAILURES: number;
+  AVAILABILITY_REMINDER_FANOUT_RETRY_BASE_SECONDS: number;
   AVAILABILITY_REMINDER_DELIVERY_ENABLED: boolean;
   AVAILABILITY_REMINDER_DELIVERY_INTERVAL_SECONDS: number;
   AVAILABILITY_REMINDER_DELIVERY_BATCH_SIZE: number;
@@ -111,10 +155,8 @@ interface Environment {
 
 const DEFAULT_DATABASE_URL = "postgres://talk:talk@localhost:5432/talk_and_talk";
 const DEFAULT_REDIS_URL = "redis://localhost:6379";
-const DEFAULT_DEEPSEEK_URL = "https://api.deepseek.com";
-const DEFAULT_DEEPSEEK_MODEL = "deepseek-chat";
-const DEFAULT_LEGAL_CONSENT_VERSION = "2.0-2026-07-20";
-const DEFAULT_LEGAL_CONSENT_EFFECTIVE_DATE = "2026-07-20";
+const DEFAULT_LEGAL_CONSENT_VERSION = "2.2-2026-08-01";
+const DEFAULT_LEGAL_CONSENT_EFFECTIVE_DATE = "2026-08-01";
 // Retain these stable public URLs for existing Mini Program consent receipts;
 // the static documents redirect to the server-rendered, configuration-backed
 // legal endpoints below.
@@ -122,24 +164,17 @@ const DEFAULT_LEGAL_PRIVACY_URL = "https://api.talkandtalk.app/legal/privacy.htm
 const DEFAULT_LEGAL_TERMS_URL = "https://api.talkandtalk.app/legal/terms.html";
 const DEFAULT_LEGAL_PLATFORM_RULES_URL = "https://api.talkandtalk.app/api/v1/legal/platform-rules";
 const DEVELOPMENT_OPERATOR_NAME = "Talk&Talk 开发环境运营方（不可用于对外发布）";
-const REQUIRED_TRANSACTIONAL_TEMPLATE_KEYS = [
-  "newOrder",
-  "orderConfirmed",
-  "orderRejected",
-  "orderResponseExpired",
-  "paymentSuccess",
-  "serviceStarted",
-  "serviceCompleted",
-  "orderCancelled",
-  "reservationExpired",
-  "rescheduleRequested",
-  "rescheduleAccepted",
-  "rescheduleRejected",
-  "rescheduleExpired",
-  "rescheduleCancelled",
-  "supportUpdate",
-  "messageReceived"
-] as const;
+const JWT_ACCESS_TTL_MIN_MS = 5 * 60_000;
+const JWT_ACCESS_TTL_MAX_MS = 60 * 60_000;
+const JWT_REFRESH_TTL_MIN_MS = 60 * 60_000;
+const JWT_REFRESH_TTL_MAX_MS = 90 * 24 * 60 * 60_000;
+const JWT_TTL_MULTIPLIERS = {
+  s: 1_000,
+  m: 60_000,
+  h: 60 * 60_000,
+  d: 24 * 60 * 60_000
+} as const;
+const REQUIRED_TRANSACTIONAL_TEMPLATE_KEYS = transactionalTemplateManifest.map(({ key }) => key);
 const DEFAULT_DEVELOPMENT_CORS_ORIGINS = [
   "http://localhost:3000",
   "http://localhost:5173",
@@ -270,6 +305,41 @@ function optionalString(value: string | undefined): string {
   return value?.trim() ?? "";
 }
 
+export function parseJwtTtlToMs(name: string, value: string): number {
+  const match = value.match(/^([1-9]\d*)(s|m|h|d)$/);
+  if (!match) {
+    throw new Error(`${name} must use a positive integer followed by s, m, h, or d (for example 15m)`);
+  }
+  const amount = Number(match[1]);
+  const ttlMs = amount * JWT_TTL_MULTIPLIERS[match[2] as keyof typeof JWT_TTL_MULTIPLIERS];
+  if (!Number.isSafeInteger(amount) || !Number.isSafeInteger(ttlMs)) {
+    throw new Error(`${name} is too large`);
+  }
+  return ttlMs;
+}
+
+export function validateConsumerJwtTtls(
+  accessValue: string | undefined,
+  refreshValue: string | undefined
+): { accessTtl: string; refreshTtl: string; accessTtlMs: number; refreshTtlMs: number } {
+  const accessTtl = accessValue?.trim() || "15m";
+  const refreshTtl = refreshValue?.trim() || "30d";
+  const accessTtlMs = parseJwtTtlToMs("JWT_ACCESS_TTL", accessTtl);
+  const refreshTtlMs = parseJwtTtlToMs("JWT_REFRESH_TTL", refreshTtl);
+
+  if (accessTtlMs < JWT_ACCESS_TTL_MIN_MS || accessTtlMs > JWT_ACCESS_TTL_MAX_MS) {
+    throw new Error("JWT_ACCESS_TTL must be between 5 minutes and 1 hour");
+  }
+  if (refreshTtlMs < JWT_REFRESH_TTL_MIN_MS || refreshTtlMs > JWT_REFRESH_TTL_MAX_MS) {
+    throw new Error("JWT_REFRESH_TTL must be between 1 hour and 90 days");
+  }
+  if (refreshTtlMs <= accessTtlMs) {
+    throw new Error("JWT_REFRESH_TTL must be greater than JWT_ACCESS_TTL");
+  }
+
+  return { accessTtl, refreshTtl, accessTtlMs, refreshTtlMs };
+}
+
 function parseCommercialReleaseMode(value: string | undefined): CommercialReleaseMode {
   const mode = value?.trim() || "internal";
   if (mode === "internal" || mode === "paidPilot" || mode === "commercial") return mode;
@@ -389,6 +459,53 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
 
   const jwtAccessSecret = env.JWT_ACCESS_SECRET?.trim() || (nodeEnv === "production" ? "" : "dev-access-secret");
   const jwtRefreshSecret = env.JWT_REFRESH_SECRET?.trim() || (nodeEnv === "production" ? "" : "dev-refresh-secret");
+  const developmentTombstoneKey = Buffer.from(
+    "talk-and-talk-development-auth-tombstone-key-v1",
+    "utf8"
+  ).toString("base64");
+  const authIdentityTombstoneHmacKeys = optionalString(
+    env.AUTH_IDENTITY_TOMBSTONE_HMAC_KEYS
+  ) || (appEnv === "production" ? "" : JSON.stringify({ "dev-v1": developmentTombstoneKey }));
+  const authIdentityTombstoneActiveKeyId = optionalString(
+    env.AUTH_IDENTITY_TOMBSTONE_ACTIVE_KEY_ID
+  ) || (appEnv === "production" ? "" : "dev-v1");
+  const authIdentityReregistrationPolicy = optionalString(
+    env.AUTH_IDENTITY_REREGISTRATION_POLICY
+  ) || "after_tombstone_expiry";
+  let tombstoneKeyring: Record<string, unknown> = {};
+  try {
+    const parsed = JSON.parse(authIdentityTombstoneHmacKeys || "");
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      tombstoneKeyring = parsed as Record<string, unknown>;
+    }
+  } catch {
+    tombstoneKeyring = {};
+  }
+  const tombstoneKeyEntries = Object.entries(tombstoneKeyring);
+  if (!tombstoneKeyEntries.length) {
+    throw new Error("AUTH_IDENTITY_TOMBSTONE_HMAC_KEYS must be a non-empty JSON keyring");
+  }
+  for (const [keyId, encoded] of tombstoneKeyEntries) {
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(keyId) || typeof encoded !== "string") {
+      throw new Error("AUTH_IDENTITY_TOMBSTONE_HMAC_KEYS contains an invalid key id or value");
+    }
+    const decoded = Buffer.from(encoded, "base64");
+    if (decoded.length < 32
+      || decoded.toString("base64").replace(/=+$/u, "") !== encoded.replace(/=+$/u, "")) {
+      throw new Error("Each auth identity tombstone HMAC key must be valid base64 for at least 32 bytes");
+    }
+    if (appEnv === "production") {
+      assertProductionValue(`AUTH_IDENTITY_TOMBSTONE_HMAC_KEYS.${keyId}`, decoded.toString("utf8"));
+    }
+  }
+  if (!Object.prototype.hasOwnProperty.call(tombstoneKeyring, authIdentityTombstoneActiveKeyId)) {
+    throw new Error("AUTH_IDENTITY_TOMBSTONE_ACTIVE_KEY_ID must exist in the configured keyring");
+  }
+  if (authIdentityReregistrationPolicy !== "after_tombstone_expiry") {
+    throw new Error(
+      "AUTH_IDENTITY_REREGISTRATION_POLICY must be after_tombstone_expiry"
+    );
+  }
   const reviewJwtAccessSecret = env.REVIEW_JWT_ACCESS_SECRET?.trim() ||
     (nodeEnv === "production" ? "" : "dev-review-access-secret");
   const reviewJwtRefreshSecret = env.REVIEW_JWT_REFRESH_SECRET?.trim() ||
@@ -415,6 +532,10 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
   if (appEnv === "production" && (reviewJwtAccessSecret === jwtAccessSecret || reviewJwtRefreshSecret === jwtRefreshSecret)) {
     throw new Error("Review JWT secrets must not reuse consumer JWT secrets in production");
   }
+  const { accessTtl: jwtAccessTtl, refreshTtl: jwtRefreshTtl } = validateConsumerJwtTtls(
+    env.JWT_ACCESS_TTL,
+    env.JWT_REFRESH_TTL
+  );
 
   const metricsToken = optionalString(env.METRICS_TOKEN);
   if (appEnv === "production" && metricsToken.length < 32) {
@@ -433,21 +554,19 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     assertProductionValue("REDIS_URL", env.REDIS_URL!.trim());
   }
 
-  const deepseekApiKey = optionalString(env.DEEPSEEK_API_KEY);
-  const deepseekUrl = requiredUrl("DEEPSEEK_URL", env.DEEPSEEK_URL, DEFAULT_DEEPSEEK_URL);
-  const deepseekModel = env.DEEPSEEK_MODEL?.trim() || DEFAULT_DEEPSEEK_MODEL;
-  if (appEnv === "production") {
-    if (!deepseekApiKey || !env.DEEPSEEK_URL?.trim() || !env.DEEPSEEK_MODEL?.trim()) {
-      throw new Error("DEEPSEEK_API_KEY, DEEPSEEK_URL and DEEPSEEK_MODEL are required for production content moderation");
-    }
-    if (deepseekApiKey.length < 24) {
-      throw new Error("DEEPSEEK_API_KEY must contain at least 24 characters in production");
-    }
-    assertProductionValue("DEEPSEEK_API_KEY", deepseekApiKey);
-    assertProductionValue("DEEPSEEK_MODEL", deepseekModel);
-    if (new URL(deepseekUrl).protocol !== "https:") {
-      throw new Error("DEEPSEEK_URL must be an absolute HTTPS URL in production");
-    }
+  const externalAiUserContentEnabled = parseBoolean(env.EXTERNAL_AI_USER_CONTENT_ENABLED, false);
+  if (externalAiUserContentEnabled) {
+    throw new Error(
+      "EXTERNAL_AI_USER_CONTENT_ENABLED=true is not supported: user-authored content must remain local-only"
+    );
+  }
+  if (optionalString(env.DEEPSEEK_API_KEY)) {
+    throw new Error(
+      "DEEPSEEK_API_KEY must be unset: the generic DeepSeek service is not approved for user-authored content"
+    );
+  }
+  if (appEnv === "production" && env.EXTERNAL_AI_USER_CONTENT_ENABLED?.trim() !== "false") {
+    throw new Error("EXTERNAL_AI_USER_CONTENT_ENABLED=false must be explicitly configured in production");
   }
 
   const smsProvider = env.SMS_PROVIDER?.trim() || defaultSmsProvider(appEnv);
@@ -491,6 +610,83 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     positiveInteger("PAYMENT_RECONCILIATION_BATCH_SIZE", env.PAYMENT_RECONCILIATION_BATCH_SIZE, 50),
     200
   );
+  const wechatDailyBillReconciliationEnabled = parseBoolean(
+    env.WECHAT_DAILY_BILL_RECONCILIATION_ENABLED,
+    false
+  );
+  const wechatDailyBillReconciliationApproved = parseBoolean(
+    env.WECHAT_DAILY_BILL_RECONCILIATION_APPROVED,
+    false
+  );
+  const wechatDailyBillReconciliationApprovalReference = optionalString(
+    env.WECHAT_DAILY_BILL_RECONCILIATION_APPROVAL_REFERENCE
+  );
+  const wechatDailyBillReconciliationStartDate = optionalString(
+    env.WECHAT_DAILY_BILL_RECONCILIATION_START_DATE
+  );
+  if (wechatDailyBillReconciliationStartDate) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(wechatDailyBillReconciliationStartDate)) {
+      throw new Error("WECHAT_DAILY_BILL_RECONCILIATION_START_DATE must use YYYY-MM-DD");
+    }
+    const parsedStartDate = new Date(`${wechatDailyBillReconciliationStartDate}T00:00:00.000Z`);
+    if (Number.isNaN(parsedStartDate.getTime())
+      || parsedStartDate.toISOString().slice(0, 10) !== wechatDailyBillReconciliationStartDate) {
+      throw new Error("WECHAT_DAILY_BILL_RECONCILIATION_START_DATE must be a valid calendar date");
+    }
+  }
+  if (wechatDailyBillReconciliationEnabled && !wechatDailyBillReconciliationStartDate) {
+    throw new Error(
+      "WECHAT_DAILY_BILL_RECONCILIATION_ENABLED=true requires WECHAT_DAILY_BILL_RECONCILIATION_START_DATE"
+    );
+  }
+  if (
+    wechatDailyBillReconciliationApprovalReference
+    && !/^[A-Za-z0-9][A-Za-z0-9._:/-]{5,159}$/.test(wechatDailyBillReconciliationApprovalReference)
+  ) {
+    throw new Error(
+      "WECHAT_DAILY_BILL_RECONCILIATION_APPROVAL_REFERENCE must be a 6-160 character non-secret reference"
+    );
+  }
+  if (
+    wechatDailyBillReconciliationApproved
+    && !wechatDailyBillReconciliationApprovalReference
+  ) {
+    throw new Error(
+      "WECHAT_DAILY_BILL_RECONCILIATION_APPROVED=true requires WECHAT_DAILY_BILL_RECONCILIATION_APPROVAL_REFERENCE"
+    );
+  }
+  const wechatDailyBillReconciliationHour = boundedInteger(
+    "WECHAT_DAILY_BILL_RECONCILIATION_HOUR",
+    env.WECHAT_DAILY_BILL_RECONCILIATION_HOUR,
+    10,
+    10,
+    23
+  );
+  const wechatDailyBillReconciliationBatchSize = boundedInteger(
+    "WECHAT_DAILY_BILL_RECONCILIATION_BATCH_SIZE",
+    env.WECHAT_DAILY_BILL_RECONCILIATION_BATCH_SIZE,
+    4,
+    1,
+    16
+  );
+  const wechatPayComplaintsEnabled = parseBoolean(
+    env.WECHAT_PAY_COMPLAINTS_ENABLED,
+    nodeEnv !== "test"
+  );
+  const wechatPayComplaintPollIntervalSeconds = boundedInteger(
+    "WECHAT_PAY_COMPLAINT_POLL_INTERVAL_SECONDS",
+    env.WECHAT_PAY_COMPLAINT_POLL_INTERVAL_SECONDS,
+    300,
+    60,
+    60 * 60
+  );
+  const wechatPayComplaintBatchSize = boundedInteger(
+    "WECHAT_PAY_COMPLAINT_BATCH_SIZE",
+    env.WECHAT_PAY_COMPLAINT_BATCH_SIZE,
+    50,
+    1,
+    200
+  );
   // This is deliberately independent from payment reconciliation: operations
   // can pause automatic reschedule expiry during an incident without delaying
   // payment/refund reconciliation. It remains off in test processes so unit
@@ -509,6 +705,48 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     200
   );
   const commercialReleaseMode = parseCommercialReleaseMode(env.COMMERCIAL_RELEASE_MODE);
+  const companionVoiceEvidenceViewerUrl = optionalString(env.COMPANION_VOICE_EVIDENCE_VIEWER_URL);
+  const companionVoiceEvidenceSigningSecret = optionalString(env.COMPANION_VOICE_EVIDENCE_SIGNING_SECRET);
+  if (Boolean(companionVoiceEvidenceViewerUrl) !== Boolean(companionVoiceEvidenceSigningSecret)) {
+    throw new Error(
+      "COMPANION_VOICE_EVIDENCE_VIEWER_URL and COMPANION_VOICE_EVIDENCE_SIGNING_SECRET must be configured together"
+    );
+  }
+  if (companionVoiceEvidenceViewerUrl) {
+    let viewerUrl: URL;
+    try {
+      viewerUrl = new URL(companionVoiceEvidenceViewerUrl);
+    } catch {
+      throw new Error("COMPANION_VOICE_EVIDENCE_VIEWER_URL must be an absolute HTTPS URL");
+    }
+    if (viewerUrl.protocol !== "https:") {
+      throw new Error("COMPANION_VOICE_EVIDENCE_VIEWER_URL must be an absolute HTTPS URL");
+    }
+    if (viewerUrl.username || viewerUrl.password || viewerUrl.search || viewerUrl.hash) {
+      throw new Error(
+        "COMPANION_VOICE_EVIDENCE_VIEWER_URL must not contain credentials, a query string or a URL fragment"
+      );
+    }
+  }
+  if (
+    appEnv === "production"
+    && companionVoiceEvidenceSigningSecret
+    && companionVoiceEvidenceSigningSecret.length < 32
+  ) {
+    throw new Error(
+      "COMPANION_VOICE_EVIDENCE_SIGNING_SECRET must contain at least 32 characters in production"
+    );
+  }
+  if (appEnv === "production" && companionVoiceEvidenceSigningSecret) {
+    assertProductionValue("COMPANION_VOICE_EVIDENCE_SIGNING_SECRET", companionVoiceEvidenceSigningSecret);
+  }
+  const companionVoiceEvidenceUrlTtlSeconds = boundedInteger(
+    "COMPANION_VOICE_EVIDENCE_URL_TTL_SECONDS",
+    env.COMPANION_VOICE_EVIDENCE_URL_TTL_SECONDS,
+    300,
+    60,
+    900
+  );
   const platformFeeBps = boundedInteger("PLATFORM_FEE_BPS", env.PLATFORM_FEE_BPS, 0, 0, 10_000);
   const companionSettlementHoldHours = boundedInteger(
     "COMPANION_SETTLEMENT_HOLD_HOURS",
@@ -517,9 +755,49 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     1,
     24 * 30
   );
+  const refundPolicyVersion = optionalString(env.REFUND_POLICY_VERSION) || "development-v1";
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{2,63}$/.test(refundPolicyVersion)) {
+    throw new Error(
+      "REFUND_POLICY_VERSION must be a controlled 3-64 character version identifier"
+    );
+  }
+  const refundPolicyApproved = parseBoolean(env.REFUND_POLICY_APPROVED, false);
+  const refundPolicyApprovalReference = optionalString(env.REFUND_POLICY_APPROVAL_REFERENCE);
+  if (
+    refundPolicyApprovalReference
+    && !/^[A-Za-z0-9][A-Za-z0-9._:/-]{5,159}$/.test(refundPolicyApprovalReference)
+  ) {
+    throw new Error(
+      "REFUND_POLICY_APPROVAL_REFERENCE must be a 6-160 character non-secret reference"
+    );
+  }
+  if (refundPolicyApproved && !refundPolicyApprovalReference) {
+    throw new Error(
+      "REFUND_POLICY_APPROVED=true requires REFUND_POLICY_APPROVAL_REFERENCE"
+    );
+  }
+  if (commercialReleaseMode === "commercial" && !refundPolicyApproved) {
+    throw new Error(
+      "COMMERCIAL_RELEASE_MODE=commercial requires an approved refund policy version"
+    );
+  }
   const refundRequestWindowHours = boundedInteger(
     "REFUND_REQUEST_WINDOW_HOURS",
     env.REFUND_REQUEST_WINDOW_HOURS,
+    72,
+    1,
+    24 * 30
+  );
+  const refundReviewSlaHours = boundedInteger(
+    "REFUND_REVIEW_SLA_HOURS",
+    env.REFUND_REVIEW_SLA_HOURS,
+    24,
+    1,
+    24 * 14
+  );
+  const refundResolutionSlaHours = boundedInteger(
+    "REFUND_RESOLUTION_SLA_HOURS",
+    env.REFUND_RESOLUTION_SLA_HOURS,
     72,
     1,
     24 * 30
@@ -587,6 +865,58 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     1,
     100
   );
+  const supportPublicServiceHours =
+    optionalString(env.SUPPORT_PUBLIC_SERVICE_HOURS) || "工作日 09:00-18:00（北京时间）";
+  if (supportPublicServiceHours.length > 120) {
+    throw new Error("SUPPORT_PUBLIC_SERVICE_HOURS must be at most 120 characters");
+  }
+  const supportPublicStatusUrl = optionalString(env.SUPPORT_PUBLIC_STATUS_URL);
+  if (supportPublicStatusUrl) {
+    requiredProtocolUrl(
+      "SUPPORT_PUBLIC_STATUS_URL",
+      supportPublicStatusUrl,
+      supportPublicStatusUrl,
+      ["https:"]
+    );
+  }
+  const dataExportDeliveryBaseUrl = optionalString(env.DATA_EXPORT_DELIVERY_BASE_URL);
+  if (dataExportDeliveryBaseUrl) {
+    requiredProtocolUrl(
+      "DATA_EXPORT_DELIVERY_BASE_URL",
+      dataExportDeliveryBaseUrl,
+      dataExportDeliveryBaseUrl,
+      ["https:"]
+    );
+  }
+  const dataExportDeliveryApiKey = optionalString(env.DATA_EXPORT_DELIVERY_API_KEY);
+  const dataExportDeliveryTimeoutMs = boundedInteger(
+    "DATA_EXPORT_DELIVERY_TIMEOUT_MS",
+    env.DATA_EXPORT_DELIVERY_TIMEOUT_MS,
+    10_000,
+    1_000,
+    60_000
+  );
+  const dataExportMaxBytes = boundedInteger(
+    "DATA_EXPORT_MAX_BYTES",
+    env.DATA_EXPORT_MAX_BYTES,
+    50 * 1024 * 1024,
+    1_024,
+    100 * 1024 * 1024
+  );
+  const companionAppealSubmissionDays = boundedInteger(
+    "COMPANION_APPEAL_SUBMISSION_DAYS",
+    env.COMPANION_APPEAL_SUBMISSION_DAYS,
+    30,
+    1,
+    365
+  );
+  const companionAppealResponseHours = boundedInteger(
+    "COMPANION_APPEAL_RESPONSE_HOURS",
+    env.COMPANION_APPEAL_RESPONSE_HOURS,
+    72,
+    1,
+    24 * 30
+  );
   const notificationDeliveryEnabled = parseBoolean(
     env.NOTIFICATION_DELIVERY_ENABLED,
     nodeEnv !== "test"
@@ -625,6 +955,41 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     20,
     1,
     100
+  );
+  const availabilityReminderFanoutBatchSize = boundedInteger(
+    "AVAILABILITY_REMINDER_FANOUT_BATCH_SIZE",
+    env.AVAILABILITY_REMINDER_FANOUT_BATCH_SIZE,
+    200,
+    1,
+    1_000
+  );
+  const availabilityReminderFanoutBatchesPerRun = boundedInteger(
+    "AVAILABILITY_REMINDER_FANOUT_BATCHES_PER_RUN",
+    env.AVAILABILITY_REMINDER_FANOUT_BATCHES_PER_RUN,
+    20,
+    1,
+    100
+  );
+  const availabilityReminderFanoutLeaseSeconds = boundedInteger(
+    "AVAILABILITY_REMINDER_FANOUT_LEASE_SECONDS",
+    env.AVAILABILITY_REMINDER_FANOUT_LEASE_SECONDS,
+    120,
+    30,
+    900
+  );
+  const availabilityReminderFanoutMaxFailures = boundedInteger(
+    "AVAILABILITY_REMINDER_FANOUT_MAX_FAILURES",
+    env.AVAILABILITY_REMINDER_FANOUT_MAX_FAILURES,
+    8,
+    1,
+    50
+  );
+  const availabilityReminderFanoutRetryBaseSeconds = boundedInteger(
+    "AVAILABILITY_REMINDER_FANOUT_RETRY_BASE_SECONDS",
+    env.AVAILABILITY_REMINDER_FANOUT_RETRY_BASE_SECONDS,
+    30,
+    5,
+    900
   );
   // Unlike preparation, this runner crosses the one-time authorization and
   // provider boundary. It remains separately and explicitly off until an
@@ -753,10 +1118,136 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     1,
     36500
   );
+  const accountDeletionRetentionPolicyApproved = parseBoolean(
+    env.ACCOUNT_DELETION_RETENTION_POLICY_APPROVED,
+    false
+  );
+  const accountDeletionRetentionPolicyApprovalReference = optionalString(
+    env.ACCOUNT_DELETION_RETENTION_POLICY_APPROVAL_REFERENCE
+  );
+  const accountDataRetentionLegalHoldPolicyApproved = parseBoolean(
+    env.ACCOUNT_DATA_RETENTION_LEGAL_HOLD_POLICY_APPROVED,
+    false
+  );
+  const accountDataRetentionLegalHoldPolicyVersion = optionalString(
+    env.ACCOUNT_DATA_RETENTION_LEGAL_HOLD_POLICY_VERSION
+  );
+  const accountDataRetentionLegalHoldPolicyApprovalReference = optionalString(
+    env.ACCOUNT_DATA_RETENTION_LEGAL_HOLD_POLICY_APPROVAL_REFERENCE
+  );
+  const accountDataRetentionLegalHoldReasonCodesJson = optionalString(
+    env.ACCOUNT_DATA_RETENTION_LEGAL_HOLD_REASON_CODES_JSON
+  ) || "[]";
+  const crisisResourcesApproved = parseBoolean(env.CRISIS_RESOURCES_APPROVED, false);
+  const crisisResourcesApprovalReference = optionalString(
+    env.CRISIS_RESOURCES_APPROVAL_REFERENCE
+  );
+  if (
+    accountDeletionRetentionPolicyApprovalReference
+    && !/^[A-Za-z0-9][A-Za-z0-9._:/-]{5,159}$/.test(accountDeletionRetentionPolicyApprovalReference)
+  ) {
+    throw new Error(
+      "ACCOUNT_DELETION_RETENTION_POLICY_APPROVAL_REFERENCE must be a 6-160 character non-secret reference"
+    );
+  }
+  if (accountDeletionRetentionPolicyApproved && !accountDeletionRetentionPolicyApprovalReference) {
+    throw new Error(
+      "ACCOUNT_DELETION_RETENTION_POLICY_APPROVED=true requires ACCOUNT_DELETION_RETENTION_POLICY_APPROVAL_REFERENCE"
+    );
+  }
+  if (
+    accountDataRetentionLegalHoldPolicyVersion
+    && !/^[A-Za-z0-9][A-Za-z0-9._:/-]{2,63}$/.test(accountDataRetentionLegalHoldPolicyVersion)
+  ) {
+    throw new Error(
+      "ACCOUNT_DATA_RETENTION_LEGAL_HOLD_POLICY_VERSION must be a controlled 3-64 character version identifier"
+    );
+  }
+  if (
+    accountDataRetentionLegalHoldPolicyApprovalReference
+    && !/^[A-Za-z0-9][A-Za-z0-9._:/-]{5,159}$/.test(
+      accountDataRetentionLegalHoldPolicyApprovalReference
+    )
+  ) {
+    throw new Error(
+      "ACCOUNT_DATA_RETENTION_LEGAL_HOLD_POLICY_APPROVAL_REFERENCE must be a 6-160 character non-secret reference"
+    );
+  }
+  let accountDataRetentionLegalHoldReasons: unknown;
+  try {
+    accountDataRetentionLegalHoldReasons = JSON.parse(
+      accountDataRetentionLegalHoldReasonCodesJson
+    );
+  } catch {
+    throw new Error("ACCOUNT_DATA_RETENTION_LEGAL_HOLD_REASON_CODES_JSON must be valid JSON");
+  }
+  const legalHoldReasonCatalogValid = Array.isArray(accountDataRetentionLegalHoldReasons)
+    && accountDataRetentionLegalHoldReasons.length > 0
+    && accountDataRetentionLegalHoldReasons.every((item) => {
+      if (!item || typeof item !== "object") return false;
+      const candidate = item as Record<string, unknown>;
+      const actions = candidate.actions;
+      const categories = candidate.categories;
+      return typeof candidate.code === "string"
+        && /^[A-Z][A-Z0-9_]{2,63}$/.test(candidate.code)
+        && Array.isArray(actions)
+        && actions.length > 0
+        && actions.every((action) => action === "placement" || action === "release")
+        && new Set(actions).size === actions.length
+        && Array.isArray(categories)
+        && categories.length > 0
+        && categories.every((category) => typeof category === "string" && category.length > 0)
+        && new Set(categories).size === categories.length;
+    });
+  if (
+    accountDataRetentionLegalHoldPolicyApproved
+    && (
+      !accountDataRetentionLegalHoldPolicyVersion
+      || !accountDataRetentionLegalHoldPolicyApprovalReference
+      || !legalHoldReasonCatalogValid
+    )
+  ) {
+    throw new Error(
+      "ACCOUNT_DATA_RETENTION_LEGAL_HOLD_POLICY_APPROVED=true requires a controlled version, approval reference and non-empty reason catalog"
+    );
+  }
+  if (
+    crisisResourcesApprovalReference
+    && !/^[A-Za-z0-9][A-Za-z0-9._:/-]{5,159}$/.test(crisisResourcesApprovalReference)
+  ) {
+    throw new Error(
+      "CRISIS_RESOURCES_APPROVAL_REFERENCE must be a 6-160 character non-secret reference"
+    );
+  }
+  if (crisisResourcesApproved && !crisisResourcesApprovalReference) {
+    throw new Error(
+      "CRISIS_RESOURCES_APPROVED=true requires CRISIS_RESOURCES_APPROVAL_REFERENCE"
+    );
+  }
   if (legalContactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(legalContactEmail)) {
     throw new Error("LEGAL_CONTACT_EMAIL must be a valid email address when configured");
   }
   if (appEnv === "production") {
+    if (!accountDeletionRetentionPolicyApproved || !accountDeletionRetentionPolicyApprovalReference) {
+      throw new Error(
+        "Production account deletion requires an approved retention policy and approval reference"
+      );
+    }
+    if (
+      !accountDataRetentionLegalHoldPolicyApproved
+      || !accountDataRetentionLegalHoldPolicyVersion
+      || !accountDataRetentionLegalHoldPolicyApprovalReference
+      || !legalHoldReasonCatalogValid
+    ) {
+      throw new Error(
+        "Production data-retention legal holds require an externally approved version, reference and reason catalog"
+      );
+    }
+    if (!crisisResourcesApproved || !crisisResourcesApprovalReference) {
+      throw new Error(
+        "Production release requires approved crisis resources and a non-secret approval reference"
+      );
+    }
     const productionLegalFields = {
       LEGAL_OPERATOR_NAME: legalOperatorName,
       LEGAL_CONTACT_EMAIL: legalContactEmail,
@@ -800,9 +1291,27 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     if (env.PAYMENT_RECONCILIATION_ENABLED !== "true") {
       throw new Error("PAYMENT_RECONCILIATION_ENABLED=true is required for a production commercial release");
     }
+    if (
+      !wechatDailyBillReconciliationEnabled
+      || !wechatDailyBillReconciliationApproved
+      || !wechatDailyBillReconciliationApprovalReference
+      || !wechatDailyBillReconciliationStartDate
+    ) {
+      throw new Error(
+        "Production commercial release requires enabled and approved WeChat T+1 daily bill reconciliation"
+      );
+    }
+    if (env.WECHAT_PAY_COMPLAINTS_ENABLED !== "true") {
+      throw new Error("WECHAT_PAY_COMPLAINTS_ENABLED=true is required for a production commercial release");
+    }
     for (const name of [
       "COMPANION_SETTLEMENT_HOLD_HOURS",
+      "REFUND_POLICY_VERSION",
+      "REFUND_POLICY_APPROVED",
+      "REFUND_POLICY_APPROVAL_REFERENCE",
       "REFUND_REQUEST_WINDOW_HOURS",
+      "REFUND_REVIEW_SLA_HOURS",
+      "REFUND_RESOLUTION_SLA_HOURS",
       "ORDER_RESPONSE_WINDOW_MINUTES",
       "ORDER_CHAT_PRE_SERVICE_WINDOW_MINUTES",
       "ORDER_CHAT_POST_SERVICE_WINDOW_MINUTES",
@@ -817,12 +1326,24 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
       "ORDER_MAX_PENDING_PER_COMPANION",
       "PAYOUT_CLAIMS_ENABLED",
       "SUPPORT_RESPONSE_HOURS",
-      "SUPPORT_MAX_OPEN_PER_USER"
+      "SUPPORT_MAX_OPEN_PER_USER",
+      "SUPPORT_PUBLIC_SERVICE_HOURS",
+      "SUPPORT_PUBLIC_STATUS_URL",
+      "DATA_EXPORT_DELIVERY_BASE_URL",
+      "DATA_EXPORT_DELIVERY_API_KEY",
+      "DATA_EXPORT_DELIVERY_TIMEOUT_MS",
+      "DATA_EXPORT_MAX_BYTES",
+      "COMPANION_APPEAL_SUBMISSION_DAYS",
+      "COMPANION_APPEAL_RESPONSE_HOURS"
     ]) {
       if (env[name] === undefined || env[name]?.trim() === "") {
         throw new Error(`${name} must be explicitly configured in production`);
       }
     }
+    assertProductionValue("SUPPORT_PUBLIC_SERVICE_HOURS", supportPublicServiceHours);
+    assertProductionValue("SUPPORT_PUBLIC_STATUS_URL", supportPublicStatusUrl);
+    assertProductionValue("DATA_EXPORT_DELIVERY_BASE_URL", dataExportDeliveryBaseUrl);
+    assertProductionValue("DATA_EXPORT_DELIVERY_API_KEY", dataExportDeliveryApiKey);
     if (companionSettlementHoldHours < refundRequestWindowHours + 24) {
       throw new Error(
         "COMPANION_SETTLEMENT_HOLD_HOURS must be at least REFUND_REQUEST_WINDOW_HOURS + 24 in production"
@@ -843,10 +1364,26 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
   const trtcEnabled = parseBoolean(env.TRTC_ENABLED, false);
   const trtcSdkAppId = boundedInteger("TRTC_SDK_APP_ID", env.TRTC_SDK_APP_ID, 0, 0, 2_147_483_647);
   const trtcSdkSecretKey = optionalString(env.TRTC_SDK_SECRET_KEY);
+  const trtcCallbackSigningKey = optionalString(env.TRTC_CALLBACK_SIGNING_KEY);
   const trtcPrivateMapKeyEnabled = parseBoolean(env.TRTC_PRIVATE_MAP_KEY_ENABLED, false);
   const trtcUserSigTtlSeconds = boundedInteger(
     "TRTC_USER_SIG_TTL_SECONDS", env.TRTC_USER_SIG_TTL_SECONDS, 300, 60, 900
   );
+  const trtcPrivacyDisclosureApproved = parseBoolean(
+    env.TRTC_PRIVACY_DISCLOSURE_APPROVED,
+    false
+  );
+  const trtcPrivacyDisclosureReference = optionalString(
+    env.TRTC_PRIVACY_DISCLOSURE_REFERENCE
+  );
+  if (
+    trtcPrivacyDisclosureReference
+    && !/^[A-Za-z0-9][A-Za-z0-9._:/-]{5,159}$/.test(trtcPrivacyDisclosureReference)
+  ) {
+    throw new Error(
+      "TRTC_PRIVACY_DISCLOSURE_REFERENCE must be a 6-160 character non-secret reference"
+    );
+  }
   // A client-side timer is only a convenience. A commercial voice service
   // needs a server-side room-close path for refunds and elapsed service
   // windows, otherwise an already-connected client can outlive the order.
@@ -872,16 +1409,25 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
   const tencentCloudSecretKey = optionalString(env.TENCENTCLOUD_SECRET_KEY);
   const tencentCloudSecurityToken = optionalString(env.TENCENTCLOUD_SECURITY_TOKEN);
   if (trtcEnabled) {
-    if (!trtcSdkAppId || !trtcSdkSecretKey || !trtcPrivateMapKeyEnabled || !trtcRoomControlEnabled) {
+    if (!trtcPrivacyDisclosureApproved || !trtcPrivacyDisclosureReference) {
       throw new Error(
-        "TRTC_ENABLED=true requires TRTC_SDK_APP_ID, TRTC_SDK_SECRET_KEY, TRTC_PRIVATE_MAP_KEY_ENABLED=true and TRTC_ROOM_CONTROL_ENABLED=true"
+        "TRTC_ENABLED=true requires TRTC_PRIVACY_DISCLOSURE_APPROVED=true and TRTC_PRIVACY_DISCLOSURE_REFERENCE"
+      );
+    }
+    if (!trtcSdkAppId || !trtcSdkSecretKey || !trtcCallbackSigningKey || !trtcPrivateMapKeyEnabled || !trtcRoomControlEnabled) {
+      throw new Error(
+        "TRTC_ENABLED=true requires TRTC_SDK_APP_ID, TRTC_SDK_SECRET_KEY, TRTC_CALLBACK_SIGNING_KEY, TRTC_PRIVATE_MAP_KEY_ENABLED=true and TRTC_ROOM_CONTROL_ENABLED=true"
       );
     }
     if (trtcSdkSecretKey.length < 16) {
       throw new Error("TRTC_SDK_SECRET_KEY is unexpectedly short");
     }
+    if (!/^[A-Za-z0-9]{16,32}$/.test(trtcCallbackSigningKey)) {
+      throw new Error("TRTC_CALLBACK_SIGNING_KEY must contain 16 to 32 ASCII letters or digits");
+    }
     if (appEnv === "production") {
       assertProductionValue("TRTC_SDK_SECRET_KEY", trtcSdkSecretKey);
+      assertProductionValue("TRTC_CALLBACK_SIGNING_KEY", trtcCallbackSigningKey);
     }
   }
   if (trtcRoomControlEnabled) {
@@ -922,23 +1468,27 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     CORS_ORIGINS: corsOrigins,
     JWT_ACCESS_SECRET: jwtAccessSecret,
     JWT_REFRESH_SECRET: jwtRefreshSecret,
-    JWT_ACCESS_TTL: env.JWT_ACCESS_TTL?.trim() || "15m",
-    JWT_REFRESH_TTL: env.JWT_REFRESH_TTL?.trim() || "30d",
+    JWT_ACCESS_TTL: jwtAccessTtl,
+    JWT_REFRESH_TTL: jwtRefreshTtl,
+    AUTH_IDENTITY_TOMBSTONE_HMAC_KEYS: authIdentityTombstoneHmacKeys,
+    AUTH_IDENTITY_TOMBSTONE_ACTIVE_KEY_ID: authIdentityTombstoneActiveKeyId,
+    AUTH_IDENTITY_REREGISTRATION_POLICY: "after_tombstone_expiry",
     REVIEW_JWT_ACCESS_SECRET: reviewJwtAccessSecret,
     REVIEW_JWT_REFRESH_SECRET: reviewJwtRefreshSecret,
     REVIEW_JWT_ACCESS_TTL: env.REVIEW_JWT_ACCESS_TTL?.trim() || "15m",
     REVIEW_JWT_REFRESH_TTL: env.REVIEW_JWT_REFRESH_TTL?.trim() || "8h",
     SMS_CODE_TTL_SECONDS: positiveInteger("SMS_CODE_TTL_SECONDS", env.SMS_CODE_TTL_SECONDS, 300),
-    DEEPSEEK_API_KEY: deepseekApiKey,
-    DEEPSEEK_URL: deepseekUrl,
-    DEEPSEEK_MODEL: deepseekModel,
+    EXTERNAL_AI_USER_CONTENT_ENABLED: externalAiUserContentEnabled,
     MEDIA_FEATURE_ENABLED: mediaFeatureEnabled,
     MEDIA_PROVIDER: mediaProvider,
     TRTC_ENABLED: trtcEnabled,
     TRTC_SDK_APP_ID: trtcSdkAppId,
     TRTC_SDK_SECRET_KEY: trtcSdkSecretKey,
+    TRTC_CALLBACK_SIGNING_KEY: trtcCallbackSigningKey,
     TRTC_PRIVATE_MAP_KEY_ENABLED: trtcPrivateMapKeyEnabled,
     TRTC_USER_SIG_TTL_SECONDS: trtcUserSigTtlSeconds,
+    TRTC_PRIVACY_DISCLOSURE_APPROVED: trtcPrivacyDisclosureApproved,
+    TRTC_PRIVACY_DISCLOSURE_REFERENCE: trtcPrivacyDisclosureReference,
     TRTC_ROOM_CONTROL_ENABLED: trtcRoomControlEnabled,
     TRTC_EMERGENCY_STOP_ENABLED: trtcEmergencyStopEnabled,
     TRTC_CONTROL_REGION: trtcControlRegion,
@@ -955,6 +1505,9 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     WECHAT_PAY_PRIVATE_KEY_PATH: wechatPayPrivateKeyPath,
     WECHAT_PAY_CERT_SERIAL_NO: wechatPayCertSerialNo,
     WECHAT_PAY_NOTIFY_BASE_URL: wechatPayNotifyBaseUrl,
+    WECHAT_PAY_COMPLAINTS_ENABLED: wechatPayComplaintsEnabled,
+    WECHAT_PAY_COMPLAINT_POLL_INTERVAL_SECONDS: wechatPayComplaintPollIntervalSeconds,
+    WECHAT_PAY_COMPLAINT_BATCH_SIZE: wechatPayComplaintBatchSize,
     WECHAT_MINIPROGRAM_APP_ID: miniProgramAppId,
     WECHAT_MINIPROGRAM_APP_SECRET: miniProgramAppSecret,
     APPLE_SIGN_IN_BUNDLE_ID: optionalString(env.APPLE_SIGN_IN_BUNDLE_ID),
@@ -967,6 +1520,12 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     PAYMENT_RECONCILIATION_ENABLED: paymentReconciliationEnabled,
     PAYMENT_RECONCILIATION_INTERVAL_SECONDS: paymentReconciliationIntervalSeconds,
     PAYMENT_RECONCILIATION_BATCH_SIZE: paymentReconciliationBatchSize,
+    WECHAT_DAILY_BILL_RECONCILIATION_ENABLED: wechatDailyBillReconciliationEnabled,
+    WECHAT_DAILY_BILL_RECONCILIATION_APPROVED: wechatDailyBillReconciliationApproved,
+    WECHAT_DAILY_BILL_RECONCILIATION_APPROVAL_REFERENCE: wechatDailyBillReconciliationApprovalReference,
+    WECHAT_DAILY_BILL_RECONCILIATION_START_DATE: wechatDailyBillReconciliationStartDate,
+    WECHAT_DAILY_BILL_RECONCILIATION_HOUR: wechatDailyBillReconciliationHour,
+    WECHAT_DAILY_BILL_RECONCILIATION_BATCH_SIZE: wechatDailyBillReconciliationBatchSize,
     ORDER_RESCHEDULE_EXPIRY_ENABLED: orderRescheduleExpiryEnabled,
     ORDER_RESCHEDULE_EXPIRY_INTERVAL_SECONDS: orderRescheduleExpiryIntervalSeconds,
     ORDER_RESCHEDULE_EXPIRY_BATCH_SIZE: orderRescheduleExpiryBatchSize,
@@ -981,10 +1540,28 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     LEGAL_CONTACT_PHONE: legalContactPhone,
     LEGAL_COMPLAINT_CHANNEL: legalComplaintChannel,
     LEGAL_PRIVACY_RETENTION_DAYS: legalPrivacyRetentionDays,
+    ACCOUNT_DELETION_RETENTION_POLICY_APPROVED: accountDeletionRetentionPolicyApproved,
+    ACCOUNT_DELETION_RETENTION_POLICY_APPROVAL_REFERENCE: accountDeletionRetentionPolicyApprovalReference,
+    ACCOUNT_DATA_RETENTION_LEGAL_HOLD_POLICY_APPROVED: accountDataRetentionLegalHoldPolicyApproved,
+    ACCOUNT_DATA_RETENTION_LEGAL_HOLD_POLICY_VERSION: accountDataRetentionLegalHoldPolicyVersion,
+    ACCOUNT_DATA_RETENTION_LEGAL_HOLD_POLICY_APPROVAL_REFERENCE:
+      accountDataRetentionLegalHoldPolicyApprovalReference,
+    ACCOUNT_DATA_RETENTION_LEGAL_HOLD_REASON_CODES_JSON:
+      accountDataRetentionLegalHoldReasonCodesJson,
+    CRISIS_RESOURCES_APPROVED: crisisResourcesApproved,
+    CRISIS_RESOURCES_APPROVAL_REFERENCE: crisisResourcesApprovalReference,
     COMMERCIAL_RELEASE_MODE: commercialReleaseMode,
+    COMPANION_VOICE_EVIDENCE_VIEWER_URL: companionVoiceEvidenceViewerUrl,
+    COMPANION_VOICE_EVIDENCE_SIGNING_SECRET: companionVoiceEvidenceSigningSecret,
+    COMPANION_VOICE_EVIDENCE_URL_TTL_SECONDS: companionVoiceEvidenceUrlTtlSeconds,
     PLATFORM_FEE_BPS: platformFeeBps,
     COMPANION_SETTLEMENT_HOLD_HOURS: companionSettlementHoldHours,
+    REFUND_POLICY_VERSION: refundPolicyVersion,
+    REFUND_POLICY_APPROVED: refundPolicyApproved,
+    REFUND_POLICY_APPROVAL_REFERENCE: refundPolicyApprovalReference,
     REFUND_REQUEST_WINDOW_HOURS: refundRequestWindowHours,
+    REFUND_REVIEW_SLA_HOURS: refundReviewSlaHours,
+    REFUND_RESOLUTION_SLA_HOURS: refundResolutionSlaHours,
     ORDER_RESPONSE_WINDOW_MINUTES: orderResponseWindowMinutes,
     ORDER_CHAT_PRE_SERVICE_WINDOW_MINUTES: orderChatPreServiceWindowMinutes,
     ORDER_CHAT_POST_SERVICE_WINDOW_MINUTES: orderChatPostServiceWindowMinutes,
@@ -997,12 +1574,25 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     PAYOUT_CLAIMS_ENABLED: payoutClaimsEnabled,
     SUPPORT_RESPONSE_HOURS: supportResponseHours,
     SUPPORT_MAX_OPEN_PER_USER: supportMaxOpenPerUser,
+    SUPPORT_PUBLIC_SERVICE_HOURS: supportPublicServiceHours,
+    SUPPORT_PUBLIC_STATUS_URL: supportPublicStatusUrl,
+    DATA_EXPORT_DELIVERY_BASE_URL: dataExportDeliveryBaseUrl,
+    DATA_EXPORT_DELIVERY_API_KEY: dataExportDeliveryApiKey,
+    DATA_EXPORT_DELIVERY_TIMEOUT_MS: dataExportDeliveryTimeoutMs,
+    DATA_EXPORT_MAX_BYTES: dataExportMaxBytes,
+    COMPANION_APPEAL_SUBMISSION_DAYS: companionAppealSubmissionDays,
+    COMPANION_APPEAL_RESPONSE_HOURS: companionAppealResponseHours,
     NOTIFICATION_DELIVERY_ENABLED: notificationDeliveryEnabled,
     NOTIFICATION_DELIVERY_INTERVAL_SECONDS: notificationDeliveryIntervalSeconds,
     NOTIFICATION_DELIVERY_BATCH_SIZE: notificationDeliveryBatchSize,
     AVAILABILITY_REMINDER_PREPARATION_ENABLED: availabilityReminderPreparationEnabled,
     AVAILABILITY_REMINDER_PREPARATION_INTERVAL_SECONDS: availabilityReminderPreparationIntervalSeconds,
     AVAILABILITY_REMINDER_PREPARATION_BATCH_SIZE: availabilityReminderPreparationBatchSize,
+    AVAILABILITY_REMINDER_FANOUT_BATCH_SIZE: availabilityReminderFanoutBatchSize,
+    AVAILABILITY_REMINDER_FANOUT_BATCHES_PER_RUN: availabilityReminderFanoutBatchesPerRun,
+    AVAILABILITY_REMINDER_FANOUT_LEASE_SECONDS: availabilityReminderFanoutLeaseSeconds,
+    AVAILABILITY_REMINDER_FANOUT_MAX_FAILURES: availabilityReminderFanoutMaxFailures,
+    AVAILABILITY_REMINDER_FANOUT_RETRY_BASE_SECONDS: availabilityReminderFanoutRetryBaseSeconds,
     AVAILABILITY_REMINDER_DELIVERY_ENABLED: availabilityReminderDeliveryEnabled,
     AVAILABILITY_REMINDER_DELIVERY_INTERVAL_SECONDS: availabilityReminderDeliveryIntervalSeconds,
     AVAILABILITY_REMINDER_DELIVERY_BATCH_SIZE: availabilityReminderDeliveryBatchSize,

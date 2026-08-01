@@ -1,0 +1,26 @@
+.hero { padding: 34rpx 30rpx; border-radius: 28rpx; background: linear-gradient(135deg, #fff, #ffe9ef); box-shadow: 0 10rpx 28rpx rgba(96, 50, 60, 0.08); }
+.eyebrow { color: #b94a68; font-size: 24rpx; font-weight: 700; }
+.hero-title { margin-top: 10rpx; font-size: 40rpx; font-weight: 700; }
+.hero-copy { margin-top: 14rpx; color: #765b60; font-size: 26rpx; line-height: 1.6; }
+.warning { margin-top: 20rpx; padding: 18rpx; border-radius: 16rpx; background: #fff0d6; color: #7f551c; font-size: 24rpx; }
+.section-title { margin: 34rpx 4rpx 16rpx; font-size: 30rpx; font-weight: 700; }
+.form-card { padding: 30rpx; }
+.field-label { margin: 22rpx 0 10rpx; color: #765b60; font-size: 24rpx; font-weight: 600; }
+.field { box-sizing: border-box; width: 100%; min-height: 82rpx; padding: 20rpx 22rpx; border: 2rpx solid #eddde1; border-radius: 16rpx; background: #fffafa; font-size: 27rpx; }
+.textarea { box-sizing: border-box; width: 100%; min-height: 220rpx; padding: 20rpx 22rpx; border: 2rpx solid #eddde1; border-radius: 16rpx; background: #fffafa; font-size: 27rpx; line-height: 1.55; }
+.textarea.compact { min-height: 150rpx; }
+.two-column { display: grid; grid-template-columns: 1fr 1fr; gap: 18rpx; }
+.subsection { margin-top: 30rpx; padding-top: 26rpx; border-top: 2rpx solid #f3e7ea; font-size: 28rpx; font-weight: 700; }
+.status-line, .hint { margin-top: 12rpx; color: #765b60; font-size: 24rpx; line-height: 1.55; }
+.hint { color: #a9878e; }
+.status-row { display: flex; align-items: center; justify-content: space-between; gap: 20rpx; }
+.status-title { font-size: 30rpx; font-weight: 700; }
+.status-badge { flex: none; padding: 8rpx 14rpx; border-radius: 999rpx; background: #f3e7ea; color: #765b60; font-size: 22rpx; }
+.status-verified { background: #e4f4ea; color: #2d7547; }
+.status-suspended { background: #ffeadf; color: #9c4a27; }
+.privacy-notice { margin-top: 22rpx; padding: 20rpx; border-radius: 16rpx; background: #f6f1eb; color: #6e5a47; font-size: 24rpx; line-height: 1.6; }
+.form-error { margin-top: 20rpx; color: #b43e3e; font-size: 24rpx; line-height: 1.5; }
+.submit { margin-top: 28rpx; }
+.secondary-button { margin-top: 16rpx; background: #f9edef; color: #a43f5c; }
+.empty-title { margin-bottom: 14rpx; color: #4b353a; font-size: 34rpx; font-weight: 700; }
+.retry { margin-top: 28rpx; }

@@ -14,7 +14,7 @@ export class UpdateMeDto {
 
   @IsOptional()
   @IsIn(USER_GENDERS)
-  gender?: UserGender;
+  gender?: UserGender | null;
 
   @IsOptional()
   @Type(() => Number)

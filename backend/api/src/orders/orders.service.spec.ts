@@ -13,11 +13,15 @@ describe("OrdersService", () => {
     companionServiceOffering: {
       findFirst: jest.fn()
     },
+    companionCommercialProfile: {
+      findUnique: jest.fn()
+    },
     companionAvailabilityWindow: {
       findFirst: jest.fn()
     },
     orderTimelineEvent: {
       create: jest.fn(),
+      count: jest.fn(),
       findMany: jest.fn()
     },
     orderRescheduleRequest: {
@@ -44,6 +48,13 @@ describe("OrdersService", () => {
       findFirst: jest.fn(),
       create: jest.fn()
     },
+    accountDeletionRequest: {
+      findFirst: jest.fn()
+    },
+    customerAdultEligibility: {
+      findFirst: jest.fn()
+    },
+    companionCustomerFutureBoundary: { findUnique: jest.fn() },
     $transaction: jest.fn()
   } as any;
 
@@ -53,8 +64,32 @@ describe("OrdersService", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    prisma.order.findUnique.mockReset().mockResolvedValue({
+      userId: "u1",
+      companion: { ownerUserId: "u-companion" }
+    });
     prisma.order.findFirst.mockResolvedValue(null);
     prisma.order.count.mockResolvedValue(0);
+    prisma.orderTimelineEvent.count.mockResolvedValue(0);
+    prisma.accountDeletionRequest.findFirst.mockResolvedValue(null);
+    prisma.companionCustomerFutureBoundary.findUnique.mockResolvedValue(null);
+    prisma.companionCommercialProfile.findUnique.mockResolvedValue({
+      status: "verified",
+      adultEligibilityVerdict: "adult",
+      adultEligibilityVerifiedAt: new Date(Date.now() - 24 * 60 * 60_000),
+      adultEligibilityValidUntil: new Date(Date.now() + 180 * 24 * 60 * 60_000)
+    });
+    prisma.customerAdultEligibility.findFirst.mockResolvedValue({
+      id: "adult-u1",
+      userId: "u1",
+      status: "adult",
+      verificationMethod: "externalProvider",
+      submittedById: "u1",
+      submittedAt: new Date(),
+      reviewedById: "supply-2",
+      verifiedAt: new Date(Date.now() - 60_000),
+      validUntil: new Date(Date.now() + 180 * 24 * 60 * 60_000)
+    });
     prisma.$transaction.mockImplementation(async (fn: any) => fn({
       ...prisma,
       $queryRaw: jest.fn().mockResolvedValue([])
@@ -66,7 +101,13 @@ describe("OrdersService", () => {
     prisma.companionProfile.findFirst.mockResolvedValue({
       id: "c1",
       pricePerHalfHour: 39,
-      isPublished: true
+      isPublished: true,
+      commercialProfile: {
+        status: "verified",
+        adultEligibilityVerdict: "adult",
+        adultEligibilityVerifiedAt: new Date(Date.now() - 24 * 60 * 60_000),
+        adultEligibilityValidUntil: new Date(Date.now() + 180 * 24 * 60 * 60_000)
+      }
     });
     prisma.order.create.mockResolvedValue({
       id: "o1",
@@ -77,6 +118,10 @@ describe("OrdersService", () => {
       amountCents: 7800,
       currency: "CNY",
       status: "pending",
+      serviceIntentSnapshot: "listen",
+      serviceIntentPolicyVersionSnapshot: "2026.1",
+      refundPolicyVersionSnapshot: "development-v1",
+      refundRequestWindowHoursSnapshot: 72,
       conversationId: null,
       paidAt: null,
       cancelledAt: null,
@@ -89,6 +134,7 @@ describe("OrdersService", () => {
       companionId: "c1",
       themeId: "t1",
       durationMinutes: 60,
+      serviceIntent: "listen",
       scheduledAt: new Date(Date.now() + 3_600_000).toISOString()
     });
 
@@ -97,12 +143,28 @@ describe("OrdersService", () => {
         data: expect.objectContaining({
           amountCents: 7800,
           status: "pending",
-          durationMinutes: 60
+          durationMinutes: 60,
+          adultEligibilityVerdictSnapshot: "adult",
+          adultEligibilityVerifiedAtSnapshot: expect.any(Date),
+          adultEligibilityValidUntilSnapshot: expect.any(Date),
+          serviceIntentSnapshot: "listen",
+          serviceIntentPolicyVersionSnapshot: "2026.1",
+          refundPolicyVersionSnapshot: "development-v1",
+          refundRequestWindowHoursSnapshot: 72
         })
       })
     );
     expect(result.amountYuan).toBe(78);
     expect(result.status).toBe("pending");
+    expect(result.serviceIntent).toEqual({
+      code: "listen",
+      label: "只想被倾听",
+      policyVersion: "2026.1"
+    });
+    expect(result).toMatchObject({
+      refundPolicyVersionSnapshot: "development-v1",
+      refundRequestWindowHoursSnapshot: 72
+    });
     expect(prisma.orderTimelineEvent.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         orderId: "o1",
@@ -113,10 +175,114 @@ describe("OrdersService", () => {
     }));
     expect(prisma.companionProfile.findFirst).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({
-        id: "c1",
-        commercialProfile: { status: "verified" }
-      })
+        id: "c1"
+      }),
+      include: { commercialProfile: true }
     }));
+    expect(prisma.companionCommercialProfile.findUnique).toHaveBeenCalledWith(expect.objectContaining({
+      where: { companionId: "c1" }
+    }));
+  });
+
+  it("fails a new order closed with a generic unavailable response for a private future-booking boundary", async () => {
+    prisma.companionCustomerFutureBoundary.findUnique.mockResolvedValue({ id: "boundary-1" });
+
+    await expect(service.create("u1", {
+      companionId: "c1",
+      themeId: "t1",
+      durationMinutes: 60,
+      serviceIntent: "listen",
+      scheduledAt: new Date(Date.now() + 3_600_000).toISOString()
+    })).rejects.toMatchObject({
+      code: "ORDER_COMPANION_UNAVAILABLE",
+      message: "This companion is currently unavailable for a new order",
+      status: HttpStatus.CONFLICT
+    });
+
+    expect(prisma.order.create).not.toHaveBeenCalled();
+    expect(prisma.companionCustomerFutureBoundary.findUnique).toHaveBeenCalledWith({
+      where: {
+        companionId_customerUserId: { companionId: "c1", customerUserId: "u1" }
+      },
+      select: { id: true }
+    });
+  });
+
+  it("rejects order creation when companion adult eligibility expires before service end", async () => {
+    const scheduledAt = new Date(Date.now() + 2 * 60 * 60_000);
+    prisma.companionProfile.findFirst.mockResolvedValue({
+      id: "c1",
+      pricePerHalfHour: 39,
+      isPublished: true,
+      commercialProfile: {
+        status: "verified",
+        adultEligibilityVerdict: "adult",
+        adultEligibilityVerifiedAt: new Date(Date.now() - 24 * 60 * 60_000),
+        adultEligibilityValidUntil: new Date(Date.now() + 180 * 24 * 60 * 60_000)
+      }
+    });
+    prisma.companionCommercialProfile.findUnique.mockResolvedValue({
+      status: "verified",
+      adultEligibilityVerdict: "adult",
+      adultEligibilityVerifiedAt: new Date(Date.now() - 24 * 60 * 60_000),
+      adultEligibilityValidUntil: new Date(scheduledAt.getTime() + 60 * 60_000 - 1)
+    });
+
+    await expect(service.create("u1", {
+      companionId: "c1",
+      themeId: "t1",
+      durationMinutes: 60,
+      scheduledAt: scheduledAt.toISOString()
+    })).rejects.toMatchObject({
+      code: "COMPANION_ADULT_ELIGIBILITY_VALIDITY_TOO_SHORT",
+      status: HttpStatus.CONFLICT
+    });
+    expect(prisma.order.create).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [null, "CUSTOMER_ADULT_ELIGIBILITY_REQUIRED"],
+    [{ status: "pending", reviewedById: null, verifiedAt: null, validUntil: null }, "CUSTOMER_ADULT_ELIGIBILITY_PENDING"],
+    [{ status: "ineligible", reviewedById: "supply-2", verifiedAt: new Date(), validUntil: null }, "CUSTOMER_ADULT_ELIGIBILITY_INELIGIBLE"],
+    [{
+      status: "adult",
+      reviewedById: "supply-2",
+      verifiedAt: new Date(Date.now() - 2 * 24 * 60 * 60_000),
+      validUntil: new Date(Date.now() - 60_000)
+    }, "CUSTOMER_ADULT_ELIGIBILITY_EXPIRED"]
+  ])("refuses new order intake when the customer adult fact is not current %#", async (override, code) => {
+    prisma.customerAdultEligibility.findFirst.mockResolvedValue(override && {
+      id: "adult-u1",
+      userId: "u1",
+      verificationMethod: "externalProvider",
+      submittedById: "u1",
+      submittedAt: new Date(),
+      ...override
+    });
+
+    await expect(service.create("u1", {
+      companionId: "c1",
+      themeId: "t1",
+      durationMinutes: 30,
+      scheduledAt: new Date(Date.now() + 3_600_000).toISOString()
+    })).rejects.toMatchObject({ code });
+    expect(prisma.order.create).not.toHaveBeenCalled();
+  });
+
+  it("serializes deletion-request creation with order intake and rejects only a new order", async () => {
+    prisma.accountDeletionRequest.findFirst.mockResolvedValue({ id: "deletion-1", status: "processing" });
+
+    await expect(service.create("u1", {
+      companionId: "c1",
+      themeId: "t1",
+      durationMinutes: 30,
+      scheduledAt: new Date(Date.now() + 3_600_000).toISOString()
+    })).rejects.toMatchObject({
+      code: "ACCOUNT_DELETION_ORDER_INTAKE_BLOCKED",
+      status: HttpStatus.CONFLICT,
+      details: expect.objectContaining({ existingOrderRightsRemainAvailable: true })
+    });
+    expect(prisma.order.create).not.toHaveBeenCalled();
   });
 
   it("binds an active service offering and freezes its commercial snapshot", async () => {
@@ -255,6 +421,7 @@ describe("OrdersService", () => {
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
         .mockResolvedValueOnce([{ id: "o-reserved" }])
         .mockResolvedValueOnce([])
     };
@@ -303,12 +470,32 @@ describe("OrdersService", () => {
 
   it("returns the original order for a matching client retry without duplicating side effects", async () => {
     const scheduledAt = new Date(Date.now() + 3_600_000);
+    const crisisIntervention = {
+      assertResourcesViewedBeforeOrder: jest.fn().mockRejectedValue(new AppException(
+        "CRISIS_RESOURCES_MUST_BE_VIEWED",
+        "Emergency resources must be viewed before continuing to order",
+        HttpStatus.CONFLICT
+      ))
+    } as any;
+    service = new OrdersService(
+      prisma,
+      notifications,
+      wechat,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      crisisIntervention
+    );
     prisma.order.findFirst.mockResolvedValue({
       id: "o-existing", userId: "u1", companionId: "c1", themeId: "t1", durationMinutes: 30,
       amountCents: 3900, currency: "CNY", status: "pending", scheduledAt,
       companionNameSnapshot: "林屿", companionRoleSnapshot: "倾听者", companionInitialsSnapshot: "LY",
       themeNameSnapshot: "轻松闲聊", conversationId: null, companionConfirmedAt: null,
       paymentReservationExpiresAt: null, paidAt: null, cancelledAt: null, completedAt: null,
+      refundPolicyVersionSnapshot: "2026.07-v1", refundRequestWindowHoursSnapshot: 72,
       clientRequestId: "order_retry_1234567890", refunds: [], createdAt: new Date(), updatedAt: new Date()
     });
 
@@ -320,30 +507,87 @@ describe("OrdersService", () => {
     expect(result.id).toBe("o-existing");
     expect(prisma.$transaction).not.toHaveBeenCalled();
     expect(prisma.order.create).not.toHaveBeenCalled();
+    expect(crisisIntervention.assertResourcesViewedBeforeOrder).not.toHaveBeenCalled();
+  });
+
+  it("rechecks a pending crisis intervention inside the order transaction before accepting intake", async () => {
+    const crisisIntervention = {
+      assertResourcesViewedBeforeOrder: jest.fn()
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new AppException(
+          "CRISIS_RESOURCES_MUST_BE_VIEWED",
+          "Emergency resources must be viewed before continuing to order",
+          HttpStatus.CONFLICT,
+          { interventionId: "crisis-pending-1" }
+        ))
+    } as any;
+    service = new OrdersService(
+      prisma,
+      notifications,
+      wechat,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      crisisIntervention
+    );
+
+    await expect(service.create("u1", {
+      companionId: "c1",
+      themeId: "t1",
+      durationMinutes: 30,
+      scheduledAt: new Date(Date.now() + 3_600_000).toISOString()
+    })).rejects.toMatchObject({
+      code: "CRISIS_RESOURCES_MUST_BE_VIEWED",
+      details: { interventionId: "crisis-pending-1" }
+    });
+    expect(crisisIntervention.assertResourcesViewedBeforeOrder).toHaveBeenCalledTimes(2);
+    expect(crisisIntervention.assertResourcesViewedBeforeOrder.mock.calls[0]).toEqual(["u1", undefined]);
+    expect(crisisIntervention.assertResourcesViewedBeforeOrder.mock.calls[1][0]).toBe("u1");
+    expect(crisisIntervention.assertResourcesViewedBeforeOrder.mock.calls[1][1]).toEqual(expect.objectContaining({
+      $queryRaw: expect.any(Function)
+    }));
+    expect(prisma.order.create).not.toHaveBeenCalled();
   });
 
   it("returns an existing idempotent order even while new intake is paused", async () => {
     const scheduledAt = new Date(Date.now() + 3_600_000);
-    const config = { get: jest.fn((key: string, fallback?: unknown) => key === "ORDER_INTAKE_ENABLED" ? false : fallback) } as any;
+    const config = { get: jest.fn((key: string, fallback?: unknown) => ({
+      ORDER_INTAKE_ENABLED: false,
+      REFUND_POLICY_VERSION: "2026.08-v2",
+      REFUND_REQUEST_WINDOW_HOURS: 24
+    } as Record<string, unknown>)[key] ?? fallback) } as any;
     service = new OrdersService(prisma, notifications, wechat, undefined, config);
     prisma.order.findFirst.mockResolvedValue({
       id: "o-existing", userId: "u1", companionId: "c1", themeId: "t1", durationMinutes: 30,
       amountCents: 3900, currency: "CNY", status: "pending", scheduledAt,
       companionNameSnapshot: "林屿", companionRoleSnapshot: "倾听者", companionInitialsSnapshot: "LY",
       themeNameSnapshot: "轻松闲聊", conversationId: null, refunds: [],
+      refundPolicyVersionSnapshot: "2026.07-v1", refundRequestWindowHoursSnapshot: 72,
       clientRequestId: "order_retry_1234567890", createdAt: new Date(), updatedAt: new Date()
     });
 
     await expect(service.create("u1", {
       companionId: "c1", themeId: "t1", durationMinutes: 30,
       scheduledAt: scheduledAt.toISOString(), clientRequestId: "order_retry_1234567890"
-    })).resolves.toMatchObject({ id: "o-existing" });
+    })).resolves.toMatchObject({
+      id: "o-existing",
+      refundPolicyVersionSnapshot: "2026.07-v1",
+      refundRequestWindowHoursSnapshot: 72
+    });
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
   it("requires a client idempotency key when commercial release mode is enabled", async () => {
     const config = {
-      get: jest.fn((key: string, fallback?: unknown) => key === "COMMERCIAL_RELEASE_MODE" ? "commercial" : fallback)
+      get: jest.fn((key: string, fallback?: unknown) => ({
+        COMMERCIAL_RELEASE_MODE: "commercial",
+        REFUND_POLICY_VERSION: "2026.08-v1",
+        REFUND_POLICY_APPROVED: true,
+        REFUND_POLICY_APPROVAL_REFERENCE: "legal:refund-policy-2026-08"
+      } as Record<string, unknown>)[key] ?? fallback)
     } as any;
     service = new OrdersService(prisma, notifications, wechat, undefined, config);
 
@@ -357,9 +601,41 @@ describe("OrdersService", () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
+  it("pauses commercial intake until the configured refund policy version is approved", async () => {
+    const config = {
+      get: jest.fn((key: string, fallback?: unknown) => ({
+        COMMERCIAL_RELEASE_MODE: "commercial",
+        REFUND_POLICY_VERSION: "2026.08-v1",
+        REFUND_POLICY_APPROVED: false,
+        REFUND_POLICY_APPROVAL_REFERENCE: ""
+      } as Record<string, unknown>)[key] ?? fallback)
+    } as any;
+    service = new OrdersService(prisma, notifications, wechat, undefined, config);
+
+    await expect(service.create("u1", {
+      companionId: "c1",
+      serviceOfferingId: "offer-text",
+      availabilityWindowId: "window-1",
+      themeId: "t1",
+      durationMinutes: 30,
+      serviceIntent: "listen",
+      scheduledAt: new Date(Date.now() + 3_600_000).toISOString(),
+      clientRequestId: "order_refund_policy_123456"
+    })).rejects.toMatchObject({
+      code: "ORDER_REFUND_POLICY_UNAVAILABLE",
+      status: HttpStatus.SERVICE_UNAVAILABLE
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
   it("requires a current service offering and structured availability window for commercial intake", async () => {
     const config = {
-      get: jest.fn((key: string, fallback?: unknown) => key === "COMMERCIAL_RELEASE_MODE" ? "commercial" : fallback)
+      get: jest.fn((key: string, fallback?: unknown) => ({
+        COMMERCIAL_RELEASE_MODE: "commercial",
+        REFUND_POLICY_VERSION: "2026.08-v1",
+        REFUND_POLICY_APPROVED: true,
+        REFUND_POLICY_APPROVAL_REFERENCE: "legal:refund-policy-2026-08"
+      } as Record<string, unknown>)[key] ?? fallback)
     } as any;
     service = new OrdersService(prisma, notifications, wechat, undefined, config);
 
@@ -371,6 +647,32 @@ describe("OrdersService", () => {
       clientRequestId: "order_structured_123456"
     })).rejects.toMatchObject({
       code: "ORDER_STRUCTURED_CATALOG_REQUIRED",
+      status: HttpStatus.UNPROCESSABLE_ENTITY
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("requires an explicit service intent for commercial intake", async () => {
+    const config = {
+      get: jest.fn((key: string, fallback?: unknown) => ({
+        COMMERCIAL_RELEASE_MODE: "commercial",
+        REFUND_POLICY_VERSION: "2026.08-v1",
+        REFUND_POLICY_APPROVED: true,
+        REFUND_POLICY_APPROVAL_REFERENCE: "legal:refund-policy-2026-08"
+      } as Record<string, unknown>)[key] ?? fallback)
+    } as any;
+    service = new OrdersService(prisma, notifications, wechat, undefined, config);
+
+    await expect(service.create("u1", {
+      companionId: "c1",
+      serviceOfferingId: "offer-text",
+      availabilityWindowId: "window-1",
+      themeId: "t1",
+      durationMinutes: 30,
+      scheduledAt: new Date(Date.now() + 3_600_000).toISOString(),
+      clientRequestId: "order_intent_123456789"
+    })).rejects.toMatchObject({
+      code: "ORDER_SERVICE_INTENT_REQUIRED",
       status: HttpStatus.UNPROCESSABLE_ENTITY
     });
     expect(prisma.$transaction).not.toHaveBeenCalled();
@@ -429,6 +731,26 @@ describe("OrdersService", () => {
     await expect(service.create("u1", {
       companionId: "c1", availabilityWindowId: "window-b", themeId: "t1", durationMinutes: 30,
       scheduledAt: scheduledAt.toISOString(), clientRequestId: "order_retry_1234567890"
+    })).rejects.toMatchObject({ code: "ORDER_IDEMPOTENCY_KEY_REUSED" });
+  });
+
+  it("treats the selected service intent as idempotency business input", async () => {
+    const scheduledAt = new Date(Date.now() + 3_600_000);
+    prisma.order.findFirst.mockResolvedValue({
+      companionId: "c1",
+      themeId: "t1",
+      durationMinutes: 30,
+      scheduledAt,
+      serviceIntentSnapshot: "listen"
+    });
+
+    await expect(service.create("u1", {
+      companionId: "c1",
+      themeId: "t1",
+      durationMinutes: 30,
+      scheduledAt: scheduledAt.toISOString(),
+      serviceIntent: "organize",
+      clientRequestId: "order_retry_1234567890"
     })).rejects.toMatchObject({ code: "ORDER_IDEMPOTENCY_KEY_REUSED" });
   });
 
@@ -495,6 +817,7 @@ describe("OrdersService", () => {
     prisma.order.findUnique.mockResolvedValue({
       id: "o1", userId: "u-customer", companion: { ownerUserId: "u-companion" }
     });
+    prisma.orderTimelineEvent.count.mockResolvedValue(2);
     prisma.orderTimelineEvent.findMany.mockResolvedValue([
       {
         id: "timeline-created", type: "orderCreated", actorId: "u-customer", actorRole: "customer",
@@ -517,7 +840,7 @@ describe("OrdersService", () => {
       }
     ]);
 
-    await expect(service.timeline("u-companion", "o1")).resolves.toEqual({
+    await expect(service.timeline("u-companion", "o1", { page: 1, pageSize: 2 })).resolves.toEqual({
       orderId: "o1",
       items: [
         {
@@ -540,13 +863,17 @@ describe("OrdersService", () => {
             status: "pending", expiresAt: "2026-07-20T02:00:00.000Z", respondedAt: null
           }
         }
-      ]
+      ],
+      pagination: { page: 1, pageSize: 2, total: 2, totalPages: 1 }
     });
     expect(prisma.orderTimelineEvent.findMany).toHaveBeenCalledWith({
       where: { orderId: "o1" },
       include: { rescheduleRequest: true },
-      orderBy: [{ createdAt: "asc" }, { id: "asc" }]
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      skip: 0,
+      take: 2
     });
+    expect(prisma.orderTimelineEvent.count).toHaveBeenCalledWith({ where: { orderId: "o1" } });
   });
 
   it("does not disclose an order timeline to a non-participant", async () => {
@@ -566,7 +893,124 @@ describe("OrdersService", () => {
     });
     prisma.orderTimelineEvent.findMany.mockResolvedValue([]);
 
-    await expect(service.timeline("u-customer", "o1")).resolves.toEqual({ orderId: "o1", items: [] });
+    await expect(service.timeline("u-customer", "o1")).resolves.toEqual({
+      orderId: "o1",
+      items: [],
+      pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 }
+    });
+  });
+
+  it("paginates the participant timeline with a stable createdAt and id order", async () => {
+    prisma.order.findUnique.mockResolvedValue({
+      id: "o1", userId: "u-customer", companion: { ownerUserId: "u-companion" }
+    });
+    prisma.orderTimelineEvent.count.mockResolvedValue(41);
+    prisma.orderTimelineEvent.findMany.mockResolvedValue([]);
+
+    await expect(service.timeline("u-customer", "o1", { page: 3, pageSize: 20 }))
+      .resolves.toEqual({
+        orderId: "o1",
+        items: [],
+        pagination: { page: 3, pageSize: 20, total: 41, totalPages: 3 }
+      });
+    expect(prisma.orderTimelineEvent.findMany).toHaveBeenCalledWith({
+      where: { orderId: "o1" },
+      include: { rescheduleRequest: true },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      skip: 40,
+      take: 20
+    });
+  });
+
+  it("returns a role-aware order detail to the assigned companion without customer-only refund or feedback text", async () => {
+    const createdAt = new Date("2026-07-20T00:00:00.000Z");
+    prisma.order.findUnique.mockResolvedValue({
+      id: "o-participant", userId: "u-customer", companionId: "c1", themeId: "t1",
+      durationMinutes: 30, amountCents: 3900, currency: "CNY", status: "paid",
+      scheduledAt: new Date("2026-07-21T01:00:00.000Z"),
+      companionNameSnapshot: "林屿", companionRoleSnapshot: "倾听者",
+      companionInitialsSnapshot: "LY", themeNameSnapshot: "情绪倾听",
+      conversationId: "conversation-row", companionConfirmedAt: createdAt,
+      paymentReservationExpiresAt: null, paidAt: createdAt, cancelledAt: null, completedAt: null,
+      createdAt, updatedAt: createdAt,
+      companion: { ownerUserId: "u-companion" },
+      user: { profile: { displayName: "小雨" } },
+      conversation: { externalId: "conversation-public" },
+      refunds: [{
+        id: "refund-private", outRefundNo: "refund-private-reference", amountCents: 3900,
+        status: "pendingReview", reason: "customer private statement", reviewNote: null,
+        failureReason: null, reviewDueAt: null, resolutionDueAt: null
+      }],
+      experienceFeedback: {
+        id: "feedback-private", rating: 2, tags: ["needsImprovement"],
+        note: "customer private feedback", createdAt
+      },
+      attendanceDispute: {
+        id: "attendance-1", issue: "technicalFailure", status: "counterpartyResponse", updatedAt: createdAt
+      }
+    });
+
+    const result: any = await service.get("u-companion", "o-participant");
+
+    expect(result).toMatchObject({
+      id: "o-participant",
+      viewerRole: "companion",
+      customer: { id: "u-customer", name: "小雨" },
+      conversationId: "conversation-public",
+      fulfillmentBlockedByRefund: true,
+      refund: null,
+      experienceFeedback: null,
+      attendanceDispute: {
+        id: "attendance-1", issue: "technicalFailure", status: "counterpartyResponse"
+      },
+      attendanceDisputeEligibility: expect.objectContaining({ eligible: false, reasonCode: "existingCase" })
+    });
+
+    const customerResult: any = await service.get("u-customer", "o-participant");
+    expect(customerResult).toMatchObject({
+      viewerRole: "customer",
+      refund: { id: "refund-private", reason: "customer private statement" },
+      experienceFeedback: { id: "feedback-private", note: "customer private feedback" },
+      attendanceDispute: { id: "attendance-1" }
+    });
+  });
+
+  it("publishes the authoritative attendance-case opening and closing window", () => {
+    const scheduledAt = new Date("2026-08-01T04:00:00.000Z");
+    const order = {
+      scheduledAt,
+      durationMinutes: 30,
+      status: "completed",
+      attendanceDispute: null
+    } as any;
+
+    expect((service as any).attendanceDisputeEligibility(
+      order,
+      new Date("2026-08-01T04:20:00.000Z")
+    )).toMatchObject({
+      eligible: true,
+      reasonCode: null,
+      opensAt: "2026-08-01T04:10:00.000Z",
+      createDeadlineAt: "2026-08-08T04:30:00.000Z"
+    });
+    expect((service as any).attendanceDisputeEligibility(
+      order,
+      new Date("2026-08-01T04:05:00.000Z")
+    )).toMatchObject({ eligible: false, reasonCode: "waitingPeriod" });
+    expect((service as any).attendanceDisputeEligibility(
+      order,
+      new Date("2026-08-08T04:31:00.000Z")
+    )).toMatchObject({ eligible: false, reasonCode: "windowClosed" });
+  });
+
+  it("keeps order detail participant-owned and makes an unrelated id indistinguishable from a missing order", async () => {
+    prisma.order.findUnique.mockResolvedValue({
+      id: "o-private", userId: "u-customer", companion: { ownerUserId: "u-companion" }
+    });
+
+    await expect(service.get("u-outsider", "o-private")).rejects.toMatchObject({
+      code: "ORDER_NOT_FOUND", status: HttpStatus.NOT_FOUND
+    });
   });
 
   it("records a structured reschedule proposal without changing the original order", async () => {
@@ -629,6 +1073,33 @@ describe("OrdersService", () => {
       "u-companion", "orderStatus", "有新的改期请求", expect.any(String), expect.objectContaining({ orderId: order.id })
     );
     expect(prisma.order.update).not.toHaveBeenCalled();
+  });
+
+  it("rejects a reschedule proposal beyond the companion adult-eligibility window", async () => {
+    const requestedScheduledAt = new Date(Date.now() + 4 * 24 * 60 * 60_000);
+    const order = {
+      id: "o-reschedule-adult-expiry",
+      userId: "u-customer",
+      companionId: "c1",
+      status: "paid",
+      scheduledAt: new Date(Date.now() + 3 * 24 * 60 * 60_000),
+      durationMinutes: 30,
+      availabilityWindowId: null,
+      companion: { ownerUserId: "u-companion" },
+      refunds: []
+    };
+    prisma.order.findUnique.mockResolvedValue(order);
+    prisma.companionCommercialProfile.findUnique.mockResolvedValue({
+      status: "verified",
+      adultEligibilityVerdict: "adult",
+      adultEligibilityVerifiedAt: new Date(Date.now() - 24 * 60 * 60_000),
+      adultEligibilityValidUntil: new Date(requestedScheduledAt.getTime() + 30 * 60_000 - 1)
+    });
+
+    await expect(service.requestReschedule("u-customer", order.id, {
+      requestedScheduledAt: requestedScheduledAt.toISOString()
+    })).rejects.toMatchObject({ code: "COMPANION_ADULT_ELIGIBILITY_VALIDITY_TOO_SHORT" });
+    expect(prisma.orderRescheduleRequest.create).not.toHaveBeenCalled();
   });
 
   it("lets the companion propose a legacy appointment and notifies the customer", async () => {
@@ -727,11 +1198,14 @@ describe("OrdersService", () => {
       $queryRaw: jest.fn()
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
         .mockResolvedValueOnce([{ id: blockingOrder.id }])
         .mockResolvedValueOnce([]),
       order: {
         ...prisma.order,
         findUnique: jest.fn()
+          .mockResolvedValueOnce({ companionId: "c1" })
           .mockResolvedValueOnce(order)
           .mockResolvedValueOnce(blockingOrder)
       },
@@ -828,6 +1302,46 @@ describe("OrdersService", () => {
     );
   });
 
+  it("rechecks companion adult eligibility when accepting a reschedule", async () => {
+    const originalScheduledAt = new Date(Date.now() + 3 * 24 * 60 * 60_000);
+    const requestedScheduledAt = new Date(Date.now() + 4 * 24 * 60 * 60_000);
+    const order = {
+      id: "o-accept-adult-expiry",
+      userId: "u-customer",
+      companionId: "c1",
+      status: "paid",
+      scheduledAt: originalScheduledAt,
+      durationMinutes: 30,
+      availabilityWindowId: null,
+      companion: { ownerUserId: "u-companion" },
+      refunds: []
+    };
+    const request = {
+      id: "reschedule-adult-expiry",
+      orderId: order.id,
+      requestedByUserId: "u-customer",
+      requestedByRole: "customer",
+      originalScheduledAt,
+      requestedScheduledAt,
+      requestedAvailabilityWindowId: null,
+      status: "pending",
+      expiresAt: new Date(Date.now() + 60 * 60_000)
+    };
+    prisma.order.findUnique.mockResolvedValue(order);
+    prisma.orderRescheduleRequest.findUnique.mockResolvedValue(request);
+    prisma.companionCommercialProfile.findUnique.mockResolvedValue({
+      status: "verified",
+      adultEligibilityVerdict: "adult",
+      adultEligibilityVerifiedAt: new Date(Date.now() - 24 * 60 * 60_000),
+      adultEligibilityValidUntil: new Date(requestedScheduledAt.getTime() + 30 * 60_000 - 1)
+    });
+
+    await expect(service.acceptReschedule("u-companion", order.id, request.id))
+      .rejects.toMatchObject({ code: "COMPANION_ADULT_ELIGIBILITY_VALIDITY_TOO_SHORT" });
+    expect(prisma.order.update).not.toHaveBeenCalled();
+    expect(prisma.orderRescheduleRequest.update).not.toHaveBeenCalled();
+  });
+
   it("does not let the requester accept their own reschedule proposal", async () => {
     const order = {
       id: "o-self-accept", userId: "u-customer", companionId: "c1", status: "paid",
@@ -902,11 +1416,14 @@ describe("OrdersService", () => {
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([])
         .mockResolvedValueOnce([{ id: blockingOrder.id }])
         .mockResolvedValueOnce([]),
       order: {
         ...prisma.order,
         findUnique: jest.fn()
+          .mockResolvedValueOnce({ companionId: "c1" })
           .mockResolvedValueOnce(order)
           .mockResolvedValueOnce(blockingOrder)
       },
@@ -1051,6 +1568,33 @@ describe("OrdersService", () => {
     expect(prisma.order.update).not.toHaveBeenCalled();
   });
 
+  it("rechecks companion adult eligibility through the actual service end before start", async () => {
+    const scheduledAt = new Date(Date.now() - 2 * 60_000);
+    const order = {
+      id: "o-start-adult-expiry",
+      userId: "u1",
+      companionId: "c1",
+      durationMinutes: 30,
+      status: "paid",
+      scheduledAt,
+      companion: { ownerUserId: "u-companion" },
+      conversation: null
+    };
+    prisma.order.findUnique.mockResolvedValue(order);
+    prisma.refundTransaction.findFirst.mockResolvedValue(null);
+    prisma.companionCommercialProfile.findUnique.mockResolvedValue({
+      status: "verified",
+      adultEligibilityVerdict: "adult",
+      adultEligibilityVerifiedAt: new Date(Date.now() - 24 * 60 * 60_000),
+      adultEligibilityValidUntil: new Date(Date.now() + 10 * 60_000)
+    });
+
+    await expect(service.startService("u-companion", order.id)).rejects.toMatchObject({
+      code: "COMPANION_ADULT_ELIGIBILITY_VALIDITY_TOO_SHORT"
+    });
+    expect(prisma.order.update).not.toHaveBeenCalled();
+  });
+
   it("starts the service and cancels a pending reschedule request in the same transaction", async () => {
     const scheduledAt = new Date(Date.now() - 5 * 60_000);
     const order = {
@@ -1073,6 +1617,8 @@ describe("OrdersService", () => {
     const db = {
       $queryRaw: jest.fn().mockResolvedValue([]),
       order: { findUnique: jest.fn().mockResolvedValue(order), update: jest.fn().mockResolvedValue(updated) },
+      customerAdultEligibility: prisma.customerAdultEligibility,
+      companionCommercialProfile: prisma.companionCommercialProfile,
       refundTransaction: { findFirst: jest.fn().mockResolvedValue(null) },
       orderRescheduleRequest: {
         findFirst: jest.fn().mockResolvedValue(request),
@@ -1348,6 +1894,12 @@ describe("OrdersService", () => {
         findUnique: jest.fn().mockResolvedValue(request),
         update: jest.fn().mockResolvedValue(resolved)
       },
+      order: {
+        findUnique: jest.fn().mockResolvedValue({
+          userId: order.userId,
+          companion: { ownerUserId: order.companion.ownerUserId }
+        })
+      },
       orderTimelineEvent: { create: jest.fn().mockResolvedValue({}) }
     };
 
@@ -1466,7 +2018,11 @@ describe("OrdersService", () => {
         availability: "online",
         availableTimes: ["全天"],
         owner: { accountStatus: "active", profile: { isVerified: true } },
-        commercialProfile: { status: "verified" }
+        commercialProfile: {
+          status: "verified",
+          adultEligibilityVerdict: "adult",
+          adultEligibilityValidUntil: new Date(Date.now() + 24 * 60 * 60_000)
+        }
       },
       conversation: null
     };
@@ -1492,7 +2048,8 @@ describe("OrdersService", () => {
           .mockResolvedValueOnce(reserved),
         update: jest.fn(),
         updateMany: jest.fn()
-      }
+      },
+      companionCommercialProfile: prisma.companionCommercialProfile
     };
     prisma.$transaction.mockImplementation(async (fn: any) => fn(db));
 
@@ -1501,6 +2058,42 @@ describe("OrdersService", () => {
       status: HttpStatus.CONFLICT
     });
     expect(db.order.update).not.toHaveBeenCalled();
+  });
+
+  it("rechecks companion adult eligibility through service end during confirmation", async () => {
+    const scheduledAt = new Date(Date.now() + 2 * 60 * 60_000);
+    const order = {
+      id: "o-confirm-adult-expiry",
+      userId: "u-customer",
+      companionId: "c1",
+      status: "pending",
+      scheduledAt,
+      durationMinutes: 60,
+      availabilityWindowId: null,
+      companionConfirmedAt: null,
+      companionResponseDeadlineAt: new Date(Date.now() + 10 * 60_000),
+      paymentReservationExpiresAt: null,
+      companion: {
+        ownerUserId: "u-companion",
+        availability: "available",
+        availableTimes: ["全天"],
+        owner: { accountStatus: "active", profile: { isVerified: true } },
+        commercialProfile: {}
+      },
+      conversation: null
+    };
+    prisma.order.findUnique.mockResolvedValue(order);
+    prisma.companionCommercialProfile.findUnique.mockResolvedValue({
+      status: "verified",
+      adultEligibilityVerdict: "adult",
+      adultEligibilityVerifiedAt: new Date(Date.now() - 24 * 60 * 60_000),
+      adultEligibilityValidUntil: new Date(scheduledAt.getTime() + 60 * 60_000 - 1)
+    });
+
+    await expect(service.confirmOrder("u-companion", order.id)).rejects.toMatchObject({
+      code: "COMPANION_ADULT_ELIGIBILITY_VALIDITY_TOO_SHORT"
+    });
+    expect(prisma.order.update).not.toHaveBeenCalled();
   });
 
   it("confirms a structured reservation from its window even when legacy availableTimes is empty", async () => {
@@ -1532,7 +2125,11 @@ describe("OrdersService", () => {
         availability: "online",
         availableTimes: [],
         owner: { accountStatus: "active", profile: { isVerified: true } },
-        commercialProfile: { status: "verified" }
+        commercialProfile: {
+          status: "verified",
+          adultEligibilityVerdict: "adult",
+          adultEligibilityValidUntil: new Date(Date.now() + 24 * 60 * 60_000)
+        }
       },
       conversation: null,
       createdAt: new Date(),
@@ -1551,8 +2148,10 @@ describe("OrdersService", () => {
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([]),
       companionAvailabilityWindow: { findFirst: jest.fn().mockResolvedValue(window) },
+      companionCommercialProfile: prisma.companionCommercialProfile,
       order: {
         findUnique: jest.fn()
+          .mockResolvedValue({ userId: order.userId, companion: { ownerUserId: order.companion.ownerUserId } })
           .mockResolvedValueOnce({ companionId: "c1" })
           .mockResolvedValueOnce(order),
         update: jest.fn().mockResolvedValue(confirmed),
@@ -1699,7 +2298,7 @@ describe("OrdersService", () => {
     }));
     expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({
       actorId: null, action: "order.reschedule_expired", resourceId: request.id,
-      metadata: expect.objectContaining({ notifiedUserIds: ["u-customer", "u-companion"] })
+      subjectUserIds: ["u-customer", "u-companion"]
     }), expect.anything());
     expect(prisma.order.update).not.toHaveBeenCalled();
   });
@@ -1740,6 +2339,8 @@ describe("OrdersService", () => {
       identityEvidenceRefSnapshot: "identity-evidence-c1",
       serviceAgreementVersionSnapshot: "v1",
       serviceAgreementEvidenceRefSnapshot: "agreement-evidence-c1",
+      refundPolicyVersionSnapshot: "2026.08-v1",
+      refundRequestWindowHoursSnapshot: 72,
       durationMinutes: 30, scheduledAt: serviceStartedAt, serviceStartedAt,
       createdAt: completedAt, updatedAt: completedAt
     };
@@ -1757,6 +2358,12 @@ describe("OrdersService", () => {
 
     await service.completeService("u-companion", "o-complete");
 
+    const completedUpdate = db.order.update.mock.calls[0][0].data;
+    expect(
+      completedUpdate.refundRequestDeadlineAt.getTime()
+        - completedUpdate.completedAt.getTime()
+    ).toBe(72 * 60 * 60_000);
+    expect(config.get).not.toHaveBeenCalledWith("REFUND_REQUEST_WINDOW_HOURS");
     expect(db.companionEarning.upsert).toHaveBeenCalledWith(expect.objectContaining({
       where: { orderId: "o-complete" },
       create: expect.objectContaining({ payableCents: 9000, platformFeeCents: 1000, status: "pending" })
@@ -1782,6 +2389,7 @@ describe("OrdersService", () => {
       settlementRecipientRefSnapshot: null, settlementRecipientMaskedSnapshot: null,
       taxProfileRefSnapshot: null, identityEvidenceRefSnapshot: null,
       serviceAgreementVersionSnapshot: null, serviceAgreementEvidenceRefSnapshot: null,
+      refundPolicyVersionSnapshot: "legacy-72h-v1", refundRequestWindowHoursSnapshot: 72,
       companion: {
         ownerUserId: "u-companion",
         commercialProfile: {
@@ -1841,6 +2449,7 @@ describe("OrdersService", () => {
       settlementRecipientRefSnapshot: "recipient-c1", settlementRecipientMaskedSnapshot: "****1234",
       taxProfileRefSnapshot: "tax-c1", identityEvidenceRefSnapshot: "identity-evidence-c1",
       serviceAgreementVersionSnapshot: "v1", serviceAgreementEvidenceRefSnapshot: "agreement-evidence-c1",
+      refundPolicyVersionSnapshot: "2026.08-v1", refundRequestWindowHoursSnapshot: 72,
       createdAt: serviceStartedAt, updatedAt: completedAt
     };
     const resolvedRequest = { ...request, status: "cancelled", respondedAt: completedAt, respondedByUserId: "u-companion" };
@@ -2066,8 +2675,11 @@ describe("OrdersService", () => {
     await service.listForCompanion("u-companion");
 
     expect(prisma.order.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      include: expect.not.objectContaining({ experienceFeedback: expect.anything() })
+      include: expect.objectContaining({
+        attendanceDispute: { select: { id: true, issue: true, status: true, updatedAt: true } }
+      })
     }));
+    expect(prisma.order.findMany.mock.calls.at(-1)?.[0]?.include).not.toHaveProperty("experienceFeedback");
   });
 
   it("lists only the eligible companion's Beijing-today service facts in appointment order", async () => {

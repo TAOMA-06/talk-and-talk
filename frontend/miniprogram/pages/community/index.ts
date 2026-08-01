@@ -30,6 +30,10 @@ Page({
   data: {
     posts: [] as CommunityPost[], recommendations: [] as DisplayRecommendation[], topic: "", content: "", kind: "femaleRequest",
     reportReceipts: [] as CommunityReportReceiptView[], reportReceiptsError: "",
+    postPage: 1, postTotal: 0, postTotalPages: 1, loadingMorePosts: false,
+    receiptPage: 1, receiptTotal: 0, receiptTotalPages: 1, loadingMoreReceipts: false,
+    recommendationsState: "loading" as "loading" | "available" | "empty" | "error",
+    recommendationsError: "",
     loading: true, submitting: false, reportingPostId: "", error: ""
   },
   stopRecommendationTracking: null as (() => void) | null,
@@ -42,20 +46,43 @@ Page({
     // A page instance can survive navigation and account changes. Clear this
     // private surface before asking the newly authenticated session for its
     // own receipts so a prior account's history is never briefly reused.
-    this.setData({ reportReceipts: [], reportReceiptsError: "" });
+    this.setData({
+      loading: true,
+      error: "",
+      reportReceipts: [],
+      reportReceiptsError: "",
+      recommendations: [],
+      recommendationsState: "loading",
+      recommendationsError: "",
+      postPage: 1,
+      postTotal: 0,
+      postTotalPages: 1,
+      receiptPage: 1,
+      receiptTotal: 0,
+      receiptTotalPages: 1
+    });
     try {
       await ensureSession();
-      const [result, recommendationResult, receiptResult] = await Promise.all([
-        api.community(),
-        api.recommendedCompanions({ placement: "communityRelated", pageSize: 6 }).catch(() => ({ items: [] as RecommendedCompanion[] })),
-        api.communityReportReceipts()
-          .then((response) => ({ items: response.items || [], error: "" }))
-          .catch(() => ({ items: [] as CommunityReportReceipt[], error: "暂时无法读取你的举报回执" }))
+      const [result, receiptResult] = await Promise.all([
+        api.community({ page: 1, pageSize: 20 }),
+        api.communityReportReceipts({ page: 1, pageSize: 20 })
+          .then((response) => ({ ...response, items: response.items || [], error: "" }))
+          .catch(() => ({
+            items: [] as CommunityReportReceipt[],
+            pagination: { page: 1, pageSize: 20, total: 0, totalPages: 1 },
+            error: "暂时无法读取你的举报回执；这不代表没有提交记录。"
+          })),
+        this.loadRecommendations()
       ]);
       this.setData({
         posts: result.items || [],
-        recommendations: withCatalogDisplays(recommendationResult.items || []),
+        postPage: result.pagination.page,
+        postTotal: result.pagination.total,
+        postTotalPages: Math.max(1, result.pagination.totalPages),
         reportReceipts: receiptResult.items.map(toReportReceiptView),
+        receiptPage: receiptResult.pagination.page,
+        receiptTotal: receiptResult.pagination.total,
+        receiptTotalPages: Math.max(1, receiptResult.pagination.totalPages),
         reportReceiptsError: receiptResult.error,
         loading: false,
         error: ""
@@ -63,6 +90,83 @@ Page({
       setTimeout(() => this.startTracking(), 0);
     } catch (error) { this.setData({ loading: false, error: (error as Error).message || "加载失败" }); }
     finally { if (stopRefresh) wx.stopPullDownRefresh(); }
+  },
+  async loadRecommendations() {
+    this.setData({ recommendations: [], recommendationsState: "loading", recommendationsError: "" });
+    try {
+      const result = await api.recommendedCompanions({ placement: "communityRelated", pageSize: 6 });
+      const recommendations = withCatalogDisplays(result.items || []);
+      this.setData({
+        recommendations,
+        recommendationsState: recommendations.length ? "available" : "empty",
+        recommendationsError: ""
+      });
+    } catch {
+      this.setData({
+        recommendations: [],
+        recommendationsState: "error",
+        recommendationsError: "相关陪伴者暂时无法读取；广场内容与举报回执不受影响。"
+      });
+    }
+  },
+  async retryRecommendations() {
+    if (this.data.recommendationsState === "loading") return;
+    await this.loadRecommendations();
+    this.stopTracking();
+    setTimeout(() => this.startTracking(), 0);
+  },
+  async retryReportReceipts() {
+    this.setData({ reportReceipts: [], reportReceiptsError: "" });
+    try {
+      const response = await api.communityReportReceipts({ page: 1, pageSize: 20 });
+      this.setData({
+        reportReceipts: (response.items || []).map(toReportReceiptView),
+        receiptPage: response.pagination.page,
+        receiptTotal: response.pagination.total,
+        receiptTotalPages: Math.max(1, response.pagination.totalPages)
+      });
+    } catch {
+      this.setData({ reportReceiptsError: "暂时无法读取你的举报回执；这不代表没有提交记录。" });
+    }
+  },
+  async loadMorePosts() {
+    if (this.data.loadingMorePosts || this.data.postPage >= this.data.postTotalPages) return;
+    this.setData({ loadingMorePosts: true, error: "" });
+    try {
+      const response = await api.community({ page: this.data.postPage + 1, pageSize: 20 });
+      const existingIds = new Set(this.data.posts.map((item) => item.id));
+      this.setData({
+        posts: [...this.data.posts, ...(response.items || []).filter((item) => !existingIds.has(item.id))],
+        postPage: response.pagination.page,
+        postTotal: response.pagination.total,
+        postTotalPages: Math.max(1, response.pagination.totalPages)
+      });
+    } catch {
+      this.setData({ error: "更多广场内容暂时无法读取；当前内容不是完整列表。" });
+    } finally {
+      this.setData({ loadingMorePosts: false });
+    }
+  },
+  async loadMoreReportReceipts() {
+    if (this.data.loadingMoreReceipts || this.data.receiptPage >= this.data.receiptTotalPages) return;
+    this.setData({ loadingMoreReceipts: true, reportReceiptsError: "" });
+    try {
+      const response = await api.communityReportReceipts({ page: this.data.receiptPage + 1, pageSize: 20 });
+      const existingIds = new Set(this.data.reportReceipts.map((item) => item.id));
+      this.setData({
+        reportReceipts: [
+          ...this.data.reportReceipts,
+          ...(response.items || []).filter((item) => !existingIds.has(item.id)).map(toReportReceiptView)
+        ],
+        receiptPage: response.pagination.page,
+        receiptTotal: response.pagination.total,
+        receiptTotalPages: Math.max(1, response.pagination.totalPages)
+      });
+    } catch {
+      this.setData({ reportReceiptsError: "更多举报回执暂时无法读取；当前内容不是完整列表。" });
+    } finally {
+      this.setData({ loadingMoreReceipts: false });
+    }
   },
   startTracking() {
     if (!this.data.recommendations.length) return;
@@ -133,7 +237,8 @@ Page({
                   status: "received"
                 }),
                 ...this.data.reportReceipts
-              ].slice(0, 50),
+              ],
+              receiptTotal: this.data.receiptTotal + 1,
               reportReceiptsError: ""
             });
           }

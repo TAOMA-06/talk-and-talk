@@ -1,13 +1,37 @@
 <view class="page">
-  <view class="safety">平台内沟通 · 可举报 · 请勿交换私人联系方式</view>
+  <view class="message-hero">
+    <view class="hero-title">消息与处理进度</view>
+    <view class="hero-copy">会话、事务通知和客服案件彼此独立，集中从这里进入。</view>
+    <view class="quick-actions">
+      <view class="quick-action" bindtap="openNotifications" aria-role="button" aria-label="打开通知中心，{{unreadNotificationCount}} 条未读" tabindex="0"><view class="quick-value">{{unreadNotificationCount}}</view><view class="quick-label">未读通知</view></view>
+      <view class="quick-action" bindtap="openSupport" aria-role="button" aria-label="打开案件中心，{{activeSupportCountUnknown ? '处理中数量暂时未知' : activeSupportCount + ' 个处理中案件'}}" tabindex="0"><view class="quick-value">{{activeSupportCountText}}</view><view class="quick-label">{{activeSupportCountUnknown ? '案件数未知' : '处理中案件'}}</view></view>
+      <view class="quick-action" bindtap="openOrders" aria-role="button" aria-label="打开订单履约状态" tabindex="0"><view class="quick-value">订单</view><view class="quick-label">履约状态</view></view>
+    </view>
+  </view>
+  <view class="safety" bindtap="openSafety" aria-role="button" aria-label="打开沟通安全说明：平台内沟通、可举报、请勿交换私人联系方式" tabindex="0">平台内沟通 · 可举报 · 请勿交换私人联系方式　›</view>
+  <view wx:if="{{partialWarning}}" class="partial-warning">{{partialWarning}}</view>
   <view wx:if="{{loading}}" class="empty">正在加载…</view>
-  <view wx:elif="{{error}}" class="empty">{{error}}</view>
+  <view wx:elif="{{error}}" class="empty">
+    <view>{{error}}</view>
+    <button class="retry-button" bindtap="load">重新加载消息</button>
+  </view>
   <view wx:elif="{{!conversations.length}}" class="empty">支付订单后，会话会出现在这里。</view>
-  <view wx:else class="card conversation" wx:for="{{conversations}}" wx:key="id" bindtap="openChat" data-id="{{item.id}}">
+  <view wx:else class="card conversation" wx:for="{{conversations}}" wx:key="id" bindtap="openChat" data-id="{{item.id}}" aria-role="button" aria-label="打开与 {{item.name}} 的会话，{{item.unreadCount}} 条未读" tabindex="0">
     <view class="row">
       <view class="conversation-name"><text class="name">{{item.name}}</text><text wx:if="{{item.conversationBlockedByYou}}" class="conversation-blocked">已拉黑</text><text wx:elif="{{!item.messageInteractionAvailable && item.messageHistoryAvailable}}" class="conversation-unavailable">只读</text><text wx:elif="{{!item.messageInteractionAvailable}}" class="conversation-unavailable">无法收发</text><text wx:elif="{{item.messageNotificationsMuted}}" class="notification-muted">已静音</text></view>
-      <text class="muted">{{item.updatedAt}}</text>
+      <text class="muted">{{item.updatedAtText}}</text>
     </view>
     <view class="preview">{{item.preview}}</view>
+    <view class="conversation-footer">
+      <text wx:if="{{item.unreadCount}}" class="unread-badge">{{item.unreadCount}} 条未读</text>
+      <text wx:else class="read-state">已读</text>
+      <text class="open-chat">{{item.conversationBlockedByYou ? '管理会话边界' : '进入会话'}} ›</text>
+    </view>
+  </view>
+  <view wx:if="{{!loading && !error && conversations.length}}" class="conversation-pagination">
+    <view class="muted">已显示 {{conversations.length}} / {{conversationTotal}} 个会话</view>
+    <view wx:if="{{loadMoreError}}" class="load-more-error">{{loadMoreError}}</view>
+    <button wx:if="{{conversationPage < conversationTotalPages}}" class="retry-button" loading="{{loadingMore}}" disabled="{{loadingMore}}" bindtap="loadMoreConversations">{{loadMoreError ? '重试加载更多' : '加载更多会话'}}</button>
+    <view wx:else class="muted">已显示全部会话</view>
   </view>
 </view>

@@ -1,12 +1,15 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 
+import { CrisisInterventionModule } from "../crisis-intervention/crisis-intervention.module";
 import { NotificationsModule } from "../notifications/notifications.module";
 import { AI_PROVIDER } from "./ai/ai-provider.interface";
 import { DeepSeekAIProvider } from "./ai/deepseek.provider";
-import { MockAIProvider } from "./ai/mock-ai.provider";
 import { ChatRestrictionService } from "./chat-restriction.service";
 import { DisabledMediaAnalysisProvider, DisabledMediaStorageProvider } from "./media/disabled-media.providers";
+import { ControlledCaseEvidenceController } from "./media/controlled-case-evidence.controller";
+import { ControlledCaseEvidenceService } from "./media/controlled-case-evidence.service";
+import { ControlledCaseEvidenceWorker } from "./media/controlled-case-evidence.worker";
 import { MediaAssetService } from "./media/media-asset.service";
 import { MEDIA_ANALYSIS_PROVIDER, MEDIA_STORAGE_PROVIDER } from "./media/media-provider.interface";
 import { MediaModerationWorker } from "./media/media-moderation.worker";
@@ -17,11 +20,10 @@ import { ModerationService } from "./moderation.service";
 import { RuleEngine } from "./rule-engine";
 
 @Module({
-  imports: [ConfigModule, NotificationsModule],
-  controllers: [ModerationController],
+  imports: [ConfigModule, CrisisInterventionModule, NotificationsModule],
+  controllers: [ModerationController, ControlledCaseEvidenceController],
   providers: [
     RuleEngine,
-    MockAIProvider,
     DeepSeekAIProvider,
     DisabledMediaStorageProvider,
     DisabledMediaAnalysisProvider,
@@ -29,19 +31,7 @@ import { RuleEngine } from "./rule-engine";
     MockMediaAnalysisProvider,
     {
       provide: AI_PROVIDER,
-      inject: [ConfigService, MockAIProvider, DeepSeekAIProvider],
-      useFactory: (
-        config: ConfigService,
-        mock: MockAIProvider,
-        deepseek: DeepSeekAIProvider
-      ) => {
-        const nodeEnv = config.get<string>("NODE_ENV", "development");
-        const apiKey = config.get<string>("DEEPSEEK_API_KEY")?.trim();
-        if (nodeEnv === "test" || !apiKey) {
-          return mock;
-        }
-        return deepseek;
-      }
+      useExisting: DeepSeekAIProvider
     },
     ModerationService,
     ModerationCaseService,
@@ -69,7 +59,9 @@ import { RuleEngine } from "./rule-engine";
         : disabled
     },
     MediaAssetService,
-    MediaModerationWorker
+    MediaModerationWorker,
+    ControlledCaseEvidenceWorker,
+    ControlledCaseEvidenceService
   ],
   exports: [
     ModerationService,
@@ -77,7 +69,9 @@ import { RuleEngine } from "./rule-engine";
     RuleEngine,
     ChatRestrictionService,
     MediaAssetService,
-    MediaModerationWorker
+    MediaModerationWorker,
+    ControlledCaseEvidenceWorker,
+    ControlledCaseEvidenceService
   ]
 })
 export class ModerationModule {}

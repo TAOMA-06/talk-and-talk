@@ -4,6 +4,7 @@ import * as bcrypt from "bcrypt";
 
 import { PrismaClient } from "../../generated/prisma/client";
 import { encryptTotpSecret, normalizeBase32Secret } from "../auth/staff-auth.crypto";
+import { STAFF_USER_ROLES, StaffUserRole } from "../auth/staff-roles";
 import { validateEnvironment } from "../config/configuration";
 
 const environment = validateEnvironment(process.env);
@@ -33,22 +34,30 @@ async function main(): Promise<void> {
   const password = required("STAFF_BOOTSTRAP_PASSWORD");
   validatePassword(password, username);
   const totpSecret = normalizeBase32Secret(required("STAFF_BOOTSTRAP_TOTP_SECRET"));
-  const role = required("STAFF_BOOTSTRAP_ROLE");
-  if (role !== "admin" && role !== "moderator") {
-    throw new Error("STAFF_BOOTSTRAP_ROLE must be admin or moderator");
+  const requestedRole = required("STAFF_BOOTSTRAP_ROLE");
+  if (!STAFF_USER_ROLES.includes(requestedRole as StaffUserRole)) {
+    throw new Error("STAFF_BOOTSTRAP_ROLE must be admin, moderator, support, finance, supply, or operations");
   }
+  const role = requestedRole as StaffUserRole;
   const displayName = process.env.STAFF_BOOTSTRAP_DISPLAY_NAME?.trim() || username;
   const passwordHash = await bcrypt.hash(password, 12);
   const totpSecretCiphertext = encryptTotpSecret(totpSecret, environment.STAFF_TOTP_ENCRYPTION_KEY);
 
   await prisma.$transaction(async (tx) => {
-    const existing = await tx.staffCredential.findUnique({ where: { username } });
+    const existing: any = await tx.staffCredential.findUnique({
+      where: { username },
+      include: { user: { select: { accountStatus: true } } }
+    } as any);
     if (existing) {
+      if (existing.status !== "active" || existing.user.accountStatus !== "active") {
+        throw new Error(
+          "Suspended or unavailable staff credentials cannot be reactivated by bootstrap; use a separately governed new credential"
+        );
+      }
       await tx.user.update({
         where: { id: existing.userId },
         data: {
           role,
-          accountStatus: "active",
           profile: {
             upsert: {
               create: { displayName, isVerified: true, safetyScore: 100 },

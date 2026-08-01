@@ -66,4 +66,4 @@ export const LEGAL_URLS = {
   terms: "https://api.talkandtalk.app/legal/terms.html"
 } as const;
 
-export const LEGAL_CONSENT_VERSION = "2.0-2026-07-20";
+export const LEGAL_CONSENT_VERSION = "2.2-2026-08-01";

@@ -576,8 +576,21 @@ export class VoiceRoomControlService {
     metadata: Record<string, unknown>;
   }): Promise<void> {
     try {
+      const order = await this.prisma.order.findUnique({
+        where: { id: input.resourceId },
+        select: {
+          userId: true,
+          companion: { select: { ownerUserId: true } }
+        }
+      });
+      const subjectUserIds = [order?.userId, order?.companion?.ownerUserId]
+        .filter((candidate): candidate is string => Boolean(candidate));
+      if (!subjectUserIds.length) {
+        throw new Error("Voice room audit is missing its order subjects");
+      }
       await this.audit.record({
         actorId: null,
+        subjectUserIds,
         action: input.action,
         resourceType: "order",
         resourceId: input.resourceId,

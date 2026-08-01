@@ -34,7 +34,11 @@ export class DisabledMediaStorageProvider implements MediaStorageProvider {
     return null;
   }
 
-  async delete(_input: MediaAssetReference): Promise<void> {}
+  async delete(_input: MediaAssetReference): Promise<never> {
+    const error = new Error("Media storage is not configured");
+    error.name = "MediaStorageNotConfigured";
+    throw error;
+  }
 }
 
 @Injectable()

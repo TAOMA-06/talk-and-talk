@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Query,
+  UseGuards
+} from "@nestjs/common";
 
 import { AuthenticatedUser } from "../../auth/auth.service";
 import { CurrentUser } from "../../auth/decorators/current-user.decorator";
@@ -19,10 +29,11 @@ import { ResolveSupportTicketDto } from "../../support/dto/resolve-support-ticke
 import { SupportService } from "../../support/support.service";
 import { InitiateSupportRefundDto } from "../../support/dto/initiate-support-refund.dto";
 import { PaymentsService } from "../../payments/payments.service";
+import { ListCompanionRecoveriesDto } from "../../commercial/dto/list-commercial-ledger.dto";
 
 @Controller("admin/commercial")
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles("admin")
+@Roles("support", "finance", "supply", "operations", "admin")
 export class AdminCommercialController {
   constructor(
     private readonly commercial: CommercialService,
@@ -32,16 +43,19 @@ export class AdminCommercialController {
   ) {}
 
   @Get("readiness")
+  @Roles("operations", "admin")
   readiness() {
     return this.commercial.operationalReadiness();
   }
 
   @Get("funnel")
+  @Roles("operations", "admin")
   funnel(@Query() query: CommercialFunnelQueryDto) {
     return this.commercialFunnel.get(query);
   }
 
   @Get("earnings")
+  @Roles("finance", "admin")
   earnings(
     @Query("page") page?: string,
     @Query("pageSize") pageSize?: string,
@@ -55,11 +69,22 @@ export class AdminCommercialController {
   }
 
   @Get("companions")
-  commercialProfiles(@Query("status") status?: string) {
-    return this.commercial.listCommercialProfiles(status);
+  @Roles("supply", "admin")
+  commercialProfiles(
+    @Query("status") status?: string,
+    @Query("page") page?: string,
+    @Query("pageSize") pageSize?: string
+  ) {
+    return this.commercial.listCommercialProfiles(
+      status,
+      page ? Number.parseInt(page, 10) : undefined,
+      pageSize ? Number.parseInt(pageSize, 10) : undefined
+    );
   }
 
   @Post("companions/:id/profile-submissions")
+  @HttpCode(HttpStatus.OK)
+  @Roles("supply", "admin")
   submitCommercialProfile(
     @CurrentUser() actor: AuthenticatedUser,
     @Param("id") companionId: string,
@@ -69,6 +94,8 @@ export class AdminCommercialController {
   }
 
   @Post("companions/:id/profile-verifications")
+  @HttpCode(HttpStatus.OK)
+  @Roles("supply", "admin")
   verifyCommercialProfile(
     @CurrentUser() actor: AuthenticatedUser,
     @Param("id") companionId: string
@@ -77,6 +104,8 @@ export class AdminCommercialController {
   }
 
   @Post("companions/:id/profile-suspensions")
+  @HttpCode(HttpStatus.OK)
+  @Roles("supply", "admin")
   suspendCommercialProfile(
     @CurrentUser() actor: AuthenticatedUser,
     @Param("id") companionId: string,
@@ -86,6 +115,8 @@ export class AdminCommercialController {
   }
 
   @Post("earnings/:id/payout-claims")
+  @HttpCode(HttpStatus.OK)
+  @Roles("finance", "admin")
   claimPayout(
     @CurrentUser() actor: AuthenticatedUser,
     @Param("id") earningId: string
@@ -94,6 +125,8 @@ export class AdminCommercialController {
   }
 
   @Post("earnings/:id/payout-submissions")
+  @HttpCode(HttpStatus.OK)
+  @Roles("finance", "admin")
   recordPayoutEvidence(
     @CurrentUser() actor: AuthenticatedUser,
     @Param("id") earningId: string,
@@ -103,6 +136,8 @@ export class AdminCommercialController {
   }
 
   @Post("earnings/:id/payout-cancellations")
+  @HttpCode(HttpStatus.OK)
+  @Roles("finance", "admin")
   cancelPayoutClaim(
     @CurrentUser() actor: AuthenticatedUser,
     @Param("id") earningId: string,
@@ -112,6 +147,8 @@ export class AdminCommercialController {
   }
 
   @Post("earnings/:id/payout-verifications")
+  @HttpCode(HttpStatus.OK)
+  @Roles("finance", "admin")
   verifyPayout(
     @CurrentUser() actor: AuthenticatedUser,
     @Param("id") earningId: string
@@ -120,11 +157,14 @@ export class AdminCommercialController {
   }
 
   @Get("recoveries")
-  recoveries(@Query("status") status?: string) {
-    return this.commercial.listRecoveries(status);
+  @Roles("finance", "admin")
+  recoveries(@Query() query: ListCompanionRecoveriesDto) {
+    return this.commercial.listRecoveries(query);
   }
 
   @Post("recoveries/:id/evidence")
+  @HttpCode(HttpStatus.OK)
+  @Roles("finance", "admin")
   recordRecoveryEvidence(
     @CurrentUser() actor: AuthenticatedUser,
     @Param("id") recoveryId: string,
@@ -134,6 +174,8 @@ export class AdminCommercialController {
   }
 
   @Post("recoveries/:id/verify")
+  @HttpCode(HttpStatus.OK)
+  @Roles("finance", "admin")
   verifyRecovery(
     @CurrentUser() actor: AuthenticatedUser,
     @Param("id") recoveryId: string
@@ -142,20 +184,52 @@ export class AdminCommercialController {
   }
 
   @Get("support/tickets")
-  supportTickets(@Query() query: ListSupportTicketsDto) {
-    return this.support.listAdmin(query);
+  @Roles("support", "admin")
+  supportTickets(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Query() query: ListSupportTicketsDto
+  ) {
+    return this.support.listAdmin(actor, query);
+  }
+
+  @Get("support/tickets/:id")
+  @Roles("support", "admin")
+  supportTicket(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param("id") ticketId: string
+  ) {
+    return this.support.getAdmin(actor, ticketId);
+  }
+
+  @Get("support/claimable")
+  @Roles("support")
+  claimableSupportTickets(@Query() query: ListSupportTicketsDto) {
+    return this.support.listClaimable(query);
+  }
+
+  @Post("support/tickets/:id/claim")
+  @Roles("support")
+  claimSupportTicket(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param("id") ticketId: string
+  ) {
+    return this.support.claim(actor.id, ticketId);
   }
 
   @Post("support/tickets/:id/assign")
+  @HttpCode(HttpStatus.OK)
+  @Roles("admin")
   assignSupportTicket(
     @CurrentUser() actor: AuthenticatedUser,
     @Param("id") ticketId: string,
     @Body() dto: AssignSupportTicketDto
   ) {
-    return this.support.assign(actor.id, ticketId, dto.assignedToUserId);
+    return this.support.assign(actor, ticketId, dto.assignedToUserId);
   }
 
   @Post("support/tickets/:id/resolve")
+  @HttpCode(HttpStatus.OK)
+  @Roles("support", "admin")
   resolveSupportTicket(
     @CurrentUser() actor: AuthenticatedUser,
     @Param("id") ticketId: string,
@@ -165,6 +239,8 @@ export class AdminCommercialController {
   }
 
   @Post("support/tickets/:id/refunds")
+  @HttpCode(HttpStatus.OK)
+  @Roles("support", "admin")
   initiateSupportRefund(
     @CurrentUser() actor: AuthenticatedUser,
     @Param("id") ticketId: string,

@@ -5,6 +5,7 @@
     <view class="access-title">暂不能进入陪伴者工作台</view>
     <view>{{loadError}}</view>
     <view class="muted">工作台仅向已完成身份与资料审核的陪伴者本人开放。</view>
+    <button class="primary-button retry-button" bindtap="openOnboarding">查看入驻与审核状态</button>
     <button class="plain-button retry-button" bindtap="retry">重新检查</button>
   </view>
 
@@ -22,7 +23,7 @@
       <view class="updated-at">更新于 {{updatedAtText}}（北京时间）</view>
     </view>
 
-    <view wx:if="{{pendingConfirmationCount}}" class="attention-card" bindtap="openOrders" hover-class="card-hover">
+    <view wx:if="{{pendingConfirmationCount}}" class="attention-card" bindtap="openOrders" hover-class="card-hover" aria-role="button" aria-label="打开待确认预约，共 {{pendingConfirmationCount}} 个" tabindex="0">
       <view class="attention-icon">!</view>
       <view class="attention-body">
         <view class="attention-title">有 {{pendingConfirmationCount}} 个预约等待你确认</view>
@@ -33,24 +34,49 @@
 
     <view class="section-heading">经营概览</view>
     <view class="overview-grid">
-      <view class="overview-card" bindtap="openServiceOfferings" hover-class="card-hover">
+      <view class="overview-card" bindtap="openServiceOfferings" hover-class="card-hover" aria-role="button" aria-label="管理服务商品" tabindex="0">
         <view class="overview-label">服务商品</view>
         <view class="overview-value">{{activeOfferingCount}}<text class="overview-unit"> 项已上架</text></view>
         <view class="overview-note">共 {{totalOfferingCount}} 项 · 管理商品 ›</view>
       </view>
-      <view class="overview-card" bindtap="openAvailabilityWindows" hover-class="card-hover">
+      <view class="overview-card" bindtap="openAvailabilityWindows" hover-class="card-hover" aria-role="button" aria-label="管理可约时段" tabindex="0">
         <view class="overview-label">可约时段</view>
         <view class="overview-value">{{futureWindowCount}}<text class="overview-unit"> 个待开放</text></view>
         <view class="overview-note">{{nextWindowText}} ›</view>
       </view>
-      <view class="overview-card earnings-card">
+      <view class="overview-card earnings-card" bindtap="openEarnings" hover-class="card-hover" aria-role="button" aria-label="查看收益与结算" tabindex="0">
         <view class="overview-label">可结算收入</view>
         <view wx:if="{{earningsUnavailable}}" class="overview-unavailable">暂无法获取</view>
         <view wx:else class="overview-value earnings-value">{{availableEarningsText}}</view>
-        <view wx:if="{{!earningsUnavailable}}" class="overview-note">{{availableEarningCount}} 笔已处于可结算状态</view>
+        <view wx:if="{{!earningsUnavailable}}" class="overview-note">{{availableEarningCount}} 笔已处于可结算状态 · 查看明细 ›</view>
         <view wx:else class="overview-note">不会影响订单和时段管理</view>
       </view>
     </view>
+
+    <view class="section-heading">资格、质量与支持</view>
+    <view class="lifecycle-grid">
+      <view class="lifecycle-card" bindtap="openOnboarding" hover-class="card-hover" aria-role="button" aria-label="打开入驻与认证" tabindex="0">
+        <view class="lifecycle-title">入驻与公开资料</view>
+        <view class="lifecycle-state">{{commercialStatusText}}</view>
+        <view class="lifecycle-link">KYC、协议、语音介绍 ›</view>
+      </view>
+      <view class="lifecycle-card" bindtap="openDevelopment" hover-class="card-hover" aria-role="button" aria-label="打开培训与质量" tabindex="0">
+        <view class="lifecycle-title">培训与账号健康</view>
+        <view class="lifecycle-state">{{trainingStatusText}}</view>
+        <view class="lifecycle-link">{{activeAccountActions}} 项有效处置 ›</view>
+      </view>
+      <view class="lifecycle-card" bindtap="openSchedule" hover-class="card-hover" aria-role="button" aria-label="打开周期排班" tabindex="0">
+        <view class="lifecycle-title">周期排班与休假</view>
+        <view class="lifecycle-state">规则先生成私有草稿</view>
+        <view class="lifecycle-link">逐个确认开放 ›</view>
+      </view>
+      <view class="lifecycle-card" bindtap="openSafety" hover-class="card-hover" aria-role="button" aria-label="打开安全、处罚与申诉" tabindex="0">
+        <view class="lifecycle-title">异常与安全支持</view>
+        <view class="lifecycle-state">{{openIncidentCount}} 个事件待处理</view>
+        <view class="lifecycle-link">举证、工单与结论 ›</view>
+      </view>
+    </view>
+    <view wx:if="{{lifecycleUnavailable}}" class="workbench-tip">生命周期状态暂时无法同步；服务商品和现有排班仍可查看，但请勿把缺失状态当作审核通过。</view>
 
     <view class="section-heading">今天的服务 · {{todayServiceDateText}}</view>
     <view wx:if="{{todayServiceOrdersUnavailable}}" class="card schedule-card">
@@ -59,7 +85,7 @@
       <button class="plain-button schedule-action" bindtap="openOrders">打开订单页</button>
     </view>
     <block wx:elif="{{todayServiceOrders.length}}">
-      <view wx:for="{{todayServiceOrders}}" wx:key="id" wx:for-item="todayOrder" class="card schedule-card today-service-card" bindtap="openOrders" hover-class="card-hover">
+      <view wx:for="{{todayServiceOrders}}" wx:key="id" wx:for-item="todayOrder" data-id="{{todayOrder.id}}" class="card schedule-card today-service-card" bindtap="openTodayOrder" hover-class="card-hover" aria-role="button" aria-label="打开今日服务：{{todayOrder.serviceTitle}}，{{todayOrder.scheduledAtText}}，状态 {{todayOrder.statusText}}" tabindex="0">
         <view class="schedule-head"><view class="schedule-title">{{todayOrder.serviceTitle}}</view><view class="status-chip">{{todayOrder.statusText}}</view></view>
         <view class="schedule-time">{{todayOrder.scheduledAtText}} · {{todayOrder.durationMinutes}} 分钟</view>
         <view class="schedule-meta">{{todayOrder.statusDescription}}</view>

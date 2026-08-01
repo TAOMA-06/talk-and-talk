@@ -7,6 +7,7 @@ import { AuditService } from "../common/audit/audit.service";
 import { AppException } from "../common/errors/app.exception";
 import { PrismaService } from "../database/prisma.service";
 import { NotificationsService } from "../notifications/notifications.service";
+import { ControlledCaseEvidenceService } from "../moderation/media/controlled-case-evidence.service";
 import { AddOrderSupportFactDto } from "./dto/add-order-support-fact.dto";
 import { CreateSupportTicketDto } from "./dto/create-support-ticket.dto";
 import { ListSupportTicketsDto } from "./dto/list-support-tickets.dto";
@@ -26,7 +27,8 @@ export class SupportService {
     private readonly config: ConfigService,
     private readonly commercial: CommercialService,
     private readonly audit: AuditService,
-    private readonly notifications: NotificationsService
+    private readonly notifications: NotificationsService,
+    private readonly caseEvidence: ControlledCaseEvidenceService
   ) {}
 
   async create(user: AuthenticatedUser, dto: CreateSupportTicketDto) {
@@ -34,6 +36,7 @@ export class SupportService {
     const priority = dto.category === "safety" ? "urgent" : ["orderIssue", "refund"].includes(dto.category) ? "high" : "normal";
     const ticket = await this.prisma.$transaction(async (tx) => {
       const db = tx as any;
+      const auditSubjectUserIds = new Set<string>([user.id]);
       if (dto.orderId) {
         // Keep the same Order → CompanionEarning lock order as refund and
         // payout flows so a new dispute cannot race a payout claim.
@@ -48,6 +51,8 @@ export class SupportService {
         if (!order || (order.userId !== user.id && order.companion.ownerUserId !== user.id)) {
           throw new AppException("ORDER_NOT_FOUND", "Order not found", HttpStatus.NOT_FOUND);
         }
+        auditSubjectUserIds.add(order.userId);
+        if (order.companion.ownerUserId) auditSubjectUserIds.add(order.companion.ownerUserId);
       }
       await db.$queryRaw`
         SELECT pg_advisory_xact_lock(hashtext(${`talk-and-talk:support:${user.id}`}))::text AS "lock"
@@ -77,6 +82,7 @@ export class SupportService {
       });
       await this.audit.record({
         actorId: user.id,
+        subjectUserIds: [...auditSubjectUserIds],
         action: "support.ticket_created",
         resourceType: "supportTicket",
         resourceId: created.id,
@@ -90,9 +96,17 @@ export class SupportService {
     return this.toDto(ticket, false);
   }
 
-  async listMine(userId: string) {
-    const items = await this.prisma.supportTicket.findMany({
-      where: { userId },
+  async listMine(userId: string, query: ListSupportTicketsDto = {}, orderId?: string) {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 20;
+    const where = {
+      userId,
+      ...(orderId ? { orderId } : {}),
+      ...(query.status ? { status: query.status } : {})
+    };
+    const [items, total] = await Promise.all([
+      this.prisma.supportTicket.findMany({
+      where,
       include: {
         order: true,
         // A requester sees only their own voluntary statements. In particular,
@@ -100,29 +114,94 @@ export class SupportService {
         // support submission or even infer its content.
         orderFacts: {
           where: { submittedByUserId: userId },
+          include: this.caseEvidence.attachmentInclude(),
           orderBy: { createdAt: "asc" }
         }
       },
-      orderBy: { updatedAt: "desc" },
-      take: 100
-    } as any);
-    return { items: items.map((ticket: any) => this.toDto(ticket, false)) };
+      orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+      skip: (page - 1) * pageSize,
+      take: pageSize
+    } as any),
+      this.prisma.supportTicket.count({ where } as any)
+    ]);
+    return {
+      items: items.map((ticket: any) => this.toDto(ticket, false)),
+      pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) }
+    };
   }
 
-  async listAdmin(query: ListSupportTicketsDto) {
+  async getMine(userId: string, ticketId: string) {
+    const ticket = await this.prisma.supportTicket.findFirst({
+      where: { id: ticketId, userId },
+      include: {
+        order: true,
+        orderFacts: {
+          where: { submittedByUserId: userId },
+          include: this.caseEvidence.attachmentInclude(),
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }]
+        }
+      }
+    } as any);
+    if (!ticket) {
+      throw new AppException("SUPPORT_TICKET_NOT_FOUND", "Support ticket not found", HttpStatus.NOT_FOUND);
+    }
+    return this.toDto(ticket, false);
+  }
+
+  async getAdmin(actor: AuthenticatedUser, ticketId: string) {
+    if (!["support", "admin"].includes(actor.role)) {
+      throw new AppException("FORBIDDEN", "Insufficient permissions", HttpStatus.FORBIDDEN);
+    }
+    const ticket = await this.prisma.supportTicket.findFirst({
+      where: {
+        id: ticketId,
+        ...(actor.role === "support" ? { assignedToUserId: actor.id } : {})
+      },
+      include: {
+        order: true,
+        requester: { select: { id: true, profile: { select: { displayName: true } } } },
+        assignedTo: { select: { id: true, profile: { select: { displayName: true } } } },
+        orderFacts: {
+          include: this.caseEvidence.attachmentInclude(),
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }]
+        }
+      }
+    } as any);
+    if (!ticket) {
+      // Assigned-to-another and nonexistent tickets intentionally share the
+      // same response so a support identity cannot probe another queue.
+      throw new AppException("SUPPORT_TICKET_NOT_FOUND", "Support ticket not found", HttpStatus.NOT_FOUND);
+    }
+    return this.toDto(ticket, true);
+  }
+
+  async listAdmin(actor: AuthenticatedUser, query: ListSupportTicketsDto) {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 50;
-    const where: any = query.status ? { status: query.status } : {};
+    if (!["support", "admin"].includes(actor.role)) {
+      throw new AppException("FORBIDDEN", "Insufficient permissions", HttpStatus.FORBIDDEN);
+    }
+    const where: any = {
+      ...(query.status ? { status: query.status } : {}),
+      ...(actor.role === "support"
+        ? { assignedToUserId: actor.id }
+        : query.assignedOnly
+          ? { assignedToUserId: { not: null } }
+          : {})
+    };
     const [items, total] = await Promise.all([
       this.prisma.supportTicket.findMany({
         where,
         include: {
           order: true,
-          requester: { include: { profile: true } },
-          assignedTo: { include: { profile: true } },
-          orderFacts: { orderBy: { createdAt: "asc" } }
+          requester: { select: { id: true, profile: { select: { displayName: true } } } },
+          assignedTo: { select: { id: true, profile: { select: { displayName: true } } } },
+          orderFacts: {
+            include: this.caseEvidence.attachmentInclude(),
+            orderBy: { createdAt: "asc" }
+          }
         },
-        orderBy: [{ priority: "desc" }, { dueAt: "asc" }, { createdAt: "asc" }],
+        orderBy: [{ priority: "desc" }, { dueAt: "asc" }, { createdAt: "asc" }, { id: "asc" }],
         skip: (page - 1) * pageSize,
         take: pageSize
       } as any),
@@ -130,6 +209,47 @@ export class SupportService {
     ]);
     return {
       items: items.map((ticket: any) => this.toDto(ticket, true)),
+      pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) }
+    };
+  }
+
+  async listClaimable(query: ListSupportTicketsDto) {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 50;
+    if (query.status && !["open", "inProgress"].includes(query.status)) {
+      return {
+        items: [],
+        pagination: { page, pageSize, total: 0, totalPages: 0 }
+      };
+    }
+    const where: any = {
+      assignedToUserId: null,
+      status: query.status ?? { in: ["open", "inProgress"] }
+    };
+    const [items, total] = await Promise.all([
+      this.prisma.supportTicket.findMany({
+        where,
+        select: {
+          id: true,
+          category: true,
+          priority: true,
+          dueAt: true,
+          orderId: true
+        },
+        orderBy: [{ priority: "desc" }, { dueAt: "asc" }, { createdAt: "asc" }, { id: "asc" }],
+        skip: (page - 1) * pageSize,
+        take: pageSize
+      } as any),
+      this.prisma.supportTicket.count({ where } as any)
+    ]);
+    return {
+      items: items.map((ticket: any) => ({
+        id: ticket.id,
+        category: ticket.category,
+        priority: ticket.priority,
+        dueAt: ticket.dueAt?.toISOString() ?? null,
+        hasOrder: Boolean(ticket.orderId)
+      })),
       pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) }
     };
   }
@@ -204,6 +324,12 @@ export class SupportService {
           statement
         }
       });
+      await this.caseEvidence.bindSupportFact(db, {
+        assetIds: dto.evidenceAssetIds,
+        userId: user.id,
+        supportTicketId: ticket.id,
+        orderSupportFactId: created.id
+      });
       // Facts do not change case status, refund, or settlement. Touching only
       // the ticket timestamp keeps the requester's private queue current.
       await db.supportTicket.update({
@@ -212,17 +338,27 @@ export class SupportService {
       });
       await this.audit.record({
         actorId: user.id,
+        subjectUserIds: [ticket.userId, ticket.order.userId, ticket.order.companion.ownerUserId]
+          .filter((candidate): candidate is string => Boolean(candidate)),
         action: "support.order_fact_added",
         resourceType: "supportTicket",
         resourceId: ticket.id,
-        metadata: { orderId: ticket.orderId, submittedByUserId: user.id, orderSupportFactId: created.id }
+        metadata: {
+          orderId: ticket.orderId,
+          submittedByUserId: user.id,
+          orderSupportFactId: created.id,
+          evidenceCount: dto.evidenceAssetIds?.length ?? 0
+        }
       }, db);
-      return created;
+      return db.orderSupportFact.findUniqueOrThrow({
+        where: { id: created.id },
+        include: this.caseEvidence.attachmentInclude()
+      });
     });
     return this.toOrderFactDto(fact, false);
   }
 
-  async assign(actorId: string, ticketId: string, assignedToUserId: string) {
+  async claim(actorId: string, ticketId: string) {
     const result = await this.prisma.$transaction(async (tx) => {
       const db = tx as any;
       const pointer = await db.supportTicket.findUnique({
@@ -236,17 +372,110 @@ export class SupportService {
         await db.$queryRaw`SELECT "id" FROM "Order" WHERE "id" = ${pointer.orderId} FOR UPDATE`;
       }
       await db.$queryRaw`SELECT "id" FROM "SupportTicket" WHERE "id" = ${ticketId} FOR UPDATE`;
-      const ticket = await db.supportTicket.findUnique({ where: { id: ticketId } });
+      const actor = await db.user.findUnique({
+        where: { id: actorId },
+        select: { id: true, role: true, accountStatus: true }
+      });
+      if (!actor || actor.role !== "support" || actor.accountStatus !== "active") {
+        throw new AppException(
+          "SUPPORT_CLAIMANT_INVALID",
+          "Only active support staff can claim a support ticket",
+          HttpStatus.FORBIDDEN
+        );
+      }
+      const claimed = await db.supportTicket.updateMany({
+        where: {
+          id: ticketId,
+          assignedToUserId: null,
+          status: { in: ["open", "inProgress"] }
+        },
+        data: { assignedToUserId: actorId, status: "inProgress" }
+      });
+      if (claimed.count !== 1) {
+        const current = await db.supportTicket.findUnique({
+          where: { id: ticketId },
+          select: { status: true, assignedToUserId: true }
+        });
+        if (!current) {
+          throw new AppException("SUPPORT_TICKET_NOT_FOUND", "Support ticket not found", HttpStatus.NOT_FOUND);
+        }
+        if (["resolved", "closed"].includes(current.status)) {
+          throw new AppException("SUPPORT_TICKET_CLOSED", "Resolved tickets cannot be claimed", HttpStatus.CONFLICT);
+        }
+        throw new AppException(
+          "SUPPORT_TICKET_ALREADY_ASSIGNED",
+          "Support ticket was claimed by another operator",
+          HttpStatus.CONFLICT
+        );
+      }
+      const updated = await db.supportTicket.findUniqueOrThrow({
+        where: { id: ticketId },
+        include: {
+          order: { include: { companion: { select: { ownerUserId: true } } } },
+          requester: { select: { id: true, profile: { select: { displayName: true } } } },
+          assignedTo: { select: { id: true, profile: { select: { displayName: true } } } },
+          orderFacts: {
+            include: this.caseEvidence.attachmentInclude(),
+            orderBy: { createdAt: "asc" }
+          }
+        }
+      });
+      await this.audit.record({
+        actorId,
+        subjectUserIds: [
+          updated.userId,
+          updated.order?.userId,
+          updated.order?.companion?.ownerUserId
+        ].filter((candidate): candidate is string => Boolean(candidate)),
+        action: "support.ticket_claimed",
+        resourceType: "supportTicket",
+        resourceId: ticketId,
+        metadata: { orderLinked: Boolean(pointer.orderId) }
+      }, db);
+      return updated;
+    });
+    return this.toDto(result, true);
+  }
+
+  async assign(actor: AuthenticatedUser, ticketId: string, assignedToUserId: string) {
+    if (actor.role !== "admin") {
+      throw new AppException("FORBIDDEN", "Insufficient permissions", HttpStatus.FORBIDDEN);
+    }
+    const result = await this.prisma.$transaction(async (tx) => {
+      const db = tx as any;
+      const pointer = await db.supportTicket.findUnique({
+        where: { id: ticketId },
+        select: { orderId: true }
+      });
+      if (!pointer) {
+        throw new AppException("SUPPORT_TICKET_NOT_FOUND", "Support ticket not found", HttpStatus.NOT_FOUND);
+      }
+      if (pointer.orderId) {
+        await db.$queryRaw`SELECT "id" FROM "Order" WHERE "id" = ${pointer.orderId} FOR UPDATE`;
+      }
+      await db.$queryRaw`SELECT "id" FROM "SupportTicket" WHERE "id" = ${ticketId} FOR UPDATE`;
+      const ticket = await db.supportTicket.findUnique({
+        where: { id: ticketId },
+        include: { order: { include: { companion: { select: { ownerUserId: true } } } } }
+      });
       const assignee = await db.user.findUnique({
         where: { id: assignedToUserId },
         select: { id: true, role: true, accountStatus: true }
       });
       if (!ticket) throw new AppException("SUPPORT_TICKET_NOT_FOUND", "Support ticket not found", HttpStatus.NOT_FOUND);
-      if (!assignee || assignee.role !== "admin" || assignee.accountStatus !== "active") {
-        throw new AppException("SUPPORT_ASSIGNEE_INVALID", "Assignee must be an active administrator", HttpStatus.BAD_REQUEST);
-      }
       if (["resolved", "closed"].includes(ticket.status)) {
         throw new AppException("SUPPORT_TICKET_CLOSED", "Resolved tickets cannot be assigned", HttpStatus.CONFLICT);
+      }
+      if (
+        !assignee
+        || !["support", "admin"].includes(assignee.role)
+        || assignee.accountStatus !== "active"
+      ) {
+        throw new AppException(
+          "SUPPORT_ASSIGNEE_INVALID",
+          "Assignee must be active support staff or an administrator",
+          HttpStatus.BAD_REQUEST
+        );
       }
       const updated = await db.supportTicket.update({
         where: { id: ticketId },
@@ -254,11 +483,22 @@ export class SupportService {
         include: { order: true }
       });
       await this.audit.record({
-        actorId,
+        actorId: actor.id,
+        subjectUserIds: [
+          ticket.userId,
+          ticket.order?.userId,
+          ticket.order?.companion?.ownerUserId,
+          ticket.assignedToUserId,
+          assignedToUserId
+        ].filter((candidate): candidate is string => Boolean(candidate)),
         action: "support.ticket_assigned",
         resourceType: "supportTicket",
         resourceId: ticketId,
-        metadata: { assignedToUserId }
+        metadata: {
+          actorRole: actor.role,
+          previousAssignedToUserId: ticket.assignedToUserId ?? null,
+          assignedToUserId
+        }
       }, db);
       return updated;
     });
@@ -281,7 +521,10 @@ export class SupportService {
         await db.$queryRaw`SELECT "id" FROM "Order" WHERE "id" = ${pointer.orderId} FOR UPDATE`;
       }
       await db.$queryRaw`SELECT "id" FROM "SupportTicket" WHERE "id" = ${ticketId} FOR UPDATE`;
-      const ticket = await db.supportTicket.findUnique({ where: { id: ticketId }, include: { order: true } });
+      const ticket = await db.supportTicket.findUnique({
+        where: { id: ticketId },
+        include: { order: { include: { companion: { select: { ownerUserId: true } } } } }
+      });
       if (!ticket) throw new AppException("SUPPORT_TICKET_NOT_FOUND", "Support ticket not found", HttpStatus.NOT_FOUND);
       if (["resolved", "closed"].includes(ticket.status)) {
         throw new AppException("SUPPORT_TICKET_CLOSED", "Ticket is already resolved", HttpStatus.CONFLICT);
@@ -327,6 +570,11 @@ export class SupportService {
       });
       await this.audit.record({
         actorId,
+        subjectUserIds: [
+          ticket.userId,
+          ticket.order?.userId,
+          ticket.order?.companion?.ownerUserId
+        ].filter((candidate): candidate is string => Boolean(candidate)),
         action: "support.ticket_resolved",
         resourceType: "supportTicket",
         resourceId: ticketId,
@@ -376,6 +624,7 @@ export class SupportService {
     const dto = {
       id: fact.id,
       statement: fact.statement,
+      evidenceAttachments: this.caseEvidence.attachmentDtos(fact),
       createdAt: fact.createdAt.toISOString()
     } as Record<string, unknown>;
     if (includeOperations) dto.submittedByUserId = fact.submittedByUserId;

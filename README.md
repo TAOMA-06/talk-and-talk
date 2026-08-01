@@ -109,13 +109,14 @@ Release 数据安全规则：正式构建不会编译 `MockData` 或离线身份
 | `CORS_ORIGINS` | 逗号分隔 allowlist | **必填** |
 | `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` | JWT 密钥 | **必填、高强度** |
 | `JWT_ACCESS_TTL` / `JWT_REFRESH_TTL` | 默认 `15m` / `30d` | 按需 |
+| `AUTH_IDENTITY_TOMBSTONE_HMAC_KEYS` / `AUTH_IDENTITY_TOMBSTONE_ACTIVE_KEY_ID` | 注销身份防重绑 HMAC 密钥环与当前写入密钥；轮换时必须保留仍覆盖有效墓碑的旧密钥 | **必填、密钥管理托管** |
+| `AUTH_IDENTITY_REREGISTRATION_POLICY` | 同一外部身份重新注册策略 | 固定 `after_tombstone_expiry` |
 | `SMS_CODE_TTL_SECONDS` | 验证码 TTL，默认 `300` | |
 | `SMS_PROVIDER` | `mock` / `none`（真实厂商见 NEXT_PHASE） | **禁止 mock**；`none` 则无短信登录 |
 | `REVIEW_JWT_ACCESS_SECRET` / `REVIEW_JWT_REFRESH_SECRET` | 审核部门专属 JWT 密钥 | **必填、不得复用用户 JWT** |
 | `REVIEW_TOTP_ENCRYPTION_KEY` | 加密审核部门 TOTP 种子 | **必填、不得复用运营 staff 密钥** |
 | `STAFF_TOTP_ENCRYPTION_KEY` | 非审核运营 staff 的历史 TOTP 密钥 | 仅保留运营兼容能力 |
-| `DEEPSEEK_API_KEY` | 文本审核提供方凭据；本地可空 | **生产必填** |
-| `DEEPSEEK_URL` / `DEEPSEEK_MODEL` | 文本审核端点与模型 | **生产显式配置、HTTPS** |
+| `EXTERNAL_AI_USER_CONTENT_ENABLED` | 是否允许把用户原文交给外部生成式 AI；当前版本固定禁止 | **必须显式为 `false`** |
 | `WECHAT_PAY_*` | 微信商户与证书路径、回调 base | 真实收款时必填 |
 | `WECHAT_MINIPROGRAM_APP_ID` / `WECHAT_MINIPROGRAM_APP_SECRET` | 小程序登录与 JSAPI 支付 AppID；AppSecret 仅后端保存 | 小程序发行必填 |
 | `APPLE_SIGN_IN_BUNDLE_ID` | 历史 iOS 登录配置 | 小程序首发不使用 |
@@ -223,10 +224,11 @@ DATABASE_URL=postgres://... ./backend/api/scripts/db-backup.sh
 - 已支持两种正式传输：公网 HTTPS `wx.request`，或微信云托管 `wx.cloud.callContainer`；后者无需配置 request 合法域名，但公网入口仍供 iOS 和支付回调使用。
 - 推荐部署与验收步骤见 [微信后端方案选型](./docs/wechat-backend-selection.md)。
 
-## DeepSeek
+## 内容安全与外部生成式 AI
 
-- 本地与 staging 可在 `DEEPSEEK_API_KEY` 为空时仅运行 RuleEngine；生产强制真实文本审核提供方，运行时故障时聊天/社区转人工、公开资料写入返回可重试错误，绝不降级公开
-- 高风险 rule `block` 会跳过 AI
+- 当前所有环境只使用服务端本地规则与授权人工复核；用户原文、上下文、账号/订单标识和审核案件标识都不会发送给 DeepSeek 或其他外部生成式 AI。
+- 生产与 staging 必须显式设置 `EXTERNAL_AI_USER_CONTENT_ENABLED=false`，并拒绝遗留 `DEEPSEEK_API_KEY`。高风险内容由本地规则失败关闭并进入人工/危机分流，不以外部模型故障为由降级公开。
+- 未来如设计外部处理方，须先完成新版隐私文本、适用的 PIA/DPA、地域、留存、禁止训练和接收方审查；这不是填写一个 API key 即可开启的能力。
 
 ## 短信
 
@@ -256,6 +258,7 @@ DATABASE_URL=postgres://... ./backend/api/scripts/db-backup.sh
 
 - Auth：微信小程序登录、JWT、原子 refresh/logout、服务端法律同意与 18+ 门禁
 - 陪伴者列表与详情、预约订单、微信 JSAPI 预支付/回调/退款/关单
-- 支付后客户与陪伴者会话、服务端审核；Admin 审核 Web
-- 通知、注销申请、同意撤回、日志脱敏、限流、helmet
-- **不做**：复杂推荐、人脸实名、多支付渠道等 → [NEXT_PHASE.md](./NEXT_PHASE.md)
+- 支付后客户与陪伴者会话、本地规则与独立人工复核；商业运营 `/admin/` 与独立审核 `/review/`
+- 站内/微信事务通知、可约提醒安全流水线、注销申请与分阶段擦除、同意撤回、日志脱敏、限流和安全响应头
+- 陪伴者自助入驻/服务/排班/收益工作台、可解释推荐与运营治理、订单级 TRTC 语音代码路径均已进入仓库；真实 KYC、微信模板、支付、TRTC 和运营值班仍是外部上线门禁
+- **刻意不做**：临床诊疗、默认录音、礼物币/财富榜、付费认证/排名和无条件保险承诺；其他后续边界见 [NEXT_PHASE.md](./NEXT_PHASE.md)

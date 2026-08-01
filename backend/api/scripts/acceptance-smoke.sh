@@ -35,7 +35,7 @@ MOCK_SMS_RETRY_INTERVAL_SECONDS="${MOCK_SMS_RETRY_INTERVAL_SECONDS:-5}"
 MOCK_SMS_MAX_ATTEMPTS="${MOCK_SMS_MAX_ATTEMPTS:-13}"
 
 # These must match the server environment. Defaults match configuration.ts.
-LEGAL_CONSENT_VERSION="${LEGAL_CONSENT_VERSION:-2.0-2026-07-20}"
+LEGAL_CONSENT_VERSION="${LEGAL_CONSENT_VERSION:-2.2-2026-08-01}"
 LEGAL_PRIVACY_URL="${LEGAL_PRIVACY_URL:-https://api.talkandtalk.app/legal/privacy.html}"
 LEGAL_TERMS_URL="${LEGAL_TERMS_URL:-https://api.talkandtalk.app/legal/terms.html}"
 
@@ -100,6 +100,21 @@ api_request() {
   printf '%s' "$status" > "$status_file"
   if [[ ! "$status" =~ ^2[0-9][0-9]$ ]]; then
     printf 'Request failed: %s %s (HTTP %s)\n' "$method" "$path" "$status" >&2
+    python3 - "$output" <<'PY' >&2 || true
+import json
+import sys
+
+try:
+    with open(sys.argv[1], encoding="utf-8") as source:
+        payload = json.load(source)
+    error = payload.get("error", {})
+    code = error.get("code")
+    message = error.get("message")
+    if code or message:
+        print(f"  {code or 'REQUEST_ERROR'}: {message or 'No public error message'}")
+except (OSError, ValueError, TypeError):
+    pass
+PY
     return 1
   fi
   printf '%s\n' "$output"
@@ -253,6 +268,19 @@ from datetime import datetime, timedelta, timezone
 
 # Small randomized offset avoids overlap with records from a concurrent smoke run.
 when = datetime.now(timezone.utc) + timedelta(days=int(sys.argv[1]), minutes=secrets.randbelow(240) + 1)
+print(when.isoformat().replace("+00:00", "Z"))
+PY
+}
+
+near_future_schedule() {
+  python3 <<'PY'
+import secrets
+from datetime import datetime, timedelta, timezone
+
+# Order intake reserves ten minutes for the companion response and five more
+# for payment. Schedule just beyond that boundary, then let the test wait a few
+# seconds for the default 15-minute paid-chat window to open.
+when = datetime.now(timezone.utc) + timedelta(minutes=15, seconds=4 + secrets.randbelow(2))
 print(when.isoformat().replace("+00:00", "Z"))
 PY
 }
@@ -443,7 +471,7 @@ OWNER_ID="$AUTH_USER_ID"
 record_legal_consent owner "$OWNER_TOKEN" "$OWNER_ID"
 
 say 'Customer creates a future service order'
-ORDER_JSON="$(api_request order-create POST '/orders' "$CUSTOMER_TOKEN" "$(make_order_body "$(future_schedule 2)")")"
+ORDER_JSON="$(api_request order-create POST '/orders' "$CUSTOMER_TOKEN" "$(make_order_body "$(near_future_schedule)")")"
 ORDER_ID="$(json_data "$ORDER_JSON" 'id')"
 
 say 'Companion owner confirms the service order'
@@ -458,6 +486,11 @@ PAYMENT_JSON="$(api_request payment-notify POST '/payments/wechat/mock-notify' "
 assert_payment_paid "$PAYMENT_JSON"
 PAYMENT_SYNC_JSON="$(api_request payment-sync POST "/orders/$ORDER_ID/payment/sync" "$CUSTOMER_TOKEN")"
 assert_payment_paid "$PAYMENT_SYNC_JSON"
+
+# The order is intentionally scheduled just outside the intake cutoff above.
+# This bounded wait exercises the real default chat boundary instead of
+# weakening it through a test-only server configuration.
+sleep 6
 
 RUN_TAG="$(date +%s)-$$"
 CUSTOMER_MESSAGE="本地验收客户消息-$RUN_TAG"
