@@ -110,8 +110,9 @@ Prisma **不提供**生产 `migrate down`。步骤：
 
 ## 回滚后验收
 
-- `GET /api/v1/health`：`dependencies.database/redis` 为 `ok`
+- `GET /api/v1/health`：精简 liveness `status=ok`
+- `GET /api/v1/health/ready` 携带 `Authorization: Bearer $METRICS_TOKEN`：`dependencies.database/redis` 为 `ok`
 - `GET /api/v1/metrics` 携带 `Authorization: Bearer $METRICS_TOKEN` 可访问（内网 / staging）
-- 登录、`GET /companions`、下单 prepay；staging 可 mock-notify
+- 登录、`GET /companions`、下单 prepay；仅 development/test 可 mock-notify（需 `MOCK_WECHAT_NOTIFY_SECRET`）
 - Web `/review/` 独立 reviewer 可登录；普通用户 JWT 访问审核路由被拒绝
 - 法律页：`/legal/privacy.html`、`/legal/terms.html`

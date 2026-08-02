@@ -1,16 +1,21 @@
 import { CallHandler, ExecutionContext } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import type { Response } from "express";
 import { firstValueFrom, of } from "rxjs";
 
 import { EnvelopeInterceptor } from "../common/envelope/envelope.interceptor";
 import { HealthController } from "./health.controller";
-import { HealthResponse, HealthService } from "./health.service";
+import { HealthLivenessResponse, HealthReadyResponse, HealthService } from "./health.service";
 
-const healthyResponse: HealthResponse = {
+const healthyLiveness: HealthLivenessResponse = {
   status: "ok",
   service: "talk-and-talk-api",
-  version: "1.2.3",
-  appEnv: "test",
+  version: "1.2.3"
+};
+
+const healthyReady: HealthReadyResponse = {
+  ...healthyLiveness,
+  appEnv: "staging",
   uptimeSeconds: 10,
   dependencies: {
     database: { status: "ok", latencyMs: 1 },
@@ -19,42 +24,40 @@ const healthyResponse: HealthResponse = {
 };
 
 describe("HealthController", () => {
-  const check = jest.fn<Promise<HealthResponse>, []>();
-  const healthService = { check } as unknown as HealthService;
-  const controller = new HealthController(healthService);
-  const interceptor = new EnvelopeInterceptor<HealthResponse>();
+  const check = jest.fn<Promise<HealthLivenessResponse>, []>();
+  const ready = jest.fn<Promise<HealthReadyResponse>, []>();
+  const healthService = { check, ready } as unknown as HealthService;
+  const config = {
+    getOrThrow: jest.fn((key: string) => (key === "APP_ENV" ? "development" : "")),
+    get: jest.fn()
+  } as unknown as ConfigService;
+  const controller = new HealthController(healthService, config);
+  const interceptor = new EnvelopeInterceptor<HealthLivenessResponse | HealthReadyResponse>();
 
   beforeEach(() => {
     check.mockReset();
+    ready.mockReset();
   });
 
-  it("returns 200 with the success envelope when dependencies are healthy", async () => {
-    check.mockResolvedValue(healthyResponse);
+  it("returns 200 with slim liveness envelope when dependencies are healthy", async () => {
+    check.mockResolvedValue(healthyLiveness);
     const response = mockResponse();
 
     const health = await controller.check(response.value);
     const envelope = await wrap(health);
 
     expect(response.status).toHaveBeenCalledWith(200);
-    expect(envelope.data).toEqual(healthyResponse);
+    expect(envelope.data).toEqual(healthyLiveness);
     expect(envelope.meta).toEqual({
       requestId: "health-test",
       timestamp: expect.any(String)
     });
   });
 
-  it("returns 503 with the same envelope when a dependency is degraded", async () => {
-    const degradedResponse: HealthResponse = {
-      ...healthyResponse,
-      status: "degraded",
-      dependencies: {
-        ...healthyResponse.dependencies,
-        database: {
-          status: "error",
-          latencyMs: 1200,
-          message: "database unavailable"
-        }
-      }
+  it("returns 503 with the same slim envelope when a dependency is degraded", async () => {
+    const degradedResponse: HealthLivenessResponse = {
+      ...healthyLiveness,
+      status: "degraded"
     };
     check.mockResolvedValue(degradedResponse);
     const response = mockResponse();
@@ -64,10 +67,17 @@ describe("HealthController", () => {
 
     expect(response.status).toHaveBeenCalledWith(503);
     expect(envelope.data).toEqual(degradedResponse);
-    expect(envelope.meta).toEqual({
-      requestId: "health-test",
-      timestamp: expect.any(String)
-    });
+  });
+
+  it("returns authenticated ready detail in development without a token", async () => {
+    ready.mockResolvedValue(healthyReady);
+    const response = mockResponse();
+
+    const health = await controller.ready(undefined, response.value);
+    const envelope = await wrap(health);
+
+    expect(response.status).toHaveBeenCalledWith(200);
+    expect(envelope.data).toEqual(healthyReady);
   });
 
   function mockResponse() {
@@ -78,7 +88,7 @@ describe("HealthController", () => {
     };
   }
 
-  function wrap(health: HealthResponse) {
+  function wrap(health: HealthLivenessResponse | HealthReadyResponse) {
     const context = {
       switchToHttp: () => ({
         getRequest: () => ({ requestId: "health-test" })
@@ -86,7 +96,7 @@ describe("HealthController", () => {
     } as unknown as ExecutionContext;
     const next = {
       handle: () => of(health)
-    } as CallHandler<HealthResponse>;
+    } as CallHandler<HealthLivenessResponse | HealthReadyResponse>;
 
     return firstValueFrom(interceptor.intercept(context, next));
   }

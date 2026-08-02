@@ -5,8 +5,9 @@ import Redis from "ioredis";
 
 import { AppException } from "../errors/app.exception";
 /**
- * Simple IP rate limit using Redis. Production authentication routes fail closed when Redis is
- * unavailable; ordinary routes and health checks remain available for diagnosis.
+ * Simple IP rate limit using Redis. External environments fail closed on sensitive
+ * write routes when Redis is unavailable; ordinary routes and health checks remain
+ * available for diagnosis.
  */
 @Injectable()
 export class IpRateLimitMiddleware implements NestMiddleware, OnModuleDestroy {
@@ -76,7 +77,7 @@ export class IpRateLimitMiddleware implements NestMiddleware, OnModuleDestroy {
       next(
         new AppException(
           "RATE_LIMIT_UNAVAILABLE",
-          "Authentication is temporarily unavailable, please try again later",
+          "Service is temporarily unavailable, please try again later",
           HttpStatus.SERVICE_UNAVAILABLE
         )
       );
@@ -93,9 +94,16 @@ export function clientIp(req: Request): string {
 }
 
 export function shouldFailClosed(req: Request, appEnv: string): boolean {
-  if (appEnv !== "production" || req.method.toUpperCase() !== "POST") {
+  if ((appEnv !== "production" && appEnv !== "staging") || req.method.toUpperCase() !== "POST") {
     return false;
   }
   const path = req.originalUrl || req.url || "";
-  return /(?:^|\/)(?:auth\/(?:sms\/send-code|phone\/login|wechat\/mini-program|refresh)|review\/auth\/(?:login|refresh))(?:[/?]|$)/.test(path);
+  return SENSITIVE_POST_PATH.test(path);
 }
+
+/**
+ * Auth/login, order create/prepay/payment sync/refund, and upload reserve paths.
+ * Keep review auth protection and extend commercial write paths.
+ */
+const SENSITIVE_POST_PATH =
+  /(?:^|\/)(?:auth\/(?:sms\/send-code|phone\/login|wechat\/mini-program|refresh)|review\/auth\/(?:login|refresh)|orders(?:$|[/?])|conversations\/[^/]+\/media-uploads(?:$|[/?])|support\/tickets\/[^/]+\/evidence-uploads(?:$|[/?])|attendance-disputes\/[^/]+\/evidence-uploads(?:$|[/?])|commercial\/companion\/incident-evidence-uploads(?:$|[/?])|case-evidence\/uploads(?:$|[/?]))/;

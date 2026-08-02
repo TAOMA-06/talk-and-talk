@@ -45,6 +45,11 @@ export type RealWeChatPayConfig = {
   fetchImpl?: typeof fetch;
   /** Unit-test escape hatch. Production calls must verify WeChat response signatures. */
   verifyResponseSignatures?: boolean;
+  /**
+   * Allow plaintext notify `resource` shapes used by local fixtures.
+   * Staging/production must leave this false so only AES-GCM ciphertext is accepted.
+   */
+  allowPlaintextNotifyResource?: boolean;
 };
 
 type PlatformCertEntry = {
@@ -331,12 +336,18 @@ export class RealWeChatPayProvider implements WeChatPayProvider {
         nonce: String(resource.nonce ?? ""),
         associatedData: String(resource.associated_data ?? "")
       });
-    } else {
-      // Plaintext test shape for local integration fixtures only.
+    } else if (this.config.allowPlaintextNotifyResource) {
+      // Plaintext test shape for local/development integration fixtures only.
       decrypted =
         ((resource as { plaintext?: Record<string, unknown> }).plaintext as
           | Record<string, unknown>
           | undefined) ?? (resource as Record<string, unknown>);
+    } else {
+      throw new AppException(
+        "WECHAT_NOTIFY_INVALID",
+        "WeChat notify resource must include AES-GCM ciphertext",
+        HttpStatus.BAD_REQUEST
+      );
     }
 
     if (!decrypted || typeof decrypted !== "object") {
@@ -389,12 +400,22 @@ export class RealWeChatPayProvider implements WeChatPayProvider {
   parseRefundNotifyPayload(rawBody: string): WeChatRefundNotifyPayload {
     const parsed = JSON.parse(rawBody) as Record<string, unknown>;
     const resource = (parsed.resource as Record<string, unknown> | undefined) ?? {};
-    const decrypted = typeof resource.ciphertext === "string" && resource.ciphertext
-      ? decryptResource(this.config.apiV3Key, {
-          ciphertext: String(resource.ciphertext), nonce: String(resource.nonce ?? ""),
-          associatedData: String(resource.associated_data ?? "")
-        })
-      : ((resource as any).plaintext ?? resource);
+    let decrypted: Record<string, unknown>;
+    if (typeof resource.ciphertext === "string" && resource.ciphertext) {
+      decrypted = decryptResource(this.config.apiV3Key, {
+        ciphertext: String(resource.ciphertext),
+        nonce: String(resource.nonce ?? ""),
+        associatedData: String(resource.associated_data ?? "")
+      });
+    } else if (this.config.allowPlaintextNotifyResource) {
+      decrypted = ((resource as any).plaintext ?? resource) as Record<string, unknown>;
+    } else {
+      throw new AppException(
+        "WECHAT_NOTIFY_INVALID",
+        "WeChat refund notify resource must include AES-GCM ciphertext",
+        HttpStatus.BAD_REQUEST
+      );
+    }
     const amount = (decrypted.amount as Record<string, unknown> | undefined) ?? {};
     return {
       appId: optionalPayloadString(decrypted.appid),

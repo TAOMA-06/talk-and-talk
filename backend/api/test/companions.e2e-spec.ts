@@ -32,7 +32,7 @@ describe("Companions and me (e2e)", () => {
 
     app = moduleRef.createNestApplication();
     app.setGlobalPrefix("api/v1");
-    app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }));
+    app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }));
     app.useGlobalInterceptors(new EnvelopeInterceptor());
     app.useGlobalFilters(new HttpExceptionFilter());
     app.enableCors(buildCorsOptions(app.get(ConfigService)));
@@ -70,9 +70,17 @@ describe("Companions and me (e2e)", () => {
     await prisma.companionServiceTag.deleteMany();
     await prisma.serviceTag.deleteMany();
     await prisma.companionProfile.deleteMany();
+    await prisma.identityVerificationRequest.deleteMany().catch(() => undefined);
+    await prisma.staffCredential.deleteMany();
     await prisma.refreshToken.deleteMany();
     await prisma.verificationCode.deleteMany();
     await prisma.authIdentity.deleteMany();
+        await prisma.userAccountAppeal.deleteMany().catch(() => undefined);
+    await prisma.customerAdultEligibility.deleteMany().catch(() => undefined);
+    await prisma.userAccountAction.deleteMany().catch(() => undefined);
+    await prisma.identityVerificationRequest.deleteMany().catch(() => undefined);
+    await prisma.staffCredential.deleteMany().catch(() => undefined);
+    await prisma.legalConsentReceipt.deleteMany().catch(() => undefined);
     await prisma.userProfile.deleteMany();
     await prisma.user.deleteMany();
   }
@@ -311,20 +319,31 @@ describe("Companions and me (e2e)", () => {
         ]));
       });
 
+    // Active windows need ≥15 minutes lead time; inactive windows must stay
+    // inside the 90-day planning horizon (not multi-year placeholders).
+    const startsAt = new Date(Date.now() + 2 * 60 * 60_000);
+    startsAt.setUTCMinutes(0, 0, 0);
+    if (startsAt.getTime() <= Date.now() + 15 * 60_000) {
+      startsAt.setTime(startsAt.getTime() + 60 * 60_000);
+    }
+    const endsAt = new Date(startsAt.getTime() + 2 * 60 * 60_000);
+    const misalignedStart = new Date(startsAt.getTime() + 24 * 60 * 60_000 + 15 * 60_000);
+    const misalignedEnd = new Date(misalignedStart.getTime() + 105 * 60_000);
+
     const created = await request(app.getHttpServer())
       .post("/api/v1/companions/me/availability-windows")
       .set("Authorization", `Bearer ${token}`)
       .send({
-        startsAt: "2030-01-02T10:00:00.000Z",
-        endsAt: "2030-01-02T12:00:00.000Z",
+        startsAt: startsAt.toISOString(),
+        endsAt: endsAt.toISOString(),
         capacity: 2
       })
       .expect(201);
 
     expect(created.body.data).toEqual(expect.objectContaining({
       id: expect.any(String),
-      startsAt: "2030-01-02T10:00:00.000Z",
-      endsAt: "2030-01-02T12:00:00.000Z",
+      startsAt: startsAt.toISOString(),
+      endsAt: endsAt.toISOString(),
       capacity: 2,
       isActive: true
     }));
@@ -345,8 +364,8 @@ describe("Companions and me (e2e)", () => {
       .post("/api/v1/companions/me/availability-windows")
       .set("Authorization", `Bearer ${token}`)
       .send({
-        startsAt: "2030-01-03T10:15:00.000Z",
-        endsAt: "2030-01-03T12:00:00.000Z"
+        startsAt: misalignedStart.toISOString(),
+        endsAt: misalignedEnd.toISOString()
       })
       .expect(400);
     expect(invalidAlignment.body.error.code).toBe("INVALID_AVAILABILITY_WINDOW_ALIGNMENT");
@@ -368,7 +387,8 @@ describe("Companions and me (e2e)", () => {
     const { token: reviewerToken } = await createUser("admin");
     const { user: owner, token: ownerToken } = await createUser("user");
 
-    await request(app.getHttpServer())
+    // Dual-control KYC: one staff submits, a different staff approves.
+    const proposal = await request(app.getHttpServer())
       .patch(`/api/v1/admin/users/${owner.id}/verification`)
       .set("Authorization", `Bearer ${token}`)
       .send({
@@ -377,6 +397,15 @@ describe("Companions and me (e2e)", () => {
         evidenceReference: "kyc://test/c-admin-owner"
       })
       .expect(200);
+    await request(app.getHttpServer())
+      .post(`/api/v1/admin/identity-verification-requests/${proposal.body.data.id}/approve`)
+      .set("Authorization", `Bearer ${reviewerToken}`)
+      .send({ reason: "independent identity review" })
+      .expect((res) => {
+        if (![200, 201].includes(res.status)) {
+          throw new Error(`identity approve unexpected status ${res.status}`);
+        }
+      });
 
     await request(app.getHttpServer())
       .post("/api/v1/admin/companions")
@@ -437,12 +466,20 @@ describe("Companions and me (e2e)", () => {
         serviceAgreementVersion: "test-v1",
         serviceAgreementEvidenceRef: "agreement://test/c-admin/v1"
       })
-      .expect(201);
+      .expect((res) => {
+        if (![200, 201].includes(res.status)) {
+          throw new Error(`profile submission unexpected status ${res.status}`);
+        }
+      });
 
     await request(app.getHttpServer())
       .post("/api/v1/admin/commercial/companions/c-admin/profile-verifications")
       .set("Authorization", `Bearer ${reviewerToken}`)
-      .expect(201);
+      .expect((res) => {
+        if (![200, 201].includes(res.status)) {
+          throw new Error(`profile verification unexpected status ${res.status}`);
+        }
+      });
 
     await request(app.getHttpServer())
       .post("/api/v1/admin/companions/c-admin/publish")

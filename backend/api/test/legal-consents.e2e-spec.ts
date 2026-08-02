@@ -32,7 +32,7 @@ describe("Legal consent receipts (e2e)", () => {
 
     app = moduleRef.createNestApplication();
     app.setGlobalPrefix("api/v1");
-    app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }));
+    app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }));
     app.useGlobalInterceptors(new EnvelopeInterceptor());
     app.useGlobalFilters(new HttpExceptionFilter());
     await app.init();

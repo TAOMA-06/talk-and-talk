@@ -267,6 +267,7 @@ export class FavoritesService {
         : "favorite.availability_reminder_disabled",
       resourceType: "companionFavorite",
       metadata: {
+        companionId: normalizedCompanionId,
         minimumIntervalHours: AVAILABILITY_REMINDER_MINIMUM_INTERVAL_HOURS
       }
     });

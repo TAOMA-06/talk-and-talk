@@ -771,7 +771,8 @@ describe("RealWeChatPayProvider helpers", () => {
       mchId: "1900000000",
       apiV3Key: "E".repeat(32),
       privateKeyPath: keyPath,
-      certSerialNo: "s"
+      certSerialNo: "s",
+      allowPlaintextNotifyResource: true
     });
 
     const payload = provider.parseRefundNotifyPayload(JSON.stringify({
@@ -804,6 +805,49 @@ describe("RealWeChatPayProvider helpers", () => {
       refundAmountCents: 1200,
       currency: "CNY"
     }));
+
+    unlinkSync(keyPath);
+  });
+
+  it("rejects plaintext notify resources outside development/test fixtures", () => {
+    const dir = mkdtempSync(join(tmpdir(), "wx-pay-"));
+    const keyPath = join(dir, "key.pem");
+    const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+    writeFileSync(keyPath, privateKey.export({ type: "pkcs8", format: "pem" }));
+    const provider = new RealWeChatPayProvider({
+      appId: "wx",
+      mchId: "m",
+      apiV3Key: "F".repeat(32),
+      privateKeyPath: keyPath,
+      certSerialNo: "s"
+    });
+
+    expect(() =>
+      provider.parseNotifyPayload(
+        JSON.stringify({
+          resource: {
+            plaintext: {
+              out_trade_no: "T1",
+              trade_state: "SUCCESS",
+              amount: { total: 100 }
+            }
+          }
+        })
+      )
+    ).toThrow(/ciphertext/i);
+
+    expect(() =>
+      provider.parseRefundNotifyPayload(
+        JSON.stringify({
+          resource: {
+            plaintext: {
+              out_refund_no: "R1",
+              refund_status: "SUCCESS"
+            }
+          }
+        })
+      )
+    ).toThrow(/ciphertext/i);
 
     unlinkSync(keyPath);
   });

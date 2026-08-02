@@ -1,7 +1,7 @@
 # 生产环境检查清单
 
 上线前在 **staging 验证通过** 后，对 production 逐项勾选。  
-本清单只检查配置与运维门禁，**不扩展产品功能**。正式交易模型、停机红线和外部签字责任见 [COMMERCIAL_RELEASE.md](./COMMERCIAL_RELEASE.md)；市场对标、正式发行边界和仓库红线见 [商用界面市场交叉审查（2026-08-01）](./commercial-market-cross-audit-2026-08-01.md)；已知未完成能力见 [NEXT_PHASE.md](../NEXT_PHASE.md)。
+本清单只检查配置与运维门禁，**不扩展产品功能**。正式交易模型、停机红线和外部签字责任见 [COMMERCIAL_RELEASE.md](./COMMERCIAL_RELEASE.md)；市场对标、正式发行边界和仓库红线见 [商用界面市场交叉审查（2026-08-02 复审）](./commercial-market-cross-audit-2026-08-02.md)（[2026-08-01 历史快照](./commercial-market-cross-audit-2026-08-01.md)）；已知未完成能力见 [NEXT_PHASE.md](../NEXT_PHASE.md)。
 
 ## 商用界面与交叉审查门禁
 
@@ -42,7 +42,9 @@
 - [ ] HTTPS 已启用（`infra/nginx/talk-and-talk.conf.example` 或等价反向代理）
 - [ ] HTTP → HTTPS 301 跳转正常
 - [ ] 证书未过期；续期流程已知（ACME 或手动）
-- [ ] `curl -fsS https://api.talkandtalk.app/api/v1/health` 返回 `ok` 或可接受的 `degraded`
+- [ ] `curl -fsS https://api.talkandtalk.app/api/v1/health` 返回精简 liveness（`status`/`service`/`version`）；依赖细节走 `GET /api/v1/health/ready` + `Authorization: Bearer $METRICS_TOKEN`
+- [ ] staging/production 未配齐微信凭证时选择 Disabled（**禁止**静默 Mock）；仅 development/test 可启用 Mock，且需 `MOCK_WECHAT_NOTIFY_SECRET`（≥32）
+- [ ] Real 微信回调在 staging/production 强制 `resource.ciphertext`；明文 resource 仅限 development/test
 
 ## CORS / JWT / 密钥
 
@@ -53,7 +55,7 @@
 - [ ] access / refresh 密钥互不相同
 - [ ] `AUTH_IDENTITY_TOMBSTONE_HMAC_KEYS` 中每把密钥均为密钥管理生成的独立 32+ 字节随机值，`AUTH_IDENTITY_TOMBSTONE_ACTIVE_KEY_ID` 存在于密钥环，`AUTH_IDENTITY_REREGISTRATION_POLICY=after_tombstone_expiry`
 - [ ] 身份墓碑换钥遵循“先加入新密钥、再切 active、等旧墓碑到期清理后才移除旧密钥”；发布前商用就绪度中的覆盖缺口和未知密钥积压均为 0
-- [ ] `METRICS_TOKEN` 为 32+ 位随机值；metrics 采集端发送 Bearer token
+- [ ] `METRICS_TOKEN` 为 32+ 位随机值；metrics 与 `/health/ready` 采集端发送 Bearer token（staging/production 均强制）
 - [ ] `COMPANION_VOICE_EVIDENCE_SIGNING_SECRET` 仅存在密钥管理/加密环境变量中，不进入 URL、日志、审计元数据或仓库
 - [ ] `.env.production` 未提交到 git（见根 `.gitignore`）
 
@@ -62,7 +64,7 @@
 - [ ] `DATABASE_URL` 使用强密码；与 compose `POSTGRES_PASSWORD` 一致
 - [ ] Postgres 不直接对公网暴露
 - [ ] `REDIS_URL` 生产建议 `redis://:PASSWORD@host:6379`（requirepass）；至少不公网裸奔
-- [ ] health 中 `dependencies.database` / `dependencies.redis` 为 `ok`
+- [ ] `/health/ready`（Bearer `METRICS_TOKEN`）中 `dependencies.database` / `dependencies.redis` 为 `ok`
 - [ ] 发布前已备份数据库；在 staging 执行 `20260725100000_derive_companion_trust_metrics` 后，逐位核对评分/评价数、完单数与平均响应文案均来自真实评价和订单。生产迁移后再次抽样，禁止手工“恢复”旧宣传数字
 - [ ] 迁移前确认 `RefundTransaction.providerRefundId` 的非空值无重复；若有差异先逐笔对账，不得删除或随意改写财务记录来强行通过唯一索引
 - [ ] `20260720163000_refund_reconciliation_schedule` 已部署；现存 `processing` 退款已获得 `nextReconcileAt`，worker 扫描后不存在长期逾期租约
@@ -74,7 +76,7 @@
 - [ ] 私钥二选一：CloudBase 使用加密环境变量 `WECHAT_PAY_PRIVATE_KEY`；Compose 使用 `WECHAT_PAY_PRIVATE_KEY_HOST_PATH` 指向 host PEM，并只读挂载为容器内 `WECHAT_PAY_PRIVATE_KEY_PATH`（见 [`infra/secrets/README.md`](../infra/secrets/README.md)）
 - [ ] 商户私钥未提交到仓库、未进入小程序包、未出现在日志中
 - [ ] 通知 URL 可达：`https://api.talkandtalk.app/api/v1/payments/wechat/notify`
-- [ ] 生产未配齐微信时 prepay 返回 `WECHAT_PAY_NOT_CONFIGURED`（**禁止** Mock 提供商）
+- [ ] 生产未配齐微信时 prepay 返回 `WECHAT_PAY_NOT_CONFIGURED`（**禁止** Mock 提供商）；staging 同样禁止静默 Mock
 - [ ] `WECHAT_PAY_COMPLAINTS_ENABLED=true`，轮询间隔和批量大小与当班承载能力一致；微信商户平台已把消费者投诉 2.0 通知地址真实登记为 `https://<API 域名>/api/v1/payments/wechat/complaint-notify`。登记截图/工单号已归档；仅配置代码或域名不算完成
 - [ ] 用隔离商户投诉通知验签、AES-256-GCM 解密、重复通知幂等与 5 秒内空 204 回执；数据库和日志都不含回调原文、手机号、openid 或远程证据 URL
 - [ ] 演练通知丢失：worker 能从近三日投诉列表发现记录、按投诉号回补权威详情；查询失败进入 `syncFailed` 和运行门禁，人工“同步微信状态”不会直接改写渠道结果

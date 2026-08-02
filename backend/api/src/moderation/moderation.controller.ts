@@ -25,6 +25,7 @@ export class ModerationController {
 
   @Get("status")
   status() {
+    // Public deployment attestation: fixed local-only user-content boundary statement.
     return {
       module: "moderation",
       status: "active",

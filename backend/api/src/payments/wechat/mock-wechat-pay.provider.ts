@@ -1,4 +1,4 @@
-import { createHash, createHmac, randomBytes } from "node:crypto";
+import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 import {
   WeChatNotifyPayload,
@@ -22,7 +22,8 @@ import {
   WeChatDailyStatementResult
 } from "./wechat-pay.provider";
 
-export const MOCK_WECHAT_NOTIFY_TOKEN = "mock-wechat-notify";
+/** Deterministic secret for unit/e2e fixtures. Never use outside development|test. */
+export const TEST_MOCK_WECHAT_NOTIFY_SECRET = "test-only-mock-wechat-notify-secret-32b";
 
 export type MockWeChatDailyStatementFixture = {
   billDate: string;
@@ -33,6 +34,7 @@ export type MockWeChatDailyStatementFixture = {
 export class MockWeChatPayProvider implements WeChatPayProvider {
   readonly mode = "mock" as const;
   readonly isMock = true;
+  private readonly notifySecret: string;
   private readonly prepays = new Map<
     string,
     { amountCents: number; channel: "app" | "miniProgram" | "native" }
@@ -41,7 +43,15 @@ export class MockWeChatPayProvider implements WeChatPayProvider {
   private readonly complaintHistories = new Map<string, WeChatComplaintNegotiationEvent[]>();
   private readonly dailyStatements = new Map<string, string>();
 
-  constructor(fixtures: readonly MockWeChatDailyStatementFixture[] = []) {
+  constructor(
+    notifySecret: string = TEST_MOCK_WECHAT_NOTIFY_SECRET,
+    fixtures: readonly MockWeChatDailyStatementFixture[] = []
+  ) {
+    const secret = notifySecret.trim();
+    if (secret.length < 32) {
+      throw new Error("Mock WeChat notify secret must be at least 32 characters");
+    }
+    this.notifySecret = secret;
     for (const fixture of fixtures) {
       this.dailyStatements.set(`${fixture.billDate}:${fixture.kind}`, fixture.text);
     }
@@ -131,13 +141,10 @@ export class MockWeChatPayProvider implements WeChatPayProvider {
     _rawBody: string
   ): boolean {
     const token = headerValue(headers, "x-mock-wechat-token");
-    // Official path never hits mock; mock notify endpoint bypasses this with token.
-    // For raw notify testing, accept MOCK token or missing signature in non-prod.
-    if (token === MOCK_WECHAT_NOTIFY_TOKEN) {
-      return true;
+    if (!token) {
+      return false;
     }
-    const signature = headerValue(headers, "wechatpay-signature");
-    return signature === "MOCK_OK";
+    return constantTimeEqual(token, this.notifySecret);
   }
 
   parseNotifyPayload(rawBody: string): WeChatNotifyPayload {
@@ -361,4 +368,10 @@ function headerValue(
   if (!key) return undefined;
   const value = headers[key];
   return Array.isArray(value) ? value[0] : value;
+}
+
+function constantTimeEqual(actual: string, expected: string): boolean {
+  const actualBuffer = Buffer.from(actual);
+  const expectedBuffer = Buffer.from(expected);
+  return actualBuffer.length === expectedBuffer.length && timingSafeEqual(actualBuffer, expectedBuffer);
 }

@@ -85,6 +85,7 @@ interface Environment {
   ORDER_RESCHEDULE_EXPIRY_INTERVAL_SECONDS: number;
   ORDER_RESCHEDULE_EXPIRY_BATCH_SIZE: number;
   METRICS_TOKEN: string;
+  MOCK_WECHAT_NOTIFY_SECRET: string;
   LEGAL_CONSENT_VERSION: string;
   LEGAL_CONSENT_EFFECTIVE_DATE: string;
   LEGAL_PRIVACY_URL: string;
@@ -538,9 +539,12 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
   );
 
   const metricsToken = optionalString(env.METRICS_TOKEN);
-  if (appEnv === "production" && metricsToken.length < 32) {
-    throw new Error("METRICS_TOKEN must contain at least 32 characters in production");
+  if ((appEnv === "production" || appEnv === "staging") && metricsToken.length < 32) {
+    throw new Error("METRICS_TOKEN must contain at least 32 characters in staging/production");
   }
+  const mockWechatNotifySecret =
+    optionalString(env.MOCK_WECHAT_NOTIFY_SECRET) ||
+    (nodeEnv === "test" ? "test-only-mock-wechat-notify-secret-32b" : "");
   if (appEnv === "production" && (!env.DATABASE_URL?.trim() || !env.REDIS_URL?.trim())) {
     throw new Error("DATABASE_URL and REDIS_URL must be explicitly configured in production");
   }
@@ -1530,6 +1534,7 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     ORDER_RESCHEDULE_EXPIRY_INTERVAL_SECONDS: orderRescheduleExpiryIntervalSeconds,
     ORDER_RESCHEDULE_EXPIRY_BATCH_SIZE: orderRescheduleExpiryBatchSize,
     METRICS_TOKEN: metricsToken,
+    MOCK_WECHAT_NOTIFY_SECRET: mockWechatNotifySecret,
     LEGAL_CONSENT_VERSION: legalConsentVersion,
     LEGAL_CONSENT_EFFECTIVE_DATE: legalConsentEffectiveDate,
     LEGAL_PRIVACY_URL: legalPrivacyUrl,

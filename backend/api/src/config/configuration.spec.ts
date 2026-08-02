@@ -343,12 +343,28 @@ describe("validateEnvironment", () => {
       JWT_ACCESS_SECRET: "staging-access",
       JWT_REFRESH_SECRET: "staging-refresh",
       REVIEW_JWT_ACCESS_SECRET: "staging-review-access",
-      REVIEW_JWT_REFRESH_SECRET: "staging-review-refresh"
+      REVIEW_JWT_REFRESH_SECRET: "staging-review-refresh",
+      METRICS_TOKEN: "s".repeat(32)
     });
 
     expect(env.APP_ENV).toBe("staging");
     expect(env.SEED_ON_STARTUP).toBe(true);
     expect(env.SMS_PROVIDER).toBe("mock");
+  });
+
+  it("requires METRICS_TOKEN in staging", () => {
+    expect(() =>
+      validateEnvironment({
+        NODE_ENV: "production",
+        APP_ENV: "staging",
+        CORS_ORIGINS: "https://api-staging.example.com",
+        JWT_ACCESS_SECRET: "staging-access",
+        JWT_REFRESH_SECRET: "staging-refresh",
+        REVIEW_JWT_ACCESS_SECRET: "staging-review-access",
+        REVIEW_JWT_REFRESH_SECRET: "staging-review-refresh",
+        METRICS_TOKEN: "short"
+      })
+    ).toThrow("METRICS_TOKEN");
   });
 
   it("rejects mock sms in production app env", () => {

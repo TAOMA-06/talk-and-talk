@@ -30,7 +30,7 @@ describe("HealthService", () => {
     jest.clearAllMocks();
   });
 
-  it("reports ok when database and redis checks pass", async () => {
+  it("reports slim liveness when database and redis checks pass", async () => {
     Pool.mockImplementation(() => ({
       query: jest.fn().mockResolvedValue({ rows: [{ "?column?": 1 }] }),
       end: jest.fn().mockResolvedValue(undefined)
@@ -42,18 +42,23 @@ describe("HealthService", () => {
       disconnect: jest.fn()
     }));
 
-    const result = await new HealthService(config()).check();
+    const service = new HealthService(config());
+    const liveness = await service.check();
+    const ready = await service.ready();
 
-    expect(result.status).toBe("ok");
-    expect(result.version).toBe("9.9.9");
-    expect(result.appEnv).toBe("staging");
-    expect(result.dependencies.database.status).toBe("ok");
-    expect(result.dependencies.redis.status).toBe("ok");
+    expect(liveness).toEqual({
+      status: "ok",
+      service: "talk-and-talk-api",
+      version: "9.9.9"
+    });
+    expect(ready.appEnv).toBe("staging");
+    expect(ready.dependencies.database.status).toBe("ok");
+    expect(ready.dependencies.redis.status).toBe("ok");
   });
 
-  it("reports degraded when a dependency fails", async () => {
+  it("reports degraded when a dependency fails without leaking error text", async () => {
     Pool.mockImplementation(() => ({
-      query: jest.fn().mockRejectedValue(new Error("db offline")),
+      query: jest.fn().mockRejectedValue(new Error("db offline secret-host")),
       end: jest.fn().mockResolvedValue(undefined)
     }));
     Redis.mockImplementation(() => ({
@@ -63,14 +68,18 @@ describe("HealthService", () => {
       disconnect: jest.fn()
     }));
 
-    const result = await new HealthService(config()).check();
+    const service = new HealthService(config());
+    const liveness = await service.check();
+    const ready = await service.ready();
 
-    expect(result.status).toBe("degraded");
-    expect(result.dependencies.database.status).toBe("error");
-    expect(result.dependencies.database.message).toContain("db offline");
+    expect(liveness.status).toBe("degraded");
+    expect(liveness).not.toHaveProperty("dependencies");
+    expect(ready.dependencies.database.status).toBe("error");
+    expect(ready.dependencies.database.message).toBe("Dependency check failed");
+    expect(JSON.stringify(ready)).not.toContain("secret-host");
   });
 
-  it("does not expose dependency error details in production", async () => {
+  it("does not expose dependency error details in production ready payload", async () => {
     Pool.mockImplementation(() => ({
       query: jest.fn().mockRejectedValue(new Error("password authentication failed for user secret-admin")),
       end: jest.fn().mockResolvedValue(undefined)
@@ -82,8 +91,9 @@ describe("HealthService", () => {
       disconnect: jest.fn()
     }));
 
-    const result = await new HealthService(config("production")).check();
+    const result = await new HealthService(config("production")).ready();
 
     expect(result.dependencies.database.message).toBe("Dependency check failed");
+    expect(JSON.stringify(result)).not.toContain("secret-admin");
   });
 });

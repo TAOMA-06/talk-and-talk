@@ -12,7 +12,7 @@ describe("CompanionsController owner schedule routes", () => {
     materializeOwnRecurringAvailabilityDrafts: jest.fn(),
     activateOwnRecurringAvailabilityDraft: jest.fn()
   } as any;
-  const controller = new CompanionsController(companionsService);
+  const controller = new CompanionsController(companionsService, { getOrThrow: () => "development" } as any);
   const user = { id: "owner-1" } as any;
 
   beforeEach(() => jest.clearAllMocks());

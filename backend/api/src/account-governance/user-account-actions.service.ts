@@ -255,6 +255,7 @@ export class UserAccountActionsService {
             subjectUserIds: [userId],
             action: "account.status_updated",
             resourceType: "user",
+            resourceId: userId,
             metadata: {
               previousStatus: user.accountStatus,
               nextStatus: "active",
@@ -339,6 +340,7 @@ export class UserAccountActionsService {
           subjectUserIds: [userId],
           action: "account.status_updated",
           resourceType: "user",
+          resourceId: userId,
           metadata: {
             previousStatus: user.accountStatus,
             nextStatus: input.status,

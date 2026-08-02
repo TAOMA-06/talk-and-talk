@@ -7,7 +7,7 @@ import {
 } from "node:crypto";
 
 import { DisabledWeChatPayProvider } from "./disabled-wechat-pay.provider";
-import { MockWeChatPayProvider } from "./mock-wechat-pay.provider";
+import { MockWeChatPayProvider, TEST_MOCK_WECHAT_NOTIFY_SECRET } from "./mock-wechat-pay.provider";
 import { RealWeChatPayProvider } from "./real-wechat-pay.provider";
 import {
   WeChatDailyStatementInput,
@@ -237,7 +237,7 @@ describe("WeChat Pay T+1 statement provider boundary", () => {
       .resolves.toEqual({ status: "noStatement", billDate: "2026-07-31", kind: "tradeAll" });
 
     const text = "交易时间,金额\n2026-07-31,10.00\n";
-    const fixture = new MockWeChatPayProvider([{
+    const fixture = new MockWeChatPayProvider(TEST_MOCK_WECHAT_NOTIFY_SECRET, [{
       billDate: "2026-07-31",
       kind: "tradeAll",
       text

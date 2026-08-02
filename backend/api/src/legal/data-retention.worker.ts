@@ -669,9 +669,12 @@ export class DataRetentionWorker implements OnModuleInit, OnModuleDestroy {
         throw new Error("Retention subject changed while locking ledger");
       }
       const placementPending = lockedActions.some(
-        (action) => action.action === "placement" && action.status === "pending"
+        (action: { action: string; status: string }) =>
+          action.action === "placement" && action.status === "pending"
       );
-      const activeHold = lockedHolds.some((hold) => hold.releasedAt === null);
+      const activeHold = lockedHolds.some(
+        (hold: { releasedAt: Date | null }) => hold.releasedAt === null
+      );
       if (placementPending || activeHold) {
         await db.accountDataRetentionRecord.update({
           where: { id: record.id },
@@ -1815,12 +1818,8 @@ export class DataRetentionWorker implements OnModuleInit, OnModuleDestroy {
         : empty;
     }
 
-    return this.processRestrictedSupportGraphPhaseBatch(
-      tx,
-      phase,
-      userId,
-      companionId
-    );
+    // Phases not owned by the restricted graph continue in processRetainedPhaseBatch.
+    return null;
   }
 
   private async verifyRetainedCategory(

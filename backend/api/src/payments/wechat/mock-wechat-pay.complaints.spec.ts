@@ -1,4 +1,4 @@
-import { MOCK_WECHAT_NOTIFY_TOKEN, MockWeChatPayProvider } from "./mock-wechat-pay.provider";
+import { TEST_MOCK_WECHAT_NOTIFY_SECRET, MockWeChatPayProvider } from "./mock-wechat-pay.provider";
 
 describe("MockWeChatPayProvider complaint contract", () => {
   it("supports notify, query, reply, complete and compensating list flows", async () => {
@@ -18,7 +18,7 @@ describe("MockWeChatPayProvider complaint contract", () => {
       }
     });
 
-    expect(provider.verifyNotifySignature({ "x-mock-wechat-token": MOCK_WECHAT_NOTIFY_TOKEN }, raw)).toBe(true);
+    expect(provider.verifyNotifySignature({ "x-mock-wechat-token": TEST_MOCK_WECHAT_NOTIFY_SECRET }, raw)).toBe(true);
     expect(provider.parseComplaintNotifyPayload(raw)).toMatchObject({
       complaintId: "complaint-1",
       actionType: "CREATE_COMPLAINT"

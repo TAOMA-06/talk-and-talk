@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 
-import { Controller, Get, Headers, Res, UnauthorizedException } from "@nestjs/common";
+import { Controller, Get, Headers, Res, ServiceUnavailableException, UnauthorizedException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Response } from "express";
 
@@ -18,8 +18,14 @@ export class MetricsController {
     @Headers("authorization") authorization?: string,
     @Res({ passthrough: true }) response?: Response
   ) {
-    if (this.config.getOrThrow<string>("APP_ENV") === "production") {
-      const expected = `Bearer ${this.config.getOrThrow<string>("METRICS_TOKEN")}`;
+    const appEnv = this.config.getOrThrow<string>("APP_ENV");
+    // Any non-local environment must present METRICS_TOKEN. Development stays open for local scrapers.
+    if (appEnv !== "development") {
+      const token = this.config.get<string>("METRICS_TOKEN")?.trim() ?? "";
+      if (token.length < 32) {
+        throw new ServiceUnavailableException("Metrics endpoint disabled: METRICS_TOKEN is not configured");
+      }
+      const expected = `Bearer ${token}`;
       if (!constantTimeEqual(authorization ?? "", expected)) {
         throw new UnauthorizedException("Metrics authentication required");
       }

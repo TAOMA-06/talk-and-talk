@@ -1,8 +1,10 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 
 import { AuthenticatedUser } from "../auth/auth.service";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { localOnlyModuleStatus } from "../common/status/local-only-module-status";
 import { CompanionsService } from "./companions.service";
 import { ApplyCompanionDto, UpdateOwnCompanionDto } from "./dto/apply-companion.dto";
 import { ListCompanionAvailabilityQueryDto } from "./dto/list-companion-availability.dto";
@@ -19,11 +21,14 @@ import { CreateOwnServiceOfferingDto, UpdateOwnServiceOfferingDto } from "./dto/
 
 @Controller("companions")
 export class CompanionsController {
-  constructor(private readonly companionsService: CompanionsService) {}
+  constructor(
+    private readonly companionsService: CompanionsService,
+    private readonly config: ConfigService
+  ) {}
 
   @Get("status")
   status() {
-    return { module: "companions", status: "active" };
+    return localOnlyModuleStatus(this.config, "companions");
   }
 
   @Get()

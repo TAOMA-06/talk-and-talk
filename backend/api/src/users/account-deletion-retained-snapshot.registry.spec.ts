@@ -1,12 +1,13 @@
 import { ACCOUNT_DELETION_RETAINED_SNAPSHOT_REGISTRY } from "./account-deletion-retained-snapshot.registry";
 
 describe("account deletion retained snapshot registry", () => {
-    it("pins the exact 51-source commercial retention registry", () => {
+    it("pins the exact 54-source commercial retention registry", () => {
       const expected = {
         transactions_tax_invoices: [
           "orders",
           "payment_transactions",
           "refund_transactions",
+          "financial_payment_dispute_orders",
           "invoice_requests",
           "companion_commercial_profiles",
           "companion_earnings",
@@ -40,13 +41,15 @@ describe("account deletion retained snapshot registry", () => {
           "conversations",
           "messages",
           "media_assets",
+          "controlled_case_evidence_attachments",
           "moderation_cases",
           "moderation_evidences",
           "moderation_action_logs",
           "moderation_appeals",
           "chat_restrictions",
           "crisis_interventions",
-          "companion_incident_reports"
+          "companion_incident_reports",
+          "companion_customer_future_boundaries"
         ],
         consent_rights_account_governance: [
           "legal_consent_receipts",
@@ -62,10 +65,10 @@ describe("account deletion retained snapshot registry", () => {
         ]
       } as const;
   
-      expect(ACCOUNT_DELETION_RETAINED_SNAPSHOT_REGISTRY).toHaveLength(51);
+      expect(ACCOUNT_DELETION_RETAINED_SNAPSHOT_REGISTRY).toHaveLength(54);
       expect(new Set(ACCOUNT_DELETION_RETAINED_SNAPSHOT_REGISTRY.map(
         (source) => `${source.category}/${source.sourceKey}`
-      )).size).toBe(51);
+      )).size).toBe(54);
       for (const [category, sourceKeys] of Object.entries(expected)) {
         expect(ACCOUNT_DELETION_RETAINED_SNAPSHOT_REGISTRY
           .filter((source) => source.category === category)

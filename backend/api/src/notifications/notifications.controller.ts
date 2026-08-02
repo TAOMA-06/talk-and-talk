@@ -1,8 +1,10 @@
 import { Body, Controller, Get, Param, Post, Query, UseGuards } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 
 import { AuthenticatedUser } from "../auth/auth.service";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { localOnlyModuleStatus } from "../common/status/local-only-module-status";
 import { ListNotificationsQueryDto } from "./dto/list-notifications.dto";
 import { CreateSubscriptionGrantDto } from "./dto/create-subscription-grant.dto";
 import { NotificationsService } from "./notifications.service";
@@ -12,12 +14,13 @@ import { WeChatSubscriptionService } from "./wechat/wechat-subscription.service"
 export class NotificationsController {
   constructor(
     private readonly notificationsService: NotificationsService,
-    private readonly subscriptions: WeChatSubscriptionService
+    private readonly subscriptions: WeChatSubscriptionService,
+    private readonly config: ConfigService
   ) {}
 
   @Get("status")
   status() {
-    return { module: "notifications", status: "active" };
+    return localOnlyModuleStatus(this.config, "notifications");
   }
 
   @Get()

@@ -1,8 +1,10 @@
 import { Body, Controller, Get, Param, Post, Query, UseGuards } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 
 import { AuthenticatedUser } from "../auth/auth.service";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { localOnlyModuleStatus } from "../common/status/local-only-module-status";
 import { PaymentsService } from "../payments/payments.service";
 import { VoiceService } from "../voice/voice.service";
 import { CreateOrderDto } from "./dto/create-order.dto";
@@ -19,12 +21,13 @@ export class OrdersController {
   constructor(
     private readonly ordersService: OrdersService,
     private readonly paymentsService: PaymentsService,
-    private readonly voiceService: VoiceService
+    private readonly voiceService: VoiceService,
+    private readonly config: ConfigService
   ) {}
 
   @Get("status")
   status() {
-    return { module: "orders", status: "active" };
+    return localOnlyModuleStatus(this.config, "orders");
   }
 
   @Post()

@@ -36,9 +36,19 @@ describe("shouldFailClosed", () => {
     "/api/v1/auth/wechat/mini-program",
     "/api/v1/auth/refresh",
     "/api/v1/review/auth/login",
-    "/api/v1/review/auth/refresh"
-  ])("protects production authentication route %s", (originalUrl) => {
+    "/api/v1/review/auth/refresh",
+    "/api/v1/orders",
+    "/api/v1/orders/ord-1/prepay",
+    "/api/v1/orders/ord-1/payment/sync",
+    "/api/v1/orders/ord-1/refund",
+    "/api/v1/conversations/c-1/media-uploads",
+    "/api/v1/support/tickets/t-1/evidence-uploads",
+    "/api/v1/attendance-disputes/d-1/evidence-uploads",
+    "/api/v1/commercial/companion/incident-evidence-uploads",
+    "/api/v1/case-evidence/uploads/a-1/complete"
+  ])("protects external sensitive route %s", (originalUrl) => {
     expect(shouldFailClosed({ method: "POST", originalUrl } as any, "production")).toBe(true);
+    expect(shouldFailClosed({ method: "POST", originalUrl } as any, "staging")).toBe(true);
   });
 
   it("keeps health checks available when Redis is unavailable", () => {

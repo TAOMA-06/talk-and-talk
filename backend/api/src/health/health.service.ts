@@ -11,10 +11,13 @@ export type DependencyStatus = {
   message?: string;
 };
 
-export type HealthResponse = {
+export type HealthLivenessResponse = {
   status: "ok" | "degraded";
   service: "talk-and-talk-api";
   version: string;
+};
+
+export type HealthReadyResponse = HealthLivenessResponse & {
   appEnv: string;
   uptimeSeconds: number;
   dependencies: {
@@ -23,13 +26,27 @@ export type HealthResponse = {
   };
 };
 
+/** @deprecated Prefer HealthLivenessResponse / HealthReadyResponse. */
+export type HealthResponse = HealthReadyResponse;
+
 @Injectable()
 export class HealthService {
   constructor(
     private readonly config: ConfigService
   ) {}
 
-  async check(): Promise<HealthResponse> {
+  /** Public liveness: status only, no env or dependency error details. */
+  async check(): Promise<HealthLivenessResponse> {
+    const ready = await this.ready();
+    return {
+      status: ready.status,
+      service: ready.service,
+      version: ready.version
+    };
+  }
+
+  /** Internal readiness with dependency detail. Callers must gate exposure. */
+  async ready(): Promise<HealthReadyResponse> {
     const [database, redis] = await Promise.all([
       this.checkDatabase(),
       this.checkRedis()
@@ -96,14 +113,12 @@ export class HealthService {
     };
   }
 
-  private error(start: number, error: unknown): DependencyStatus {
-    const exposeDetails = this.config.getOrThrow<string>("APP_ENV") !== "production";
+  private error(start: number, _error: unknown): DependencyStatus {
+    // Never echo dependency exception text to anonymous or authenticated health callers.
     return {
       status: "error",
       latencyMs: this.latency(start),
-      message: exposeDetails && error instanceof Error
-        ? error.message || error.name || "Dependency check failed"
-        : "Dependency check failed"
+      message: "Dependency check failed"
     };
   }
 

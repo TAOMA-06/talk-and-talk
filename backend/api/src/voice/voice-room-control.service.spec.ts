@@ -37,6 +37,12 @@ describe("VoiceRoomControlService", () => {
         return Promise.resolve([]);
       }),
       $executeRaw: jest.fn().mockResolvedValue(1),
+      order: {
+        findUnique: jest.fn().mockResolvedValue({
+          userId: "customer-1",
+          companion: { ownerUserId: "companion-owner-1" }
+        })
+      },
       voiceSession: {
         findUnique: jest.fn().mockResolvedValue(voiceSession),
         update: jest.fn().mockImplementation(async ({ data }: { data: { terminationReason: string } }) => ({

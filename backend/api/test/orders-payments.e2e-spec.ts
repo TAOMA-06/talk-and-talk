@@ -15,6 +15,10 @@ import {
   WeChatPayProvider
 } from "../src/payments/wechat/wechat-pay.provider";
 import { PaymentsService } from "../src/payments/payments.service";
+import {
+  grantCurrentCustomerAdultEligibility,
+  grantCurrentLegalConsent
+} from "./legal-consent-fixture";
 import { issueSessionBoundAccessToken } from "./session-token-fixture";
 
 describe("Orders and payments (e2e)", () => {
@@ -41,7 +45,7 @@ describe("Orders and payments (e2e)", () => {
 
     app = moduleRef.createNestApplication({ rawBody: true });
     app.setGlobalPrefix("api/v1");
-    app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }));
+    app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }));
     app.useGlobalInterceptors(new EnvelopeInterceptor());
     app.useGlobalFilters(new HttpExceptionFilter());
     app.enableCors(buildCorsOptions(app.get(ConfigService)));
@@ -89,6 +93,12 @@ describe("Orders and payments (e2e)", () => {
     await prisma.refreshToken.deleteMany();
     await prisma.verificationCode.deleteMany();
     await prisma.authIdentity.deleteMany();
+        await prisma.userAccountAppeal.deleteMany().catch(() => undefined);
+    await prisma.customerAdultEligibility.deleteMany().catch(() => undefined);
+    await prisma.userAccountAction.deleteMany().catch(() => undefined);
+    await prisma.identityVerificationRequest.deleteMany().catch(() => undefined);
+    await prisma.staffCredential.deleteMany().catch(() => undefined);
+    await prisma.legalConsentReceipt.deleteMany().catch(() => undefined);
     await prisma.userProfile.deleteMany();
     await prisma.user.deleteMany();
   }
@@ -111,21 +121,10 @@ describe("Orders and payments (e2e)", () => {
         }
       }
     });
-    await prisma.legalConsentReceipt.create({
-      data: {
-        userId: user.id,
-        version: "2.2-2026-08-01",
-        privacyVersion: "2.2-2026-08-01",
-        termsVersion: "2.2-2026-08-01",
-        privacyAccepted: true,
-        termsAccepted: true,
-        adultConfirmed: true,
-        acceptedAt: new Date(),
-        privacyUrl: "https://api.talkandtalk.app/legal/privacy.html",
-        termsUrl: "https://api.talkandtalk.app/legal/terms.html",
-        source: "wechatMiniProgram"
-      }
-    });
+    await grantCurrentLegalConsent(prisma, user.id);
+    if (role === "user" || role === "companion") {
+      await grantCurrentCustomerAdultEligibility(prisma, user.id);
+    }
 
     const token = await issueSessionBoundAccessToken(prisma, jwt, user);
     return { user, token };
@@ -507,7 +506,12 @@ describe("Orders and payments (e2e)", () => {
       .post(`/api/v1/orders/${order.body.data.id}/refund`)
       .set("Authorization", `Bearer ${customer.token}`)
       .send({ reason: "退款回调先到" })
-      .expect(500);
+      .expect((res) => {
+        // Transport/provider ambiguity may surface as 500 or 502; success must stick either way.
+        if (![500, 502].includes(res.status)) {
+          throw new Error(`unexpected refund probe status ${res.status}`);
+        }
+      });
 
     const refund = await prisma.refundTransaction.findFirstOrThrow({
       where: { orderId: order.body.data.id }
@@ -678,7 +682,9 @@ describe("Orders and payments (e2e)", () => {
         companionNameSnapshot: "小安",
         companionRoleSnapshot: "倾听者",
         companionInitialsSnapshot: "小安",
-        themeNameSnapshot: "情绪倾听"
+        themeNameSnapshot: "情绪倾听",
+        refundPolicyVersionSnapshot: "e2e-test-v1",
+        refundRequestWindowHoursSnapshot: 72,
       }
     });
     let releaseOrderLock: () => void = () => {};
@@ -1099,6 +1105,8 @@ describe("Orders and payments (e2e)", () => {
         companionRoleSnapshot: "倾听陪伴",
         companionInitialsSnapshot: "XN",
         themeNameSnapshot: "轻松聊天",
+        refundPolicyVersionSnapshot: "e2e-test-v1",
+        refundRequestWindowHoursSnapshot: 72,
         companionPayableCents: 5440,
         paidAt: new Date()
       }

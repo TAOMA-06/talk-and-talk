@@ -8,15 +8,24 @@ API="$BASE_URL/api/v1"
 : "${METRICS_TOKEN:?Set METRICS_TOKEN to the production metrics bearer token}"
 : "${PRODUCTION_ADMIN_ACCESS_TOKEN:?Set a short-lived production admin access token}"
 
-echo "==> Health and dependencies"
+echo "==> Health liveness and authenticated readiness"
 HEALTH=$(curl -fsS "$API/health")
 python3 - "$HEALTH" <<'PY'
 import json, sys
 data = json.loads(sys.argv[1])["data"]
 assert data["status"] == "ok", data
+assert "dependencies" not in data, data
+print(f"health liveness ok: {data['service']} {data['version']}")
+PY
+
+READY=$(curl -fsS -H "Authorization: Bearer $METRICS_TOKEN" "$API/health/ready")
+python3 - "$READY" <<'PY'
+import json, sys
+data = json.loads(sys.argv[1])["data"]
+assert data["status"] == "ok", data
 assert data["dependencies"]["database"]["status"] == "ok", data
 assert data["dependencies"]["redis"]["status"] == "ok", data
-print(f"health ok: {data['service']} {data['version']}")
+print(f"health ready ok: env={data.get('appEnv')}")
 PY
 
 echo "==> WeChat Mini Program configuration"

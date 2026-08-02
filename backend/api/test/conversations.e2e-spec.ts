@@ -10,7 +10,10 @@ import { HttpExceptionFilter } from "../src/common/errors/http-exception.filter"
 import { buildCorsOptions } from "../src/config/cors";
 import { PrismaService } from "../src/database/prisma.service";
 import { seedDatabase } from "../src/database/seed";
-import { grantCurrentLegalConsent } from "./legal-consent-fixture";
+import {
+  grantCurrentCustomerAdultEligibility,
+  grantCurrentLegalConsent
+} from "./legal-consent-fixture";
 import { issueSessionBoundAccessToken } from "./session-token-fixture";
 
 describe("Conversations (e2e)", () => {
@@ -35,7 +38,7 @@ describe("Conversations (e2e)", () => {
 
     app = moduleRef.createNestApplication();
     app.setGlobalPrefix("api/v1");
-    app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }));
+    app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }));
     app.useGlobalInterceptors(new EnvelopeInterceptor());
     app.useGlobalFilters(new HttpExceptionFilter());
     app.enableCors(buildCorsOptions(app.get(ConfigService)));
@@ -76,6 +79,12 @@ describe("Conversations (e2e)", () => {
     await prisma.refreshToken.deleteMany();
     await prisma.verificationCode.deleteMany();
     await prisma.authIdentity.deleteMany();
+        await prisma.userAccountAppeal.deleteMany().catch(() => undefined);
+    await prisma.customerAdultEligibility.deleteMany().catch(() => undefined);
+    await prisma.userAccountAction.deleteMany().catch(() => undefined);
+    await prisma.identityVerificationRequest.deleteMany().catch(() => undefined);
+    await prisma.staffCredential.deleteMany().catch(() => undefined);
+    await prisma.legalConsentReceipt.deleteMany().catch(() => undefined);
     await prisma.userProfile.deleteMany();
     await prisma.user.deleteMany();
   }
@@ -95,6 +104,7 @@ describe("Conversations (e2e)", () => {
       }
     });
     await grantCurrentLegalConsent(prisma, user.id);
+    await grantCurrentCustomerAdultEligibility(prisma, user.id);
 
     const token = await issueSessionBoundAccessToken(prisma, jwt, user);
     return { user, token };
@@ -117,6 +127,8 @@ describe("Conversations (e2e)", () => {
         companionRoleSnapshot: companion.role,
         companionInitialsSnapshot: companion.initials,
         themeNameSnapshot: "情绪倾听",
+        refundPolicyVersionSnapshot: "e2e-test-v1",
+        refundRequestWindowHoursSnapshot: 72,
         conversationId,
         paidAt: new Date()
       }

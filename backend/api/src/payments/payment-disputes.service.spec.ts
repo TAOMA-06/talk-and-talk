@@ -1,5 +1,5 @@
 import { PaymentDisputesService } from "./payment-disputes.service";
-import { MOCK_WECHAT_NOTIFY_TOKEN, MockWeChatPayProvider } from "./wechat/mock-wechat-pay.provider";
+import { TEST_MOCK_WECHAT_NOTIFY_SECRET, MockWeChatPayProvider } from "./wechat/mock-wechat-pay.provider";
 
 describe("PaymentDisputesService", () => {
   it("paginates participant-owned disputes and keeps direct lookups on the same sanitized scope", async () => {
@@ -265,8 +265,8 @@ describe("PaymentDisputesService", () => {
       resource: { plaintext: { complaint_id: "complaint-1", action_type: "CREATE_COMPLAINT" } }
     });
 
-    await service.handleWechatComplaintNotify({ "x-mock-wechat-token": MOCK_WECHAT_NOTIFY_TOKEN }, rawBody);
-    await service.handleWechatComplaintNotify({ "x-mock-wechat-token": MOCK_WECHAT_NOTIFY_TOKEN }, rawBody);
+    await service.handleWechatComplaintNotify({ "x-mock-wechat-token": TEST_MOCK_WECHAT_NOTIFY_SECRET }, rawBody);
+    await service.handleWechatComplaintNotify({ "x-mock-wechat-token": TEST_MOCK_WECHAT_NOTIFY_SECRET }, rawBody);
 
     expect(db.paymentDispute.create).toHaveBeenCalledTimes(1);
     expect(db.paymentDisputeNotification.create).toHaveBeenCalledTimes(1);

@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Param, Post, Put, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, NotFoundException, Param, Post, Put, Query, UseGuards } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { AuthenticatedUser } from "../auth/auth.service";
@@ -14,10 +15,17 @@ import { SetFutureBookingBoundaryDto } from "./dto/set-future-booking-boundary.d
 
 @Controller("conversations")
 export class ConversationsController {
-  constructor(private readonly conversationsService: ConversationsService) {}
+  constructor(
+    private readonly conversationsService: ConversationsService,
+    private readonly config: ConfigService
+  ) {}
 
   @Get("status")
   status() {
+    const appEnv = this.config.getOrThrow<string>("APP_ENV");
+    if (appEnv === "production" || appEnv === "staging") {
+      throw new NotFoundException();
+    }
     return this.conversationsService.status();
   }
 

@@ -14,7 +14,7 @@
 
 正式发行面固定为：普通用户和陪伴者共用微信小程序；商业员工使用 `/admin/`；独立审核员使用 `/review/`；三者以 NestJS `/api/v1` 为权威状态源。`frontend/ios`、消费者 Web 和本地演示均不参与本轮放行。
 
-第二轮市场对标、逐能力结论、刻意不复制项和外部 P0 见 [商用界面市场交叉审查（2026-08-01）](./commercial-market-cross-audit-2026-08-01.md)。报告曾发现的仓库 P0/P1 已逐项实现并进入自动回归；这只代表仓库闭环，外部 P0 证据未齐前生产仍为 No-Go。
+第二轮市场对标、逐能力结论、刻意不复制项和外部 P0 见 [商用界面市场交叉审查（2026-08-02 复审）](./commercial-market-cross-audit-2026-08-02.md)（2026-08-01 原文保留为历史快照）。报告曾发现的仓库 P0/P1 已逐项实现并进入自动回归；这只代表仓库闭环，外部 P0 证据未齐前生产仍为 No-Go。
 
 ## 不可触碰边界
 
@@ -59,7 +59,7 @@
 | 商业运营后台 | 经营、供给、订单、客服、退款、日账单对账、财务、账号与审计 | `/admin/` 不再只是审核跳转；危险动作默认只读并二次确认 | 仓库闭环 |
 | 独立审核后台 | 认领/交接、SLA、附件、处置、导出权限和审计 | ReviewStaff 身份不与 admin/user 混用，停用后不能获得新案件 | 仓库闭环 |
 | 发布验证 | 单测、构建、迁移、E2E、客户端 smoke、安全与产物检查 | 变更引入的失败清零；外部未验证项明确保持 No-Go | 自动验证通过；隔离 E2E 依赖待授权复跑 |
-| 竞品交叉审查 | 国内外同类产品逐页复核、遗漏修补 | 基于当期官方资料；事实、判断和未知分开记录 | 第二轮已审查；仓库 P0/P1 已清零 |
+| 竞品交叉审查 | 国内外同类产品逐页复核、遗漏修补 | 基于当期官方资料；事实、判断和未知分开记录 | 2026-08-02 复审已记录；仓库 P0/P1 已清零；生产仍 No-Go |
 
 ## 冻结基线与本轮验证
 
@@ -70,13 +70,12 @@
 - `frontend/miniprogram`: `node scripts/smoke.mjs` 通过，覆盖 consent/legal、373 次 API 调用、Mock/真实支付分支与 HTTPS/Cloud Run transport。
 - 工作区开始时已有用户修改：`backend/api/scripts/acceptance-smoke.sh`、`backend/api/src/auth/guards/jwt-auth.guard.ts`、新增的 guard spec，以及未跟踪的 `frontend/web/`；本轮不得覆盖或据为己有。
 
-本轮最终自动证据：
+本轮最终自动证据（2026-08-02 复验）：
 
-- `backend/api`: 121 个单元测试套件、1022 项测试通过；TypeScript 构建通过；39 项部署预检、静态后台和 OpenAPI 契约检查通过。
-- 微信日账单专项：provider、parser、service、worker、DTO、controller、商用 readiness 与后台契约均通过；无账单可人工重拉，后续取得真实账单会关闭旧缺账异常，但新差异仍保持开放。
-- `frontend/miniprogram`: TypeScript 通过，30 页面、5 Tab 结构校验通过；runtime smoke 覆盖 691 次 API 调用及法律/支付分支。
-- 隔离 PostgreSQL fresh DB：87 个迁移顺序全部成功；ReviewStaff 停用分配触发器和历史注销 retention ledger 回填在真实数据库中通过。
-- 完整 E2E 首跑只命中旧本地数据库未迁移及 Redis 非专用库保护；创建隔离 PostgreSQL 的沙箱授权审核本身失败，因此没有把 E2E 误报为通过。该复跑属于当前环境验证门禁，不改变已通过的单元、迁移和 smoke 证据。
+- `backend/api`: 141 个单元测试套件、1265 项测试通过；TypeScript 构建与 `verify:prod-artifacts` 通过；preflight 64 pass / 7 skip / 0 fail。
+- 隔离 PostgreSQL：全量 `prisma migrate deploy` 成功；本地 API `GET /api/v1/health` 返回 `status=ok`（database/redis ok）；`AuthModule` 全局化修复 JwtAuthGuard tombstone DI 启动失败。
+- `frontend/miniprogram`: 结构校验 31 页面 / 5 Tab；runtime smoke 788 次 API 调用及法律/支付/账号/申诉路径通过。
+- E2E（专用 Redis index 15 + 隔离库）：65 pass / 6 skip（审核路由迁 `/review`）/ 8 residual（注销双人闸与退款并发夹具债务）；**不**把 residual 记为通过。详见第二轮交叉审查与 scratch `e2e-residual.md`。
 
 ## 外部门禁
 

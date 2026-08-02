@@ -120,7 +120,7 @@ DEPLOY_ENV_FILE=../backend/api/.env.staging \
 
 生产部署默认加载 `backend/api/.env.production`（见 `infra/docker-compose.prod.yml` 中 `DEPLOY_ENV_FILE`，路径相对 `infra/`）。
 
-环境变量：`APP_ENV`（development/staging/production）控制 mock 支付与 seed；`GET /api/v1/health` 只返回依赖状态，metrics 需携带 `Authorization: Bearer $METRICS_TOKEN` 请求 `/api/v1/metrics`。
+环境变量：`APP_ENV`（development/staging/production）控制 mock 支付与 seed；`GET /api/v1/health` 返回精简 liveness，依赖细节走鉴权后的 `/api/v1/health/ready`；metrics 需携带 `Authorization: Bearer $METRICS_TOKEN` 请求 `/api/v1/metrics`（staging/production 强制）。
 
 微信小程序的当前本地结构与运行冒烟见 [小程序 README](../frontend/miniprogram/README.md)，真实环境联调见 [staging-acceptance.md](./staging-acceptance.md)，商用闭环证据见 [commercial-interface-closure.md](./commercial-interface-closure.md)。[miniprogram-verification.md](./miniprogram-verification.md) 只保留 2026-07-13 的历史双端验证记录。历史 iOS 若需单独维护，再按 `frontend/ios` 内配置运行；它不进入本节首发步骤。
 

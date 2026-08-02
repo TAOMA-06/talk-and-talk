@@ -1,7 +1,7 @@
 import { HttpStatus } from "@nestjs/common";
 
 import { AppException } from "../common/errors/app.exception";
-import { MockWeChatPayProvider } from "./wechat/mock-wechat-pay.provider";
+import { MockWeChatPayProvider, TEST_MOCK_WECHAT_NOTIFY_SECRET } from "./wechat/mock-wechat-pay.provider";
 import { PaymentsService } from "./payments.service";
 
 describe("PaymentsService", () => {
@@ -995,7 +995,7 @@ describe("PaymentsService", () => {
     });
 
     const result = await service.handleWechatNotify(
-      { "wechatpay-signature": "MOCK_OK" },
+      { "x-mock-wechat-token": TEST_MOCK_WECHAT_NOTIFY_SECRET },
       JSON.stringify({
         appid: "wx-mini-app",
         mchid: "1900000000",
@@ -1083,7 +1083,7 @@ describe("PaymentsService", () => {
     });
 
     const result = await service.handleWechatNotify(
-      { "wechatpay-signature": "MOCK_OK" },
+      { "x-mock-wechat-token": TEST_MOCK_WECHAT_NOTIFY_SECRET },
       JSON.stringify({
         appid: "wx-mini-app",
         mchid: "1900000000",
@@ -1118,7 +1118,7 @@ describe("PaymentsService", () => {
 
     await expect(
       service.handleWechatNotify(
-        { "wechatpay-signature": "MOCK_OK" },
+        { "x-mock-wechat-token": TEST_MOCK_WECHAT_NOTIFY_SECRET },
         JSON.stringify({
           appid: "wx-mini-app",
           mchid: "1900000000",
@@ -1148,7 +1148,7 @@ describe("PaymentsService", () => {
     ["mchid", "other-merchant", "WECHAT_MCH_ID_MISMATCH"]
   ])("rejects a payment notify with the wrong %s", async (field, value, code) => {
     await expect(service.handleWechatNotify(
-      { "wechatpay-signature": "MOCK_OK" },
+      { "x-mock-wechat-token": TEST_MOCK_WECHAT_NOTIFY_SECRET },
       JSON.stringify({
         appid: "wx-mini-app",
         mchid: "1900000000",
@@ -1163,7 +1163,7 @@ describe("PaymentsService", () => {
 
   it("rejects a payment notify with the wrong currency", async () => {
     await expect(service.handleWechatNotify(
-      { "wechatpay-signature": "MOCK_OK" },
+      { "x-mock-wechat-token": TEST_MOCK_WECHAT_NOTIFY_SECRET },
       JSON.stringify({
         appid: "wx-mini-app",
         mchid: "1900000000",
@@ -1188,7 +1188,7 @@ describe("PaymentsService", () => {
     }));
 
     await expect(service.handleWechatNotify(
-      { "wechatpay-signature": "MOCK_OK" },
+      { "x-mock-wechat-token": TEST_MOCK_WECHAT_NOTIFY_SECRET },
       JSON.stringify({
         appid: "wx-mini-app",
         mchid: "1900000000",
@@ -1213,7 +1213,7 @@ describe("PaymentsService", () => {
     });
 
     await expect(service.handleWechatRefundNotify(
-      { "wechatpay-signature": "MOCK_OK" },
+      { "x-mock-wechat-token": TEST_MOCK_WECHAT_NOTIFY_SECRET },
       JSON.stringify({
         appid: "wx-mini-app",
         mchid: "1900000000",
@@ -1240,7 +1240,7 @@ describe("PaymentsService", () => {
     });
 
     await expect(service.handleWechatRefundNotify(
-      { "wechatpay-signature": "MOCK_OK" },
+      { "x-mock-wechat-token": TEST_MOCK_WECHAT_NOTIFY_SECRET },
       JSON.stringify({
         appid: "wx-mini-app",
         mchid: "1900000000",
@@ -1664,7 +1664,7 @@ describe("PaymentsService", () => {
     }));
 
     await expect(service.handleWechatNotify(
-      { "wechatpay-signature": "MOCK_OK" },
+      { "x-mock-wechat-token": TEST_MOCK_WECHAT_NOTIFY_SECRET },
       JSON.stringify({
         appid: "wx-mini-app",
         mchid: "1900000000",

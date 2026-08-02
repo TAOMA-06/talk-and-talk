@@ -13,9 +13,7 @@ import { AdminPaymentDisputesController } from "./admin-payment-disputes.control
 import { PaymentDisputesController } from "./payment-disputes.controller";
 import { PaymentDisputesService } from "./payment-disputes.service";
 import { PaymentDisputesWorker } from "./payment-disputes.worker";
-import { DisabledWeChatPayProvider } from "./wechat/disabled-wechat-pay.provider";
-import { MockWeChatPayProvider } from "./wechat/mock-wechat-pay.provider";
-import { RealWeChatPayProvider, isWeChatConfigured } from "./wechat/real-wechat-pay.provider";
+import { createWeChatPayProvider } from "./wechat/wechat-pay-provider.factory";
 import { WECHAT_PAY_PROVIDER } from "./wechat/wechat-pay.provider";
 
 @Module({
@@ -30,49 +28,7 @@ import { WECHAT_PAY_PROVIDER } from "./wechat/wechat-pay.provider";
     PaymentDisputesWorker,
     {
       provide: WECHAT_PAY_PROVIDER,
-      useFactory: (config: ConfigService) => {
-        const appEnv = config.getOrThrow<string>("APP_ENV");
-        const env = {
-          WECHAT_PAY_APP_ID: config.get<string>("WECHAT_PAY_APP_ID", ""),
-          WECHAT_PAY_MCH_ID: config.get<string>("WECHAT_PAY_MCH_ID", ""),
-          WECHAT_PAY_API_V3_KEY: config.get<string>("WECHAT_PAY_API_V3_KEY", ""),
-          WECHAT_PAY_PRIVATE_KEY: config.get<string>("WECHAT_PAY_PRIVATE_KEY", ""),
-          WECHAT_PAY_PRIVATE_KEY_PATH: config.get<string>("WECHAT_PAY_PRIVATE_KEY_PATH", ""),
-          WECHAT_PAY_CERT_SERIAL_NO: config.get<string>("WECHAT_PAY_CERT_SERIAL_NO", ""),
-          WECHAT_MINIPROGRAM_APP_ID: config.get<string>("WECHAT_MINIPROGRAM_APP_ID", "")
-        };
-
-        // Production: Real when fully configured; otherwise Disabled (never Mock).
-        if (appEnv === "production") {
-          if (isWeChatConfigured(env)) {
-            return new RealWeChatPayProvider({
-              appId: env.WECHAT_PAY_APP_ID,
-              mchId: env.WECHAT_PAY_MCH_ID,
-              apiV3Key: env.WECHAT_PAY_API_V3_KEY,
-              privateKey: env.WECHAT_PAY_PRIVATE_KEY,
-              privateKeyPath: env.WECHAT_PAY_PRIVATE_KEY_PATH,
-              certSerialNo: env.WECHAT_PAY_CERT_SERIAL_NO,
-              miniProgramAppId: env.WECHAT_MINIPROGRAM_APP_ID
-            });
-          }
-          return new DisabledWeChatPayProvider();
-        }
-
-        // Staging / development / test: prefer Real when configured, else Mock closed-loop.
-        if (isWeChatConfigured(env)) {
-          return new RealWeChatPayProvider({
-            appId: env.WECHAT_PAY_APP_ID,
-            mchId: env.WECHAT_PAY_MCH_ID,
-            apiV3Key: env.WECHAT_PAY_API_V3_KEY,
-            privateKey: env.WECHAT_PAY_PRIVATE_KEY,
-            privateKeyPath: env.WECHAT_PAY_PRIVATE_KEY_PATH,
-            certSerialNo: env.WECHAT_PAY_CERT_SERIAL_NO,
-            miniProgramAppId: env.WECHAT_MINIPROGRAM_APP_ID
-          });
-        }
-
-        return new MockWeChatPayProvider();
-      },
+      useFactory: (config: ConfigService) => createWeChatPayProvider(config),
       inject: [ConfigService]
     }
   ],

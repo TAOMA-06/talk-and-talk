@@ -22,10 +22,12 @@ async function bootstrap() {
   const bodyLimit = config.get<string>("BODY_SIZE_LIMIT") ?? "1mb";
   const apiPrefix = config.getOrThrow<string>("API_PREFIX").replace(/^\/+|\/+$/g, "");
 
-  // Production is deployed behind exactly one trusted reverse-proxy hop (the compose Nginx
-  // service). Express then derives req.ip from the right-most untrusted address instead of
-  // application code trusting a client-controlled X-Forwarded-For value.
-  if (config.getOrThrow<string>("APP_ENV") === "production") {
+  // Reverse-proxied deployments (staging + production) sit behind one trusted hop
+  // (compose Nginx / CloudBase edge). Express then derives req.ip from the right-most
+  // untrusted address instead of application code trusting a client-controlled
+  // X-Forwarded-For value.
+  const appEnv = config.getOrThrow<string>("APP_ENV");
+  if (appEnv === "production" || appEnv === "staging") {
     app.set("trust proxy", 1);
   }
 
@@ -68,7 +70,7 @@ async function bootstrap() {
   router.get("/admin/", (_req: any, res: any) => res.sendFile(join(publicRoot, "admin", "index.html")));
 
   app.setGlobalPrefix(apiPrefix);
-  app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }));
+  app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }));
   app.useGlobalInterceptors(new EnvelopeInterceptor());
   app.useGlobalFilters(new HttpExceptionFilter());
   app.enableCors(buildCorsOptions(config));

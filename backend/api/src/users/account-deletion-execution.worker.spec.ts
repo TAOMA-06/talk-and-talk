@@ -395,14 +395,14 @@ describe("AccountDeletionExecutionWorker retained snapshot registry", () => {
       action: "account.deletion_retention_snapshot_recorded",
       metadata: expect.objectContaining({
         category: "transactions_tax_invoices",
-        sourceCount: 16
+        sourceCount: 17
       })
     }), harness.tx);
   });
 
   it.each([
-    ["transactions_tax_invoices", "retained_transactions_snapshot", "retained_safety_snapshot", 16],
-    ["support_disputes_safety", "retained_safety_snapshot", "retained_governance_snapshot", 25],
+    ["transactions_tax_invoices", "retained_transactions_snapshot", "retained_safety_snapshot", 17],
+    ["support_disputes_safety", "retained_safety_snapshot", "retained_governance_snapshot", 27],
     ["consent_rights_account_governance", "retained_governance_snapshot", "final_verification", 10]
   ] as const)(
     "aggregates completed %s progress and advances its phase",
