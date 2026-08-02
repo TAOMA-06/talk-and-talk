@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1731" height="909" viewBox="0 0 1731 909" fill="none">
+  <defs>
+    <linearGradient id="surface" x1="0" y1="0" x2="1731" y2="909" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#102F47"/>
+      <stop offset="0.58" stop-color="#123F58"/>
+      <stop offset="1" stop-color="#0D273C"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientTransform="translate(1400 135) rotate(136) scale(523 489)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7ED8D4" stop-opacity=".3"/>
+      <stop offset="1" stop-color="#7ED8D4" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="signal" x1="1032" y1="315" x2="1571" y2="548" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#BDE9E8"/>
+      <stop offset=".5" stop-color="#F6D6A8"/>
+      <stop offset="1" stop-color="#BDE9E8"/>
+    </linearGradient>
+    <filter id="shadow" x="900" y="150" width="750" height="610" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="34" stdDeviation="36" flood-color="#081A29" flood-opacity=".36"/>
+    </filter>
+  </defs>
+  <rect width="1731" height="909" fill="url(#surface)"/>
+  <rect width="1731" height="909" fill="url(#glow)"/>
+  <g opacity=".08" stroke="#C7EEEC">
+    <path d="M0 91H1731M0 182H1731M0 273H1731M0 364H1731M0 455H1731M0 546H1731M0 637H1731M0 728H1731M0 819H1731"/>
+    <path d="M91 0V909M182 0V909M273 0V909M364 0V909M455 0V909M546 0V909M637 0V909M728 0V909M819 0V909M910 0V909M1001 0V909M1092 0V909M1183 0V909M1274 0V909M1365 0V909M1456 0V909M1547 0V909M1638 0V909"/>
+  </g>
+  <g transform="translate(115 108)">
+    <rect width="58" height="58" rx="18" fill="#E6F5F5"/>
+    <path d="M17 20.5C17 16.9 19.9 14 23.5 14H35c3.9 0 7 3.1 7 7v8.4c0 3.9-3.1 7-7 7h-5.3l-6.2 5c-1.1.9-2.7.1-2.7-1.3v-3.7a7 7 0 0 1-3.8-6.2v-9.7Z" stroke="#123F58" stroke-width="2.8" stroke-linejoin="round"/>
+    <path d="M25.8 25.2c0-1.7 1.4-3.1 3.1-3.1.9 0 1.7.4 2.2 1.1a3.1 3.1 0 0 1 2.2-1.1c1.8 0 3.2 1.4 3.2 3.1 0 2.8-3.5 4.9-5.4 6.4-2-1.5-5.3-3.6-5.3-6.4Z" fill="#123F58"/>
+    <text x="79" y="27" fill="#FFFFFF" font-family="Fraunces, Georgia, serif" font-size="39" font-weight="600" letter-spacing="-1.8">Talk&amp;Talk</text>
+    <text x="80" y="50" fill="#A8D3D8" font-family="PingFang SC, Noto Sans CJK SC, sans-serif" font-size="14" font-weight="600" letter-spacing="2.4">有边界的线上陪伴</text>
+  </g>
+  <g transform="translate(115 282)">
+    <text fill="#F7D49D" font-family="PingFang SC, Noto Sans CJK SC, sans-serif" font-size="17" font-weight="700" letter-spacing="3">可信服务路径</text>
+    <text y="96" fill="#FFFFFF" font-family="PingFang SC, Noto Sans CJK SC, sans-serif" font-size="69" font-weight="700" letter-spacing="-4">认真倾听，不该只是一句温柔的话。</text>
+    <text y="183" fill="#D4EFF0" font-family="PingFang SC, Noto Sans CJK SC, sans-serif" font-size="69" font-weight="700" letter-spacing="-4">它也该有一条让人安心的路径。</text>
+    <text y="261" fill="#B8D3D7" font-family="PingFang SC, Noto Sans CJK SC, sans-serif" font-size="25" font-weight="400">发现、预约、沟通与支持，留在同一套可信结构里。</text>
+    <g transform="translate(0 332)">
+      <rect width="318" height="58" rx="29" fill="#1B5E74" stroke="#A9DADD" stroke-opacity=".32"/>
+      <text x="28" y="37" fill="#FFFFFF" font-family="PingFang SC, Noto Sans CJK SC, sans-serif" font-size="18" font-weight="700">女性友好的服务体验</text>
+      <path d="M272 22h15m0 0-6-6m6 6-6 6" stroke="#F6D6A8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="916" y="178" width="692" height="552" rx="34" fill="#143B52" fill-opacity=".95" stroke="#C6EFEE" stroke-opacity=".28"/>
+    <text x="960" y="230" fill="#BCE5E6" font-family="Arial, sans-serif" font-size="14" font-weight="700" letter-spacing="3">CONNECTION SIGNAL</text>
+    <text x="1468" y="230" fill="#F6D6A8" font-family="PingFang SC, Noto Sans CJK SC, sans-serif" font-size="15" font-weight="700">可信路径</text>
+    <path d="M960 260H1564" stroke="#C4E9E8" stroke-opacity=".15"/>
+    <rect x="958" y="293" width="608" height="251" rx="25" fill="#E7FBFA" fill-opacity=".06" stroke="#C6EFEE" stroke-opacity=".17"/>
+    <path d="M1032 468C1128 468 1150 333 1282 333C1414 333 1437 468 1533 468" stroke="#BFEAE9" stroke-opacity=".27" stroke-width="5" stroke-linecap="round"/>
+    <path d="M1032 468C1128 468 1150 333 1282 333C1414 333 1437 468 1533 468" stroke="url(#signal)" stroke-width="6" stroke-linecap="round" stroke-dasharray="10 16"/>
+    <g>
+      <circle cx="1032" cy="468" r="28" fill="#F6D6A8" stroke="#FFF2D4" stroke-width="3"/>
+      <circle cx="1032" cy="468" r="8" fill="#143B52"/>
+      <text x="1032" y="522" text-anchor="middle" fill="#CBEDEF" font-family="Arial, sans-serif" font-size="13" font-weight="700">01</text>
+    </g>
+    <g>
+      <circle cx="1282" cy="333" r="28" fill="#143B52" stroke="#BFEAE9" stroke-width="3"/>
+      <circle cx="1282" cy="333" r="8" fill="#A9E1E0"/>
+      <text x="1282" y="286" text-anchor="middle" fill="#CBEDEF" font-family="Arial, sans-serif" font-size="13" font-weight="700">02</text>
+    </g>
+    <g>
+      <circle cx="1533" cy="468" r="28" fill="#143B52" stroke="#BFEAE9" stroke-width="3"/>
+      <circle cx="1533" cy="468" r="8" fill="#A9E1E0"/>
+      <text x="1533" y="522" text-anchor="middle" fill="#CBEDEF" font-family="Arial, sans-serif" font-size="13" font-weight="700">03</text>
+    </g>
+    <g transform="translate(960 579)">
+      <rect width="174" height="80" rx="15" fill="#F6D6A8" fill-opacity=".13" stroke="#F6D6A8" stroke-opacity=".75"/>
+      <text x="18" y="29" fill="#F6D6A8" font-family="PingFang SC, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="700">认识服务</text>
+      <text x="18" y="56" fill="#FFFFFF" font-family="PingFang SC, Noto Sans CJK SC, sans-serif" font-size="17" font-weight="700">边界先说清</text>
+    </g>
+    <g transform="translate(1156 579)">
+      <rect width="194" height="80" rx="15" fill="#E7FBFA" fill-opacity=".06" stroke="#C6EFEE" stroke-opacity=".2"/>
+      <text x="18" y="29" fill="#BCE5E6" font-family="PingFang SC, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="700">确认规则</text>
+      <text x="18" y="56" fill="#FFFFFF" font-family="PingFang SC, Noto Sans CJK SC, sans-serif" font-size="17" font-weight="700">状态可回看</text>
+    </g>
+    <g transform="translate(1372 579)">
+      <rect width="194" height="80" rx="15" fill="#E7FBFA" fill-opacity=".06" stroke="#C6EFEE" stroke-opacity=".2"/>
+      <text x="18" y="29" fill="#BCE5E6" font-family="PingFang SC, Noto Sans CJK SC, sans-serif" font-size="12" font-weight="700">平台支持</text>
+      <text x="18" y="56" fill="#FFFFFF" font-family="PingFang SC, Noto Sans CJK SC, sans-serif" font-size="17" font-weight="700">关系有回应</text>
+    </g>
+  </g>
+  <text x="115" y="824" fill="#89BFC3" font-family="PingFang SC, Noto Sans CJK SC, sans-serif" font-size="17" font-weight="600" letter-spacing="1.2">发现 · 预约 · 沟通 · 支持</text>
+</svg>
