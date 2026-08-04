@@ -54,6 +54,7 @@ export type CommercialReadinessBlockers = {
   retainedExpiryFailures: number;
   overdueUserAccountAppeals: number;
   overdueCompanionAccountAppeals: number;
+  overdueCompanionRemediationTasks: number;
   overduePaymentDisputes: number;
   paymentDisputeSyncFailures: number;
   notificationDeliveryDisabledWithPending: number;
@@ -496,6 +497,7 @@ export class CommercialService {
       latestRetentionFailure,
       overdueUserAccountAppeals,
       overdueCompanionAccountAppeals,
+      overdueCompanionRemediationTasks,
       overduePaymentDisputes,
       paymentDisputeSyncFailures,
       failedNotifications,
@@ -645,6 +647,11 @@ export class CommercialService {
       this.prisma.companionAccountAppeal.count({
         where: { status: "pending", reviewDueAt: { lt: now } }
       } as any),
+      (this.prisma as any).companionRemediationTask?.count
+        ? (this.prisma as any).companionRemediationTask.count({
+            where: { status: "overdue" }
+          })
+        : Promise.resolve(0),
       (this.prisma as any).paymentDispute.count({
         where: {
           status: { in: ["pendingSync", "open", "processing", "syncFailed"] },
@@ -820,6 +827,7 @@ export class CommercialService {
       retainedExpiryFailures,
       overdueUserAccountAppeals,
       overdueCompanionAccountAppeals,
+      overdueCompanionRemediationTasks,
       overduePaymentDisputes,
       paymentDisputeSyncFailures,
       notificationDeliveryDisabledWithPending:

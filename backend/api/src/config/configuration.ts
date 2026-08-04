@@ -138,6 +138,9 @@ interface Environment {
   DATA_EXPORT_MAX_BYTES: number;
   COMPANION_APPEAL_SUBMISSION_DAYS: number;
   COMPANION_APPEAL_RESPONSE_HOURS: number;
+  COMPANION_REMEDIATION_OVERDUE_WORKER_ENABLED: boolean;
+  COMPANION_REMEDIATION_OVERDUE_WORKER_INTERVAL_SECONDS: number;
+  COMPANION_REMEDIATION_OVERDUE_WORKER_BATCH_SIZE: number;
   NOTIFICATION_DELIVERY_ENABLED: boolean;
   NOTIFICATION_DELIVERY_INTERVAL_SECONDS: number;
   NOTIFICATION_DELIVERY_BATCH_SIZE: number;
@@ -941,6 +944,24 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     1,
     24 * 30
   );
+  const companionRemediationOverdueWorkerEnabled = parseBoolean(
+    env.COMPANION_REMEDIATION_OVERDUE_WORKER_ENABLED,
+    nodeEnv !== "test"
+  );
+  const companionRemediationOverdueWorkerIntervalSeconds = boundedInteger(
+    "COMPANION_REMEDIATION_OVERDUE_WORKER_INTERVAL_SECONDS",
+    env.COMPANION_REMEDIATION_OVERDUE_WORKER_INTERVAL_SECONDS,
+    60,
+    5,
+    60 * 60
+  );
+  const companionRemediationOverdueWorkerBatchSize = boundedInteger(
+    "COMPANION_REMEDIATION_OVERDUE_WORKER_BATCH_SIZE",
+    env.COMPANION_REMEDIATION_OVERDUE_WORKER_BATCH_SIZE,
+    50,
+    1,
+    200
+  );
   const notificationDeliveryEnabled = parseBoolean(
     env.NOTIFICATION_DELIVERY_ENABLED,
     nodeEnv !== "test"
@@ -1608,6 +1629,10 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     DATA_EXPORT_MAX_BYTES: dataExportMaxBytes,
     COMPANION_APPEAL_SUBMISSION_DAYS: companionAppealSubmissionDays,
     COMPANION_APPEAL_RESPONSE_HOURS: companionAppealResponseHours,
+    COMPANION_REMEDIATION_OVERDUE_WORKER_ENABLED: companionRemediationOverdueWorkerEnabled,
+    COMPANION_REMEDIATION_OVERDUE_WORKER_INTERVAL_SECONDS:
+      companionRemediationOverdueWorkerIntervalSeconds,
+    COMPANION_REMEDIATION_OVERDUE_WORKER_BATCH_SIZE: companionRemediationOverdueWorkerBatchSize,
     NOTIFICATION_DELIVERY_ENABLED: notificationDeliveryEnabled,
     NOTIFICATION_DELIVERY_INTERVAL_SECONDS: notificationDeliveryIntervalSeconds,
     NOTIFICATION_DELIVERY_BATCH_SIZE: notificationDeliveryBatchSize,

@@ -305,6 +305,8 @@ const RETENTION_RESTRICTED_PHASES: Record<string, readonly string[]> = {
     "user_account_action",
     "companion_training",
     "companion_account_appeal",
+    "companion_remediation_task",
+    "companion_quality_case",
     "companion_account_action",
     "companion_detach",
     "retention_verify"
@@ -1417,6 +1419,24 @@ export class DataRetentionWorker implements OnModuleInit, OnModuleDestroy {
     if (phase === "companion_account_appeal") {
       return companionId
         ? del("CompanionAccountAppeal", 'target."companionId" = $1', [companionId])
+        : empty;
+    }
+    if (phase === "companion_remediation_task") {
+      return companionId
+        ? del(
+            "CompanionRemediationTask",
+            `EXISTS (
+              SELECT 1 FROM "CompanionQualityCase" quality_case
+              WHERE quality_case."id" = target."caseId"
+                AND quality_case."companionId" = $1
+            )`,
+            [companionId]
+          )
+        : empty;
+    }
+    if (phase === "companion_quality_case") {
+      return companionId
+        ? del("CompanionQualityCase", 'target."companionId" = $1', [companionId])
         : empty;
     }
     if (phase === "companion_account_action") {

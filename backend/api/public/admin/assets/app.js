@@ -140,6 +140,7 @@
     accountDeletionAuthTombstoneUnknownKeys: "存在当前密钥环无法验证的登录标识保护摘要，新身份注册已关闭",
     overdueUserAccountAppeals: "普通用户账号申诉复核超时",
     overdueCompanionAccountAppeals: "陪伴者账号申诉复核超时",
+    overdueCompanionRemediationTasks: "陪伴者整改任务逾期",
     failedNotifications: "用户通知失败",
     staleNotificationLeases: "通知任务租约过期",
     notificationDeliveryDisabledWithPending: "通知队列有待投递任务，但投递工作进程未启用",

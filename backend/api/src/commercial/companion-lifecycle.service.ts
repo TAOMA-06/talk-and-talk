@@ -9,9 +9,12 @@ import { PrismaService } from "../database/prisma.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { ControlledCaseEvidenceService } from "../moderation/media/controlled-case-evidence.service";
 import {
+  AddRemediationTaskDto,
+  CompleteRemediationTaskDto,
   CreateCompanionAccountActionDto,
   CreateCompanionAppealDto,
   CreateCompanionIncidentDto,
+  CreateCompanionQualityCaseDto,
   CreateWithdrawalRequestDto,
   ResolveCompanionAppealDto,
   ResolveCompanionIncidentDto,
@@ -610,76 +613,636 @@ export class CompanionLifecycleService {
     const action = await this.prisma.$transaction(async (tx) => {
       const db = tx as any;
       await db.$queryRaw`SELECT "id" FROM "CompanionProfile" WHERE "id" = ${input.companionId} FOR UPDATE`;
+      return this.createAccountActionInTx(db, actorId, {
+        companionId: input.companionId,
+        kind: input.kind,
+        reasonCode: input.reasonCode,
+        message: input.message,
+        endsAt,
+        appealDeadlineAt
+      });
+    });
+    return this.actionDto(action);
+  }
+
+  async createQualityCase(actorId: string, input: CreateCompanionQualityCaseDto) {
+    const tasks = input.tasks ?? [];
+    if (input.grade === "needsRemediation" && tasks.length === 0) {
+      throw new AppException(
+        "COMPANION_QUALITY_TASKS_REQUIRED",
+        "needsRemediation cases require at least one remediation task",
+        HttpStatus.BAD_REQUEST
+      );
+    }
+    for (const task of tasks) {
+      const dueAt = new Date(task.dueAt);
+      if (Number.isNaN(dueAt.getTime()) || dueAt.getTime() <= Date.now()) {
+        throw new AppException(
+          "COMPANION_REMEDIATION_DUE_INVALID",
+          "Remediation task due time must be in the future",
+          HttpStatus.BAD_REQUEST
+        );
+      }
+    }
+
+    // noIssue defaults to closed; other grades stay open unless explicitly closed with no tasks.
+    const closeImmediately = input.grade === "noIssue"
+      ? input.closeImmediately !== false
+      : input.closeImmediately === true;
+    if (closeImmediately && tasks.length > 0) {
+      throw new AppException(
+        "COMPANION_QUALITY_CLOSE_WITH_TASKS",
+        "Cannot close a quality case that still has open remediation tasks",
+        HttpStatus.BAD_REQUEST
+      );
+    }
+
+    const appealSubmissionDays =
+      this.config.get<number>("COMPANION_APPEAL_SUBMISSION_DAYS") ?? 30;
+    const appealDeadlineAt = new Date(
+      Date.now() + appealSubmissionDays * 24 * 60 * 60_000
+    );
+
+    const created = await this.prisma.$transaction(async (tx) => {
+      const db = tx as any;
+      await db.$queryRaw`SELECT "id" FROM "CompanionProfile" WHERE "id" = ${input.companionId} FOR UPDATE`;
       const companion = await db.companionProfile.findUnique({ where: { id: input.companionId } });
       if (!companion) {
         throw new AppException("COMPANION_NOT_FOUND", "Companion not found", HttpStatus.NOT_FOUND);
       }
-      const created = await db.companionAccountAction.create({
+
+      if (input.sourceIncidentId) {
+        const incident = await db.companionIncidentReport.findFirst({
+          where: { id: input.sourceIncidentId, companionId: companion.id },
+          select: { id: true }
+        });
+        if (!incident) {
+          throw new AppException(
+            "COMPANION_INCIDENT_NOT_FOUND",
+            "Source incident not found for this companion",
+            HttpStatus.NOT_FOUND
+          );
+        }
+      }
+      if (input.sourceActionId) {
+        const action = await db.companionAccountAction.findFirst({
+          where: { id: input.sourceActionId, companionId: companion.id },
+          select: { id: true }
+        });
+        if (!action) {
+          throw new AppException(
+            "COMPANION_ACTION_NOT_FOUND",
+            "Source account action not found for this companion",
+            HttpStatus.NOT_FOUND
+          );
+        }
+      }
+
+      let linkedActionId = input.sourceActionId ?? null;
+      if (input.grade === "restrictIntake" || input.grade === "delist") {
+        const kind = input.grade === "restrictIntake" ? "serviceRestriction" : "suspension";
+        const action = await this.createAccountActionInTx(db, actorId, {
+          companionId: companion.id,
+          kind,
+          reasonCode: input.reasonCode.trim(),
+          message: input.summary.trim(),
+          endsAt: null,
+          appealDeadlineAt
+        });
+        linkedActionId = action.id;
+      }
+
+      const now = new Date();
+      const qualityCase = await db.companionQualityCase.create({
         data: {
           companionId: companion.id,
-          kind: input.kind,
+          grade: input.grade,
           reasonCode: input.reasonCode.trim(),
-          message: input.message.trim(),
-          endsAt,
-          appealDeadlineAt,
-          createdById: actorId
-        }
-      });
-      if (input.kind === "serviceRestriction" || input.kind === "suspension") {
-        await db.companionProfile.update({
-          where: { id: companion.id },
-          data: { isPublished: false, availability: "busy", isOnline: false }
-        });
-      }
-      if (input.kind === "suspension") {
-        await db.companionCommercialProfile.updateMany({
-          where: { companionId: companion.id },
-          data: {
-            status: "suspended",
-            suspendedAt: new Date(),
-            suspendedById: actorId,
-            suspendedReason: input.message.trim()
+          summary: input.summary.trim(),
+          sourceIncidentId: input.sourceIncidentId ?? null,
+          sourceActionId: linkedActionId,
+          createdById: actorId,
+          status: closeImmediately ? "closed" : "open",
+          closedAt: closeImmediately ? now : null,
+          closedById: closeImmediately ? actorId : null,
+          tasks: {
+            create: tasks.map((task) => ({
+              title: task.title.trim(),
+              moduleCode: task.moduleCode?.trim() || null,
+              dueAt: new Date(task.dueAt),
+              status: "open"
+            }))
           }
-        });
-      }
+        },
+        include: { tasks: { orderBy: [{ dueAt: "asc" }, { id: "asc" }] } }
+      });
+
       await this.audit.record({
         actorId,
         subjectUserIds: companion.ownerUserId ? [companion.ownerUserId] : [],
-        action: "commercial.companion_account_action_created",
-        resourceType: "companionAccountAction",
-        resourceId: created.id,
+        action: "commercial.companion_quality_case_created",
+        resourceType: "companionQualityCase",
+        resourceId: qualityCase.id,
         metadata: {
           companionId: companion.id,
-          kind: input.kind,
+          grade: input.grade,
           reasonCode: input.reasonCode.trim(),
-          endsAt: endsAt?.toISOString() ?? null,
-          appealDeadlineAt: appealDeadlineAt.toISOString()
+          status: qualityCase.status,
+          taskCount: tasks.length,
+          sourceIncidentId: input.sourceIncidentId ?? null,
+          sourceActionId: linkedActionId
         }
       }, db);
-      if (companion.ownerUserId) {
+
+      if (companion.ownerUserId && input.grade !== "noIssue") {
         await this.notifications.createTransactional(db, {
           userId: companion.ownerUserId,
           type: "safetyAlert",
-          title: input.kind === "warning"
-            ? "陪伴者账号收到平台提醒"
-            : input.kind === "serviceRestriction"
-              ? "陪伴者服务资格已受限"
-              : "陪伴者服务资格已暂停",
-          body: created.message,
+          title: input.grade === "needsRemediation"
+            ? "陪伴者质量整改工单已创建"
+            : input.grade === "restrictIntake"
+              ? "陪伴者接单资格已受限"
+              : "陪伴者已被下架停用",
+          body: qualityCase.summary,
           data: {
             route: "companionDevelopment",
-            actionId: created.id,
-            actionKind: created.kind,
-            reasonCode: created.reasonCode,
-            appealDeadlineAt: created.appealDeadlineAt.toISOString()
+            qualityCaseId: qualityCase.id,
+            grade: qualityCase.grade,
+            reasonCode: qualityCase.reasonCode
           },
-          eventKey: `companion-account-action:${created.id}:created:${companion.ownerUserId}`,
+          eventKey: `companion-quality-case:${qualityCase.id}:created:${companion.ownerUserId}`,
           templateKey: "supportUpdate"
         });
       }
+
+      return qualityCase;
+    });
+
+    return this.qualityCaseDto(created);
+  }
+
+  async listQualityCasesAdmin(status?: string, page = 1, pageSize = 50) {
+    const safePage = Math.max(1, Math.floor(page));
+    const safePageSize = Math.min(100, Math.max(1, Math.floor(pageSize)));
+    const where = status ? { status } : {};
+    const [items, total] = await Promise.all([
+      (this.prisma as any).companionQualityCase.findMany({
+        where,
+        include: {
+          companion: { select: { id: true, name: true, ownerUserId: true } },
+          tasks: { orderBy: [{ dueAt: "asc" }, { id: "asc" }] }
+        },
+        orderBy: [{ status: "asc" }, { createdAt: "desc" }, { id: "desc" }],
+        skip: (safePage - 1) * safePageSize,
+        take: safePageSize
+      }),
+      (this.prisma as any).companionQualityCase.count({ where })
+    ]);
+    return {
+      items: items.map((item: any) => ({
+        ...this.qualityCaseDto(item),
+        companion: item.companion
+      })),
+      pagination: this.pagination(safePage, safePageSize, total)
+    };
+  }
+
+  async listQualityCasesForCompanion(userId: string) {
+    const companion = await this.ownCompanion(userId);
+    const items = await (this.prisma as any).companionQualityCase.findMany({
+      where: { companionId: companion.id },
+      include: { tasks: { orderBy: [{ dueAt: "asc" }, { id: "asc" }] } },
+      orderBy: [{ status: "asc" }, { createdAt: "desc" }, { id: "desc" }]
+    });
+    return { items: items.map((item: any) => this.qualityCaseDto(item)) };
+  }
+
+  async addRemediationTask(actorId: string, caseId: string, input: AddRemediationTaskDto) {
+    const dueAt = new Date(input.dueAt);
+    if (Number.isNaN(dueAt.getTime()) || dueAt.getTime() <= Date.now()) {
+      throw new AppException(
+        "COMPANION_REMEDIATION_DUE_INVALID",
+        "Remediation task due time must be in the future",
+        HttpStatus.BAD_REQUEST
+      );
+    }
+    const task = await this.prisma.$transaction(async (tx) => {
+      const db = tx as any;
+      await db.$queryRaw`SELECT "id" FROM "CompanionQualityCase" WHERE "id" = ${caseId} FOR UPDATE`;
+      const qualityCase = await db.companionQualityCase.findUnique({
+        where: { id: caseId },
+        include: { companion: { select: { ownerUserId: true } } }
+      });
+      if (!qualityCase) {
+        throw new AppException("COMPANION_QUALITY_CASE_NOT_FOUND", "Quality case not found", HttpStatus.NOT_FOUND);
+      }
+      if (qualityCase.status !== "open") {
+        throw new AppException(
+          "COMPANION_QUALITY_CASE_NOT_OPEN",
+          "Remediation tasks can only be added to open quality cases",
+          HttpStatus.CONFLICT
+        );
+      }
+      const created = await db.companionRemediationTask.create({
+        data: {
+          caseId: qualityCase.id,
+          title: input.title.trim(),
+          moduleCode: input.moduleCode?.trim() || null,
+          dueAt,
+          status: "open"
+        }
+      });
+      await this.audit.record({
+        actorId,
+        subjectUserIds: qualityCase.companion?.ownerUserId
+          ? [qualityCase.companion.ownerUserId]
+          : [],
+        action: "commercial.companion_remediation_task_added",
+        resourceType: "companionRemediationTask",
+        resourceId: created.id,
+        metadata: {
+          caseId: qualityCase.id,
+          companionId: qualityCase.companionId,
+          dueAt: dueAt.toISOString(),
+          moduleCode: created.moduleCode
+        }
+      }, db);
       return created;
     });
-    return this.actionDto(action);
+    return this.remediationTaskDto(task);
+  }
+
+  async waiveRemediationTask(actorId: string, taskId: string, reason: string) {
+    const trimmedReason = reason.trim();
+    if (trimmedReason.length < 5) {
+      throw new AppException(
+        "COMPANION_REMEDIATION_WAIVER_REASON_REQUIRED",
+        "A waiver reason is required",
+        HttpStatus.BAD_REQUEST
+      );
+    }
+    const task = await this.prisma.$transaction(async (tx) => {
+      const db = tx as any;
+      await db.$queryRaw`SELECT "id" FROM "CompanionRemediationTask" WHERE "id" = ${taskId} FOR UPDATE`;
+      const existing = await db.companionRemediationTask.findUnique({
+        where: { id: taskId },
+        include: {
+          case: {
+            include: { companion: { select: { ownerUserId: true } } }
+          }
+        }
+      });
+      if (!existing) {
+        throw new AppException(
+          "COMPANION_REMEDIATION_TASK_NOT_FOUND",
+          "Remediation task not found",
+          HttpStatus.NOT_FOUND
+        );
+      }
+      if (!["open", "overdue"].includes(existing.status)) {
+        throw new AppException(
+          "COMPANION_REMEDIATION_TASK_NOT_WAIVABLE",
+          "Only open or overdue remediation tasks can be waived",
+          HttpStatus.CONFLICT
+        );
+      }
+      if (existing.case?.companion?.ownerUserId === actorId) {
+        throw new AppException(
+          "COMPANION_REMEDIATION_SELF_WAIVE_FORBIDDEN",
+          "A companion owner cannot waive their own remediation task",
+          HttpStatus.CONFLICT
+        );
+      }
+      if (existing.case.status !== "open") {
+        throw new AppException(
+          "COMPANION_QUALITY_CASE_NOT_OPEN",
+          "Remediation tasks can only be waived on open quality cases",
+          HttpStatus.CONFLICT
+        );
+      }
+      const now = new Date();
+      const updated = await db.companionRemediationTask.update({
+        where: { id: existing.id },
+        data: {
+          status: "waived",
+          waivedAt: now,
+          waivedById: actorId,
+          waiverReason: trimmedReason
+        }
+      });
+      await this.audit.record({
+        actorId,
+        subjectUserIds: existing.case?.companion?.ownerUserId
+          ? [existing.case.companion.ownerUserId]
+          : [],
+        action: "commercial.companion_remediation_task_waived",
+        resourceType: "companionRemediationTask",
+        resourceId: existing.id,
+        metadata: {
+          caseId: existing.caseId,
+          companionId: existing.case.companionId,
+          reason: trimmedReason
+        }
+      }, db);
+      return updated;
+    });
+    return this.remediationTaskDto(task);
+  }
+
+  async closeQualityCase(actorId: string, caseId: string) {
+    const qualityCase = await this.prisma.$transaction(async (tx) => {
+      const db = tx as any;
+      await db.$queryRaw`SELECT "id" FROM "CompanionQualityCase" WHERE "id" = ${caseId} FOR UPDATE`;
+      const existing = await db.companionQualityCase.findUnique({
+        where: { id: caseId },
+        include: {
+          companion: { select: { ownerUserId: true } },
+          tasks: true
+        }
+      });
+      if (!existing) {
+        throw new AppException("COMPANION_QUALITY_CASE_NOT_FOUND", "Quality case not found", HttpStatus.NOT_FOUND);
+      }
+      if (existing.status !== "open") {
+        throw new AppException(
+          "COMPANION_QUALITY_CASE_ALREADY_CLOSED",
+          "Quality case is already closed",
+          HttpStatus.CONFLICT
+        );
+      }
+      const outstanding = existing.tasks.filter((task: any) =>
+        ["open", "overdue"].includes(task.status)
+      );
+      if (outstanding.length > 0) {
+        throw new AppException(
+          "COMPANION_REMEDIATION_OUTSTANDING",
+          "All remediation tasks must be completed or waived before closing the case",
+          HttpStatus.CONFLICT,
+          { outstandingTaskIds: outstanding.map((task: any) => task.id) }
+        );
+      }
+      const now = new Date();
+      const updated = await db.companionQualityCase.update({
+        where: { id: existing.id },
+        data: {
+          status: "closed",
+          closedAt: now,
+          closedById: actorId
+        },
+        include: { tasks: { orderBy: [{ dueAt: "asc" }, { id: "asc" }] } }
+      });
+      await this.audit.record({
+        actorId,
+        subjectUserIds: existing.companion?.ownerUserId
+          ? [existing.companion.ownerUserId]
+          : [],
+        action: "commercial.companion_quality_case_closed",
+        resourceType: "companionQualityCase",
+        resourceId: existing.id,
+        metadata: { companionId: existing.companionId, grade: existing.grade }
+      }, db);
+      return updated;
+    });
+    return this.qualityCaseDto(qualityCase);
+  }
+
+  async completeRemediationTask(userId: string, taskId: string, evidenceRef?: string) {
+    const companion = await this.ownCompanion(userId);
+    const task = await this.prisma.$transaction(async (tx) => {
+      const db = tx as any;
+      await db.$queryRaw`SELECT "id" FROM "CompanionRemediationTask" WHERE "id" = ${taskId} FOR UPDATE`;
+      const existing = await db.companionRemediationTask.findUnique({
+        where: { id: taskId },
+        include: { case: true }
+      });
+      if (!existing || existing.case.companionId !== companion.id) {
+        throw new AppException(
+          "COMPANION_REMEDIATION_TASK_NOT_FOUND",
+          "Remediation task not found",
+          HttpStatus.NOT_FOUND
+        );
+      }
+      if (existing.case.status !== "open") {
+        throw new AppException(
+          "COMPANION_QUALITY_CASE_NOT_OPEN",
+          "Remediation tasks can only be completed on open quality cases",
+          HttpStatus.CONFLICT
+        );
+      }
+      if (!["open", "overdue"].includes(existing.status)) {
+        throw new AppException(
+          "COMPANION_REMEDIATION_TASK_NOT_COMPLETABLE",
+          "Only open or overdue remediation tasks can be completed",
+          HttpStatus.CONFLICT
+        );
+      }
+      const now = new Date();
+      const updated = await db.companionRemediationTask.update({
+        where: { id: existing.id },
+        data: {
+          status: "completed",
+          completedAt: now,
+          completedByCompanion: true,
+          evidenceRef: evidenceRef?.trim() || null
+        }
+      });
+      await this.audit.record({
+        actorId: userId,
+        subjectUserIds: [userId],
+        action: "commercial.companion_remediation_task_completed",
+        resourceType: "companionRemediationTask",
+        resourceId: existing.id,
+        metadata: {
+          caseId: existing.caseId,
+          companionId: companion.id,
+          evidenceRef: evidenceRef?.trim() || null
+        }
+      }, db);
+      return updated;
+    });
+    return this.remediationTaskDto(task);
+  }
+
+  async processOverdueRemediationTasks(limit = 50) {
+    const safeLimit = Math.min(200, Math.max(1, Math.floor(limit)));
+    const now = new Date();
+    const dueTasks = await (this.prisma as any).companionRemediationTask.findMany({
+      where: {
+        status: "open",
+        dueAt: { lt: now }
+      },
+      include: {
+        case: {
+          include: { companion: { select: { id: true, ownerUserId: true } } }
+        }
+      },
+      orderBy: [{ dueAt: "asc" }, { id: "asc" }],
+      take: safeLimit
+    });
+
+    let markedOverdue = 0;
+    let restrictionsCreated = 0;
+    const appealSubmissionDays =
+      this.config.get<number>("COMPANION_APPEAL_SUBMISSION_DAYS") ?? 30;
+
+    for (const task of dueTasks) {
+      await this.prisma.$transaction(async (tx) => {
+        const db = tx as any;
+        await db.$queryRaw`SELECT "id" FROM "CompanionRemediationTask" WHERE "id" = ${task.id} FOR UPDATE`;
+        const locked = await db.companionRemediationTask.findUnique({
+          where: { id: task.id },
+          include: {
+            case: {
+              include: { companion: { select: { id: true, ownerUserId: true } } }
+            }
+          }
+        });
+        if (!locked || locked.status !== "open" || locked.dueAt.getTime() >= Date.now()) {
+          return;
+        }
+        await db.companionRemediationTask.update({
+          where: { id: locked.id },
+          data: { status: "overdue" }
+        });
+        markedOverdue += 1;
+
+        const companionId = locked.case.companionId;
+        await db.$queryRaw`SELECT "id" FROM "CompanionProfile" WHERE "id" = ${companionId} FOR UPDATE`;
+        const activeRestriction = await db.companionAccountAction.count({
+          where: {
+            companionId,
+            kind: { in: ["serviceRestriction", "suspension"] },
+            revokedAt: null,
+            startsAt: { lte: now },
+            OR: [{ endsAt: null }, { endsAt: { gt: now } }]
+          }
+        });
+
+        let actionId: string | null = null;
+        if (activeRestriction === 0) {
+          const appealDeadlineAt = new Date(
+            Date.now() + appealSubmissionDays * 24 * 60 * 60_000
+          );
+          const action = await this.createAccountActionInTx(db, "system:companion-remediation-worker", {
+            companionId,
+            kind: "serviceRestriction",
+            reasonCode: "quality_remediation_overdue",
+            message: "整改任务逾期未完成，平台已自动限制接单资格，请尽快完成整改。",
+            endsAt: null,
+            appealDeadlineAt
+          });
+          actionId = action.id;
+          restrictionsCreated += 1;
+        }
+
+        await this.audit.record({
+          actorId: "system:companion-remediation-worker",
+          subjectUserIds: locked.case.companion?.ownerUserId
+            ? [locked.case.companion.ownerUserId]
+            : [],
+          action: "commercial.companion_remediation_task_overdue",
+          resourceType: "companionRemediationTask",
+          resourceId: locked.id,
+          metadata: {
+            caseId: locked.caseId,
+            companionId,
+            dueAt: locked.dueAt.toISOString(),
+            restrictionActionId: actionId,
+            restrictionCreated: Boolean(actionId)
+          }
+        }, db);
+      });
+    }
+
+    return { scanned: dueTasks.length, markedOverdue, restrictionsCreated };
+  }
+
+  async countOverdueRemediationTasks() {
+    return (this.prisma as any).companionRemediationTask.count({
+      where: { status: "overdue" }
+    });
+  }
+
+  private async createAccountActionInTx(
+    db: any,
+    actorId: string,
+    input: {
+      companionId: string;
+      kind: "warning" | "serviceRestriction" | "suspension";
+      reasonCode: string;
+      message: string;
+      endsAt: Date | null;
+      appealDeadlineAt: Date;
+    }
+  ) {
+    const companion = await db.companionProfile.findUnique({ where: { id: input.companionId } });
+    if (!companion) {
+      throw new AppException("COMPANION_NOT_FOUND", "Companion not found", HttpStatus.NOT_FOUND);
+    }
+    const created = await db.companionAccountAction.create({
+      data: {
+        companionId: companion.id,
+        kind: input.kind,
+        reasonCode: input.reasonCode.trim(),
+        message: input.message.trim(),
+        endsAt: input.endsAt,
+        appealDeadlineAt: input.appealDeadlineAt,
+        createdById: actorId
+      }
+    });
+    if (input.kind === "serviceRestriction" || input.kind === "suspension") {
+      await db.companionProfile.update({
+        where: { id: companion.id },
+        data: { isPublished: false, availability: "busy", isOnline: false }
+      });
+    }
+    if (input.kind === "suspension") {
+      await db.companionCommercialProfile.updateMany({
+        where: { companionId: companion.id },
+        data: {
+          status: "suspended",
+          suspendedAt: new Date(),
+          suspendedById: actorId,
+          suspendedReason: input.message.trim()
+        }
+      });
+    }
+    await this.audit.record({
+      actorId,
+      subjectUserIds: companion.ownerUserId ? [companion.ownerUserId] : [],
+      action: "commercial.companion_account_action_created",
+      resourceType: "companionAccountAction",
+      resourceId: created.id,
+      metadata: {
+        companionId: companion.id,
+        kind: input.kind,
+        reasonCode: input.reasonCode.trim(),
+        endsAt: input.endsAt?.toISOString() ?? null,
+        appealDeadlineAt: input.appealDeadlineAt.toISOString()
+      }
+    }, db);
+    if (companion.ownerUserId) {
+      await this.notifications.createTransactional(db, {
+        userId: companion.ownerUserId,
+        type: "safetyAlert",
+        title: input.kind === "warning"
+          ? "陪伴者账号收到平台提醒"
+          : input.kind === "serviceRestriction"
+            ? "陪伴者服务资格已受限"
+            : "陪伴者服务资格已暂停",
+        body: created.message,
+        data: {
+          route: "companionDevelopment",
+          actionId: created.id,
+          actionKind: created.kind,
+          reasonCode: created.reasonCode,
+          appealDeadlineAt: created.appealDeadlineAt.toISOString()
+        },
+        eventKey: `companion-account-action:${created.id}:created:${companion.ownerUserId}`,
+        templateKey: "supportUpdate"
+      });
+    }
+    return created;
   }
 
   async resolveAppeal(actorId: string, appealId: string, input: ResolveCompanionAppealDto) {
@@ -1555,6 +2118,46 @@ export class CompanionLifecycleService {
         && action.startsAt.getTime() <= now
         && (!action.endsAt || action.endsAt.getTime() > now),
       createdAt: action.createdAt.toISOString()
+    };
+  }
+
+  private qualityCaseDto(qualityCase: any) {
+    return {
+      id: qualityCase.id,
+      companionId: qualityCase.companionId,
+      grade: qualityCase.grade,
+      reasonCode: qualityCase.reasonCode,
+      summary: qualityCase.summary,
+      sourceIncidentId: qualityCase.sourceIncidentId ?? null,
+      sourceActionId: qualityCase.sourceActionId ?? null,
+      createdById: qualityCase.createdById,
+      status: qualityCase.status,
+      closedAt: qualityCase.closedAt?.toISOString() ?? null,
+      closedById: qualityCase.closedById ?? null,
+      createdAt: qualityCase.createdAt.toISOString(),
+      updatedAt: qualityCase.updatedAt?.toISOString?.() ?? qualityCase.updatedAt,
+      tasks: Array.isArray(qualityCase.tasks)
+        ? qualityCase.tasks.map((task: any) => this.remediationTaskDto(task))
+        : undefined
+    };
+  }
+
+  private remediationTaskDto(task: any) {
+    return {
+      id: task.id,
+      caseId: task.caseId,
+      title: task.title,
+      moduleCode: task.moduleCode ?? null,
+      dueAt: task.dueAt.toISOString(),
+      status: task.status,
+      completedAt: task.completedAt?.toISOString() ?? null,
+      evidenceRef: task.evidenceRef ?? null,
+      completedByCompanion: Boolean(task.completedByCompanion),
+      waivedAt: task.waivedAt?.toISOString() ?? null,
+      waivedById: task.waivedById ?? null,
+      waiverReason: task.waiverReason ?? null,
+      createdAt: task.createdAt.toISOString(),
+      updatedAt: task.updatedAt?.toISOString?.() ?? task.updatedAt
     };
   }
 

@@ -403,7 +403,7 @@ describe("AccountDeletionExecutionWorker retained snapshot registry", () => {
   it.each([
     ["transactions_tax_invoices", "retained_transactions_snapshot", "retained_safety_snapshot", 17],
     ["support_disputes_safety", "retained_safety_snapshot", "retained_governance_snapshot", 27],
-    ["consent_rights_account_governance", "retained_governance_snapshot", "final_verification", 10]
+    ["consent_rights_account_governance", "retained_governance_snapshot", "final_verification", 12]
   ] as const)(
     "aggregates completed %s progress and advances its phase",
     async (category, phase, expectedNextPhase, sourceCount) => {

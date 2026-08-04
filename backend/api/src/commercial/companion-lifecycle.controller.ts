@@ -4,6 +4,7 @@ import { AuthenticatedUser } from "../auth/auth.service";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import {
+  CompleteRemediationTaskDto,
   CreateCompanionAppealDto,
   CreateCompanionIncidentDto,
   CreateWithdrawalRequestDto,
@@ -52,6 +53,20 @@ export class CompanionLifecycleController {
   @Get("quality")
   quality(@CurrentUser() user: AuthenticatedUser) {
     return this.lifecycle.quality(user.id);
+  }
+
+  @Get("quality-cases")
+  qualityCases(@CurrentUser() user: AuthenticatedUser) {
+    return this.lifecycle.listQualityCasesForCompanion(user.id);
+  }
+
+  @Post("remediation-tasks/:id/completion")
+  completeRemediationTask(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id") taskId: string,
+    @Body() dto: CompleteRemediationTaskDto
+  ) {
+    return this.lifecycle.completeRemediationTask(user.id, taskId, dto.evidenceRef);
   }
 
   @Get("actions")

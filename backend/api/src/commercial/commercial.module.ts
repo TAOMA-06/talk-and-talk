@@ -10,6 +10,7 @@ import { CompanionLifecycleController } from "./companion-lifecycle.controller";
 import { CompanionLifecycleService } from "./companion-lifecycle.service";
 import { CommercialFunnelService } from "./commercial-funnel.service";
 import { CommercialSettlementWorker } from "./commercial-settlement.worker";
+import { CompanionQualityRemediationWorker } from "./companion-quality-remediation.worker";
 import { CommercialService } from "./commercial.service";
 
 @Module({
@@ -19,7 +20,8 @@ import { CommercialService } from "./commercial.service";
     CommercialService,
     CompanionLifecycleService,
     CommercialFunnelService,
-    CommercialSettlementWorker
+    CommercialSettlementWorker,
+    CompanionQualityRemediationWorker
   ],
   exports: [CommercialService, CompanionLifecycleService, CommercialFunnelService]
 })

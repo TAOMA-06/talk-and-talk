@@ -4633,6 +4633,46 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuccessEnvelope"
+  /commercial/companion/quality-cases:
+    get:
+      tags: [commercial, companions]
+      summary: List quality cases and remediation tasks for the companion owner
+      operationId: listMyCompanionQualityCases
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Owner-scoped quality cases
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+  /commercial/companion/remediation-tasks/{id}/completion:
+    post:
+      tags: [commercial, companions]
+      summary: Mark one open or overdue remediation task complete with optional evidence
+      operationId: completeMyCompanionRemediationTask
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompanionRemediationTaskCompletionInput"
+      responses:
+        "201":
+          description: Remediation task completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
   /commercial/companion/actions:
     get:
       tags: [commercial, companions]
@@ -4911,6 +4951,126 @@ paths:
               schema:
                 $ref: "#/components/schemas/SuccessEnvelope"
         "400":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /admin/commercial/companion-lifecycle/quality-cases:
+    get:
+      tags: [admin, commercial, companions]
+      summary: List companion quality cases for supply review
+      operationId: adminListCompanionQualityCases
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: qualityCaseStatus
+          in: query
+          schema: { type: string, enum: [open, closed] }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - $ref: "#/components/parameters/PageSizeQuery"
+      responses:
+        "200":
+          description: Quality case queue
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedItemsEnvelope"
+    post:
+      tags: [admin, commercial, companions]
+      summary: Create a quality case with optional remediation tasks and grade side effects
+      description: |
+        needsRemediation requires at least one task. restrictIntake creates a serviceRestriction
+        and unpublishes. delist creates a suspension, unpublishes, and suspends the commercial profile.
+      operationId: adminCreateCompanionQualityCase
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompanionQualityCaseInput"
+      responses:
+        "201":
+          description: Quality case created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+        "400":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /admin/commercial/companion-lifecycle/quality-cases/{id}/remediation-tasks:
+    post:
+      tags: [admin, commercial, companions]
+      summary: Add a remediation task to an open quality case
+      operationId: adminAddCompanionRemediationTask
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompanionRemediationTaskInput"
+      responses:
+        "201":
+          description: Remediation task created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /admin/commercial/companion-lifecycle/remediation-tasks/{id}/waive:
+    post:
+      tags: [admin, commercial, companions]
+      summary: Waive an open or overdue remediation task
+      operationId: adminWaiveCompanionRemediationTask
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompanionRemediationTaskWaiverInput"
+      responses:
+        "201":
+          description: Remediation task waived
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /admin/commercial/companion-lifecycle/quality-cases/{id}/close:
+    post:
+      tags: [admin, commercial, companions]
+      summary: Close a quality case after all tasks are completed or waived
+      operationId: adminCloseCompanionQualityCase
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "201":
+          description: Quality case closed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+        "404":
           $ref: "#/components/responses/Error"
         "409":
           $ref: "#/components/responses/Error"
@@ -9567,6 +9727,7 @@ components:
         - retainedExpiryFailures
         - overdueUserAccountAppeals
         - overdueCompanionAccountAppeals
+        - overdueCompanionRemediationTasks
         - overduePaymentDisputes
         - paymentDisputeSyncFailures
         - notificationDeliveryDisabledWithPending
@@ -9663,6 +9824,10 @@ components:
           type: integer
           minimum: 0
           description: Pending companion account-action appeals whose immutable review deadline has passed.
+        overdueCompanionRemediationTasks:
+          type: integer
+          minimum: 0
+          description: Companion remediation tasks already marked overdue by the quality worker.
         overduePaymentDisputes: { type: integer, minimum: 0 }
         paymentDisputeSyncFailures: { type: integer, minimum: 0 }
         notificationDeliveryDisabledWithPending: { type: integer, minimum: 0, description: Pending deliveries that cannot drain because the delivery worker is disabled. }
@@ -12627,6 +12792,58 @@ components:
           minLength: 10
           maxLength: 1000
         endsAt: { type: string, format: date-time }
+    CompanionRemediationTaskInput:
+      type: object
+      additionalProperties: false
+      required: [title, dueAt]
+      properties:
+        title: { type: string, minLength: 3, maxLength: 200 }
+        moduleCode:
+          type: string
+          minLength: 3
+          maxLength: 80
+          pattern: "^[a-z0-9][a-z0-9-]*$"
+        dueAt: { type: string, format: date-time }
+    CompanionQualityCaseInput:
+      type: object
+      additionalProperties: false
+      required: [companionId, grade, reasonCode, summary]
+      properties:
+        companionId:
+          type: string
+          minLength: 1
+          maxLength: 191
+          pattern: '^[^\u0000-\u001F\u007F]+$'
+        grade: { type: string, enum: [noIssue, needsRemediation, restrictIntake, delist] }
+        reasonCode:
+          type: string
+          minLength: 3
+          maxLength: 80
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+        summary: { type: string, minLength: 10, maxLength: 1000 }
+        sourceIncidentId: { type: string, format: uuid }
+        sourceActionId: { type: string, format: uuid }
+        closeImmediately: { type: boolean }
+        tasks:
+          type: array
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/CompanionRemediationTaskInput"
+    CompanionRemediationTaskWaiverInput:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 5, maxLength: 500 }
+    CompanionRemediationTaskCompletionInput:
+      type: object
+      additionalProperties: false
+      properties:
+        evidenceRef:
+          type: string
+          minLength: 6
+          maxLength: 160
+          pattern: "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
     CompanionAppealQueueItem:
       type: object
       additionalProperties: false

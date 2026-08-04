@@ -698,6 +698,7 @@ describe("CommercialService", () => {
       authIdentityTombstone: { count: jest.fn().mockResolvedValue(0) },
       userAccountAppeal: { count: jest.fn().mockResolvedValue(7) },
       companionAccountAppeal: { count: jest.fn().mockResolvedValue(8) },
+      companionRemediationTask: { count: jest.fn().mockResolvedValue(0) },
       notificationDelivery: { count: jest.fn().mockResolvedValue(0) },
       availabilityReminderFanoutJob: { count: jest.fn().mockResolvedValue(0) },
       companionCommercialProfile: { count: jest.fn().mockResolvedValue(0) },
