@@ -198,6 +198,8 @@ const MUTABLE_TABLES = new Set([
   "CompanionTrainingRecord",
   "CompanionAccountAppeal",
   "CompanionAccountAction",
+  "CompanionQualityCase",
+  "CompanionRemediationTask",
   "AccountDeletionRatingRefreshJob",
   "AccountDeletionRetentionSnapshotProgress",
   "AccountDeletionRequest",

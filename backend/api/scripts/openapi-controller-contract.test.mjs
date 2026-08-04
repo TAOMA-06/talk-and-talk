@@ -370,7 +370,7 @@ test("commercial readiness contract exposes notification, reminder, appeal, and 
     readiness.responses["200"].content["application/json"].schema.$ref,
     "#/components/schemas/CommercialReadinessEnvelope"
   );
-  for (const field of ["overdueUserAccountAppeals", "overdueCompanionAccountAppeals"]) {
+  for (const field of ["overdueUserAccountAppeals", "overdueCompanionAccountAppeals", "overdueCompanionRemediationTasks"]) {
     assert.ok(blockers.required.includes(field), `readiness blockers are missing required field ${field}`);
     assert.equal(blockers.properties[field].type, "integer");
     assert.equal(blockers.properties[field].minimum, 0);

@@ -1513,14 +1513,14 @@ describe("UsersService", () => {
       await expect((service as any).assertRetainedSnapshotFinalGate(db, request)).resolves.toEqual({
         transactions_tax_invoices: 17,
         support_disputes_safety: 27,
-        consent_rights_account_governance: 10
+        consent_rights_account_governance: 12
       });
 
       expect(db.$executeRawUnsafe.mock.calls.map(([sql]: [string]) => sql)).toEqual([
         "SET LOCAL statement_timeout = '3000ms'",
         "SET LOCAL lock_timeout = '500ms'"
       ]);
-      expect(db.$queryRaw).toHaveBeenCalledTimes(55);
+      expect(db.$queryRaw).toHaveBeenCalledTimes(57);
       const queries = db.$queryRaw.mock.calls.map(([query]: [any]) => retainedQueryText(query));
       expect(queries[0]).toContain('FROM "AccountDeletionRetentionSnapshotProgress"');
       expect(queries[0]).toContain("FOR UPDATE");

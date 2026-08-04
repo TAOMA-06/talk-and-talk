@@ -2208,6 +2208,36 @@ export class CompanionsService {
         HttpStatus.CONFLICT
       );
     }
+    const now = new Date();
+    const activeServiceRestriction = await db.companionAccountAction.count({
+      where: {
+        companionId,
+        kind: { in: ["serviceRestriction", "suspension"] },
+        revokedAt: null,
+        startsAt: { lte: now },
+        OR: [{ endsAt: null }, { endsAt: { gt: now } }]
+      }
+    });
+    if (activeServiceRestriction > 0) {
+      throw new AppException(
+        "COMPANION_SERVICE_RESTRICTED",
+        "An active service restriction or suspension blocks publishing",
+        HttpStatus.CONFLICT
+      );
+    }
+    const outstandingRemediation = await db.companionRemediationTask.count({
+      where: {
+        status: { in: ["open", "overdue"] },
+        case: { companionId }
+      }
+    });
+    if (outstandingRemediation > 0) {
+      throw new AppException(
+        "COMPANION_REMEDIATION_OUTSTANDING",
+        "Open or overdue remediation tasks must be cleared before publishing",
+        HttpStatus.CONFLICT
+      );
+    }
   }
 
   private async assertAssignableOwnerUnderLock(db: any, ownerUserId: string) {

@@ -152,6 +152,7 @@ test("commercial admin exposes real queues and controlled mutation safeguards", 
   assert.match(adminHtml, /value="voided"/);
   assert.match(adminScript, /overdueUserAccountAppeals:\s*"普通用户账号申诉复核超时"/);
   assert.match(adminScript, /overdueCompanionAccountAppeals:\s*"陪伴者账号申诉复核超时"/);
+  assert.match(adminScript, /overdueCompanionRemediationTasks:\s*"陪伴者整改任务逾期"/);
   assert.match(adminScript, /accountDeletionRetentionPolicyUnapproved:\s*"账号注销保留政策未获外部法律批准"/);
   assert.match(adminScript, /accountDeletionRetentionApprovalBacklog:\s*"账号注销保留分类待法律批准入账"/);
   for (const blocker of [

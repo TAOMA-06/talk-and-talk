@@ -11,6 +11,7 @@ import { CompanionLifecycleService } from "./companion-lifecycle.service";
 import { CommercialFunnelService } from "./commercial-funnel.service";
 import { CommercialOpsMetricsService } from "./commercial-ops-metrics.service";
 import { CommercialSettlementWorker } from "./commercial-settlement.worker";
+import { CompanionQualityRemediationWorker } from "./companion-quality-remediation.worker";
 import { CommercialService } from "./commercial.service";
 
 @Module({
@@ -21,7 +22,8 @@ import { CommercialService } from "./commercial.service";
     CompanionLifecycleService,
     CommercialFunnelService,
     CommercialOpsMetricsService,
-    CommercialSettlementWorker
+    CommercialSettlementWorker,
+    CompanionQualityRemediationWorker
   ],
   exports: [CommercialService, CompanionLifecycleService, CommercialFunnelService, CommercialOpsMetricsService]
 })

@@ -161,6 +161,7 @@ for (const requiredAdminContract of [
 for (const [blockerKey, blockerLabel] of [
   ["overdueUserAccountAppeals", "普通用户账号申诉复核超时"],
   ["overdueCompanionAccountAppeals", "陪伴者账号申诉复核超时"],
+  ["overdueCompanionRemediationTasks", "陪伴者整改任务逾期"],
   ["accountDeletionRetentionPolicyUnapproved", "账号注销保留政策未获外部法律批准"]
 ]) {
   if (!adminScript.includes(blockerKey) || !adminScript.includes(blockerLabel)) {

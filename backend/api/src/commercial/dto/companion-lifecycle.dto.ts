@@ -3,6 +3,7 @@ import {
   ArrayMinSize,
   ArrayUnique,
   IsArray,
+  IsBoolean,
   IsDateString,
   IsIn,
   IsInt,
@@ -13,7 +14,8 @@ import {
   Max,
   MaxLength,
   Min,
-  MinLength
+  MinLength,
+  ValidateNested
 } from "class-validator";
 import { Type } from "class-transformer";
 
@@ -21,6 +23,7 @@ import { IsSafeOperationalText } from "../../common/validation/sensitive-free-te
 
 const EXTERNAL_REFERENCE = /^[A-Za-z0-9][A-Za-z0-9._:/-]*$/;
 const MASKED_REFERENCE = /^[A-Za-z0-9*._\-\s]{3,80}$/;
+const MODULE_CODE = /^[a-z0-9][a-z0-9-]*$/;
 
 export class SubmitTrainingAttemptDto {
   @IsString()
@@ -198,6 +201,10 @@ export class ListCompanionLifecycleAdminDto {
   trainingStatus?: "inProgress" | "passed" | "expired";
 
   @IsOptional()
+  @IsIn(["open", "closed"])
+  qualityCaseStatus?: "open" | "closed";
+
+  @IsOptional()
   @IsIn(["true", "false"])
   active?: "true" | "false";
 
@@ -213,4 +220,99 @@ export class ListCompanionLifecycleAdminDto {
   @Min(1)
   @Max(100)
   pageSize?: number = 50;
+}
+
+export class CreateRemediationTaskDto {
+  @IsString()
+  @IsSafeOperationalText()
+  @MinLength(3)
+  @MaxLength(200)
+  title!: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(3)
+  @MaxLength(80)
+  @Matches(MODULE_CODE)
+  moduleCode?: string;
+
+  @IsDateString()
+  dueAt!: string;
+}
+
+export class CreateCompanionQualityCaseDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(191)
+  @Matches(/^[^\u0000-\u001F\u007F]+$/)
+  companionId!: string;
+
+  @IsIn(["noIssue", "needsRemediation", "restrictIntake", "delist"])
+  grade!: "noIssue" | "needsRemediation" | "restrictIntake" | "delist";
+
+  @IsString()
+  @MinLength(3)
+  @MaxLength(80)
+  @Matches(/^[A-Za-z0-9][A-Za-z0-9._-]*$/)
+  reasonCode!: string;
+
+  @IsString()
+  @IsSafeOperationalText()
+  @MinLength(10)
+  @MaxLength(1000)
+  summary!: string;
+
+  @IsOptional()
+  @IsUUID()
+  sourceIncidentId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  sourceActionId?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  closeImmediately?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @ValidateNested({ each: true })
+  @Type(() => CreateRemediationTaskDto)
+  tasks?: CreateRemediationTaskDto[];
+}
+
+export class AddRemediationTaskDto {
+  @IsString()
+  @IsSafeOperationalText()
+  @MinLength(3)
+  @MaxLength(200)
+  title!: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(3)
+  @MaxLength(80)
+  @Matches(MODULE_CODE)
+  moduleCode?: string;
+
+  @IsDateString()
+  dueAt!: string;
+}
+
+export class WaiveRemediationTaskDto {
+  @IsString()
+  @IsSafeOperationalText()
+  @MinLength(5)
+  @MaxLength(500)
+  reason!: string;
+}
+
+export class CompleteRemediationTaskDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(6)
+  @MaxLength(160)
+  @Matches(EXTERNAL_REFERENCE)
+  evidenceRef?: string;
 }

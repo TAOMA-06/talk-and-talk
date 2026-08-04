@@ -61,14 +61,16 @@ describe("account deletion retained snapshot registry", () => {
           "customer_adult_eligibilities",
           "companion_training_records",
           "companion_account_actions",
-          "companion_account_appeals"
+          "companion_account_appeals",
+          "companion_quality_cases",
+          "companion_remediation_tasks"
         ]
       } as const;
-  
-      expect(ACCOUNT_DELETION_RETAINED_SNAPSHOT_REGISTRY).toHaveLength(54);
+
+      expect(ACCOUNT_DELETION_RETAINED_SNAPSHOT_REGISTRY).toHaveLength(56);
       expect(new Set(ACCOUNT_DELETION_RETAINED_SNAPSHOT_REGISTRY.map(
         (source) => `${source.category}/${source.sourceKey}`
-      )).size).toBe(54);
+      )).size).toBe(56);
       for (const [category, sourceKeys] of Object.entries(expected)) {
         expect(ACCOUNT_DELETION_RETAINED_SNAPSHOT_REGISTRY
           .filter((source) => source.category === category)
