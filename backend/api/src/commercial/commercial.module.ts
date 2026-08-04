@@ -9,6 +9,7 @@ import { CompanionLifecycleAdminController } from "./companion-lifecycle-admin.c
 import { CompanionLifecycleController } from "./companion-lifecycle.controller";
 import { CompanionLifecycleService } from "./companion-lifecycle.service";
 import { CommercialFunnelService } from "./commercial-funnel.service";
+import { CommercialOpsMetricsService } from "./commercial-ops-metrics.service";
 import { CommercialSettlementWorker } from "./commercial-settlement.worker";
 import { CommercialService } from "./commercial.service";
 
@@ -19,8 +20,9 @@ import { CommercialService } from "./commercial.service";
     CommercialService,
     CompanionLifecycleService,
     CommercialFunnelService,
+    CommercialOpsMetricsService,
     CommercialSettlementWorker
   ],
-  exports: [CommercialService, CompanionLifecycleService, CommercialFunnelService]
+  exports: [CommercialService, CompanionLifecycleService, CommercialFunnelService, CommercialOpsMetricsService]
 })
 export class CommercialModule {}

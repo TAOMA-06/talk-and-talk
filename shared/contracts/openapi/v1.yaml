@@ -5341,6 +5341,31 @@ paths:
                 $ref: "#/components/schemas/SuccessEnvelope"
         "400":
           $ref: "#/components/responses/Error"
+  /admin/commercial/ops-metrics:
+    get:
+      tags: [admin, commercial]
+      summary: Read-only operating metrics for supply funnel, confirmation/reject/timeout rates, slot utilization, refund reason buckets, complaint SLA, same-companion repurchase, bookmark conversion, moderation backlog, and availability-reminder pipeline health
+      operationId: adminCommercialOpsMetrics
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string, format: date-time }
+          description: Inclusive cohort start; defaults to 30 days before the request.
+        - name: to
+          in: query
+          schema: { type: string, format: date-time }
+          description: Inclusive cohort end; cannot be in the future. The range may not exceed 90 days.
+      responses:
+        "200":
+          description: Privacy-safe commercial operating metrics (counts and rates only)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+        "400":
+          $ref: "#/components/responses/Error"
   /admin/commercial/companions:
     get:
       tags: [admin, commercial]
