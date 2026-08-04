@@ -37,6 +37,13 @@ interface Environment {
   EXTERNAL_AI_USER_CONTENT_ENABLED: boolean;
   MEDIA_FEATURE_ENABLED: boolean;
   MEDIA_PROVIDER: string;
+  MEDIA_S3_ENDPOINT: string;
+  MEDIA_S3_REGION: string;
+  MEDIA_S3_BUCKET: string;
+  MEDIA_S3_ACCESS_KEY_ID: string;
+  MEDIA_S3_SECRET_ACCESS_KEY: string;
+  MEDIA_S3_FORCE_PATH_STYLE: boolean;
+  MEDIA_S3_PUBLIC_BASE_URL: string;
   TRTC_ENABLED: boolean;
   TRTC_SDK_APP_ID: number;
   TRTC_SDK_SECRET_KEY: string;
@@ -1397,11 +1404,37 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
   }
   const mediaFeatureEnabled = parseBoolean(env.MEDIA_FEATURE_ENABLED, false);
   const mediaProvider = env.MEDIA_PROVIDER?.trim() || "disabled";
-  if (!["disabled", "mock"].includes(mediaProvider)) {
-    throw new Error("MEDIA_PROVIDER must be disabled or mock until a production media adapter is installed");
+  if (!["disabled", "mock", "s3_compatible"].includes(mediaProvider)) {
+    throw new Error("MEDIA_PROVIDER must be disabled, mock, or s3_compatible");
   }
-  if (appEnv === "production" && mediaFeatureEnabled) {
-    throw new Error("MEDIA_FEATURE_ENABLED requires a configured production media adapter and cannot use the bundled mock provider");
+  const mediaS3Endpoint = optionalString(env.MEDIA_S3_ENDPOINT);
+  const mediaS3Region = optionalString(env.MEDIA_S3_REGION) || "auto";
+  const mediaS3Bucket = optionalString(env.MEDIA_S3_BUCKET);
+  const mediaS3AccessKeyId = optionalString(env.MEDIA_S3_ACCESS_KEY_ID);
+  const mediaS3SecretAccessKey = optionalString(env.MEDIA_S3_SECRET_ACCESS_KEY);
+  const mediaS3ForcePathStyle = parseBoolean(env.MEDIA_S3_FORCE_PATH_STYLE, true);
+  const mediaS3PublicBaseUrl = optionalString(env.MEDIA_S3_PUBLIC_BASE_URL);
+  const mediaS3Configured = Boolean(
+    mediaS3Endpoint && mediaS3Bucket && mediaS3AccessKeyId && mediaS3SecretAccessKey
+  );
+  if (mediaS3Endpoint && !/^https:\/\//i.test(mediaS3Endpoint)) {
+    throw new Error("MEDIA_S3_ENDPOINT must be an https URL");
+  }
+  if (mediaS3PublicBaseUrl && !/^https:\/\//i.test(mediaS3PublicBaseUrl)) {
+    throw new Error("MEDIA_S3_PUBLIC_BASE_URL must be an https URL");
+  }
+  if (mediaProvider === "s3_compatible" && mediaFeatureEnabled && !mediaS3Configured) {
+    throw new Error(
+      "MEDIA_PROVIDER=s3_compatible with MEDIA_FEATURE_ENABLED=true requires MEDIA_S3_ENDPOINT, MEDIA_S3_BUCKET, MEDIA_S3_ACCESS_KEY_ID, and MEDIA_S3_SECRET_ACCESS_KEY"
+    );
+  }
+  if (mediaFeatureEnabled && commercialSurface !== "full") {
+    throw new Error("MEDIA_FEATURE_ENABLED requires COMMERCIAL_SURFACE=full");
+  }
+  if (appEnv === "production" && mediaFeatureEnabled && mediaProvider !== "s3_compatible") {
+    throw new Error(
+      "MEDIA_FEATURE_ENABLED in production requires MEDIA_PROVIDER=s3_compatible with configured credentials"
+    );
   }
   // Real-time voice is intentionally independent from attachment/media
   // uploads. It remains closed until the provider room restriction has been
@@ -1526,6 +1559,13 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     EXTERNAL_AI_USER_CONTENT_ENABLED: externalAiUserContentEnabled,
     MEDIA_FEATURE_ENABLED: mediaFeatureEnabled,
     MEDIA_PROVIDER: mediaProvider,
+    MEDIA_S3_ENDPOINT: mediaS3Endpoint,
+    MEDIA_S3_REGION: mediaS3Region,
+    MEDIA_S3_BUCKET: mediaS3Bucket,
+    MEDIA_S3_ACCESS_KEY_ID: mediaS3AccessKeyId,
+    MEDIA_S3_SECRET_ACCESS_KEY: mediaS3SecretAccessKey,
+    MEDIA_S3_FORCE_PATH_STYLE: mediaS3ForcePathStyle,
+    MEDIA_S3_PUBLIC_BASE_URL: mediaS3PublicBaseUrl,
     TRTC_ENABLED: trtcEnabled,
     TRTC_SDK_APP_ID: trtcSdkAppId,
     TRTC_SDK_SECRET_KEY: trtcSdkSecretKey,

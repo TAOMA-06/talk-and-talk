@@ -2127,9 +2127,11 @@
   function renderAvailabilityReminderReadiness(container, readiness) {
     const pipeline = readiness.pipeline || {};
     const terminalAttempts = pipeline.terminalAttempts || {};
+    const unresolved = Number(terminalAttempts.unresolved || 0);
+    const deliveryOff = pipeline.deliveryRunnerEnabled !== true;
     const rows = [
       ["准备 runner", pipeline.preparationRunnerEnabled ? "已开启" : "未开启"],
-      ["投递 runner", pipeline.deliveryRunnerEnabled ? "已开启" : "未开启"],
+      ["投递 runner", pipeline.deliveryRunnerEnabled ? "已开启" : "默认关闭（需模板审批 + staging 演练后才可开）"],
       ["待准备候选", pipeline.pendingCandidates || 0],
       ["已到期待准备", pipeline.dueCandidates || 0],
       ["待预留交接", pipeline.pending || 0],
@@ -2147,12 +2149,21 @@
       ["预留 claim 租约过期", pipeline.expiredReservationLeases || 0],
       ["投递 claim 租约过期", pipeline.expiredDeliveryClaimLeases || 0],
       ["发送租约过期", pipeline.expiredAttemptLeases || 0],
-      ["终态待人工核对", terminalAttempts.unresolved || 0],
+      ["终态待人工核对", unresolved],
       ["终态已人工核对", terminalAttempts.resolved || 0],
       ["积压时效", pipeline.backlogSlaBreached ? `超出 ${pipeline.backlogSlaSeconds || 300} 秒` : "未超出代码阈值"]
     ];
-    container.innerHTML = `<article class="compact-item ${readiness.status === "attentionRequired" ? "urgent" : ""}"><div class="compact-item-head"><h3>运行状态</h3>${statusPill(readiness.status || "unknown")}</div><p>检查于 ${escapeHtml(formatTime(pipeline.checkedAt || readiness.checkedAt))}；代码 readiness 不等于微信后台模板或主体审批。</p></article>`
-      + rows.map(([label, value]) => `<div class="stack-row"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join("");
+    const callouts = [
+      unresolved > 0
+        ? `<div class="section-callout"><strong>终态待人工核对 ${escapeHtml(unresolved)}</strong><span>不得自动重发；使用下方“标记终态已人工核对”并保全证据。代码 readiness 不等于微信模板已审批。</span></div>`
+        : "",
+      deliveryOff
+        ? `<div class="section-callout"><strong>投递默认关闭</strong><span>仅在 availabilityReminder 模板审批、staging 真链演练与指标值班就绪后，才可将 AVAILABILITY_REMINDER_DELIVERY_ENABLED 设为 true。</span></div>`
+        : ""
+    ].join("");
+    container.innerHTML = `<article class="compact-item ${readiness.status === "attentionRequired" || unresolved > 0 ? "urgent" : ""}"><div class="compact-item-head"><h3>运行状态</h3>${statusPill(readiness.status || "unknown")}</div><p>检查于 ${escapeHtml(formatTime(pipeline.checkedAt || readiness.checkedAt))}；代码 readiness 不等于微信后台模板或主体审批。</p></article>`
+      + callouts
+      + rows.map(([label, value]) => `<div class="stack-row ${label === "终态待人工核对" && unresolved > 0 ? "alert" : ""}"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join("");
   }
 
   async function loadGrowth() {

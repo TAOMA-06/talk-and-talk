@@ -14,6 +14,7 @@ import { MediaAssetService } from "./media/media-asset.service";
 import { MEDIA_ANALYSIS_PROVIDER, MEDIA_STORAGE_PROVIDER } from "./media/media-provider.interface";
 import { MediaModerationWorker } from "./media/media-moderation.worker";
 import { MockMediaAnalysisProvider, MockMediaStorageProvider } from "./media/mock-media.providers";
+import { S3CompatibleMediaStorageProvider } from "./media/s3-compatible-media.providers";
 import { ModerationCaseService } from "./moderation-case.service";
 import { ModerationController } from "./moderation.controller";
 import { ModerationService } from "./moderation.service";
@@ -29,6 +30,7 @@ import { RuleEngine } from "./rule-engine";
     DisabledMediaAnalysisProvider,
     MockMediaStorageProvider,
     MockMediaAnalysisProvider,
+    S3CompatibleMediaStorageProvider,
     {
       provide: AI_PROVIDER,
       useExisting: DeepSeekAIProvider
@@ -38,14 +40,26 @@ import { RuleEngine } from "./rule-engine";
     ChatRestrictionService,
     {
       provide: MEDIA_STORAGE_PROVIDER,
-      inject: [ConfigService, DisabledMediaStorageProvider, MockMediaStorageProvider],
+      inject: [
+        ConfigService,
+        DisabledMediaStorageProvider,
+        MockMediaStorageProvider,
+        S3CompatibleMediaStorageProvider
+      ],
       useFactory: (
         config: ConfigService,
         disabled: DisabledMediaStorageProvider,
-        mock: MockMediaStorageProvider
-      ) => config.get<boolean>("MEDIA_FEATURE_ENABLED") && config.get<string>("MEDIA_PROVIDER") === "mock"
-        ? mock
-        : disabled
+        mock: MockMediaStorageProvider,
+        s3Compatible: S3CompatibleMediaStorageProvider
+      ) => {
+        if (!config.get<boolean>("MEDIA_FEATURE_ENABLED")) {
+          return disabled;
+        }
+        const provider = config.get<string>("MEDIA_PROVIDER");
+        if (provider === "mock") return mock;
+        if (provider === "s3_compatible" && s3Compatible.isConfigured) return s3Compatible;
+        return disabled;
+      }
     },
     {
       provide: MEDIA_ANALYSIS_PROVIDER,

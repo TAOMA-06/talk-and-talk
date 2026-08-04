@@ -485,6 +485,54 @@ export function validateDeploymentConfig(env) {
   if ((commercialSurface === "text_only" || commercialSurface === "text-only") && env.MEDIA_FEATURE_ENABLED === "true") {
     errors.push("COMMERCIAL_SURFACE=text_only forbids MEDIA_FEATURE_ENABLED=true");
   }
+  if (commercialSurface === "full") {
+    if (env.TRTC_ENABLED === "true") {
+      for (const key of [
+        "TRTC_SDK_APP_ID",
+        "TRTC_SDK_SECRET_KEY",
+        "TRTC_CALLBACK_SIGNING_KEY",
+        "TENCENTCLOUD_SECRET_ID",
+        "TENCENTCLOUD_SECRET_KEY"
+      ]) {
+        if (!env[key]?.trim()) {
+          errors.push(`COMMERCIAL_SURFACE=full with TRTC_ENABLED=true requires ${key}`);
+        }
+      }
+      if (env.TRTC_PRIVATE_MAP_KEY_ENABLED !== "true") {
+        errors.push("COMMERCIAL_SURFACE=full with TRTC_ENABLED=true requires TRTC_PRIVATE_MAP_KEY_ENABLED=true");
+      }
+      if (env.TRTC_ROOM_CONTROL_ENABLED !== "true") {
+        errors.push("COMMERCIAL_SURFACE=full with TRTC_ENABLED=true requires TRTC_ROOM_CONTROL_ENABLED=true");
+      }
+      if (env.TRTC_PRIVACY_DISCLOSURE_APPROVED !== "true") {
+        errors.push("COMMERCIAL_SURFACE=full with TRTC_ENABLED=true requires TRTC_PRIVACY_DISCLOSURE_APPROVED=true");
+      }
+      if (!env.TRTC_PRIVACY_DISCLOSURE_REFERENCE?.trim()) {
+        errors.push("COMMERCIAL_SURFACE=full with TRTC_ENABLED=true requires TRTC_PRIVACY_DISCLOSURE_REFERENCE");
+      }
+    }
+    if (env.MEDIA_FEATURE_ENABLED === "true") {
+      if (env.MEDIA_PROVIDER !== "s3_compatible") {
+        errors.push("COMMERCIAL_SURFACE=full with MEDIA_FEATURE_ENABLED=true requires MEDIA_PROVIDER=s3_compatible");
+      }
+      for (const key of [
+        "MEDIA_S3_ENDPOINT",
+        "MEDIA_S3_BUCKET",
+        "MEDIA_S3_ACCESS_KEY_ID",
+        "MEDIA_S3_SECRET_ACCESS_KEY"
+      ]) {
+        if (!env[key]?.trim()) {
+          errors.push(`MEDIA_FEATURE_ENABLED=true requires ${key}`);
+        }
+      }
+      if (env.MEDIA_S3_ENDPOINT && !/^https:\/\//i.test(env.MEDIA_S3_ENDPOINT.trim())) {
+        errors.push("MEDIA_S3_ENDPOINT must be an https URL");
+      }
+    }
+  }
+  if (env.MEDIA_PROVIDER && !["disabled", "mock", "s3_compatible"].includes(env.MEDIA_PROVIDER.trim())) {
+    errors.push("MEDIA_PROVIDER must be disabled, mock, or s3_compatible");
+  }
   for (const key of ["LEGAL_PRIVACY_RETENTION_DAYS", "PLATFORM_FEE_BPS", "COMPANION_SETTLEMENT_HOLD_HOURS", "REFUND_REQUEST_WINDOW_HOURS", "ORDER_RESPONSE_WINDOW_MINUTES", "ORDER_MAX_SCHEDULE_DAYS", "ORDER_MAX_OPEN_TOTAL", "ORDER_MAX_OPEN_PER_USER", "ORDER_MAX_PENDING_PER_COMPANION", "SUPPORT_RESPONSE_HOURS", "SUPPORT_MAX_OPEN_PER_USER"]) {
     if (env[key] && !/^\d+$/.test(env[key])) errors.push(`${key} must be an integer`);
   }
