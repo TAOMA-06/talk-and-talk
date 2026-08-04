@@ -1325,7 +1325,20 @@
       void loadDashboard(false).then(() => writeReviewRoute());
     });
     elements.refreshButton.addEventListener("click", () => loadDashboard(false));
-    elements.logoutButton.addEventListener("click", logout);
+    document.querySelectorAll("[data-review-logout]").forEach((button) => {
+      button.addEventListener("click", () => void logout());
+    });
+    document.querySelector("#filterResetButton")?.addEventListener("click", () => {
+      elements.filterStatus.value = "";
+      elements.filterRisk.value = "";
+      elements.filterPriority.value = "";
+      elements.filterSource.value = "";
+      elements.filterKeyword.value = "";
+      state.selectedCaseId = null;
+      state.selectedCase = null;
+      state.filters = { page: 1, pageSize: 50 };
+      void loadDashboard(false).then(() => writeReviewRoute());
+    });
     elements.labelForm.addEventListener("submit", saveLabel);
     elements.exportLabelsButton.addEventListener("click", exportLabels);
     elements.staffOffboardingList?.addEventListener("click", (event) => {

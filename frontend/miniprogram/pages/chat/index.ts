@@ -1,4 +1,5 @@
 import { api, ApiError, ensureSession, readLocalFile, uploadAuthorizedMedia } from "../../utils/api";
+import { clientChatMediaEnabled } from "../../utils/config";
 import { openCrisisResources } from "../../utils/crisis-gate";
 import { ChatMessage } from "../../utils/models";
 import { ensurePrivacyAuthorization } from "../../utils/privacy";
@@ -187,7 +188,7 @@ Page({
     try {
       const status = await api.conversationStatus(this.conversationId);
       this.setData({
-        mediaEnabled: status.mediaEnabled,
+        mediaEnabled: clientChatMediaEnabled(status.mediaEnabled),
         messageNotificationsMuted: status.messageNotificationsMuted,
         conversationBlockedByYou: status.conversationBlockedByYou,
         viewerCanManageFutureBookingBoundary: status.viewerCanManageFutureBookingBoundary,
@@ -219,7 +220,7 @@ Page({
           loading: false,
           hasLoadedInitial: true,
           hasMore: this.hasMore,
-          mediaEnabled: status.mediaEnabled,
+          mediaEnabled: clientChatMediaEnabled(status.mediaEnabled),
           messageNotificationsMuted: status.messageNotificationsMuted,
           conversationBlockedByYou: status.conversationBlockedByYou,
           viewerCanManageFutureBookingBoundary: status.viewerCanManageFutureBookingBoundary,

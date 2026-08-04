@@ -20,6 +20,7 @@
 ## 商用模式总门禁
 
 - [ ] `COMMERCIAL_RELEASE_MODE=commercial`；`REFUND_POLICY_VERSION`、`REFUND_REQUEST_WINDOW_HOURS` 与已批准规则一致，取得非秘密 `REFUND_POLICY_APPROVAL_REFERENCE` 后才设置 `REFUND_POLICY_APPROVED=true`；`COMPANION_SETTLEMENT_HOLD_HOURS` 至少晚于退款窗口 24 小时。生产示例默认未批准并保持 No-Go
+- [ ] **首发产品范围（text-only）**：`MEDIA_PROVIDER=disabled`、`MEDIA_FEATURE_ENABLED=false`、`TRTC_ENABLED=false`；小程序客户端隐藏聊天附件与实时语音入口。MEDIA/TRTC 能力保留在仓库内，但未取得生产运行证据前不得对用户开放
 - [ ] 账号注销后的分类保留期限已经外部法律/合规批准；仅在取得可追溯、非秘密的批准引用后，将 `ACCOUNT_DELETION_RETENTION_POLICY_APPROVED=true` 并填写 `ACCOUNT_DELETION_RETENTION_POLICY_APPROVAL_REFERENCE`，否则保持 No-Go
 - [ ] `COMPANION_VOICE_EVIDENCE_VIEWER_URL` 指向无凭据、无 query/fragment 的外部 HTTPS 受控查看器；签名密钥为独立 32+ 位随机值，TTL 在 60–900 秒。管理员实测短期地址过期、换人或换版本后不可复用；查看器缺失时语音批准返回 503 且后台明确 No-Go
 - [ ] 用正式小程序重放一次创建订单：缺少 `clientRequestId`、`serviceOfferingId` 或 `availabilityWindowId` 均返回 422；相同幂等键和相同业务输入只返回原订单及原退款规则版本/小时快照，即使当前配置已经换版也不产生第二笔订单或支付意图
@@ -166,14 +167,19 @@
 - [ ] 生产 `SEED_ON_STARTUP=false`
 - [ ] 按 [review-department.md](./review-department.md) 创建独立 reviewer 与 lead，并完成密码 + TOTP 真实登录
 - [ ] 确认生产不存在 seed 手机账号、共享员工账号或默认密码
-- [ ] Web `/review/` 仅内网或 VPN 可达（推荐；至少不公开宣传）
+- [ ] Web `/admin/` 与 `/review/` **必须**仅内网或 VPN 可达（公网 `GET /admin/`、`GET /review/` → 403/401；探测证据附件必传）。「不公开宣传」不可作为控制。
+- [ ] 生产边缘（nginx / CloudBase ACL）已应用与 `infra/nginx/talk-and-talk.conf.example` 等价的 `/admin/`、`/review/` allow/deny；可用 `node infra/nginx/assert-commercial-surface.mjs` 校验示例配置。
+- [ ] CloudBase `servicePath=/` 未在无私网门禁情况下对公网发布（见模板 `PRIVATE_INGRESS_REQUIRED`）。
 
 ## 监控与告警
 
-- [ ] `GET /api/v1/health` 纳入探活
+- [ ] `GET /api/v1/health` 纳入 **liveness**（进程存活；不因 DB/Redis 抖动重启）
+- [ ] `GET /api/v1/health/ready` + `Authorization: Bearer $METRICS_TOKEN` 纳入 **readiness**
 - [ ] `GET /api/v1/metrics` 仅内网抓取（勿对公网裸奔）
 - [ ] 告警：5xx 率、依赖 down、磁盘、证书到期（工具自选）
+- [ ] 商用业务告警已接线（至少：微信 notify 失败、退款积压、通知/租约过期）；样例见 `infra/observability/alertmanager-payment-rules.sample.yml`；注入失败后 ≤5 分钟触达值班
 - [ ] 商用业务告警：失败退款、超时工单、失败通知、追偿逾期、结算任务超时、服务订单超时；告警在多副本环境可聚合并实际触达值班人员
+- [ ] `COMMERCIAL_SURFACE=text_only`（首发）且 `MEDIA_*=off`、`TRTC_ENABLED=false`；误开 TRTC/MEDIA 时配置校验失败
 
 ## 微信开发者工具 / 发行
 

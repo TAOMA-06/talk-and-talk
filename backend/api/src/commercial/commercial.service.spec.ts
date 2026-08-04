@@ -1,4 +1,5 @@
 import { CommercialService } from "./commercial.service";
+import { latestReadyWeChatBillDate } from "../payments/wechat-reconciliation-gate";
 
 describe("CommercialService", () => {
   const prisma = { $queryRaw: jest.fn(), $transaction: jest.fn() } as any;
@@ -6,6 +7,7 @@ describe("CommercialService", () => {
   const audit = { record: jest.fn().mockResolvedValue({}) } as any;
   let service: CommercialService;
   let legalHoldPolicyApproved = true;
+  const readinessBillDate = latestReadyWeChatBillDate(new Date(), 10);
 
   const legalHoldConfigValue = (key: string): unknown => {
     if (key === "ACCOUNT_DATA_RETENTION_LEGAL_HOLD_POLICY_APPROVED") {
@@ -25,9 +27,12 @@ describe("CommercialService", () => {
     return undefined;
   };
 
-  const reconciliationRuns = (kinds = ["tradeAll", "fundBasic", "fundOperation", "fundFees"]) =>
+  const reconciliationRuns = (
+    kinds = ["tradeAll", "fundBasic", "fundOperation", "fundFees"],
+    billDate = readinessBillDate
+  ) =>
     kinds.map((kind) => ({
-      billDate: new Date("2026-07-31T00:00:00.000Z"),
+      billDate: new Date(`${billDate}T00:00:00.000Z`),
       kind,
       status: "reconciled"
     }));
@@ -150,7 +155,7 @@ describe("CommercialService", () => {
       if (key === "WECHAT_DAILY_BILL_RECONCILIATION_APPROVAL_REFERENCE") {
         return "finance:wechat-daily-bill-sop-2026-08";
       }
-      if (key === "WECHAT_DAILY_BILL_RECONCILIATION_START_DATE") return "2026-07-31";
+      if (key === "WECHAT_DAILY_BILL_RECONCILIATION_START_DATE") return readinessBillDate;
       if (key === "WECHAT_DAILY_BILL_RECONCILIATION_HOUR") return 10;
       return 24;
     });
@@ -813,7 +818,7 @@ describe("CommercialService", () => {
       if (key === "WECHAT_DAILY_BILL_RECONCILIATION_APPROVAL_REFERENCE") {
         return "finance:wechat-daily-bill-sop-2026-08";
       }
-      if (key === "WECHAT_DAILY_BILL_RECONCILIATION_START_DATE") return "2026-07-31";
+      if (key === "WECHAT_DAILY_BILL_RECONCILIATION_START_DATE") return readinessBillDate;
       if (key === "WECHAT_DAILY_BILL_RECONCILIATION_HOUR") return 10;
       return 24;
     });
@@ -836,7 +841,7 @@ describe("CommercialService", () => {
       if (key === "WECHAT_DAILY_BILL_RECONCILIATION_APPROVAL_REFERENCE") {
         return "finance:wechat-daily-bill-sop-2026-08";
       }
-      if (key === "WECHAT_DAILY_BILL_RECONCILIATION_START_DATE") return "2026-07-31";
+      if (key === "WECHAT_DAILY_BILL_RECONCILIATION_START_DATE") return readinessBillDate;
       if (key === "WECHAT_DAILY_BILL_RECONCILIATION_HOUR") return 10;
       return 24;
     });
@@ -1019,7 +1024,7 @@ describe("CommercialService", () => {
       if (key === "WECHAT_DAILY_BILL_RECONCILIATION_APPROVAL_REFERENCE") {
         return "finance:wechat-daily-bill-sop-2026-08";
       }
-      if (key === "WECHAT_DAILY_BILL_RECONCILIATION_START_DATE") return "2026-07-31";
+      if (key === "WECHAT_DAILY_BILL_RECONCILIATION_START_DATE") return readinessBillDate;
       if (key === "WECHAT_DAILY_BILL_RECONCILIATION_HOUR") return 10;
       if (key === "TRTC_ENABLED") return true;
       if (key === "TRTC_ROOM_CONTROL_ENABLED") return true;
@@ -1099,7 +1104,7 @@ describe("CommercialService", () => {
       if (key === "WECHAT_DAILY_BILL_RECONCILIATION_APPROVAL_REFERENCE") {
         return "finance:wechat-daily-bill-sop-2026-08";
       }
-      if (key === "WECHAT_DAILY_BILL_RECONCILIATION_START_DATE") return "2026-07-31";
+      if (key === "WECHAT_DAILY_BILL_RECONCILIATION_START_DATE") return readinessBillDate;
       if (key === "WECHAT_DAILY_BILL_RECONCILIATION_HOUR") return 10;
       if (key === "WECHAT_PAY_COMPLAINTS_ENABLED") return true;
       if (key === "NOTIFICATION_DELIVERY_ENABLED") return notificationEnabled;

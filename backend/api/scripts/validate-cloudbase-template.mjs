@@ -81,6 +81,12 @@ export function validateCloudBaseTemplate(templatePath = defaultCloudBaseTemplat
   checkEqual(errors, inputs.dockerfilePath, "./Dockerfile", "CloudBase dockerfilePath");
   checkEqual(errors, inputs.buildDir, "./", "CloudBase buildDir");
 
+  if (template.PRIVATE_INGRESS_REQUIRED !== true) {
+    errors.push(
+      "CloudBase template must set PRIVATE_INGRESS_REQUIRED=true because servicePath=/ serves /admin and /review"
+    );
+  }
+
   if (!Number.isInteger(inputs.minNum) || inputs.minNum < 1) {
     errors.push("CloudBase minNum must be an integer of at least 1 while real-time voice is enabled");
   }

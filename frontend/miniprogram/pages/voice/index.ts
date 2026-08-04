@@ -3,6 +3,7 @@ import {
   handleCustomerAdultEligibilityError,
   isCustomerAdultEligibilityError
 } from "../../utils/adult-eligibility-recovery";
+import { clientRealtimeVoiceEnabled } from "../../utils/config";
 import { VoiceRoomAccess } from "../../utils/models";
 import { ensurePrivacyAuthorization, openLegalDocument } from "../../utils/privacy";
 import { attendanceDisputesApi } from "../../utils/attendance-disputes-api";
@@ -200,6 +201,15 @@ Page({
   hasJoinedOnce: false,
   serviceEndsAtMs: 0,
   onLoad(options: Record<string, string | undefined>) {
+    if (!clientRealtimeVoiceEnabled()) {
+      this.setData({
+        roomState: "error",
+        statusText: "首发仅开放文字陪伴；实时语音待平台配置完成后再开放。",
+        canRetry: false,
+        preflightVisible: false
+      });
+      return;
+    }
     const orderId = String(options.orderId || "").trim();
     if (!orderId) {
       this.setData({

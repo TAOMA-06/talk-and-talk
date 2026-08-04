@@ -1,3 +1,6 @@
+# Prefer pinning digest in promotion pipelines, e.g.:
+#   FROM node:22-alpine@sha256:<digest>
+# Floating tags are acceptable for local builds only.
 FROM node:22-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
@@ -26,6 +29,8 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
   && chown -R node:node /app
 USER node
 EXPOSE 3000
+# Liveness only — process up. Orchestration readiness must use
+# GET /api/v1/health/ready with Authorization: Bearer $METRICS_TOKEN.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD curl -fsS http://127.0.0.1:3000/api/v1/health || exit 1
 ENTRYPOINT ["docker-entrypoint.sh"]

@@ -358,7 +358,7 @@ test("rejects missing, malformed, out-of-range, or inverted consumer JWT TTLs", 
 });
 
 test("requires restricted TRTC signing inputs only when real-time voice is enabled", () => {
-  const enabled = { ...validProduction(), TRTC_ENABLED: "true" };
+  const enabled = { ...validProduction(), COMMERCIAL_SURFACE: "full", TRTC_ENABLED: "true" };
   assert.match(validateDeploymentConfig(enabled).join("\n"), /TRTC_SDK_APP_ID is required/);
 
   Object.assign(enabled, {
@@ -378,6 +378,10 @@ test("requires restricted TRTC signing inputs only when real-time voice is enabl
     TENCENTCLOUD_SECRET_KEY: "tencent-cloud-control-secret-material"
   });
   assert.deepEqual(validateDeploymentConfig(enabled), []);
+  assert.match(
+    validateDeploymentConfig({ ...validProduction(), COMMERCIAL_SURFACE: "text_only", TRTC_ENABLED: "true" }).join("\n"),
+    /COMMERCIAL_SURFACE=text_only forbids TRTC_ENABLED=true/
+  );
   assert.match(
     validateDeploymentConfig({ ...enabled, TRTC_PRIVACY_DISCLOSURE_APPROVED: "false" }).join("\n"),
     /TRTC_PRIVACY_DISCLOSURE_APPROVED must be true/

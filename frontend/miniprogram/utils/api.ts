@@ -15,6 +15,8 @@ export type RequestOptions = {
   data?: Record<string, unknown>;
   authenticated?: boolean;
   retry?: boolean;
+  /** Transport-level retries for network/timeout failures. Defaults to true. */
+  networkRetry?: boolean;
 };
 export type CreateOrderRequest = {
   companionId: string;
@@ -45,16 +47,30 @@ const REFRESH_TOKEN_KEY = "talkandtalk.refreshToken";
 const USER_KEY = "talkandtalk.user";
 const LOGIN_IDENTITY_UNAVAILABLE_KEY = "talkandtalk.loginIdentityUnavailable";
 const LOGIN_IDENTITY_UNAVAILABLE_MESSAGE = "该登录标识暂不可使用，请联系客服";
+const REQUEST_TIMEOUT_MS = 15_000;
+const NETWORK_RETRY_MAX = 2;
+const NETWORK_RETRY_BASE_MS = 400;
+const CRITICAL_READ_REPLAY_LIMIT = 8;
 let refreshInFlight: Promise<void> | null = null;
 let loginInFlight: Promise<AuthSession> | null = null;
 let legalRecoveryLoginInFlight: Promise<AuthSession> | null = null;
 let legalConsentVerificationInFlight: Promise<void> | null = null;
 let verifiedLegalConsentKey = "";
 const initializedCloudEnvironments = new Set<string>();
+let networkRecoveryInstalled = false;
+let lastKnownNetworkConnected = true;
+const pendingCriticalReadReplays = new Map<string, () => Promise<unknown>>();
 
 function storedAccessToken(): string { return wx.getStorageSync(ACCESS_TOKEN_KEY) || ""; }
 function storedRefreshToken(): string { return wx.getStorageSync(REFRESH_TOKEN_KEY) || ""; }
 
+/**
+ * RISK: Mini Program local storage is process-readable plaintext. There is no
+ * hardware-backed key store for arbitrary app secrets, so inventing a client
+ * "encryption" wrapper would only obscure tokens without real confidentiality.
+ * Mitigations already in place: short-lived access JWT (+30s skew), refresh
+ * rotation, and clearSession on logout / consent withdrawal / identity-unavailable.
+ */
 function saveSession(session: AuthSession): void {
   wx.setStorageSync(ACCESS_TOKEN_KEY, session.accessToken);
   wx.setStorageSync(REFRESH_TOKEN_KEY, session.refreshToken);
@@ -126,6 +142,73 @@ export function initializeBackend(): void {
   if (config.transport === "cloudRun") ensureCloudInitialized(config);
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isNetworkTransportError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error || "");
+  return /网络连接失败|网络超时|request:fail|timeout|TIMED_OUT|ERR_NETWORK|fail:timeout/i.test(message);
+}
+
+function isCriticalReadOnlyPath(path: string, method: NonNullable<RequestOptions["method"]>): boolean {
+  if (method !== "GET") return false;
+  const pathname = path.split("?", 1)[0];
+  return pathname === "/me"
+    || pathname === "/orders"
+    || pathname.startsWith("/orders/")
+    || pathname === "/conversations"
+    || pathname.startsWith("/conversations/")
+    || pathname === "/notifications"
+    || pathname === "/notifications/unread-count"
+    || pathname.startsWith("/payments/");
+}
+
+function rememberCriticalReadReplay(path: string, options: RequestOptions, runner: () => Promise<unknown>): void {
+  if (!isCriticalReadOnlyPath(path, options.method || "GET")) return;
+  if (pendingCriticalReadReplays.size >= CRITICAL_READ_REPLAY_LIMIT) {
+    const oldest = pendingCriticalReadReplays.keys().next().value;
+    if (oldest) pendingCriticalReadReplays.delete(oldest);
+  }
+  pendingCriticalReadReplays.set(path.split("?", 1)[0], runner);
+}
+
+async function replayCriticalReadOnlyRequests(): Promise<void> {
+  if (!pendingCriticalReadReplays.size) return;
+  const entries = [...pendingCriticalReadReplays.entries()];
+  pendingCriticalReadReplays.clear();
+  for (const [, runner] of entries) {
+    try {
+      await runner();
+    } catch {
+      // Best-effort recovery; pages still have explicit retry controls.
+    }
+  }
+}
+
+/** Install once from App.onLaunch. Replays recent critical GETs after reconnect. */
+export function installNetworkRecovery(): void {
+  if (networkRecoveryInstalled) return;
+  networkRecoveryInstalled = true;
+  try {
+    wx.getNetworkType?.({
+      success: (result: { networkType?: string }) => {
+        lastKnownNetworkConnected = result.networkType !== "none";
+      }
+    });
+  } catch {
+    // Older bases may lack getNetworkType; onNetworkStatusChange still helps.
+  }
+  if (typeof wx.onNetworkStatusChange !== "function") return;
+  wx.onNetworkStatusChange((result: { isConnected?: boolean }) => {
+    const connected = Boolean(result?.isConnected);
+    if (connected && !lastKnownNetworkConnected) {
+      void replayCriticalReadOnlyRequests();
+    }
+    lastKnownNetworkConnected = connected;
+  });
+}
+
 /** Shared transport boundary: public HTTPS and WeChat Cloud Run return the same API envelope. */
 export function dispatchBackendRequest(
   config: BackendConfig,
@@ -136,7 +219,11 @@ export function dispatchBackendRequest(
   return new Promise((resolve, reject) => {
     const callbacks = {
       success: (response: TransportResponse) => resolve(response),
-      fail: () => reject(new Error("网络连接失败，请稍后重试"))
+      fail: (error?: { errMsg?: string }) => {
+        const detail = String(error?.errMsg || "");
+        if (/timeout/i.test(detail)) reject(new Error("网络超时，请稍后重试"));
+        else reject(new Error("网络连接失败，请稍后重试"));
+      }
     };
 
     if (config.transport === "cloudRun") {
@@ -152,6 +239,7 @@ export function dispatchBackendRequest(
         method: options.method || "GET",
         data: options.data,
         header: { ...header, "X-WX-SERVICE": config.service },
+        timeout: REQUEST_TIMEOUT_MS,
         ...callbacks
       });
       return;
@@ -162,6 +250,7 @@ export function dispatchBackendRequest(
       method: options.method || "GET",
       data: options.data,
       header,
+      timeout: REQUEST_TIMEOUT_MS,
       ...callbacks
     });
   });
@@ -219,15 +308,40 @@ async function verifyServerLegalConsent(user: AuthUser): Promise<void> {
 async function rawRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const header: Record<string, string> = { "content-type": "application/json" };
   if (options.authenticated !== false && storedAccessToken()) header.Authorization = `Bearer ${storedAccessToken()}`;
-  const response = await dispatchBackendRequest(backendConfig(), path, options, header);
-  const body = response.data || {};
-  if (response.statusCode >= 200 && response.statusCode < 300) return body.data as T;
 
-  const error = new Error(body.error?.message || "服务暂时不可用") as ApiError;
-  error.statusCode = response.statusCode;
-  error.code = body.error?.code;
-  error.details = body.error?.details;
-  throw error;
+  const method = options.method || "GET";
+  // Mutations stay single-shot: ambiguous transport failures must not duplicate
+  // payments/orders. Reads may use a short exponential backoff.
+  const allowNetworkRetry = options.networkRetry !== false && method === "GET";
+  const maxAttempts = allowNetworkRetry ? NETWORK_RETRY_MAX + 1 : 1;
+  let attempt = 0;
+  while (true) {
+    attempt += 1;
+    try {
+      const response = await dispatchBackendRequest(backendConfig(), path, options, header);
+      const body = response.data || {};
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        if (isCriticalReadOnlyPath(path, method)) {
+          pendingCriticalReadReplays.delete(path.split("?", 1)[0]);
+        }
+        return body.data as T;
+      }
+
+      const error = new Error(body.error?.message || "服务暂时不可用") as ApiError;
+      error.statusCode = response.statusCode;
+      error.code = body.error?.code;
+      error.details = body.error?.details;
+      throw error;
+    } catch (error) {
+      if (!isNetworkTransportError(error) || attempt >= maxAttempts) {
+        if (isNetworkTransportError(error) && isCriticalReadOnlyPath(path, method)) {
+          rememberCriticalReadReplay(path, options, () => rawRequest(path, { ...options, networkRetry: false }));
+        }
+        throw error;
+      }
+      await sleep(NETWORK_RETRY_BASE_MS * (2 ** (attempt - 1)));
+    }
+  }
 }
 
 export function readLocalFile(path: string): Promise<ArrayBuffer> {

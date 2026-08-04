@@ -4,6 +4,8 @@
 
 本轮唯一消费者发行面是微信小程序，普通用户与陪伴者在同一小程序内使用角色化界面；商业员工使用 `/admin/`，独立审核部门使用 `/review/`，权威 API 为 NestJS `/api/v1`。`frontend/ios`、消费者 Web 和本地演示不参与商用放行。当前市场交叉审查、仓库红线及刻意不复制项见 [商用界面市场交叉审查（2026-08-02 复审）](./commercial-market-cross-audit-2026-08-02.md)。
 
+**首发产品范围（text-only）**：服务端 `COMMERCIAL_SURFACE=text_only`（默认）硬锁语音 SKU 写入、语音下单、voice-room access 与聊天媒体；配置层同时禁止 `TRTC_ENABLED=true` / `MEDIA_FEATURE_ENABLED=true`。小程序隐藏对应入口。未取得生产运行证据前不得切到 `COMMERCIAL_SURFACE=full`。详见 [production-checklist.md](./production-checklist.md)。
+
 ## 商业交易模型
 
 1. 陪伴者先完成实名核验，再录入仅含受控外部引用的商业档案：身份核验证据、服务协议版本与签署证据、税务档案、结算收款对象。录入人与复核人必须不同；重新提交或暂停商业档案会自动下架，恢复后仍须单独重新上架。

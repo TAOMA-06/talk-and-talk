@@ -794,7 +794,7 @@ export class PaymentsService implements OnModuleInit {
             HttpStatus.FORBIDDEN
           );
         }
-        this.assertRefundAssignee(refund, actorId);
+        this.assertRefundReviewAuthorization(refund, actorId);
         const updated = await db.refundTransaction.update({
           where: { id: refundId },
           data: {
@@ -2488,6 +2488,36 @@ export class PaymentsService implements OnModuleInit {
           assigned: Boolean(refund.assignedToUserId),
           assignedAt: refund.assignedAt?.toISOString?.() ?? null
         }
+      );
+    }
+  }
+
+  /**
+   * Below the dual-control threshold the claimer may approve (existing flow).
+   * At or above the threshold the claimer must not approve: a different
+   * finance operator reviews after the item is claimed.
+   */
+  private assertRefundReviewAuthorization(refund: any, actorId: string): void {
+    const threshold = Number(this.config.get<number>("REFUND_DUAL_CONTROL_THRESHOLD_CENTS", 100) ?? 100);
+    const amountCents = Number(refund.amountCents ?? 0);
+    const dualControl = Number.isFinite(amountCents) && amountCents >= threshold;
+    if (!dualControl) {
+      this.assertRefundAssignee(refund, actorId);
+      return;
+    }
+    if (!refund.assignedToUserId) {
+      throw new AppException(
+        "REFUND_ASSIGNEE_REQUIRED",
+        "A finance operator must claim this refund before a second reviewer can approve it",
+        HttpStatus.FORBIDDEN
+      );
+    }
+    if (refund.assignedToUserId === actorId) {
+      throw new AppException(
+        "REFUND_SECOND_REVIEW_REQUIRED",
+        "A different administrator must approve refunds at or above the dual-control threshold",
+        HttpStatus.FORBIDDEN,
+        { thresholdCents: threshold, amountCents }
       );
     }
   }

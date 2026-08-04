@@ -1,0 +1,50 @@
+# Alertmanager-compatible samples for Talk&Talk commercial readiness (CTO-C02 / T-M03).
+# Wire these to Prometheus scraping of private GET /api/v1/metrics (Bearer METRICS_TOKEN).
+# Production evidence: inject a notify signature failure and confirm paging ≤5 minutes.
+
+groups:
+  - name: talk-and-talk-payments
+    rules:
+      - alert: WeChatNotifyFailures
+        expr: increase(talk_wechat_notify_failures_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: page
+          service: talk-and-talk-api
+        annotations:
+          summary: WeChat payment notify failures detected
+          description: >
+            talk_wechat_notify_failures_total increased in the last 5 minutes.
+            Locate payment callback / worker path within 15 minutes.
+
+      - alert: RefundWorkerBacklog
+        expr: talk_commercial_readiness_blocker{blocker="staleRefunds"} > 0
+          or talk_commercial_readiness_blocker{blocker="failedRefunds"} > 0
+        for: 5m
+        labels:
+          severity: page
+          service: talk-and-talk-api
+        annotations:
+          summary: Refund readiness blockers are non-zero
+          description: Failed or stale refunds require finance dual-control review.
+
+      - alert: NotificationOrLeaseStale
+        expr: talk_commercial_readiness_blocker{blocker="staleNotificationLeases"} > 0
+          or talk_commercial_readiness_blocker{blocker="notificationDeliveryOverduePending"} > 0
+        for: 5m
+        labels:
+          severity: ticket
+          service: talk-and-talk-api
+        annotations:
+          summary: Notification delivery leases or overdue pending backlog
+          description: Check notification-delivery worker and Redis/DB leases.
+
+      - alert: HealthReadyDegraded
+        expr: probe_success{job="talk-health-ready"} == 0
+        for: 2m
+        labels:
+          severity: page
+          service: talk-and-talk-api
+        annotations:
+          summary: Authenticated /health/ready probe failing
+          description: Dependencies degraded; do not restart on public /health alone.

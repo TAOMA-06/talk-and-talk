@@ -36,7 +36,8 @@ for (const runtimeDependency of ["dotenv", "prisma"]) {
 }
 
 const expectedEntrypointCommands = [
-  "./node_modules/.bin/prisma migrate deploy",
+  "prisma migrate status",
+  "RUN_MIGRATE_ON_START",
   "node dist/src/database/seed.js",
   "exec node dist/src/main.js"
 ];
@@ -45,6 +46,15 @@ for (const command of expectedEntrypointCommands) {
   if (!entrypoint.includes(command)) {
     throw new Error(`docker-entrypoint.sh must contain: ${command}`);
   }
+}
+if (!entrypoint.includes("prisma migrate deploy")) {
+  throw new Error("docker-entrypoint.sh must retain opt-in prisma migrate deploy");
+}
+if (!/RUN_MIGRATE_ON_START:-false/.test(entrypoint)) {
+  throw new Error("docker-entrypoint.sh must default RUN_MIGRATE_ON_START to false");
+}
+if (!mainSource.includes("enableShutdownHooks")) {
+  throw new Error("main.ts must enable Nest shutdown hooks for worker lease release");
 }
 
 const staticAssetsCopy = "COPY --from=build /app/public ./dist/public";

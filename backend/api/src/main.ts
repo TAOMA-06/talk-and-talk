@@ -74,6 +74,9 @@ async function bootstrap() {
   app.useGlobalInterceptors(new EnvelopeInterceptor());
   app.useGlobalFilters(new HttpExceptionFilter());
   app.enableCors(buildCorsOptions(config));
+  // Workers release Redis/DB leases in OnModuleDestroy. Without this, SIGTERM
+  // during rolling deploys skips Nest lifecycle hooks and can leak leases.
+  app.enableShutdownHooks();
 
   await app.listen(
     config.getOrThrow<number>("PORT"),

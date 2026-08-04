@@ -900,6 +900,28 @@ describe("PaymentsService", () => {
       .rejects.toMatchObject({ code: "REFUND_SECOND_REVIEW_REQUIRED", status: HttpStatus.FORBIDDEN });
   });
 
+  it("requires a different finance operator to approve claimed refunds at the dual-control threshold", async () => {
+    const db = {
+      $queryRaw: jest.fn(),
+      refundTransaction: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "refund-user-1",
+          status: "pendingReview",
+          initiatedById: null,
+          assignedToUserId: "finance-1",
+          amountCents: 5_000,
+          order: { id: "o1", userId: "u1", companionId: "c1" }
+        }),
+        update: jest.fn()
+      }
+    } as any;
+    prisma.$transaction.mockImplementation(async (fn: any) => fn(db));
+
+    await expect(service.approveRefund("finance-1", "refund-user-1"))
+      .rejects.toMatchObject({ code: "REFUND_SECOND_REVIEW_REQUIRED", status: HttpStatus.FORBIDDEN });
+    expect(db.refundTransaction.update).not.toHaveBeenCalled();
+  });
+
   it("does not let finance overturn a final attendance refund decision", async () => {
     const db = {
       $queryRaw: jest.fn(),

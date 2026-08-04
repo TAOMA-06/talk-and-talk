@@ -247,9 +247,9 @@ describe("Companions and me (e2e)", () => {
       .post("/api/v1/companions/me/service-offerings")
       .set("Authorization", `Bearer ${token}`)
       .send({
-        title: "周末语音陪伴",
+        title: "周末文字陪伴",
         description: "在平台内聊天，不交换联系方式。",
-        deliveryMode: "voice",
+        deliveryMode: "text",
         durationMinutes: 60,
         priceCents: 8800,
         topicIds: ["t1", "t3"],
@@ -260,13 +260,28 @@ describe("Companions and me (e2e)", () => {
     expect(created.body.data).toEqual(expect.objectContaining({
       id: expect.any(String),
       code: expect.stringMatching(/^service-/),
-      title: "周末语音陪伴",
-      deliveryMode: "voice",
+      title: "周末文字陪伴",
+      deliveryMode: "text",
       durationMinutes: 60,
       priceCents: 8800,
       isActive: true,
       sortOrder: 12
     }));
+
+    await request(app.getHttpServer())
+      .post("/api/v1/companions/me/service-offerings")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        title: "语音应被 text-only 拒绝",
+        deliveryMode: "voice",
+        durationMinutes: 60,
+        priceCents: 8800,
+        topicIds: ["t1"]
+      })
+      .expect(422)
+      .expect(({ body }) => {
+        expect(body.error?.code || body.code).toEqual(expect.stringMatching(/COMMERCIAL_SURFACE_TEXT_ONLY|VOICE/));
+      });
 
     await request(app.getHttpServer())
       .patch(`/api/v1/companions/me/service-offerings/${created.body.data.id}`)
@@ -528,9 +543,7 @@ describe("Companions and me (e2e)", () => {
       .send({
         displayName: "新的小楷",
         age: 23,
-        gender: "male",
-        role: "admin",
-        safetyScore: 0
+        gender: "male"
       })
       .expect(200)
       .expect(({ body }) => {

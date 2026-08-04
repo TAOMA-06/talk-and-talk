@@ -1,4 +1,11 @@
 {
+  "_comments": [
+    "PRIVATE_INGRESS_REQUIRED: servicePath=/ serves /admin and /review from the same container.",
+    "Do not deploy this template to a public internet hostname without an edge allowlist/VPN for /admin and /review.",
+    "Prefer private access gateway or attach nginx with infra/nginx/talk-and-talk.conf.example locks.",
+    "maxNum>1 requires RUN_MIGRATE_ON_START=false and a single-flight migrate release job."
+  ],
+  "PRIVATE_INGRESS_REQUIRED": true,
   "envId": "__REPLACE_WITH_CLOUDBASE_ENV_ID__",
   "framework": {
     "plugins": {

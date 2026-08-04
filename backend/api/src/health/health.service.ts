@@ -35,13 +35,16 @@ export class HealthService {
     private readonly config: ConfigService
   ) {}
 
-  /** Public liveness: status only, no env or dependency error details. */
+  /**
+   * Public liveness: process is up. Never probe DB/Redis here — dependency
+   * failures belong on authenticated `/health/ready` so orchestrators do not
+   * restart healthy processes during brief dependency blips.
+   */
   async check(): Promise<HealthLivenessResponse> {
-    const ready = await this.ready();
     return {
-      status: ready.status,
-      service: ready.service,
-      version: ready.version
+      status: "ok",
+      service: "talk-and-talk-api",
+      version: this.config.getOrThrow<string>("APP_VERSION")
     };
   }
 

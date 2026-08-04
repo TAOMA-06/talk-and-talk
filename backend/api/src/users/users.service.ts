@@ -1068,7 +1068,7 @@ export class UsersService {
           CASE WHEN ${companionId}::TEXT IS NULL THEN FALSE ELSE (
             EXISTS (SELECT 1 FROM "AvailabilityReminderCandidate" WHERE "companionId" = ${companionId})
             OR EXISTS (SELECT 1 FROM "AvailabilityReminderFanoutJob" WHERE "companionId" = ${companionId})
-            OR EXISTS (SELECT 1 FROM "CompanionAvailabilityWindow" window WHERE window."companionId" = ${companionId} AND (window."isActive" OR NOT EXISTS (SELECT 1 FROM "Order" orders WHERE orders."availabilityWindowId" = window."id")))
+            OR EXISTS (SELECT 1 FROM "CompanionAvailabilityWindow" availability_window WHERE availability_window."companionId" = ${companionId} AND (availability_window."isActive" OR NOT EXISTS (SELECT 1 FROM "Order" orders WHERE orders."availabilityWindowId" = availability_window."id")))
             OR EXISTS (SELECT 1 FROM "CompanionRecurringAvailabilityRule" WHERE "companionId" = ${companionId})
             OR EXISTS (SELECT 1 FROM "CompanionAvailabilityBlackout" WHERE "companionId" = ${companionId})
             OR EXISTS (SELECT 1 FROM "CompanionRecommendationPolicy" WHERE "companionId" = ${companionId})

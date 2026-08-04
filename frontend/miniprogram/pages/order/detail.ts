@@ -1,4 +1,5 @@
 import { api, ensureSession } from "../../utils/api";
+import { clientRealtimeVoiceEnabled } from "../../utils/config";
 import { Order, OrderTimelineEvent } from "../../utils/models";
 import {
   canOpenConversation,
@@ -407,6 +408,10 @@ Page({
     wx.navigateTo({ url: `/pages/chat/index?id=${encodeURIComponent(conversationId)}` });
   },
   openVoice() {
+    if (!clientRealtimeVoiceEnabled()) {
+      wx.showToast({ title: "实时语音尚未对首发开放，请使用订单内文字沟通", icon: "none" });
+      return;
+    }
     wx.navigateTo({ url: `/pages/voice/index?orderId=${encodeURIComponent(this.orderId)}` });
   },
   openAftercare() {
@@ -422,7 +427,10 @@ Page({
     const scheduledAtMs = Date.parse(order.scheduledAt || "");
     getApp().globalData.discoveryIntent = {
       topicId: order.themeId || undefined,
-      deliveryMode: deliveryMode === "text" || deliveryMode === "voice" ? deliveryMode : undefined,
+      deliveryMode: deliveryMode === "text"
+        || (deliveryMode === "voice" && clientRealtimeVoiceEnabled())
+        ? deliveryMode
+        : undefined,
       availableWithinDays: Number.isFinite(scheduledAtMs)
         && scheduledAtMs <= Date.now() + 3 * 24 * 60 * 60_000 ? 3 : undefined,
       sortBy: "soonestAvailable",

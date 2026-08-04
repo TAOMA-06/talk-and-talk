@@ -68,7 +68,7 @@
       <view class="field-label">服务方式</view>
       <view class="mode-options">
         <button class="mode-button {{formDeliveryMode === 'text' ? 'selected' : ''}}" bindtap="setFormDeliveryMode" data-mode="text">文字服务</button>
-        <button class="mode-button {{formDeliveryMode === 'voice' ? 'selected' : ''}}" bindtap="setFormDeliveryMode" data-mode="voice">语音服务</button>
+        <button wx:if="{{voiceDeliveryModeAvailable}}" class="mode-button {{formDeliveryMode === 'voice' ? 'selected' : ''}}" bindtap="setFormDeliveryMode" data-mode="voice">语音服务</button>
       </view>
 
       <view class="field-label">服务时长</view>

@@ -475,6 +475,16 @@ export function validateDeploymentConfig(env) {
   if (env.COMMERCIAL_RELEASE_MODE === "commercial" && refundPolicyApproved !== "true") {
     errors.push("COMMERCIAL_RELEASE_MODE=commercial requires REFUND_POLICY_APPROVED=true");
   }
+  const commercialSurface = (env.COMMERCIAL_SURFACE || "text_only").trim().toLowerCase();
+  if (!["text_only", "text-only", "full"].includes(commercialSurface)) {
+    errors.push("COMMERCIAL_SURFACE must be text_only or full");
+  }
+  if ((commercialSurface === "text_only" || commercialSurface === "text-only") && env.TRTC_ENABLED === "true") {
+    errors.push("COMMERCIAL_SURFACE=text_only forbids TRTC_ENABLED=true");
+  }
+  if ((commercialSurface === "text_only" || commercialSurface === "text-only") && env.MEDIA_FEATURE_ENABLED === "true") {
+    errors.push("COMMERCIAL_SURFACE=text_only forbids MEDIA_FEATURE_ENABLED=true");
+  }
   for (const key of ["LEGAL_PRIVACY_RETENTION_DAYS", "PLATFORM_FEE_BPS", "COMPANION_SETTLEMENT_HOLD_HOURS", "REFUND_REQUEST_WINDOW_HOURS", "ORDER_RESPONSE_WINDOW_MINUTES", "ORDER_MAX_SCHEDULE_DAYS", "ORDER_MAX_OPEN_TOTAL", "ORDER_MAX_OPEN_PER_USER", "ORDER_MAX_PENDING_PER_COMPANION", "SUPPORT_RESPONSE_HOURS", "SUPPORT_MAX_OPEN_PER_USER"]) {
     if (env[key] && !/^\d+$/.test(env[key])) errors.push(`${key} must be an integer`);
   }

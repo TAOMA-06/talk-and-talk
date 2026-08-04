@@ -20,10 +20,19 @@ html, body { min-height: 100%; }
 body { margin: 0; color: var(--ink); background: var(--paper); }
 button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
 .hidden { display: none !important; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .eyebrow { margin: 0 0 8px; color: var(--green); font-size: 11px; font-weight: 800; letter-spacing: .13em; }
 .muted { color: var(--muted); }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 
 .login-shell { min-height: 100vh; display: grid; grid-template-columns: minmax(420px, 1.1fr) minmax(420px, .9fr); background: var(--surface); }
 .login-intro { min-height: 100%; padding: 42px clamp(42px, 8vw, 128px); color: #f9fbf7; background: radial-gradient(circle at 78% 19%, rgba(86, 165, 135, .44), transparent 26%), radial-gradient(circle at 13% 86%, rgba(232, 185, 73, .16), transparent 25%), var(--deep); display: flex; flex-direction: column; }
@@ -84,7 +93,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--green); box-shad
 .portal-main { min-width: 0; padding: 38px clamp(22px, 4vw, 62px) 50px; }
 .portal-header { display: flex; justify-content: space-between; align-items: end; gap: 20px; margin-bottom: 28px; }
 .portal-header h1 { margin: 0; font-size: clamp(28px, 3.4vw, 42px); letter-spacing: -.06em; }
-.header-actions { display: flex; gap: 12px; align-items: center; }
+.header-actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.header-logout { min-height: 34px; padding: 0 12px; font-size: 12px; }
 .last-updated { color: var(--muted); font-size: 12px; }
 .session-chip { min-height: 30px; padding: 6px 10px; border: 1px solid #cfe0d6; border-radius: 999px; color: #315c4e; background: #edf7f1; font-size: 11px; font-weight: 760; white-space: nowrap; }
 .session-chip.warning { color: #765800; border-color: #ead28d; background: #fff6dc; }
@@ -110,6 +120,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--green); box-shad
 .search-field > span { position: absolute; top: 9px; left: 11px; color: #91a19a; font-size: 18px; }
 .search-field input { min-height: 37px; padding-left: 32px; font-size: 12px; }
 .filter-form .button { min-height: 37px; }
+.filter-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .case-list { max-height: calc(100vh - 480px); min-height: 230px; overflow-y: auto; padding: 8px; }
 .case-card { width: 100%; border: 1px solid transparent; padding: 13px 12px; border-radius: 9px; color: var(--ink); background: transparent; text-align: left; transition: background .12s, border .12s; }
 .case-card:hover { background: #f3f8f4; }
@@ -260,7 +271,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--green); box-shad
   .portal { display: block; }
   .sidebar { position: static; height: auto; padding: 18px; }
   .sidebar .department-label, .sidebar-bottom { display: none; }
-  .nav-list { display: flex; margin-top: 18px; overflow-x: auto; }
+  .nav-list { display: flex; margin-top: 18px; overflow-x: auto; gap: 4px; -webkit-overflow-scrolling: touch; }
   .nav-item { flex: 0 0 auto; width: auto; }
   .portal-main { padding: 28px 18px 40px; }
   .workbench, .label-layout { grid-template-columns: 1fr; }
@@ -271,16 +282,22 @@ input:focus, select:focus, textarea:focus { border-color: var(--green); box-shad
   .reviewer-picker .assignment-select, .reviewer-picker .reviewer-picker-status { grid-column: auto; }
   .case-list { max-height: 390px; }
   .empty-state { min-height: 380px; }
+  .header-logout { display: inline-flex; }
+  .filter-actions { grid-template-columns: 1fr; }
+}
+@media (min-width: 841px) {
+  .header-logout { display: none; }
 }
 @media (max-width: 520px) {
   .security-points { grid-template-columns: 1fr; gap: 12px; }
   .security-points div { display: grid; grid-template-columns: 38px 1fr; }
   .security-points dd { margin: 0; }
   .portal-header { align-items: start; flex-direction: column; }
-  .header-actions { width: 100%; justify-content: space-between; }
+  .header-actions { width: 100%; justify-content: flex-start; }
   .metrics-grid { grid-template-columns: 1fr 1fr; }
   .metric-card { min-height: 112px; padding: 14px; }
   .metric-card strong { font-size: 29px; }
   .detail-metadata, .two-up { grid-template-columns: 1fr; }
   .case-detail { padding: 19px; }
+  .login-card h2 { font-size: 26px; }
 }

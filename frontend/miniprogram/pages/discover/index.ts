@@ -1,5 +1,6 @@
 import { api, ensureSession } from "../../utils/api";
 import { CatalogDisplay, withCatalogDisplays } from "../../utils/catalog";
+import { clientRealtimeVoiceEnabled } from "../../utils/config";
 import { openCrisisResources, passCrisisGate } from "../../utils/crisis-gate";
 import { Companion, RecommendedCompanion, RecommendationTopic } from "../../utils/models";
 import { flushRecommendationEvents, queueRecommendationEvent, trackRecommendationCardViews } from "../../utils/recommendations";
@@ -31,6 +32,12 @@ const DELIVERY_MODES: Array<Omit<DeliveryModeFilter, "selected">> = [
   { value: "text", label: "文字服务" },
   { value: "voice", label: "语音服务" }
 ];
+
+function availableDeliveryModes(): Array<Omit<DeliveryModeFilter, "selected">> {
+  return clientRealtimeVoiceEnabled()
+    ? DELIVERY_MODES
+    : DELIVERY_MODES.filter((mode) => mode.value !== "voice");
+}
 const PRICE_LIMITS: Array<Omit<PriceFilter, "selected">> = [
   { value: 5_000, label: "¥50 内" },
   { value: 10_000, label: "¥100 内" },
@@ -67,7 +74,7 @@ function displayTopics(topics: RecommendationTopic[], selectedTopicId: string): 
 }
 
 function displayDeliveryModes(selectedDeliveryMode: DeliveryMode): DeliveryModeFilter[] {
-  return DELIVERY_MODES.map((mode) => ({ ...mode, selected: mode.value === selectedDeliveryMode }));
+  return availableDeliveryModes().map((mode) => ({ ...mode, selected: mode.value === selectedDeliveryMode }));
 }
 
 function displayPriceLimits(selectedMaxServicePriceCents: number): PriceFilter[] {
@@ -160,7 +167,7 @@ Page({
     if (getApp()?.globalData) getApp().globalData.discoveryIntent = null;
     if (intent) {
       const selectedTopicId = typeof intent.topicId === "string" ? intent.topicId : "";
-      const selectedDeliveryMode = DELIVERY_MODES.some((mode) => mode.value === intent.deliveryMode)
+      const selectedDeliveryMode = availableDeliveryModes().some((mode) => mode.value === intent.deliveryMode)
         ? intent.deliveryMode!
         : "";
       const selectedAvailableWithinDays = AVAILABILITY_WITHIN_DAYS.some((item) => item.value === intent.availableWithinDays)
@@ -361,6 +368,7 @@ Page({
   },
   async selectDeliveryMode(event: any) {
     const value = String(event.currentTarget.dataset.value || "") as DeliveryMode;
+    if (!availableDeliveryModes().some((mode) => mode.value === value)) return;
     const selectedDeliveryMode = value === this.data.selectedDeliveryMode ? "" : value;
     this.setData({
       selectedDeliveryMode,

@@ -1,6 +1,7 @@
 import { api, ApiError, ensureSession } from "../../utils/api";
 import { handleCustomerAdultEligibilityError } from "../../utils/adult-eligibility-recovery";
 import { CatalogDisplay, withCatalogDisplays } from "../../utils/catalog";
+import { clientRealtimeVoiceEnabled } from "../../utils/config";
 import {
   CompanionAvailabilityCandidate, Order, OrderExperienceFeedbackTag, OrderRescheduleRequest, OrderTimelineEvent, RecommendedCompanion, SupportTicket
 } from "../../utils/models";
@@ -500,7 +501,7 @@ function fulfillmentDisplayPatch(order: Order, viewerRole: OrderViewerRole): Pic
 > {
   const guidance = fulfillmentGuidance(order, viewerRole);
   const activeRefund = hasActiveRefund(order);
-  const realTimeVoice = isRealtimeVoiceService(order);
+  const realTimeVoice = clientRealtimeVoiceEnabled() && isRealtimeVoiceService(order);
   return {
     hasFulfillmentGuidance: guidance.show && !activeRefund,
     fulfillmentTitle: guidance.title,
@@ -1972,7 +1973,9 @@ Page({
     try {
       const started = await api.startService(id);
       await this.load();
-      if (started.serviceOfferingSnapshot?.deliveryMode === "voice") this.navigateToVoiceRoom(id);
+      if (clientRealtimeVoiceEnabled() && started.serviceOfferingSnapshot?.deliveryMode === "voice") {
+        this.navigateToVoiceRoom(id);
+      }
     }
     catch (error) {
       const apiError = error as ApiError;
@@ -1989,7 +1992,7 @@ Page({
       wx.showToast({ title: "订单信息已变化，请刷新后重试", icon: "none" });
       return;
     }
-    const realTimeVoice = isRealtimeVoiceService(context.order);
+    const realTimeVoice = clientRealtimeVoiceEnabled() && isRealtimeVoiceService(context.order);
     const confirmation = await new Promise<any>((resolve) => wx.showModal({
       title: "确认接单",
       content: realTimeVoice
@@ -2076,6 +2079,10 @@ Page({
   },
   openVoiceRoom(event: any) {
     const id = String(event.currentTarget.dataset.id || "");
+    if (!clientRealtimeVoiceEnabled()) {
+      wx.showToast({ title: "实时语音尚未对首发开放，请使用订单内文字沟通", icon: "none" });
+      return;
+    }
     const context = this.orderContext(id);
     if (!context || !context.order.canOpenRealtimeVoice) {
       wx.showToast({ title: "实时语音尚未到可进入时间，请刷新订单后重试", icon: "none" });
@@ -2084,6 +2091,10 @@ Page({
     this.navigateToVoiceRoom(id);
   },
   navigateToVoiceRoom(orderId: string) {
+    if (!clientRealtimeVoiceEnabled()) {
+      wx.showToast({ title: "实时语音尚未对首发开放，请使用订单内文字沟通", icon: "none" });
+      return;
+    }
     wx.navigateTo({ url: `/pages/voice/index?orderId=${encodeURIComponent(orderId)}` });
   },
   async openSupport(event: any) {

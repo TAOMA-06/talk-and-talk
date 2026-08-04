@@ -287,7 +287,11 @@ describe("OrdersService", () => {
 
   it("binds an active service offering and freezes its commercial snapshot", async () => {
     const config = {
-      get: jest.fn((key: string, fallback?: unknown) => key === "TRTC_ENABLED" ? true : fallback)
+      get: jest.fn((key: string, fallback?: unknown) => {
+        if (key === "COMMERCIAL_SURFACE") return "full";
+        if (key === "TRTC_ENABLED") return true;
+        return fallback;
+      })
     } as any;
     service = new OrdersService(prisma, notifications, wechat, undefined, config);
     prisma.companionProfile.findFirst.mockResolvedValue({
@@ -334,7 +338,11 @@ describe("OrdersService", () => {
 
   it("rejects a voice offering before it creates an order when real-time voice is disabled", async () => {
     const config = {
-      get: jest.fn((key: string, fallback?: unknown) => key === "TRTC_ENABLED" ? false : fallback)
+      get: jest.fn((key: string, fallback?: unknown) => {
+        if (key === "COMMERCIAL_SURFACE") return "full";
+        if (key === "TRTC_ENABLED") return false;
+        return fallback;
+      })
     } as any;
     service = new OrdersService(prisma, notifications, wechat, undefined, config);
     prisma.companionProfile.findFirst.mockResolvedValue({

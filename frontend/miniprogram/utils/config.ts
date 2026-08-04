@@ -67,3 +67,28 @@ export const LEGAL_URLS = {
 } as const;
 
 export const LEGAL_CONSENT_VERSION = "2.2-2026-08-01";
+
+/**
+ * First commercial release stays text-only. Chat media uploads and TRTC voice
+ * stay in the codebase for later activation, but default UX must not surface
+ * those entry points until MEDIA/TRTC production evidence is archived.
+ * Smoke may set `globalThis.__TALK_AND_TALK_COMMERCIAL_TEXT_ONLY__ = false`
+ * to exercise the dormant capability path without shipping it.
+ */
+const COMMERCIAL_TEXT_ONLY_DEFAULT = true;
+
+export function isCommercialTextOnly(): boolean {
+  const override = (globalThis as { __TALK_AND_TALK_COMMERCIAL_TEXT_ONLY__?: boolean })
+    .__TALK_AND_TALK_COMMERCIAL_TEXT_ONLY__;
+  if (typeof override === "boolean") return override;
+  return COMMERCIAL_TEXT_ONLY_DEFAULT;
+}
+
+/** Server mediaEnabled is still authoritative once text-only scope is lifted. */
+export function clientChatMediaEnabled(serverEnabled: boolean): boolean {
+  return !isCommercialTextOnly() && serverEnabled;
+}
+
+export function clientRealtimeVoiceEnabled(): boolean {
+  return !isCommercialTextOnly();
+}

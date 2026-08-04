@@ -264,7 +264,11 @@ describe("CompanionsService", () => {
     deactivateBlackout: jest.fn()
   } as any;
   const config = {
-    get: jest.fn((key: string, fallback?: unknown) => key === "TRTC_ENABLED" ? true : fallback)
+    get: jest.fn((key: string, fallback?: unknown) => {
+      if (key === "COMMERCIAL_SURFACE") return "full";
+      if (key === "TRTC_ENABLED") return true;
+      return fallback;
+    })
   } as any;
 
   let service: CompanionsService;
@@ -871,7 +875,11 @@ describe("CompanionsService", () => {
 
   it("hides voice purchase entry points while real-time voice is disabled without changing owner catalog data", async () => {
     const disabledConfig = {
-      get: jest.fn((key: string, fallback?: unknown) => key === "TRTC_ENABLED" ? false : fallback)
+      get: jest.fn((key: string, fallback?: unknown) => {
+        if (key === "COMMERCIAL_SURFACE") return "text_only";
+        if (key === "TRTC_ENABLED") return false;
+        return fallback;
+      })
     } as any;
     const disabledService = new CompanionsService(
       prisma,

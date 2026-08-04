@@ -440,9 +440,14 @@ describe("Orders and payments (e2e)", () => {
       .set("Authorization", `Bearer ${customer.token}`)
       .send({ outTradeNo: prepay.body.data.payment.outTradeNo })
       .expect(201);
+    const completedAt = new Date();
     await prisma.order.update({
       where: { id: order.body.data.id },
-      data: { status: "completed", completedAt: new Date() }
+      data: {
+        status: "completed",
+        completedAt,
+        refundRequestDeadlineAt: new Date(completedAt.getTime() + 72 * 60 * 60_000)
+      }
     });
     const requested = await request(app.getHttpServer())
       .post(`/api/v1/orders/${order.body.data.id}/refund`)
@@ -451,6 +456,10 @@ describe("Orders and payments (e2e)", () => {
       .expect(201);
     const refundId = requested.body.data.refund.id as string;
     expect(requested.body.data.refund.status).toBe("pendingReview");
+    await request(app.getHttpServer())
+      .post(`/api/v1/payments/refunds/${refundId}/claim`)
+      .set("Authorization", `Bearer ${moderator.token}`)
+      .expect(201);
     const createRefund = jest.spyOn(wechat, "createRefund");
 
     const results = await Promise.all([
@@ -499,7 +508,14 @@ describe("Orders and payments (e2e)", () => {
       const refund = await prisma.refundTransaction.findUniqueOrThrow({
         where: { outRefundNo: input.outRefundNo }
       });
-      await (paymentsService as any).applyRefundResult(refund.id, "SUCCESS", "wx_refund_race");
+      const acceptedAt = new Date();
+      await (paymentsService as any).applyRefundResult(
+        refund.id,
+        "SUCCESS",
+        "wx_refund_race",
+        acceptedAt.toISOString(),
+        new Date(acceptedAt.getTime() + 1_000).toISOString()
+      );
       throw new Error("response timed out after WeChat accepted the refund");
     });
     await request(app.getHttpServer())

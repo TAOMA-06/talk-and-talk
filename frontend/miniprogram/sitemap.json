@@ -1,4 +1,25 @@
 {
-  "desc": "Talk&Talk 小程序页面索引配置",
-  "rules": [{ "action": "allow", "page": "*" }]
+  "desc": "Talk&Talk 小程序页面索引：公开发现页可索引；会话、支付、账号权利与陪伴者工作台等敏感页禁止收录。",
+  "rules": [
+    { "action": "disallow", "page": "pages/voice/index" },
+    { "action": "disallow", "page": "pages/chat/index" },
+    { "action": "disallow", "page": "pages/order/payment" },
+    { "action": "disallow", "page": "pages/order/dispute" },
+    { "action": "disallow", "page": "pages/order/aftercare" },
+    { "action": "disallow", "page": "pages/account/index" },
+    { "action": "disallow", "page": "pages/account/adult-eligibility" },
+    { "action": "disallow", "page": "pages/account/deletion-status" },
+    { "action": "disallow", "page": "pages/crisis/index" },
+    { "action": "disallow", "page": "pages/support/detail" },
+    { "action": "disallow", "page": "pages/notifications/index" },
+    { "action": "disallow", "page": "pages/companion/workbench/index" },
+    { "action": "disallow", "page": "pages/companion/onboarding/index" },
+    { "action": "disallow", "page": "pages/companion/schedule/index" },
+    { "action": "disallow", "page": "pages/companion/development/index" },
+    { "action": "disallow", "page": "pages/companion/earnings/index" },
+    { "action": "disallow", "page": "pages/companion/safety/index" },
+    { "action": "disallow", "page": "pages/companion/services/index" },
+    { "action": "disallow", "page": "pages/companion/availability/index" },
+    { "action": "allow", "page": "*" }
+  ]
 }

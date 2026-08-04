@@ -1,7 +1,9 @@
-import { HttpStatus, Inject, Injectable } from "@nestjs/common";
+import { HttpStatus, Inject, Injectable, Optional } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { randomUUID } from "node:crypto";
 
 import { AppException } from "../../common/errors/app.exception";
+import { isCommercialTextOnlySurface } from "../../config/commercial-surface";
 import { PrismaService } from "../../database/prisma.service";
 import {
   MEDIA_ANALYSIS_PROVIDER,
@@ -61,10 +63,12 @@ export class MediaAssetService {
   constructor(
     private readonly prisma: PrismaService,
     @Inject(MEDIA_STORAGE_PROVIDER) private readonly storage: MediaStorageProvider,
-    @Inject(MEDIA_ANALYSIS_PROVIDER) private readonly analysis: MediaAnalysisProvider
+    @Inject(MEDIA_ANALYSIS_PROVIDER) private readonly analysis: MediaAnalysisProvider,
+    @Optional() private readonly config?: ConfigService
   ) {}
 
   isFeatureEnabled(): boolean {
+    if (isCommercialTextOnlySurface(this.config)) return false;
     return this.storage.isConfigured && this.analysis.isConfigured;
   }
 

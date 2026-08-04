@@ -49,6 +49,21 @@ assert.match(
   /TRTC 仅在你进入实时语音并再次确认后初始化[\s\S]*默认不录音或启用 AI 转写/,
   "first-use consent must disclose delayed TRTC initialization and the no-recording boundary"
 );
+assert.match(
+  readFileSync(join(root, "sitemap.json"), "utf8"),
+  /"action":\s*"disallow"[\s\S]*pages\/voice\/index/,
+  "sitemap must disallow the TRTC voice room from public indexing"
+);
+assert.match(
+  readFileSync(join(root, "utils/config.ts"), "utf8"),
+  /COMMERCIAL_TEXT_ONLY_DEFAULT\s*=\s*true/,
+  "commercial release must default to text-only client scope"
+);
+assert.match(
+  readFileSync(join(root, "pages/chat/index.wxml"), "utf8"),
+  /wx:if="\{\{mediaEnabled\}\}"[\s\S]*图片[\s\S]*wx:if="\{\{mediaEnabled\}\}"[\s\S]*语音/,
+  "chat attachment entry points must remain gated behind mediaEnabled"
+);
 const adultEligibilityTemplate = readFileSync(join(root, "pages/account/adult-eligibility.wxml"), "utf8");
 assert.match(adultEligibilityTemplate, /不接收证件照片/);
 assert.match(adultEligibilityTemplate, /不要填写身份证号、手机号、姓名、住址或验证码/);
@@ -2212,6 +2227,9 @@ globalThis.Page = (options) => { registeredPage = options; };
 globalThis.App = () => undefined;
 const smokeApp = { globalData: { discoveryIntent: null } };
 globalThis.getApp = () => smokeApp;
+// Capability-path coverage for dormant MEDIA/TRTC code. Shipping UX stays
+// text-only via utils/config.ts unless this override is set.
+globalThis.__TALK_AND_TALK_COMMERCIAL_TEXT_ONLY__ = false;
 globalThis.__TALK_AND_TALK_TRTC_SDK__ = class SmokeTrtc {
   constructor(page) {
     this.page = page;
@@ -2321,6 +2339,7 @@ globalThis.wx = {
   getPrivacySetting: ({ success }) => queueMicrotask(() => success({ needAuthorization: true })),
   requirePrivacyAuthorize: ({ success }) => { privacyAuthorizationRequests += 1; queueMicrotask(success); },
   getNetworkType: ({ success }) => queueMicrotask(() => success({ networkType: "wifi" })),
+  onNetworkStatusChange: () => undefined,
   getSetting: ({ success }) => queueMicrotask(() => success({ authSetting: { "scope.record": true } })),
   authorize: ({ success }) => queueMicrotask(() => success({})),
   openSetting: ({ success }) => queueMicrotask(() => success({ authSetting: { "scope.record": true } })),
@@ -4679,9 +4698,16 @@ assert.ok(navigations.includes("/pages/consent/index"));
 
 const apiModule = await import(`${pathToFileURL(join(output, "utils/api.js")).href}`);
 const configModule = await import(`${pathToFileURL(join(output, "utils/config.js")).href}`);
+assert.equal(configModule.isCommercialTextOnly(), false, "smoke enables the dormant voice/media capability path");
+delete globalThis.__TALK_AND_TALK_COMMERCIAL_TEXT_ONLY__;
+assert.equal(configModule.isCommercialTextOnly(), true, "shipping default must fail closed to text-only");
+assert.equal(configModule.clientChatMediaEnabled(true), false, "text-only scope must hide chat attachments even if the server flag is true");
+assert.equal(configModule.clientRealtimeVoiceEnabled(), false, "text-only scope must hide realtime voice entry points");
+globalThis.__TALK_AND_TALK_COMMERCIAL_TEXT_ONLY__ = false;
 assert.equal(configModule.backendConfig().baseUrl, "https://api.talkandtalk.app/api/v1");
 environmentVersion = "trial";
 assert.equal(configModule.backendConfig().baseUrl, "https://api-staging.talkandtalk.app/api/v1");
+assert.equal(typeof apiModule.installNetworkRecovery, "function", "weak-network recovery must be exportable for App.onLaunch");
 const cloudResponse = await apiModule.dispatchBackendRequest(
   { transport: "cloudRun", envId: "smoke-env", service: "talk-and-talk-api", apiPrefix: "/api/v1" },
   "/health",

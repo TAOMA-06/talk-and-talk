@@ -1,5 +1,6 @@
 import { api, ApiError, ensureSession } from "../../utils/api";
 import { handleCustomerAdultEligibilityError } from "../../utils/adult-eligibility-recovery";
+import { clientRealtimeVoiceEnabled } from "../../utils/config";
 import { openCrisisResources, passCrisisGate } from "../../utils/crisis-gate";
 import {
   Companion, CompanionAvailabilityCandidate, CompanionAvailabilityResponse, OrderServiceIntentCode,
@@ -141,11 +142,13 @@ function initialOffering(
 }
 
 function isBookableOffering(offering: ServiceOffering): boolean {
+  const deliveryModeAllowed = offering.deliveryMode === "text"
+    || (offering.deliveryMode === "voice" && clientRealtimeVoiceEnabled());
   return typeof offering.id === "string"
     && Boolean(offering.id.trim())
     && typeof offering.title === "string"
     && Boolean(offering.title.trim())
-    && (offering.deliveryMode === "text" || offering.deliveryMode === "voice")
+    && deliveryModeAllowed
     && Number.isInteger(offering.durationMinutes)
     && offering.durationMinutes >= 30
     && offering.durationMinutes <= 240

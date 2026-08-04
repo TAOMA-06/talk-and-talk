@@ -54,7 +54,7 @@ export async function grantCurrentCustomerAdultEligibility(
       userId,
       status: "adult",
       verificationMethod: "secureManualReview",
-      evidenceReference: `e2e:adult-${randomUUID().replace(/-/g, "").slice(0, 16)}`,
+      evidenceReference: `e2e:adult-${randomUUID().slice(0, 23)}`,
       submittedById: userId,
       reviewedById: reviewer.id,
       verifiedAt: now,

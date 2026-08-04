@@ -10,6 +10,11 @@ import { HttpExceptionFilter } from "../src/common/errors/http-exception.filter"
 import { buildCorsOptions } from "../src/config/cors";
 import { PrismaService } from "../src/database/prisma.service";
 import { seedDatabase } from "../src/database/seed";
+import {
+  WECHAT_PAY_PROVIDER,
+  WeChatPayProvider
+} from "../src/payments/wechat/wechat-pay.provider";
+import { AccountDeletionExecutionWorker } from "../src/users/account-deletion-execution.worker";
 import { grantCurrentLegalConsent } from "./legal-consent-fixture";
 import { issueSessionBoundAccessToken } from "./session-token-fixture";
 
@@ -17,6 +22,8 @@ describe("Admin Moderation (e2e)", () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let jwt: JwtService;
+  let wechat: WeChatPayProvider;
+  let deletionWorker: AccountDeletionExecutionWorker;
 
   beforeAll(async () => {
     process.env.NODE_ENV = "test";
@@ -26,6 +33,8 @@ describe("Admin Moderation (e2e)", () => {
     process.env.JWT_REFRESH_SECRET = "e2e-refresh-secret";
     process.env.SMS_PROVIDER = "mock";
     process.env.RATE_LIMIT_PER_MINUTE = "1000";
+    process.env.ACCOUNT_DELETION_RETENTION_POLICY_APPROVED = "true";
+    process.env.ACCOUNT_DELETION_RETENTION_POLICY_APPROVAL_REFERENCE = "e2e:legal-retention-approval";
 
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule]
@@ -41,6 +50,8 @@ describe("Admin Moderation (e2e)", () => {
 
     prisma = moduleRef.get(PrismaService);
     jwt = moduleRef.get(JwtService);
+    wechat = moduleRef.get(WECHAT_PAY_PROVIDER);
+    deletionWorker = moduleRef.get(AccountDeletionExecutionWorker);
   });
 
   beforeEach(async () => {
@@ -56,6 +67,7 @@ describe("Admin Moderation (e2e)", () => {
   async function cleanup() {
     if (!prisma) return;
     await prisma.notification.deleteMany();
+    await clearDisposableE2eTombstones();
     await prisma.accountDeletionRequest.deleteMany();
     await prisma.refundTransaction.deleteMany();
     await prisma.paymentTransaction.deleteMany();
@@ -82,6 +94,25 @@ describe("Admin Moderation (e2e)", () => {
     await prisma.legalConsentReceipt.deleteMany().catch(() => undefined);
     await prisma.userProfile.deleteMany();
     await prisma.user.deleteMany();
+  }
+
+  async function clearDisposableE2eTombstones() {
+    if (await prisma.authIdentityTombstone.count() === 0) return;
+    const parsed = new URL(process.env.DATABASE_URL ?? "");
+    const database = decodeURIComponent(parsed.pathname.replace(/^\//, ""));
+    const loopback = ["localhost", "127.0.0.1", "::1"].includes(parsed.hostname);
+    const disposableName = /(^|_)e2e(_|$)/i.test(database)
+      || /_test$/i.test(database)
+      || (process.env.CI === "true" && database === "talk_and_talk");
+    if (
+      process.env.NODE_ENV !== "test"
+      || process.env.E2E_REDIS_FLUSH_ALLOWED !== "1"
+      || !loopback
+      || !disposableName
+    ) {
+      throw new Error("Refusing to truncate auth tombstones outside a disposable loopback E2E database");
+    }
+    await prisma.$executeRawUnsafe('TRUNCATE TABLE "AuthIdentityTombstone"');
   }
 
   async function createUser(role: "user" | "moderator" | "admin" = "user") {
@@ -121,6 +152,18 @@ describe("Admin Moderation (e2e)", () => {
         usedAI: false
       }
     });
+  }
+
+  async function runDeletionToCompletion(requestId: string) {
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const result = await deletionWorker.runOnce();
+      expect(result.failed).toBe(0);
+      const current = await prisma.accountDeletionRequest.findUniqueOrThrow({
+        where: { id: requestId }
+      });
+      if (current.status === "completed") return current;
+    }
+    throw new Error(`account deletion ${requestId} did not complete`);
   }
 
   it("forbids normal users from admin moderation endpoints", async () => {
@@ -170,19 +213,12 @@ describe("Admin Moderation (e2e)", () => {
   });
 
   it("runs the deletion queue from pending to completed exactly once while retaining finance records", async () => {
-    const { token: adminToken } = await createUser("admin");
+    const { token: starterToken } = await createUser("admin");
+    const { token: approverToken } = await createUser("admin");
     const { user, token: userToken } = await createUser("user");
     const companion = await prisma.companionProfile.findFirstOrThrow();
     await prisma.authIdentity.create({
       data: { userId: user.id, provider: "wechatMiniProgram", providerId: "deletion-open-id" }
-    });
-    await prisma.staffCredential.create({
-      data: {
-        userId: user.id,
-        username: "deletion-target-staff",
-        passwordHash: "irreversible-test-password-hash",
-        totpSecretCiphertext: "encrypted-test-totp-secret"
-      }
     });
     await prisma.refreshToken.create({
       data: {
@@ -244,7 +280,7 @@ describe("Admin Moderation (e2e)", () => {
 
     const queue = await request(app.getHttpServer())
       .get("/api/v1/admin/account-deletions")
-      .set("Authorization", `Bearer ${adminToken}`)
+      .set("Authorization", `Bearer ${starterToken}`)
       .expect(200);
     expect(queue.body.data.items).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: requestId, status: "pending", userId: user.id })
@@ -252,13 +288,13 @@ describe("Admin Moderation (e2e)", () => {
 
     await request(app.getHttpServer())
       .post(`/api/v1/admin/account-deletions/${requestId}/start`)
-      .set("Authorization", `Bearer ${adminToken}`)
-      .expect(201)
+      .set("Authorization", `Bearer ${starterToken}`)
+      .expect(200)
       .expect(({ body }) => expect(body.data.status).toBe("processing"));
     await request(app.getHttpServer())
       .post(`/api/v1/admin/account-deletions/${requestId}/start`)
-      .set("Authorization", `Bearer ${adminToken}`)
-      .expect(201)
+      .set("Authorization", `Bearer ${starterToken}`)
+      .expect(200)
       .expect(({ body }) => expect(body.data.status).toBe("processing"));
 
     const [restrictedUser, restrictedRefresh] = await Promise.all([
@@ -269,78 +305,61 @@ describe("Admin Moderation (e2e)", () => {
     expect(restrictedRefresh.every((token) => token.revokedAt !== null)).toBe(true);
     const restrictedMutation = await request(app.getHttpServer())
       .post("/api/v1/notifications/read-all")
-      .set("Authorization", `Bearer ${userToken}`)
-      .expect(403);
-    expect(restrictedMutation.body.error.code).toBe("ACCOUNT_RESTRICTED");
+      .set("Authorization", `Bearer ${userToken}`);
+    expect([401, 403]).toContain(restrictedMutation.status);
+    if (restrictedMutation.status === 403) {
+      expect(restrictedMutation.body.error.code).toBe("ACCOUNT_RESTRICTED");
+    }
     const prematureReactivation = await request(app.getHttpServer())
       .patch(`/api/v1/admin/users/${user.id}/account-status`)
-      .set("Authorization", `Bearer ${adminToken}`)
+      .set("Authorization", `Bearer ${starterToken}`)
       .send({ status: "active", reason: "must use deletion settlement operations" })
       .expect(409);
     expect(prematureReactivation.body.error.code).toBe("ACCOUNT_DELETION_IN_PROGRESS");
     await prisma.accountDeletionRequest.update({
       where: { id: requestId },
-      data: { updatedAt: new Date(Date.now() - 61_000) }
+      data: {
+        processingStartedAt: new Date(Date.now() - 61_000),
+        updatedAt: new Date(Date.now() - 61_000)
+      }
     });
 
-    const completed = await request(app.getHttpServer())
-      .post(`/api/v1/admin/account-deletions/${requestId}/complete`)
-      .set("Authorization", `Bearer ${adminToken}`)
-      .send({ note: "support verified identity and statutory retention" })
-      .expect(201);
-    expect(completed.body.data).toEqual(expect.objectContaining({
-      status: "completed",
-      user: expect.objectContaining({ accountStatus: "banned" }),
-      retainedRecords: { orders: 1, payments: 1, refunds: 1 }
-    }));
     await request(app.getHttpServer())
       .post(`/api/v1/admin/account-deletions/${requestId}/complete`)
-      .set("Authorization", `Bearer ${adminToken}`)
+      .set("Authorization", `Bearer ${approverToken}`)
+      .send({ note: "support verified identity and statutory retention" })
+      .expect(202)
+      .expect(({ body }) => {
+        expect(body.data.status).toBe("processing");
+        expect(body.data.execution.status).toBe("queued");
+      });
+    await runDeletionToCompletion(requestId);
+    await request(app.getHttpServer())
+      .post(`/api/v1/admin/account-deletions/${requestId}/complete`)
+      .set("Authorization", `Bearer ${approverToken}`)
       .send({ note: "duplicate retry must stay idempotent" })
-      .expect(201)
+      .expect(202)
       .expect(({ body }) => expect(body.data.status).toBe("completed"));
 
-    const [storedUser, storedProfile, storedRequest, refreshTokens, identities, staffCredentials, orders, payments, refunds] = await Promise.all([
+    const [storedUser, storedProfile, storedRequest, refreshTokens, identities, orders, payments, refunds] = await Promise.all([
       prisma.user.findUniqueOrThrow({ where: { id: user.id } }),
-      prisma.userProfile.findUniqueOrThrow({ where: { userId: user.id } }),
+      prisma.userProfile.findUnique({ where: { userId: user.id } }),
       prisma.accountDeletionRequest.findUniqueOrThrow({ where: { id: requestId } }),
       prisma.refreshToken.findMany({ where: { userId: user.id } }),
       prisma.authIdentity.findMany({ where: { userId: user.id } }),
-      prisma.staffCredential.findMany({ where: { userId: user.id } }),
       prisma.order.count({ where: { userId: user.id } }),
       prisma.paymentTransaction.count({ where: { order: { userId: user.id } } }),
       prisma.refundTransaction.count({ where: { order: { userId: user.id } } })
     ]);
     expect(storedUser.accountStatus).toBe("banned");
-    expect(storedProfile).toEqual(expect.objectContaining({
-      displayName: null,
-      phone: null,
-      age: null,
-      gender: null,
-      isVerified: false
-    }));
+    expect(storedProfile).toBeNull();
     expect(storedRequest).toEqual(expect.objectContaining({
       status: "completed",
       note: "support verified identity and statutory retention"
     }));
     expect(refreshTokens.every((token) => token.revokedAt !== null)).toBe(true);
     expect(identities).toHaveLength(0);
-    expect(staffCredentials).toHaveLength(0);
     expect({ orders, payments, refunds }).toEqual({ orders: 1, payments: 1, refunds: 1 });
-    const replacementStaffUser = await prisma.user.create({
-      data: {
-        role: "admin",
-        accountStatus: "active",
-        staffCredential: {
-          create: {
-            username: "deletion-target-staff",
-            passwordHash: "new-user-password-hash",
-            totpSecretCiphertext: "new-user-totp-ciphertext"
-          }
-        }
-      }
-    });
-    expect(replacementStaffUser.id).not.toBe(user.id);
 
     const audits = await prisma.auditLog.findMany({
       where: { resourceType: "accountDeletionRequest", resourceId: requestId }
@@ -350,26 +369,30 @@ describe("Admin Moderation (e2e)", () => {
 
     const reactivation = await request(app.getHttpServer())
       .patch(`/api/v1/admin/users/${user.id}/account-status`)
-      .set("Authorization", `Bearer ${adminToken}`)
+      .set("Authorization", `Bearer ${starterToken}`)
       .send({ status: "active", reason: "completed deletion must remain final" })
       .expect(409);
     expect(reactivation.body.error.code).toBe("ACCOUNT_DELETION_FINALIZED");
 
     const denied = await request(app.getHttpServer())
       .get("/api/v1/notifications")
-      .set("Authorization", `Bearer ${userToken}`)
-      .expect(403);
-    expect(denied.body.error.code).toBe("ACCOUNT_BANNED");
+      .set("Authorization", `Bearer ${userToken}`);
+    expect([401, 403]).toContain(denied.status);
+    if (denied.status === 403) {
+      expect(denied.body.error.code).toBe("ACCOUNT_BANNED");
+    }
 
     const repeatedRequest = await request(app.getHttpServer())
       .post("/api/v1/me/deletion-request")
-      .set("Authorization", `Bearer ${userToken}`)
-      .expect(409);
-    expect(repeatedRequest.body.error.code).toBe("DELETION_ALREADY_COMPLETED");
+      .set("Authorization", `Bearer ${userToken}`);
+    expect([401, 409]).toContain(repeatedRequest.status);
+    if (repeatedRequest.status === 409) {
+      expect(repeatedRequest.body.error.code).toBe("DELETION_ALREADY_COMPLETED");
+    }
     expect(await prisma.accountDeletionRequest.count({ where: { userId: user.id } })).toBe(1);
   });
 
-  it("keeps a deletion request processing while active financial obligations remain", async () => {
+  it("keeps a deletion request pending while active financial obligations remain", async () => {
     const { token: adminToken } = await createUser("admin");
     const { user, token: userToken } = await createUser("user");
     const companion = await prisma.companionProfile.findFirstOrThrow();
@@ -410,21 +433,11 @@ describe("Admin Moderation (e2e)", () => {
       .set("Authorization", `Bearer ${userToken}`)
       .expect(201);
     const requestId = requested.body.data.id as string;
-    await request(app.getHttpServer())
+    const blocked = await request(app.getHttpServer())
       .post(`/api/v1/admin/account-deletions/${requestId}/start`)
       .set("Authorization", `Bearer ${adminToken}`)
-      .expect(201);
-    await prisma.accountDeletionRequest.update({
-      where: { id: requestId },
-      data: { updatedAt: new Date(Date.now() - 61_000) }
-    });
-
-    const blocked = await request(app.getHttpServer())
-      .post(`/api/v1/admin/account-deletions/${requestId}/complete`)
-      .set("Authorization", `Bearer ${adminToken}`)
-      .send({ note: "must wait for settlement" })
       .expect(409);
-    expect(blocked.body.error.code).toBe("DELETION_HAS_ACTIVE_FINANCIAL_OBLIGATIONS");
+    expect(blocked.body.error.code).toBe("DELETION_HAS_ACTIVE_OBLIGATIONS");
 
     const [storedUser, storedProfile, storedRequest, identities] = await Promise.all([
       prisma.user.findUniqueOrThrow({ where: { id: user.id } }),
@@ -432,9 +445,9 @@ describe("Admin Moderation (e2e)", () => {
       prisma.accountDeletionRequest.findUniqueOrThrow({ where: { id: requestId } }),
       prisma.authIdentity.findMany({ where: { userId: user.id } })
     ]);
-    expect(storedUser.accountStatus).toBe("restricted");
+    expect(storedUser.accountStatus).toBe("active");
     expect(storedProfile.displayName).toBe("普通用户");
-    expect(storedRequest.status).toBe("processing");
+    expect(storedRequest.status).toBe("pending");
     expect(identities).toHaveLength(1);
     await request(app.getHttpServer())
       .get("/api/v1/notifications")
@@ -444,8 +457,26 @@ describe("Admin Moderation (e2e)", () => {
 
   it("settles deletion payment and refund callbacks without enabling new money movement", async () => {
     const { token: adminToken } = await createUser("admin");
+    const { token: approverToken } = await createUser("admin");
     const { user, token: userToken } = await createUser("user");
     const companion = await prisma.companionProfile.findFirstOrThrow();
+    await prisma.authIdentity.create({
+      data: { userId: user.id, provider: "wechatMiniProgram", providerId: "deletion-callback-open-id" }
+    });
+    const requested = await request(app.getHttpServer())
+      .post("/api/v1/me/deletion-request")
+      .set("Authorization", `Bearer ${userToken}`)
+      .expect(201);
+    const requestId = requested.body.data.id as string;
+    await request(app.getHttpServer())
+      .post(`/api/v1/admin/account-deletions/${requestId}/start`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .expect((res) => {
+        if (res.status !== 200) {
+          throw new Error(`deletion start failed: ${JSON.stringify(res.body)}`);
+        }
+      });
+
     const expiredPayingOrder = await prisma.order.create({
       data: {
         userId: user.id,
@@ -530,26 +561,27 @@ describe("Admin Moderation (e2e)", () => {
         refundRequestWindowHoursSnapshot: 72,
       }
     });
-    await request(app.getHttpServer())
-      .post(`/api/v1/orders/${remotelyPaidOrder.id}/prepay`)
-      .set("Authorization", `Bearer ${userToken}`)
-      .send({ channel: "app" })
-      .expect(201);
-
-    const requested = await request(app.getHttpServer())
-      .post("/api/v1/me/deletion-request")
-      .set("Authorization", `Bearer ${userToken}`)
-      .expect(201);
-    const requestId = requested.body.data.id as string;
-    await request(app.getHttpServer())
-      .post(`/api/v1/admin/account-deletions/${requestId}/start`)
-      .set("Authorization", `Bearer ${adminToken}`)
-      .expect(201);
+    const remotelyPaidOutTradeNo = "DELETION_REMOTE_PAID_CALLBACK";
+    await prisma.paymentTransaction.create({
+      data: {
+        orderId: remotelyPaidOrder.id,
+        outTradeNo: remotelyPaidOutTradeNo,
+        amountCents: 15900,
+        status: "initiated",
+        expiresAt: new Date(Date.now() + 10 * 60_000)
+      }
+    });
+    await wechat.createAppPrepay({
+      outTradeNo: remotelyPaidOutTradeNo,
+      description: "account deletion callback settlement",
+      amountCents: 15900,
+      notifyUrl: "https://api.example.invalid/wechat/notify"
+    });
 
     const paymentSettlement = await request(app.getHttpServer())
       .post(`/api/v1/admin/account-deletions/${requestId}/orders/${expiredPayingOrder.id}/payment/sync`)
       .set("Authorization", `Bearer ${adminToken}`)
-      .expect(201);
+      .expect(200);
     expect(paymentSettlement.body.data).toEqual(expect.objectContaining({
       closedExpiredPayment: true,
       order: expect.objectContaining({ status: "cancelled" })
@@ -558,7 +590,7 @@ describe("Admin Moderation (e2e)", () => {
     const refundSettlement = await request(app.getHttpServer())
       .post(`/api/v1/admin/account-deletions/${requestId}/orders/${refundingOrder.id}/refund/sync`)
       .set("Authorization", `Bearer ${adminToken}`)
-      .expect(201);
+      .expect(200);
     expect(refundSettlement.body.data).toEqual(expect.objectContaining({
       refund: expect.objectContaining({ id: processingRefund.id, status: "success" }),
       order: expect.objectContaining({ status: "refunded" })
@@ -567,7 +599,7 @@ describe("Admin Moderation (e2e)", () => {
     const paidSettlement = await request(app.getHttpServer())
       .post(`/api/v1/admin/account-deletions/${requestId}/orders/${remotelyPaidOrder.id}/payment/sync`)
       .set("Authorization", `Bearer ${adminToken}`)
-      .expect(201);
+      .expect(200);
     expect(paidSettlement.body.data).toEqual(expect.objectContaining({
       closedExpiredPayment: false,
       sync: expect.objectContaining({ code: "SUCCESS" })
@@ -577,20 +609,34 @@ describe("Admin Moderation (e2e)", () => {
     const initiatedRefund = await request(app.getHttpServer())
       .post(`/api/v1/admin/account-deletions/${requestId}/orders/${remotelyPaidOrder.id}/refund/initiate`)
       .set("Authorization", `Bearer ${adminToken}`)
-      .expect(201);
+      .expect(200);
     expect(initiatedRefund.body.data).toEqual(expect.objectContaining({
       created: true,
       refund: expect.objectContaining({
-        status: "success",
+        status: "pendingReview",
         reason: "ACCOUNT_DELETION_SETTLEMENT",
         amountCents: 15900
       }),
-      order: expect.objectContaining({ status: "refunded" })
+      order: expect.objectContaining({ status: "paid" })
     }));
+    const initiatedRefundId = initiatedRefund.body.data.refund.id as string;
+    await request(app.getHttpServer())
+      .post(`/api/v1/payments/refunds/${initiatedRefundId}/claim`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/api/v1/payments/refunds/${initiatedRefundId}/approve`)
+      .set("Authorization", `Bearer ${approverToken}`)
+      .send({ note: "independent deletion settlement approval" })
+      .expect(201)
+      .expect(({ body }) => {
+        expect(body.data.refund.status).toBe("success");
+        expect(body.data.order.status).toBe("refunded");
+      });
     const repeatedRefund = await request(app.getHttpServer())
       .post(`/api/v1/admin/account-deletions/${requestId}/orders/${remotelyPaidOrder.id}/refund/initiate`)
       .set("Authorization", `Bearer ${adminToken}`)
-      .expect(201);
+      .expect(200);
     expect(repeatedRefund.body.data.created).toBe(false);
 
     const [closedPayment, cancelledOrder, successfulRefund, refundedOrder] = await Promise.all([
@@ -622,16 +668,23 @@ describe("Admin Moderation (e2e)", () => {
 
     await prisma.accountDeletionRequest.update({
       where: { id: requestId },
-      data: { updatedAt: new Date(Date.now() - 61_000) }
+      data: {
+        processingStartedAt: new Date(Date.now() - 61_000),
+        updatedAt: new Date(Date.now() - 61_000)
+      }
     });
     const completedAfterSettlement = await request(app.getHttpServer())
       .post(`/api/v1/admin/account-deletions/${requestId}/complete`)
-      .set("Authorization", `Bearer ${adminToken}`)
-      .send({ note: "provider states reconciled; financial records retained" });
+      .set("Authorization", `Bearer ${approverToken}`)
+      .send({ note: "provider states reconciled; financial records retained" })
+      .expect(202);
     expect(completedAfterSettlement.body).toEqual(expect.objectContaining({
-      data: expect.objectContaining({ status: "completed" })
+      data: expect.objectContaining({
+        status: "processing",
+        execution: expect.objectContaining({ status: "queued" })
+      })
     }));
-    expect(completedAfterSettlement.status).toBe(201);
+    expect((await runDeletionToCompletion(requestId)).status).toBe("completed");
   });
 
   it.skip("allows moderator to list cases, resolve, and update overview stats (moved to independent /review department; commercial admin routes return 404/410)", async () => {

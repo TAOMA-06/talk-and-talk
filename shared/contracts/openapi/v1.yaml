@@ -99,18 +99,47 @@ paths:
   /health:
     get:
       tags: [health]
-      summary: Service health
+      summary: Process liveness (no dependency probes)
       operationId: getHealth
       security: []
       responses:
         "200":
-          description: Health snapshot (ok | degraded)
+          description: Process is up (status ok). Dependency health is never reflected here.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuccessEnvelope"
+  /health/ready:
+    get:
+      tags: [health]
+      summary: Dependency readiness (authenticated outside development)
+      operationId: getHealthReady
+      description: >
+        Returns database and redis dependency status. Outside development, requires
+        `Authorization: Bearer <METRICS_TOKEN>` (token length ≥ 32). Prefer this for
+        orchestration readiness probes; keep public `/health` for liveness only.
+      parameters:
+        - name: Authorization
+          in: header
+          required: false
+          description: Bearer METRICS_TOKEN (required when APP_ENV is not development)
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Dependencies are healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+        "401":
+          description: Missing or invalid METRICS_TOKEN bearer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
         "503":
-          description: Dependency health is degraded; the response still contains the health snapshot
+          description: Dependencies degraded, or METRICS_TOKEN not configured outside development
           content:
             application/json:
               schema:

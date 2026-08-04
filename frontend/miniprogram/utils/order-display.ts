@@ -1,3 +1,4 @@
+import { clientRealtimeVoiceEnabled } from "./config";
 import { Order, OrderRefund } from "./models";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -93,6 +94,7 @@ export function canRequestRefund(order: Order): boolean {
 }
 
 export function canOpenVoiceOrder(order: Order): boolean {
+  if (!clientRealtimeVoiceEnabled()) return false;
   return order.serviceOfferingSnapshot?.deliveryMode === "voice"
     && ["inService"].includes(order.status);
 }

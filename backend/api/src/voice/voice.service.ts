@@ -5,6 +5,7 @@ import { createHash } from "node:crypto";
 import { AuditService } from "../common/audit/audit.service";
 import { AppException } from "../common/errors/app.exception";
 import { assertCurrentCompanionCommercialEligibility } from "../commercial/companion-commercial-eligibility";
+import { isCommercialTextOnlySurface } from "../config/commercial-surface";
 import { PrismaService } from "../database/prisma.service";
 import { assertCurrentCustomerAdultEligibility } from "../users/customer-adult-eligibility.service";
 
@@ -242,6 +243,13 @@ export class VoiceService {
   }
 
   private runtimeConfig(): VoiceRuntimeConfig {
+    if (isCommercialTextOnlySurface(this.config)) {
+      throw new AppException(
+        "COMMERCIAL_SURFACE_TEXT_ONLY",
+        "Real-time voice is disabled for the current commercial surface",
+        HttpStatus.UNPROCESSABLE_ENTITY
+      );
+    }
     const enabled = this.config.get<boolean>("TRTC_ENABLED", false);
     if (!enabled) {
       throw new AppException(

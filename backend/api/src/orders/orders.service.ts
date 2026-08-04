@@ -15,6 +15,7 @@ import {
 } from "../common/service-intent-policy";
 import { AuditRecordInput, AuditService } from "../common/audit/audit.service";
 import { assertCurrentCompanionCommercialEligibility } from "../commercial/companion-commercial-eligibility";
+import { isCommercialTextOnlySurface } from "../config/commercial-surface";
 import { PrismaService } from "../database/prisma.service";
 import { CrisisInterventionService } from "../crisis-intervention/crisis-intervention.service";
 import { ModerationCaseService } from "../moderation/moderation-case.service";
@@ -664,6 +665,13 @@ export class OrdersService {
 
   private assertVoiceDeliveryModeEnabled(deliveryMode: unknown): void {
     if (deliveryMode !== "voice") return;
+    if (isCommercialTextOnlySurface(this.config)) {
+      throw new AppException(
+        "COMMERCIAL_SURFACE_TEXT_ONLY",
+        "Voice orders are disabled for the current commercial surface",
+        HttpStatus.UNPROCESSABLE_ENTITY
+      );
+    }
     if (this.config?.get<boolean>("TRTC_ENABLED", false) !== true) {
       throw new AppException(
         "VOICE_FEATURE_DISABLED",

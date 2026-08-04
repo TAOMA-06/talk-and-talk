@@ -35,7 +35,7 @@
           <form id="loginForm" class="credential-form" novalidate>
             <label>
               <span>审核员账号</span>
-              <input id="loginUsername" name="username" autocomplete="username" maxlength="80" placeholder="例如：reviewer.liu" required />
+              <input id="loginUsername" name="username" autocomplete="username" spellcheck="false" autocapitalize="off" maxlength="80" placeholder="例如：reviewer.liu" required />
             </label>
             <label>
               <span>密码</span>
@@ -43,7 +43,7 @@
             </label>
             <label>
               <span>动态口令</span>
-              <input id="loginTotp" name="totpCode" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="6 位验证器口令" required />
+              <input id="loginTotp" name="totpCode" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="6 位验证器口令" spellcheck="false" required />
             </label>
             <button class="button primary full" id="loginButton" type="submit">
               <span>安全登录</span><span aria-hidden="true">→</span>
@@ -78,7 +78,7 @@
             <span class="reviewer-avatar" id="reviewerInitials">审</span>
             <div><strong id="reviewerName">审核员</strong><small id="reviewerRole">reviewer</small></div>
           </div>
-          <button id="logoutButton" class="text-button" type="button">退出独立会话 <span aria-hidden="true">↗</span></button>
+          <button id="logoutButton" class="text-button" data-review-logout type="button">退出独立会话 <span aria-hidden="true">↗</span></button>
         </div>
       </aside>
 
@@ -92,6 +92,7 @@
             <span id="sessionRemaining" class="session-chip" aria-live="polite">会话：—</span>
             <span id="lastUpdated" class="last-updated">尚未加载</span>
             <button id="refreshButton" class="button quiet" type="button">刷新队列</button>
+            <button id="headerLogoutButton" class="button quiet header-logout" data-review-logout type="button">退出会话</button>
           </div>
         </header>
 
@@ -118,7 +119,10 @@
                   <label><span class="sr-only">来源</span><select id="filterSource"><option value="">全部来源</option><option value="chat">聊天</option><option value="community">社区</option><option value="report">举报</option><option value="profile">资料</option></select></label>
                 </div>
                 <label class="search-field"><span aria-hidden="true">⌕</span><input id="filterKeyword" maxlength="200" placeholder="搜索内容、规则或理由" /></label>
-                <button class="button quiet full" type="submit">应用筛选</button>
+                <div class="filter-actions">
+                  <button class="button quiet full" type="submit">应用筛选</button>
+                  <button id="filterResetButton" class="button quiet full" type="button">重置筛选</button>
+                </div>
               </form>
               <div id="caseList" class="case-list" aria-live="polite"></div>
               <div id="pagination" class="pagination"></div>

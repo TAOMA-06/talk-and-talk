@@ -30,33 +30,20 @@ describe("HealthService", () => {
     jest.clearAllMocks();
   });
 
-  it("reports slim liveness when database and redis checks pass", async () => {
-    Pool.mockImplementation(() => ({
-      query: jest.fn().mockResolvedValue({ rows: [{ "?column?": 1 }] }),
-      end: jest.fn().mockResolvedValue(undefined)
-    }));
-    Redis.mockImplementation(() => ({
-      on: jest.fn(),
-      connect: jest.fn().mockResolvedValue(undefined),
-      ping: jest.fn().mockResolvedValue("PONG"),
-      disconnect: jest.fn()
-    }));
-
+  it("reports slim liveness without probing dependencies", async () => {
     const service = new HealthService(config());
     const liveness = await service.check();
-    const ready = await service.ready();
 
     expect(liveness).toEqual({
       status: "ok",
       service: "talk-and-talk-api",
       version: "9.9.9"
     });
-    expect(ready.appEnv).toBe("staging");
-    expect(ready.dependencies.database.status).toBe("ok");
-    expect(ready.dependencies.redis.status).toBe("ok");
+    expect(Pool).not.toHaveBeenCalled();
+    expect(Redis).not.toHaveBeenCalled();
   });
 
-  it("reports degraded when a dependency fails without leaking error text", async () => {
+  it("keeps liveness ok when a dependency fails and only readiness degrades", async () => {
     Pool.mockImplementation(() => ({
       query: jest.fn().mockRejectedValue(new Error("db offline secret-host")),
       end: jest.fn().mockResolvedValue(undefined)
@@ -72,8 +59,9 @@ describe("HealthService", () => {
     const liveness = await service.check();
     const ready = await service.ready();
 
-    expect(liveness.status).toBe("degraded");
+    expect(liveness.status).toBe("ok");
     expect(liveness).not.toHaveProperty("dependencies");
+    expect(ready.status).toBe("degraded");
     expect(ready.dependencies.database.status).toBe("error");
     expect(ready.dependencies.database.message).toBe("Dependency check failed");
     expect(JSON.stringify(ready)).not.toContain("secret-host");

@@ -1,6 +1,6 @@
 import { ConfigService } from "@nestjs/config";
 
-import { IpRateLimitMiddleware, clientIp, shouldFailClosed } from "./ip-rate-limit.middleware";
+import { IpRateLimitMiddleware, clientIp, isWeChatPaymentCallback, shouldFailClosed } from "./ip-rate-limit.middleware";
 
 const disconnect = jest.fn();
 
@@ -57,6 +57,23 @@ describe("shouldFailClosed", () => {
 
   it("keeps development usable without Redis", () => {
     expect(shouldFailClosed({ method: "POST", originalUrl: "/api/v1/auth/refresh" } as any, "development")).toBe(false);
+  });
+});
+
+describe("isWeChatPaymentCallback", () => {
+  it.each([
+    "/api/v1/payments/wechat/notify",
+    "/api/v1/payments/wechat/refund-notify",
+    "/api/v1/payments/wechat/complaints"
+  ])("recognizes provider callback %s", (originalUrl) => {
+    expect(isWeChatPaymentCallback({ method: "POST", originalUrl } as any)).toBe(true);
+  });
+
+  it("does not bypass ordinary payment sync", () => {
+    expect(isWeChatPaymentCallback({
+      method: "POST",
+      originalUrl: "/api/v1/orders/ord-1/payment/sync"
+    } as any)).toBe(false);
   });
 });
 

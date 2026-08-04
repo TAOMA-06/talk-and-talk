@@ -4,6 +4,7 @@ import { HttpStatus, Injectable, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 
 import { AppException } from "../common/errors/app.exception";
+import { isCommercialTextOnlySurface } from "../config/commercial-surface";
 import { PrismaService } from "../database/prisma.service";
 import { AvailabilityReminderCandidateService } from "../favorites/availability-reminder-candidate.service";
 import { ModerationCaseService } from "../moderation/moderation-case.service";
@@ -1427,6 +1428,7 @@ export class CompanionsService {
   }
 
   private isVoiceBookingEnabled(): boolean {
+    if (isCommercialTextOnlySurface(this.config)) return false;
     return this.config?.get<boolean>("TRTC_ENABLED", false) === true
       && this.config?.get<boolean>("TRTC_EMERGENCY_STOP_ENABLED", false) !== true;
   }
@@ -1743,7 +1745,16 @@ export class CompanionsService {
   }
 
   private normalizeServiceOfferingDeliveryMode(value: unknown): "text" | "voice" {
-    if (value === "text" || value === "voice") return value;
+    if (value === "text" || value === "voice") {
+      if (value === "voice" && !this.isVoiceBookingEnabled()) {
+        throw new AppException(
+          "COMMERCIAL_SURFACE_TEXT_ONLY",
+          "Voice service offerings are disabled for the current commercial surface",
+          HttpStatus.UNPROCESSABLE_ENTITY
+        );
+      }
+      return value;
+    }
     throw new AppException("INVALID_SERVICE_OFFERING", "deliveryMode must be text or voice", HttpStatus.BAD_REQUEST);
   }
 

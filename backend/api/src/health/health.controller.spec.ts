@@ -39,7 +39,7 @@ describe("HealthController", () => {
     ready.mockReset();
   });
 
-  it("returns 200 with slim liveness envelope when dependencies are healthy", async () => {
+  it("returns 200 with slim liveness envelope", async () => {
     check.mockResolvedValue(healthyLiveness);
     const response = mockResponse();
 
@@ -54,19 +54,14 @@ describe("HealthController", () => {
     });
   });
 
-  it("returns 503 with the same slim envelope when a dependency is degraded", async () => {
-    const degradedResponse: HealthLivenessResponse = {
-      ...healthyLiveness,
-      status: "degraded"
-    };
-    check.mockResolvedValue(degradedResponse);
+  it("never returns dependency-driven degraded status from public liveness", async () => {
+    check.mockResolvedValue(healthyLiveness);
     const response = mockResponse();
 
-    const health = await controller.check(response.value);
-    const envelope = await wrap(health);
+    await controller.check(response.value);
 
-    expect(response.status).toHaveBeenCalledWith(503);
-    expect(envelope.data).toEqual(degradedResponse);
+    expect(check).toHaveBeenCalled();
+    expect(response.status).toHaveBeenCalledWith(200);
   });
 
   it("returns authenticated ready detail in development without a token", async () => {

@@ -3,6 +3,7 @@ import transactionalTemplateManifest = require("../../config/transactional-templ
 type NodeEnv = "development" | "test" | "production";
 type AppEnv = "development" | "staging" | "production";
 type CommercialReleaseMode = "internal" | "paidPilot" | "commercial";
+type CommercialSurface = "text_only" | "full";
 
 export type WeChatSubscribeTemplate = {
   key: string;
@@ -105,6 +106,7 @@ interface Environment {
   CRISIS_RESOURCES_APPROVED: boolean;
   CRISIS_RESOURCES_APPROVAL_REFERENCE: string;
   COMMERCIAL_RELEASE_MODE: CommercialReleaseMode;
+  COMMERCIAL_SURFACE: CommercialSurface;
   COMPANION_VOICE_EVIDENCE_VIEWER_URL: string;
   COMPANION_VOICE_EVIDENCE_SIGNING_SECRET: string;
   COMPANION_VOICE_EVIDENCE_URL_TTL_SECONDS: number;
@@ -345,6 +347,13 @@ function parseCommercialReleaseMode(value: string | undefined): CommercialReleas
   const mode = value?.trim() || "internal";
   if (mode === "internal" || mode === "paidPilot" || mode === "commercial") return mode;
   throw new Error("COMMERCIAL_RELEASE_MODE must be internal, paidPilot or commercial");
+}
+
+function parseCommercialSurface(value: string | undefined): CommercialSurface {
+  const normalized = (value ?? "text_only").trim().toLowerCase();
+  if (normalized === "text_only" || normalized === "text-only") return "text_only";
+  if (normalized === "full") return "full";
+  throw new Error("COMMERCIAL_SURFACE must be text_only or full");
 }
 
 function parseWeChatSubscribeTemplates(value: string | undefined, enabled: boolean): WeChatSubscribeTemplate[] {
@@ -709,6 +718,17 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     200
   );
   const commercialReleaseMode = parseCommercialReleaseMode(env.COMMERCIAL_RELEASE_MODE);
+  const commercialSurface = parseCommercialSurface(
+    typeof env.COMMERCIAL_SURFACE === "string" ? env.COMMERCIAL_SURFACE : undefined
+  );
+  if (commercialSurface === "text_only") {
+    if (parseBoolean(env.TRTC_ENABLED, false)) {
+      throw new Error("COMMERCIAL_SURFACE=text_only forbids TRTC_ENABLED=true");
+    }
+    if (parseBoolean(env.MEDIA_FEATURE_ENABLED, false)) {
+      throw new Error("COMMERCIAL_SURFACE=text_only forbids MEDIA_FEATURE_ENABLED=true");
+    }
+  }
   const companionVoiceEvidenceViewerUrl = optionalString(env.COMPANION_VOICE_EVIDENCE_VIEWER_URL);
   const companionVoiceEvidenceSigningSecret = optionalString(env.COMPANION_VOICE_EVIDENCE_SIGNING_SECRET);
   if (Boolean(companionVoiceEvidenceViewerUrl) !== Boolean(companionVoiceEvidenceSigningSecret)) {
@@ -1556,6 +1576,7 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     CRISIS_RESOURCES_APPROVED: crisisResourcesApproved,
     CRISIS_RESOURCES_APPROVAL_REFERENCE: crisisResourcesApprovalReference,
     COMMERCIAL_RELEASE_MODE: commercialReleaseMode,
+    COMMERCIAL_SURFACE: commercialSurface,
     COMPANION_VOICE_EVIDENCE_VIEWER_URL: companionVoiceEvidenceViewerUrl,
     COMPANION_VOICE_EVIDENCE_SIGNING_SECRET: companionVoiceEvidenceSigningSecret,
     COMPANION_VOICE_EVIDENCE_URL_TTL_SECONDS: companionVoiceEvidenceUrlTtlSeconds,

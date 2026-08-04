@@ -1,6 +1,15 @@
 # Talk&Talk 商用界面闭环与验收台账
 
-更新时间：2026-08-01
+更新时间：2026-08-03（复审）
+
+## E2E residual
+
+隔离复跑（Redis `127.0.0.1:6379/14` + disposable PG `talk_and_talk_fix_e2e_20260803`，跑后 DROP/FLUSHDB）：
+
+- **72+ pass / 6 skip / 0 fail**（含新增 `review.e2e-spec.ts`；旧 admin-moderation 审核路由 skip 保留，指向独立 `/review` suite）
+- 关键路径（退款/注销结算/资料/`/me`/成人资格夹具）已对齐 text-only 与退款双人闸
+
+豁免：无未署名关键路径失败。
 
 ## 目标与口径
 
@@ -75,7 +84,7 @@
 - `backend/api`: 141 个单元测试套件、1265 项测试通过；TypeScript 构建与 `verify:prod-artifacts` 通过；preflight 64 pass / 7 skip / 0 fail。
 - 隔离 PostgreSQL：全量 `prisma migrate deploy` 成功；本地 API `GET /api/v1/health` 返回 `status=ok`（database/redis ok）；`AuthModule` 全局化修复 JwtAuthGuard tombstone DI 启动失败。
 - `frontend/miniprogram`: 结构校验 31 页面 / 5 Tab；runtime smoke 788 次 API 调用及法律/支付/账号/申诉路径通过。
-- E2E（专用 Redis index 15 + 隔离库）：65 pass / 6 skip（审核路由迁 `/review`）/ 8 residual（注销双人闸与退款并发夹具债务）；**不**把 residual 记为通过。详见第二轮交叉审查与 scratch `e2e-residual.md`。
+- E2E（专用 Redis index 15 + 隔离库）：原 8 项 residual 的成年资格、退款并发/超时、注销双人复核/结算与 `/me` 夹具已修复，并新增 `/review` 登录、案件列表、证据权限和处置 HTTP 回归；全量复跑 74 pass / 6 skip / 0 fail。
 
 ## 外部门禁
 

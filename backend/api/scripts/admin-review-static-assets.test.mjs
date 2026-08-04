@@ -352,6 +352,22 @@ test("review workbench exposes assignment, SLA, evidence, and lead-only export c
   assert.match(reviewHtml, /id="exportLabelsButton" class="button quiet lead-only"/);
 });
 
+test("review workbench keeps mobile-safe session exit and filter reset on the real client", async () => {
+  const reviewStyles = await readFile("public/review/assets/styles.css", "utf8");
+  assert.match(reviewHtml, /data-review-logout/);
+  assert.match(reviewHtml, /id="headerLogoutButton"/);
+  assert.match(reviewHtml, /id="filterResetButton"/);
+  assert.match(reviewScript, /querySelectorAll\("\[data-review-logout\]"\)/);
+  assert.match(reviewScript, /#filterResetButton/);
+  assert.match(reviewScript, /state\.filters = \{ page: 1, pageSize: 50 \}/);
+  assert.match(reviewScript, /sessionStorage\.(setItem|getItem|removeItem)/);
+  assert.doesNotMatch(reviewScript, /localStorage/);
+  assert.match(reviewStyles, /:focus-visible/);
+  assert.match(reviewStyles, /prefers-reduced-motion:\s*reduce/);
+  assert.match(reviewStyles, /\.header-logout/);
+  assert.match(reviewStyles, /\.sidebar-bottom \{ display: none/);
+});
+
 test("review staff operations search and traverse every stable directory page without clearing errors", () => {
   for (const id of [
     "staffOffboardingFilterForm",

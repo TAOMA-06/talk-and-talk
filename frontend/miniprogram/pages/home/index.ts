@@ -16,7 +16,7 @@ type HomeCompanion = CatalogDisplay<RecommendedCompanion>;
 const SCENARIOS: Array<Omit<Scenario, "selected">> = [
   { id: "emotion", topicId: "t1", title: "想找人听我说", description: "情绪倾听" },
   { id: "work", topicId: "t2", title: "工作压力很大", description: "职场减压" },
-  { id: "sleep", topicId: "t3", title: "睡前想有人陪", description: "睡前语音" },
+  { id: "sleep", topicId: "t3", title: "睡前想有人陪", description: "睡前陪伴" },
   { id: "study", topicId: "t4", title: "需要一起专注", description: "学习陪伴" },
   { id: "exercise", topicId: "t5", title: "想获得一点鼓励", description: "运动鼓励" },
   { id: "interest", topicId: "t6", title: "随便聊聊兴趣", description: "兴趣聊天" }

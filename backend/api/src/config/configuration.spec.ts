@@ -121,9 +121,18 @@ describe("validateEnvironment", () => {
     expect(env.APP_VERSION).toBe("0.1.0");
     expect(env.CORS_ORIGINS).toContain("http://localhost:3000");
     expect(env.EXTERNAL_AI_USER_CONTENT_ENABLED).toBe(false);
-    expect(env.MEDIA_FEATURE_ENABLED).toBe(false);
-    expect(env.MEDIA_PROVIDER).toBe("disabled");
     expect(env.TRTC_ENABLED).toBe(false);
+    expect(env.COMMERCIAL_SURFACE).toBe("text_only");
+    expect(() => validateEnvironment({
+      COMMERCIAL_SURFACE: "text_only",
+      TRTC_ENABLED: "true"
+    })).toThrow("COMMERCIAL_SURFACE=text_only forbids TRTC_ENABLED=true");
+    expect(() => validateEnvironment({
+      COMMERCIAL_SURFACE: "text_only",
+      MEDIA_FEATURE_ENABLED: "true",
+      MEDIA_PROVIDER: "mock"
+    })).toThrow("COMMERCIAL_SURFACE=text_only forbids MEDIA_FEATURE_ENABLED=true");
+    expect(validateEnvironment({ COMMERCIAL_SURFACE: "full" }).COMMERCIAL_SURFACE).toBe("full");
     expect(env.TRTC_SDK_APP_ID).toBe(0);
     expect(env.TRTC_PRIVATE_MAP_KEY_ENABLED).toBe(false);
     expect(env.TRTC_USER_SIG_TTL_SECONDS).toBe(300);
@@ -461,18 +470,28 @@ describe("validateEnvironment", () => {
   });
 
   it("keeps media closed by default and rejects an unregistered production media provider", () => {
-    const development = validateEnvironment({ MEDIA_FEATURE_ENABLED: "true", MEDIA_PROVIDER: "mock" });
+    const development = validateEnvironment({
+      COMMERCIAL_SURFACE: "full",
+      MEDIA_FEATURE_ENABLED: "true",
+      MEDIA_PROVIDER: "mock"
+    });
     expect(development.MEDIA_FEATURE_ENABLED).toBe(true);
-    expect(() => validateEnvironment({ ...productionEnv, MEDIA_FEATURE_ENABLED: "true", MEDIA_PROVIDER: "mock" }))
+    expect(() => validateEnvironment({
+      ...productionEnv,
+      COMMERCIAL_SURFACE: "full",
+      MEDIA_FEATURE_ENABLED: "true",
+      MEDIA_PROVIDER: "mock"
+    }))
       .toThrow("MEDIA_FEATURE_ENABLED");
     expect(() => validateEnvironment({ MEDIA_PROVIDER: "unknown" }))
       .toThrow("MEDIA_PROVIDER");
   });
 
   it("requires a restricted, server-side TRTC signing configuration before enabling real-time voice", () => {
-    expect(() => validateEnvironment({ TRTC_ENABLED: "true" }))
+    expect(() => validateEnvironment({ COMMERCIAL_SURFACE: "full", TRTC_ENABLED: "true" }))
       .toThrow("TRTC_ENABLED=true requires");
     expect(() => validateEnvironment({
+      COMMERCIAL_SURFACE: "full",
       TRTC_ENABLED: "true",
       TRTC_SDK_APP_ID: "1400000001",
       TRTC_SDK_SECRET_KEY: "too-short",
@@ -483,12 +502,13 @@ describe("validateEnvironment", () => {
     })).toThrow("TRTC_SDK_SECRET_KEY");
     expect(() => validateEnvironment({ TRTC_USER_SIG_TTL_SECONDS: "59" }))
       .toThrow("TRTC_USER_SIG_TTL_SECONDS");
-    expect(() => validateEnvironment({ TRTC_ROOM_CONTROL_ENABLED: "true" }))
+    expect(() => validateEnvironment({ COMMERCIAL_SURFACE: "full", TRTC_ROOM_CONTROL_ENABLED: "true" }))
       .toThrow("TRTC_ROOM_CONTROL_ENABLED=true requires");
-    expect(() => validateEnvironment({ TRTC_EMERGENCY_STOP_ENABLED: "true" }))
+    expect(() => validateEnvironment({ COMMERCIAL_SURFACE: "full", TRTC_EMERGENCY_STOP_ENABLED: "true" }))
       .toThrow("TRTC_EMERGENCY_STOP_ENABLED=true requires");
 
     const enabled = validateEnvironment({
+      COMMERCIAL_SURFACE: "full",
       TRTC_ENABLED: "true",
       TRTC_SDK_APP_ID: "1400000001",
       TRTC_SDK_SECRET_KEY: "trtc-test-secret-key-material",
@@ -517,6 +537,7 @@ describe("validateEnvironment", () => {
     expect(enabled.TRTC_ROOM_CONTROL_INTERVAL_SECONDS).toBe(20);
 
     const emergencyDrain = validateEnvironment({
+      COMMERCIAL_SURFACE: "full",
       TRTC_ENABLED: "true",
       TRTC_SDK_APP_ID: "1400000001",
       TRTC_SDK_SECRET_KEY: "trtc-test-secret-key-material",

@@ -11,6 +11,7 @@ import { VoiceService } from "./voice.service";
 
 describe("VoiceService", () => {
   const voiceConfig: Record<string, unknown> = {
+    COMMERCIAL_SURFACE: "full",
     TRTC_ENABLED: true,
     TRTC_SDK_APP_ID: 1400000001,
     TRTC_SDK_SECRET_KEY: "trtc-test-secret-key-material",

@@ -33,6 +33,12 @@ export class IpRateLimitMiddleware implements NestMiddleware, OnModuleDestroy {
   }
 
   async use(req: Request, res: Response, next: NextFunction) {
+    // WeChat payment callbacks share egress IPs and may burst retries. Do not
+    // share the generic client rate-limit bucket with them.
+    if (isWeChatPaymentCallback(req)) {
+      next();
+      return;
+    }
     const limit = this.config.get<number>("RATE_LIMIT_PER_MINUTE") ?? 120;
     const windowSeconds = 60;
     const ip = clientIp(req);
@@ -101,9 +107,19 @@ export function shouldFailClosed(req: Request, appEnv: string): boolean {
   return SENSITIVE_POST_PATH.test(path);
 }
 
+export function isWeChatPaymentCallback(req: Request): boolean {
+  if (req.method.toUpperCase() !== "POST") return false;
+  const path = req.originalUrl || req.url || "";
+  return WECHAT_PAYMENT_CALLBACK_PATH.test(path);
+}
+
 /**
  * Auth/login, order create/prepay/payment sync/refund, and upload reserve paths.
  * Keep review auth protection and extend commercial write paths.
  */
 const SENSITIVE_POST_PATH =
   /(?:^|\/)(?:auth\/(?:sms\/send-code|phone\/login|wechat\/mini-program|refresh)|review\/auth\/(?:login|refresh)|orders(?:$|[/?])|conversations\/[^/]+\/media-uploads(?:$|[/?])|support\/tickets\/[^/]+\/evidence-uploads(?:$|[/?])|attendance-disputes\/[^/]+\/evidence-uploads(?:$|[/?])|commercial\/companion\/incident-evidence-uploads(?:$|[/?])|case-evidence\/uploads(?:$|[/?]))/;
+
+/** Provider callbacks — bypass generic IP buckets; edge allowlists remain recommended. */
+const WECHAT_PAYMENT_CALLBACK_PATH =
+  /(?:^|\/)payments\/wechat\/(?:notify|refund-notify|complaints(?:$|[/?]))/;
