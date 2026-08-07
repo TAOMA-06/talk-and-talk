@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { enforceApiSurface } from "../../../../lib/enforce-web-surface";
 import {
   ACCESS_COOKIE,
   REFRESH_COOKIE,
@@ -62,6 +63,9 @@ function isCrossSiteMutation(request: Request): boolean {
 }
 
 async function proxy(request: Request, context: RouteContext) {
+  const surfaceRefusal = enforceApiSurface("/api/backend");
+  if (surfaceRefusal) return surfaceRefusal;
+
   const { path: pathSegments } = await context.params;
   const path = normalizedPath(pathSegments);
   if (!path || isBlocked(path)) {

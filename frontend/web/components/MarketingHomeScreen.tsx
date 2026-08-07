@@ -2,42 +2,41 @@
 
 import {
   ArrowRight,
-  BriefcaseBusiness,
-  CalendarCheck2,
-  HeartHandshake,
+  LockKeyhole,
   MessageCircleHeart,
   ShieldCheck,
-  UserRoundCheck,
-  WalletCards,
+  Smartphone,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 
 import MiniprogramCta from "./MiniprogramCta";
-import { ConnectionPulse } from "./motion/ConnectionPulse";
 import { HeroOrchestration } from "./motion/HeroOrchestration";
-import { TrustJourney } from "./motion/TrustJourney";
+import { IconOrbit } from "./motion/IconOrbit";
 import { Reveal, RevealItem, RevealStagger } from "./motion/Reveal";
 
-const proofPoints = [
+const trustSignals = [
+  { label: "服务入口", value: "微信小程序" },
+  { label: "服务对象", value: "年满 18 周岁" },
+  { label: "连接方式", value: "平台内完成" },
+  { label: "边界", value: "非医疗 · 非急救" },
+];
+
+const valueProps = [
   {
-    title: "资料有展示规则",
-    copy: "公开前经过平台流程",
-    Icon: UserRoundCheck,
+    code: "01",
+    title: "先被听见，再决定怎么继续",
+    copy: "情绪倾听、职场减压、睡前陪伴——从真实需要出发，不必先组织成「正确」的表达。",
   },
   {
-    title: "服务可确认",
-    copy: "时间、价格与状态说清楚",
-    Icon: CalendarCheck2,
+    code: "02",
+    title: "连接可以亲近，边界必须清楚",
+    copy: "预约、沟通与支持留在平台内可回看的路径中；私联、私下转账与线下邀约不被鼓励。",
   },
   {
-    title: "沟通留在站内",
-    copy: "关键过程有支持入口",
-    Icon: MessageCircleHeart,
-  },
-  {
-    title: "问题有迹可循",
-    copy: "订单、举报与售后相连接",
-    Icon: ShieldCheck,
+    code: "03",
+    title: "服务入口真实可到达",
+    copy: "官网说明品牌、规则与路径；真实服务以微信小程序页面状态为准，App 即将到来。",
   },
 ];
 
@@ -45,7 +44,7 @@ const moments = [
   {
     label: "情绪倾听",
     title: "心里有点乱",
-    copy: "不用先组织好语言，也可以从被认真听完开始。",
+    copy: "不用先想清楚，也可以从被认真听完开始。",
   },
   {
     label: "职场减压",
@@ -59,196 +58,311 @@ const moments = [
   },
 ];
 
-const serviceSteps = [
+const pathSteps = [
   {
-    code: "01 / 发现",
-    title: "从公开资料开始选择",
-    copy: "主题、服务方式与可约时间集中呈现，让“合不合适”有可以比较的依据。",
-    Icon: UserRoundCheck,
+    code: "01",
+    title: "认识边界",
+    copy: "先了解产品是什么、不是什么，以及如何安全使用。",
   },
   {
-    code: "02 / 预约",
-    title: "把一次约定讲清楚",
-    copy: "预约、确认与时段容量共享同一条状态路径，减少猜测和反复确认。",
-    Icon: CalendarCheck2,
+    code: "02",
+    title: "打开小程序",
+    copy: "服务入口与可约状态以微信小程序页面为准。",
   },
   {
-    code: "03 / 履约",
-    title: "把关系留在可支持的空间",
-    copy: "支付、平台内沟通、订单进度与售后支持相互连接，不用转向私下交接。",
-    Icon: WalletCards,
+    code: "03",
+    title: "完成连接",
+    copy: "预约、沟通与支持都留在平台内的可回看路径中。",
   },
 ];
 
-const audiencePaths = [
+const trustPoints = [
   {
-    eyebrow: "正在寻找陪伴",
-    title: "先看看哪些连接方式适合你",
-    copy: "网页可以浏览公开资料与产品规则；服务入口以微信小程序页面状态为准。",
-    href: "/demo?stage=discover#demo-route",
-    action: "查看网页产品演示",
-    Icon: HeartHandshake,
+    Icon: MessageCircleHeart,
+    title: "重要互动留在平台内",
+    copy: "会话、订单与支持入口彼此接得上，减少私下交接带来的风险。",
   },
   {
-    eyebrow: "陪伴者工作台",
-    title: "用同一个账号管理服务与履约",
-    copy: "服务商品、可约时段、订单和履约信息在同一套产品结构里协同。",
-    href: "/demo?stage=delivery#demo-route",
-    action: "查看工作台产品演示",
-    Icon: BriefcaseBusiness,
+    Icon: LockKeyhole,
+    title: "私联与私下转账不被鼓励",
+    copy: "费用与退款应留在订单结构里；线下邀约不属于产品服务范围。",
   },
   {
-    eyebrow: "机构、媒体与合作",
-    title: "从边界清楚的合作开始",
-    copy: "面向组织关怀、女性社区、媒体与行业交流，先明确服务范围与隐私边界。",
-    href: "/partners",
-    action: "了解合作方式",
     Icon: ShieldCheck,
+    title: "陪伴不是治疗或急救",
+    copy: "不提供医疗诊断、心理治疗或紧急救援；遇紧急风险请联系当地紧急服务。",
+  },
+  {
+    Icon: Smartphone,
+    title: "入口以小程序页面为准",
+    copy: "网页帮助你理解规则；真实服务范围与可用状态以小程序展示为准。",
   },
 ];
 
 export default function MarketingHomeScreen() {
   return (
-    <div className="marketing-page marketing-page-redesign">
-      <section className="marketing-hero marketing-hero-redesign">
+    <div className="bubble-site mint-brand site-home">
+      <section className="bubble-hero mint-hero" aria-labelledby="hero-title">
+        <div className="hero-surface" aria-hidden="true" />
         <HeroOrchestration
-          className="marketing-hero-grid marketing-hero-grid-redesign"
+          className="bubble-hero-grid"
           brand={
             <p className="hero-brand">
               <span>Talk&amp;Talk</span>
               <i />
-              有边界的线上陪伴
+              女性友好的线上陪伴
             </p>
           }
           title={
             <h1 id="hero-title">
-              认真倾听，不该只是一句温柔的话。
-              <span>它也该有一条让人安心的路径。</span>
+              有边界的线上陪伴，
+              <span>从被认真听见开始。</span>
             </h1>
           }
           lead={
-            <p className="hero-lead">
-              Talk&amp;Talk 是女性友好的线上陪伴平台。我们把发现、预约、支付、沟通与支持留在同一套可信结构里，让每一次连接都有分寸、有回应。
-            </p>
+            <>
+              <p className="hero-lead">
+                Talk&amp;Talk 面向需要情绪倾听、减压与陪伴的成年人。发现、预约与沟通在平台内完成；
+                官网说明规则与边界，真实服务请进入微信小程序。App 即将到来。
+              </p>
+              <ul className="hero-trust-strip" aria-label="产品可信要点">
+                {trustSignals.map((item) => (
+                  <li key={item.label}>
+                    <small>{item.label}</small>
+                    <strong>{item.value}</strong>
+                  </li>
+                ))}
+              </ul>
+            </>
           }
-          actions={<MiniprogramCta variant="hero" secondaryHref="/how-it-works" secondaryLabel="了解服务路径" />}
-          visual={<ConnectionPulse />}
+          actions={
+            <MiniprogramCta
+              variant="hero"
+              secondaryHref="/how-it-works"
+              secondaryLabel="了解服务路径"
+              showAppComingSoon
+            />
+          }
+          visual={<IconOrbit />}
         />
       </section>
 
-      <Reveal className="marketing-proof-rail" as="section">
-        <RevealStagger className="marketing-proof-grid">
-          {proofPoints.map(({ Icon, title, copy }) => (
-            <RevealItem key={title}>
-              <article>
-                <span><Icon size={19} aria-hidden="true" /></span>
-                <div>
-                  <strong>{title}</strong>
-                  <small>{copy}</small>
+      <section className="home-values" aria-labelledby="values-title">
+        <Reveal as="header" className="bubble-heading">
+          <p className="eyebrow">我们做什么</p>
+          <h2 id="values-title">把陪伴做成可确认的服务，而不是一次偶然的聊天。</h2>
+          <p>
+            认真被听见需要空间，也需要分寸。Talk&amp;Talk 用同一套产品结构承接发现、约定、沟通与支持。
+          </p>
+        </Reveal>
+        <RevealStagger className="home-value-grid" stagger={0.06}>
+          {valueProps.map((item) => (
+            <RevealItem key={item.code}>
+              <article className="home-value-card">
+                <span className="home-value-code">{item.code}</span>
+                <h3>{item.title}</h3>
+                <p>{item.copy}</p>
+              </article>
+            </RevealItem>
+          ))}
+        </RevealStagger>
+      </section>
+
+      <section className="bubble-moments" aria-labelledby="moments-title">
+        <Reveal as="header" className="bubble-heading">
+          <p className="eyebrow">适合这样开始</p>
+          <h2 id="moments-title">不用先想清楚一切，也可以找到好好说话的空间。</h2>
+          <p>以下是常见需要。真实服务与可约状态，以微信小程序页面为准。</p>
+        </Reveal>
+        <RevealStagger className="home-moment-list" stagger={0.05}>
+          {moments.map((moment, index) => (
+            <RevealItem key={moment.label}>
+              <article className="home-moment-row">
+                <span className="home-moment-index" aria-hidden="true">
+                  {String(index + 1).padStart(2, "0")}
+                </span>
+                <div className="home-moment-copy">
+                  <small>{moment.label}</small>
+                  <strong>{moment.title}</strong>
+                  <p>{moment.copy}</p>
                 </div>
               </article>
             </RevealItem>
           ))}
         </RevealStagger>
-      </Reveal>
-
-      <TrustJourney />
-
-      <section className="marketing-section marketing-moment-section">
-        <Reveal as="header" className="editorial-heading editorial-heading-wide">
-          <p className="eyebrow">从你此刻的需要出发</p>
-          <h2>不用先把一切想清楚，先找到能好好说话的空间。</h2>
-          <p>主题只是开始，不会替你定义正在经历什么。</p>
-        </Reveal>
-        <RevealStagger className="marketing-moment-grid marketing-moment-grid-redesign" stagger={0.1}>
-          {moments.map((moment) => (
-            <RevealItem key={moment.label}>
-              <Link href="/demo?stage=discover#demo-route" className="marketing-moment-card">
-                <small>{moment.label}</small>
-                <strong>{moment.title}</strong>
-                <span>{moment.copy}</span>
-                <span className="marketing-card-link">查看网页产品演示 <ArrowRight size={16} aria-hidden="true" /></span>
-              </Link>
-            </RevealItem>
-          ))}
-        </RevealStagger>
       </section>
 
-      <section className="marketing-section marketing-system-section">
-        <Reveal as="header" className="editorial-heading editorial-heading-wide">
-          <p className="eyebrow">服务如何发生</p>
-          <h2>温度留给交流，规则留给平台承接。</h2>
-          <p>不是把流程变复杂，而是让每一次选择和支持都有清楚的去处。</p>
-        </Reveal>
-        <RevealStagger className="service-system-grid" stagger={0.12}>
-          {serviceSteps.map(({ Icon, code, title, copy }) => (
-            <RevealItem key={code}>
-              <article className="service-system-card">
-                <div className="service-system-head">
-                  <span>{code}</span>
-                  <Icon size={21} aria-hidden="true" />
+      <section className="bubble-path mint-path home-path" aria-labelledby="path-title">
+        <Reveal as="div" className="bubble-path-inner home-path-inner">
+          <header className="bubble-heading bubble-heading-light">
+            <p className="eyebrow">如何开始</p>
+            <h2 id="path-title">官网说明规则，小程序完成连接。</h2>
+            <p>我们不把完整服务功能放在网页里。服务入口以微信小程序为准，App 也在路上。</p>
+          </header>
+          <ol className="bubble-path-steps">
+            {pathSteps.map((step) => (
+              <li key={step.code}>
+                <span>{step.code}</span>
+                <div>
+                  <strong>{step.title}</strong>
+                  <p>{step.copy}</p>
                 </div>
+              </li>
+            ))}
+          </ol>
+          <div className="bubble-path-actions">
+            <MiniprogramCta
+              variant="inline"
+              secondaryHref="/safety"
+              secondaryLabel="阅读安全说明"
+              showAppComingSoon
+            />
+          </div>
+        </Reveal>
+      </section>
+
+      <section className="home-trust" aria-labelledby="trust-title">
+        <Reveal as="header" className="bubble-heading">
+          <p className="eyebrow">可信的表达方式</p>
+          <h2 id="trust-title">我们用结构说明产品，不用虚构数字。</h2>
+          <p>
+            官网不展示未核验的规模叙事。你可以在这里理解路径与边界，再进入微信小程序完成真实服务。
+          </p>
+        </Reveal>
+        <RevealStagger className="home-trust-grid" stagger={0.05}>
+          {trustPoints.map(({ Icon, title, copy }) => (
+            <RevealItem key={title}>
+              <article className="home-trust-card">
+                <span className="home-trust-icon" aria-hidden="true">
+                  <Icon size={20} />
+                </span>
                 <h3>{title}</h3>
                 <p>{copy}</p>
               </article>
             </RevealItem>
           ))}
         </RevealStagger>
-        <Reveal as="div" className="service-system-note">
-          <span><ShieldCheck size={18} aria-hidden="true" /></span>
-          <p>Talk&amp;Talk 不提供心理治疗、医疗诊断或紧急救援；遇到紧急风险请立即联系当地紧急服务。</p>
-          <Link href="/how-it-works">查看完整服务说明 <ArrowRight size={16} aria-hidden="true" /></Link>
-        </Reveal>
-      </section>
-
-      <section className="marketing-section marketing-audience-section">
-        <Reveal as="header" className="editorial-heading editorial-heading-wide">
-          <p className="eyebrow">不止一个入口</p>
-          <h2>一套可信结构，服务不同角色的真实需要。</h2>
-          <p>用户、陪伴者与合作方都应看见清楚的下一步，而不是被迫进入同一条路径。</p>
-        </Reveal>
-        <RevealStagger className="marketing-audience-grid" stagger={0.1}>
-          {audiencePaths.map(({ Icon, eyebrow, title, copy, href, action }) => (
-            <RevealItem key={eyebrow}>
-              <article className="marketing-audience-card">
-                <span className="audience-icon"><Icon size={22} aria-hidden="true" /></span>
-                <p>{eyebrow}</p>
-                <h3>{title}</h3>
-                <span>{copy}</span>
-                <Link href={href} className="audience-link">
-                  {action} <ArrowRight size={16} aria-hidden="true" />
-                </Link>
-              </article>
-            </RevealItem>
-          ))}
-        </RevealStagger>
-      </section>
-
-      <Reveal as="section" className="marketing-safety-band marketing-safety-band-redesign">
-        <div>
-          <p className="eyebrow">边界与安全</p>
-          <h2>真正让人放松的，不是没有规则，而是规则足够清楚。</h2>
-          <p>
-            我们不鼓励私联、私下转账或线下邀约。平台内沟通、订单状态、举报与支持入口共同承接关键边界。
-          </p>
-          <Link href="/safety" className="button button-secondary">
-            阅读安全与支持说明 <ArrowRight size={17} aria-hidden="true" />
+        <div className="home-trust-links">
+          <Link href="/about" className="button button-secondary">
+            关于我们
+          </Link>
+          <Link href="/partners" className="button button-secondary">
+            合作与联系
+          </Link>
+          <Link href="/safety" className="bubble-text-link">
+            阅读安全说明 <ArrowRight size={16} aria-hidden="true" />
           </Link>
         </div>
-        <ul className="marketing-safety-list">
-          <li><MessageCircleHeart size={18} aria-hidden="true" /> 重要沟通留在平台内</li>
-          <li><WalletCards size={18} aria-hidden="true" /> 交易与状态使用同一订单</li>
-          <li><ShieldCheck size={18} aria-hidden="true" /> 遇到问题有明确支持入口</li>
-        </ul>
-      </Reveal>
+      </section>
 
-      <Reveal as="section" className="marketing-closing marketing-closing-redesign">
-        <div>
-          <p className="eyebrow">开始一段有分寸的连接</p>
-          <h2>先认识规则，再放心开始。</h2>
-          <p>服务入口以微信小程序页面状态为准。网页可以先帮你了解产品、浏览公开资料与确认边界。</p>
+      <section className="bubble-channels" aria-labelledby="channels-title">
+        <Reveal as="header" className="bubble-heading">
+          <p className="eyebrow">服务入口</p>
+          <h2 id="channels-title">去真正能完成连接的地方。</h2>
+        </Reveal>
+        <div className="bubble-channel-grid">
+          <article className="bubble-channel-card primary mint-channel-primary">
+            <span className="bubble-channel-icon">
+              <Image
+                src="/brand/app-icon.png"
+                alt=""
+                width={44}
+                height={44}
+                className="channel-app-icon"
+                aria-hidden="true"
+              />
+            </span>
+            <p className="eyebrow">当前主入口</p>
+            <h3>微信小程序</h3>
+            <p>
+              浏览、预约、沟通与支持以小程序实际页面状态为准。可在微信中搜索「Talk&amp;Talk」。
+            </p>
+            <MiniprogramCta
+              variant="inline"
+              secondaryHref="/how-it-works"
+              secondaryLabel="了解服务路径"
+            />
+          </article>
+          <article className="bubble-channel-card">
+            <span className="bubble-channel-icon">
+              <Smartphone size={22} aria-hidden="true" />
+            </span>
+            <p className="eyebrow">即将到来</p>
+            <h3>Talk&amp;Talk App</h3>
+            <p>
+              独立 App 正在准备中。上线后将在官网与官方渠道同步公布下载方式，请勿轻信非官方链接。
+            </p>
+            <span className="bubble-channel-badge">Coming soon</span>
+          </article>
+          <article className="bubble-channel-card">
+            <span className="bubble-channel-icon">
+              <ShieldCheck size={22} aria-hidden="true" />
+            </span>
+            <p className="eyebrow">安全须知</p>
+            <h3>边界与安全</h3>
+            <p>了解平台内沟通、禁止私联与私下转账，以及紧急风险时的正确做法。</p>
+            <Link href="/safety" className="bubble-text-link">
+              阅读安全说明 <ArrowRight size={16} aria-hidden="true" />
+            </Link>
+          </article>
         </div>
-        <MiniprogramCta variant="panel" secondaryHref="/how-it-works" secondaryLabel="了解服务路径" />
+      </section>
+
+      <section className="bubble-symbol home-symbol" aria-labelledby="symbol-title">
+        <Reveal as="div" className="bubble-symbol-panel mint-symbol-panel">
+          <div className="bubble-symbol-copy">
+            <p className="eyebrow">品牌符号</p>
+            <h2 id="symbol-title">两枚对话相遇，形成一颗温柔的心。</h2>
+            <p>
+              产品图标里的对话气泡、中心的心与环状守护，定义了 Talk&amp;Talk 的气质：
+              连接可以亲密，边界必须清楚——柔和、可亲近，但不廉价。
+            </p>
+            <ul className="bubble-symbol-list">
+              <li>
+                <strong>双向对话</strong>
+                <span>倾听与回应相遇，而不是单向输出。</span>
+              </li>
+              <li>
+                <strong>心与边界并存</strong>
+                <span>温柔被看见，但不吞没各自的空间。</span>
+              </li>
+              <li>
+                <strong>结构守护关系</strong>
+                <span>外环与空泡提醒：靠近可以，越界不可以。</span>
+              </li>
+            </ul>
+          </div>
+          <figure className="bubble-symbol-visual mint-icon-stage">
+            <div className="mint-icon-glow" aria-hidden="true" />
+            <Image
+              src="/brand/app-icon.png"
+              alt="Talk&Talk 官方图标：两枚对话气泡交叠成心，周围漂浮空泡"
+              width={420}
+              height={420}
+              className="bubble-symbol-image mint-icon-image"
+              priority={false}
+            />
+            <figcaption>产品图标即官网视觉源：对话 · 心 · 守护</figcaption>
+          </figure>
+        </Reveal>
+      </section>
+
+      <Reveal as="section" className="bubble-closing mint-closing">
+        <div className="bubble-closing-inner">
+          <div>
+            <p className="eyebrow">开始一段有分寸的连接</p>
+            <h2>先认识规则，再进入小程序。</h2>
+            <p>
+              网页帮助你理解产品与边界；真实服务请使用微信小程序。App 上线后会在此更新。
+            </p>
+          </div>
+          <MiniprogramCta
+            variant="panel"
+            secondaryHref="/how-it-works"
+            secondaryLabel="了解服务路径"
+            showAppComingSoon
+          />
+        </div>
       </Reveal>
     </div>
   );

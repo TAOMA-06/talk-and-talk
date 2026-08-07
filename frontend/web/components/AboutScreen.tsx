@@ -14,7 +14,7 @@ export default function AboutScreen() {
       <PageHeading
         eyebrow="关于我们"
         title="认真听你说，也认真守住边界"
-        description="Talk&Talk 是女性友好的线上陪伴平台。我们把发现、预约、支付、沟通与支持放在同一套可治理的产品结构里。"
+        description="Talk&Talk 是女性友好的线上陪伴平台。发现、预约、支付、沟通与支持放在同一套可治理的产品结构里；服务入口以微信小程序页面状态为准。"
       />
 
       <Reveal as="section" className="about-section">
@@ -101,9 +101,14 @@ export default function AboutScreen() {
           <p>
             媒体、合作或陪伴者入驻相关事务，请通过邮件联系。我们不会在官网上展示未经核验的用户量或融资数据。
           </p>
-          <a className="button button-secondary" href="mailto:hello@talkandtalk.app">
-            <Mail size={17} /> hello@talkandtalk.app
-          </a>
+          <div className="about-contact-actions">
+            <a className="button button-secondary" href="mailto:hello@talkandtalk.app">
+              <Mail size={17} aria-hidden="true" /> hello@talkandtalk.app
+            </a>
+            <Link href="/partners" className="text-link">
+              查看合作路径 <ArrowRight size={16} aria-hidden="true" />
+            </Link>
+          </div>
         </div>
         <MiniprogramCta variant="panel" secondaryHref="/how-it-works" secondaryLabel="了解服务路径" />
       </Reveal>

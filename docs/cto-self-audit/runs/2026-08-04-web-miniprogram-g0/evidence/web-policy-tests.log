@@ -1,0 +1,75 @@
+=== VERIFICATION PLAN STEP 3 re-run 2026-08-07T07:27:58Z ===
+HEAD: 9cf5e3849a9654ddfddb8046bf29a580533fa268
+CWD: /Users/taoma/Documents/talk and talk
+--- policy ---
+TAP version 13
+# Subtest: missing config yields honest search fallback
+ok 1 - missing config yields honest search fallback
+  ---
+  duration_ms: 0.379458
+  type: 'test'
+  ...
+# Subtest: allowlisted https QR is accepted
+ok 2 - allowlisted https QR is accepted
+  ---
+  duration_ms: 0.273417
+  type: 'test'
+  ...
+# Subtest: non-allowlisted QR host falls back
+ok 3 - non-allowlisted QR host falls back
+  ---
+  duration_ms: 0.073792
+  type: 'test'
+  ...
+# Subtest: weixin scheme path is accepted
+ok 4 - weixin scheme path is accepted
+  ---
+  duration_ms: 0.039709
+  type: 'test'
+  ...
+# Subtest: javascript or bare tokens are not promoted to deep links
+ok 5 - javascript or bare tokens are not promoted to deep links
+  ---
+  duration_ms: 0.052375
+  type: 'test'
+  ...
+# Subtest: classifies marketing, private, deferred, and API surfaces
+ok 6 - classifies marketing, private, deferred, and API surfaces
+  ---
+  duration_ms: 0.36875
+  type: 'test'
+  ...
+# Subtest: production candidate refuses deferred trade and private surfaces without flags
+ok 7 - production candidate refuses deferred trade and private surfaces without flags
+  ---
+  duration_ms: 0.10825
+  type: 'test'
+  ...
+# Subtest: BFF/session remain available for local non-candidate builds
+ok 8 - BFF/session remain available for local non-candidate builds
+  ---
+  duration_ms: 0.07075
+  type: 'test'
+  ...
+# Subtest: deferred surfaces require explicit flag and non-production API allowlist
+ok 9 - deferred surfaces require explicit flag and non-production API allowlist
+  ---
+  duration_ms: 0.061916
+  type: 'test'
+  ...
+# Subtest: sitemap only lists public marketing paths and excludes business/demo
+ok 10 - sitemap only lists public marketing paths and excludes business/demo
+  ---
+  duration_ms: 0.287375
+  type: 'test'
+  ...
+1..10
+# tests 10
+# suites 0
+# pass 10
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 54.294041
+POLICY_EXIT:0

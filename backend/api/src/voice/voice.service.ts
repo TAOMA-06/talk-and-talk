@@ -6,6 +6,7 @@ import { AuditService } from "../common/audit/audit.service";
 import { AppException } from "../common/errors/app.exception";
 import { assertCurrentCompanionCommercialEligibility } from "../commercial/companion-commercial-eligibility";
 import { isCommercialTextOnlySurface } from "../config/commercial-surface";
+import { isFirstReleaseCapabilityEnabled } from "../config/first-release-capability-matrix";
 import { PrismaService } from "../database/prisma.service";
 import { assertCurrentCustomerAdultEligibility } from "../users/customer-adult-eligibility.service";
 
@@ -243,7 +244,10 @@ export class VoiceService {
   }
 
   private runtimeConfig(): VoiceRuntimeConfig {
-    if (isCommercialTextOnlySurface(this.config)) {
+    if (
+      !isFirstReleaseCapabilityEnabled("trtcUserSig", this.config)
+      || isCommercialTextOnlySurface(this.config)
+    ) {
       throw new AppException(
         "COMMERCIAL_SURFACE_TEXT_ONLY",
         "Real-time voice is disabled for the current commercial surface",

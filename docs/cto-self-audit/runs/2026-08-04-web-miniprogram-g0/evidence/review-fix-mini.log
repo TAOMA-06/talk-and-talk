@@ -1,0 +1,7 @@
+=== mini after review fixes ===
+WARN: WECHAT_MINIPROGRAM_APP_ID must be supplied externally as a valid wx-prefixed AppID; local structure checks continue in development mode
+Mini Program structure valid: 31 pages, 5 tabs (development gate)
+VALIDATE:0
+TSC:0
+Mini Program runtime smoke passed: consent/legal gates, 835 API calls, mock/real payment branches and HTTPS/Cloud Run transport coverage
+SMOKE:0

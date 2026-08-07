@@ -67,10 +67,11 @@ export default function HowItWorksScreen() {
     <div className="marketing-detail-page how-it-works-page">
       <section className="marketing-detail-hero marketing-detail-hero-split how-it-works-hero">
         <div className="marketing-detail-hero-copy">
-          <p className="hero-brand"><span>产品如何运作</span><i /> Talk&amp;Talk service guide</p>
+          <p className="hero-brand"><span>产品如何运作</span><i /> 服务路径说明</p>
           <h1>把一次认真连接，放进一条清楚的服务路径。</h1>
           <p>
-            不是让每件事都变得复杂，而是让资料、约定、交易、沟通与支持彼此接得上。
+            从公开资料到预约确认，从平台支付到服务沟通与支持——每一步都应接得上。
+            服务入口与履约以微信小程序页面状态为准。
           </p>
           <div className="marketing-detail-actions">
             <Link href="/demo" className="button button-primary button-large">
@@ -136,11 +137,14 @@ export default function HowItWorksScreen() {
           <h2>在开始之前，先把重要的事问清楚。</h2>
         </Reveal>
         <RevealStagger className="faq-list" stagger={0.08}>
-          {faqs.map((faq) => (
+          {faqs.map((faq, index) => (
             <RevealItem key={faq.question}>
-              <details>
-                <summary><CircleHelp size={18} aria-hidden="true" /> {faq.question}</summary>
-                <p>{faq.answer}</p>
+              <details className="faq-item">
+                <summary>
+                  <CircleHelp size={18} aria-hidden="true" />
+                  <span>{faq.question}</span>
+                </summary>
+                <p id={`faq-answer-${index}`}>{faq.answer}</p>
               </details>
             </RevealItem>
           ))}

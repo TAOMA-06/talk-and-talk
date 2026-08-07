@@ -44,8 +44,8 @@ export default function BusinessScreen() {
           <h1>把线上陪伴，从一次偶然连接，做成一套可信的服务基础设施。</h1>
           <p>
             Talk&amp;Talk 是女性友好的双边线上陪伴平台。需求端更容易找到合适的人，
-            供给端拥有清晰的经营工具，平台则把审核、交易、沟通和售后串成可治理的闭环。
-            用户服务入口以微信小程序页面状态为准。
+            供给端拥有清晰的经营工具，平台把审核、交易、沟通和售后串成可治理的闭环。
+            本页只陈述已实现能力与明确标注的后续验证项；用户服务入口以微信小程序页面状态为准。
           </p>
           <div className="hero-actions">
             <Link href="/demo" className="button button-primary button-large">

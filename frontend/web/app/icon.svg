@@ -1,15 +1,22 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="16" fill="#123f58"/>
-  <path
-    d="M18 20.5c0-4.7 3.8-8.5 8.5-8.5h11c4.7 0 8.5 3.8 8.5 8.5v10c0 4.7-3.8 8.5-8.5 8.5H31l-8.8 7.1c-1.3 1-3.2.1-3.2-1.5V38a8.5 8.5 0 0 1-1-4V20.5Z"
-    fill="none"
-    stroke="#d9f3f2"
-    stroke-linecap="round"
-    stroke-linejoin="round"
-    stroke-width="3.5"
-  />
-  <path
-    d="M26.5 25.5c0-2.2 1.7-4 3.9-4 1.1 0 2.1.5 2.8 1.3a4 4 0 0 1 2.8-1.3c2.2 0 4 1.8 4 4 0 3.5-4.3 6.1-6.8 8-2.5-1.9-6.7-4.5-6.7-8Z"
-    fill="#f6d6a8"
-  />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="8" y1="4" x2="56" y2="60" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#B8F0C8"/>
+      <stop offset="0.55" stop-color="#6EDFA0"/>
+      <stop offset="1" stop-color="#3BCF88"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#bg)"/>
+  <ellipse cx="12" cy="16" rx="3.2" ry="3.2" fill="#fff" opacity="0.55"/>
+  <ellipse cx="52" cy="14" rx="2.4" ry="2.4" fill="#fff" opacity="0.45"/>
+  <ellipse cx="50" cy="50" rx="3.6" ry="3.6" fill="#fff" opacity="0.4"/>
+  <ellipse cx="14" cy="48" rx="2.2" ry="2.2" fill="#fff" opacity="0.5"/>
+  <path d="M18 20c0-5.5 4.5-10 10-10h4c5.5 0 10 4.5 10 10v6c0 4.1-2.5 7.6-6 9.1L32 40l-4-4.9C24.5 33.6 22 30.1 22 26v-6Z" fill="#F4FFF8" opacity="0.95"/>
+  <path d="M28 24c0-4.4 3.6-8 8-8h2c4.4 0 8 3.6 8 8v5c0 3.3-2 6.1-4.8 7.3L38 40l-3.2-3.7C32 34.1 30 31.3 30 28v-4Z" fill="#C9F8DD" opacity="0.95"/>
+  <path d="M30.2 28.8c1.8-1.8 4.7-1.8 6.5 0l.3.3.3-.3c1.8-1.8 4.7-1.8 6.5 0 1.9 1.9 1.9 5 0 6.9L37 39.5 30.2 35.7c-1.9-1.9-1.9-5 0-6.9Z" fill="#1FA86A"/>
+  <circle cx="26" cy="25" r="1.4" fill="#2FBF7A"/>
+  <circle cx="30" cy="25" r="1.4" fill="#2FBF7A"/>
+  <circle cx="40" cy="27" r="1.2" fill="#169A5F"/>
+  <circle cx="43.5" cy="27" r="1.2" fill="#169A5F"/>
+  <circle cx="47" cy="27" r="1.2" fill="#169A5F"/>
 </svg>

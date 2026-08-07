@@ -1939,7 +1939,7 @@ model OrderExperienceFeedback {
 
 model UserRecommendationPreference {
   userId                 String   @id
-  personalizationEnabled Boolean  @default(true)
+  personalizationEnabled Boolean  @default(false)
   topicIds               String[] @default([])
   city                   String?
   maxPricePerHalfHour    Int?

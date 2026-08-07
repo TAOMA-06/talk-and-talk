@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { enforcePageSurface } from "../../lib/enforce-web-surface";
 import BusinessScreen from "../../components/BusinessScreen";
 
 export const metadata: Metadata = {
@@ -14,5 +15,6 @@ export const metadata: Metadata = {
 };
 
 export default function BusinessPage() {
+  enforcePageSurface("/business");
   return <BusinessScreen />;
 }

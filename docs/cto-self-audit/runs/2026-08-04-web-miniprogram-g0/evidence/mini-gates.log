@@ -1,0 +1,11 @@
+=== MINI gates after voice-intro UI fix 2026-08-07T07:49:57Z ===
+HEAD: 9cf5e3849a9654ddfddb8046bf29a580533fa268
+WARN: WECHAT_MINIPROGRAM_APP_ID must be supplied externally as a valid wx-prefixed AppID; local structure checks continue in development mode
+Mini Program structure valid: 31 pages, 5 tabs (development gate)
+VALIDATE_EXIT:0
+TSC_EXIT:0
+Mini Program runtime smoke passed: consent/legal gates, 835 API calls, mock/real payment branches and HTTPS/Cloud Run transport coverage
+SMOKE_EXIT:0
+Mini Program local-build isolation test passed
+LOCAL_EXIT:0
+ALL_MINI_GATES_OK

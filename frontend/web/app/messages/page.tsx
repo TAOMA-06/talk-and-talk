@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { enforcePageSurface } from "../../lib/enforce-web-surface";
 import MessagesScreen from "../../components/MessagesScreen";
 
 export const metadata: Metadata = {
@@ -9,5 +10,6 @@ export const metadata: Metadata = {
 };
 
 export default function MessagesPage() {
+  enforcePageSurface("/messages");
   return <MessagesScreen />;
 }

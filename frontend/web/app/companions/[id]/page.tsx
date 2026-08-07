@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { enforcePageSurface } from "../../../lib/enforce-web-surface";
 import CompanionDetailScreen from "../../../components/CompanionDetailScreen";
 
 export const metadata: Metadata = {
@@ -13,6 +14,7 @@ export default async function CompanionPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  enforcePageSurface("/companions/[id]");
   const { id } = await params;
   return <CompanionDetailScreen id={id} />;
 }

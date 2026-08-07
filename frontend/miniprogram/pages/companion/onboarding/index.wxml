@@ -73,11 +73,12 @@
       <view class="field-label">城市/区域</view>
       <input class="field" value="{{profile.cityDistrict}}" data-field="cityDistrict" bindinput="setProfileField" />
 
-      <view class="subsection">语音介绍元数据</view>
-      <view class="status-line">审核状态：{{overview.companion.voiceIntro.status}}</view>
-      <view class="hint">这里只接受受控媒体服务生成的外部引用；不会把本地路径或未审核音频当作已上线内容。</view>
-      <input class="field" value="{{profile.voiceIntroAssetRef}}" data-field="voiceIntroAssetRef" bindinput="setProfileField" placeholder="外部媒体引用，例如 media/audio/..." />
-      <input class="field" type="number" value="{{profile.voiceIntroDurationSeconds}}" data-field="voiceIntroDurationSeconds" bindinput="setProfileField" placeholder="时长（秒，1–600）" />
+      <view wx:if="{{voiceIntroEnabled}}" class="subsection">语音介绍元数据</view>
+      <view wx:if="{{voiceIntroEnabled}}" class="status-line">审核状态：{{overview.companion.voiceIntro.status}}</view>
+      <view wx:if="{{voiceIntroEnabled}}" class="hint">这里只接受受控媒体服务生成的外部引用；不会把本地路径或未审核音频当作已上线内容。</view>
+      <input wx:if="{{voiceIntroEnabled}}" class="field" value="{{profile.voiceIntroAssetRef}}" data-field="voiceIntroAssetRef" bindinput="setProfileField" placeholder="外部媒体引用，例如 media/audio/..." />
+      <input wx:if="{{voiceIntroEnabled}}" class="field" type="number" value="{{profile.voiceIntroDurationSeconds}}" data-field="voiceIntroDurationSeconds" bindinput="setProfileField" placeholder="时长（秒，1–600）" />
+      <view wx:if="{{!voiceIntroEnabled}}" class="hint">首发文字陪伴不开放语音介绍；请完善文字资料后提交审核。</view>
       <button class="primary-button submit" loading="{{saving}}" disabled="{{saving}}" bindtap="saveProfile">保存并提交资料审核</button>
     </view>
 

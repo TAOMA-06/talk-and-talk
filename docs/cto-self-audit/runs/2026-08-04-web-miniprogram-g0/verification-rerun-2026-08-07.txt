@@ -1,0 +1,109 @@
+=== VERIFICATION PLAN STEP 6: candidate package 2026-08-07T07:28:43Z ===
+baseline_sha: 9cf5e3849a9654ddfddb8046bf29a580533fa268
+branch: main
+date_utc: 2026-08-07T07:28:43Z
+
+=== lockfile hashes ===
+3c71416521db2338d3b15c17e85bf5db8346ab2afef364b5616edc500596cb5c  frontend/web/package-lock.json
+657491bd9d480bf01d6a1ad04b99db2c65d0c8e143b462ecdbe086b3fb37fc73  backend/api/package-lock.json
+6e87a27ba3eaf3c4788e15bd323402982490067aff8221682fc15063779347e8  frontend/miniprogram/package-lock.json
+
+=== run dir listing ===
+docs/cto-self-audit/runs/2026-08-04-web-miniprogram-g0/candidate-manifest.md
+docs/cto-self-audit/runs/2026-08-04-web-miniprogram-g0/change-map.md
+docs/cto-self-audit/runs/2026-08-04-web-miniprogram-g0/decisions.md
+docs/cto-self-audit/runs/2026-08-04-web-miniprogram-g0/evidence/api-gates.log
+docs/cto-self-audit/runs/2026-08-04-web-miniprogram-g0/evidence/candidate-manifest.txt
+docs/cto-self-audit/runs/2026-08-04-web-miniprogram-g0/evidence/g0-revalidate-status.txt
+docs/cto-self-audit/runs/2026-08-04-web-miniprogram-g0/evidence/mini-gates.log
+docs/cto-self-audit/runs/2026-08-04-web-miniprogram-g0/evidence/shared-p0-tests.log
+docs/cto-self-audit/runs/2026-08-04-web-miniprogram-g0/evidence/web-check-1.log
+docs/cto-self-audit/runs/2026-08-04-web-miniprogram-g0/evidence/web-check-2.log
+docs/cto-self-audit/runs/2026-08-04-web-miniprogram-g0/evidence/web-policy-tests.log
+docs/cto-self-audit/runs/2026-08-04-web-miniprogram-g0/handoff.md
+docs/cto-self-audit/runs/2026-08-04-web-miniprogram-g0/scope.md
+docs/cto-self-audit/runs/2026-08-04-web-miniprogram-g0/state.md
+docs/cto-self-audit/runs/2026-08-04-web-miniprogram-g0/validation.md
+
+=== evidence log sizes ===
+total 152
+drwxr-xr-x@ 10 taoma  staff    320 Aug  7 15:28 .
+drwxr-xr-x@ 10 taoma  staff    320 Aug  7 15:13 ..
+-rw-r--r--@  1 taoma  staff  30304 Aug  7 15:28 api-gates.log
+-rw-r--r--@  1 taoma  staff   4867 Aug  7 15:12 candidate-manifest.txt
+-rw-r--r--@  1 taoma  staff   8065 Aug  7 15:28 g0-revalidate-status.txt
+-rw-r--r--@  1 taoma  staff    633 Aug  7 15:28 mini-gates.log
+-rw-r--r--@  1 taoma  staff   1254 Aug  7 15:28 shared-p0-tests.log
+-rw-r--r--@  1 taoma  staff   7410 Aug  7 15:28 web-check-1.log
+-rw-r--r--@  1 taoma  staff   7411 Aug  7 15:28 web-check-2.log
+-rw-r--r--@  1 taoma  staff   2068 Aug  7 15:28 web-policy-tests.log
+
+=== structural proof: shipped identity hard gate wired into services ===
+backend/api/src/users/public-interaction-identity.gate.ts:12:export const PUBLIC_INTERACTION_IDENTITY_REQUIRED = "PUBLIC_INTERACTION_IDENTITY_REQUIRED";
+backend/api/src/users/public-interaction-identity.gate.ts:53:export function assertPublicInteractionIdentity(
+backend/api/src/users/public-interaction-identity.gate.ts:59:    PUBLIC_INTERACTION_IDENTITY_REQUIRED,
+backend/api/src/conversations/conversations.service.ts:15:import { assertPublicInteractionIdentity } from "../users/public-interaction-identity.gate";
+backend/api/src/conversations/conversations.service.ts:481:    assertPublicInteractionIdentity(user);
+backend/api/src/community/community.service.ts:7:import { assertPublicInteractionIdentity } from "../users/public-interaction-identity.gate";
+backend/api/src/community/community.service.ts:88:    assertPublicInteractionIdentity(user);
+shared/contracts/openapi/v1.yaml:3026:            (`PUBLIC_INTERACTION_IDENTITY_REQUIRED`). details include
+shared/contracts/openapi/v1.yaml:3818:            `PUBLIC_INTERACTION_IDENTITY_REQUIRED` with recoveryPath and do not
+
+=== structural proof: personalization default off ===
+backend/api/src/recommendations/recommendations.service.ts:163:        personalizationEnabled: dto.personalizationEnabled ?? false,
+backend/api/src/recommendations/recommendations.service.ts:926:      personalizationEnabled: value?.personalizationEnabled === true,
+backend/api/prisma/schema.prisma:892:  isVerified  Boolean @default(false)
+backend/api/prisma/schema.prisma:959:  isOnline                         Boolean                                @default(false)
+backend/api/prisma/schema.prisma:960:  isVerified                       Boolean                                @default(false)
+backend/api/prisma/schema.prisma:976:  isPublished                      Boolean                                @default(false)
+backend/api/prisma/schema.prisma:1019:  availabilityReminderEnabled         Boolean   @default(false)
+backend/api/prisma/schema.prisma:1713:  incomingUserResponse        Boolean                     @default(false)
+backend/api/prisma/schema.prisma:1715:  complaintFullRefunded       Boolean                     @default(false)
+backend/api/prisma/schema.prisma:1716:  requiresImmediateService    Boolean                     @default(false)
+backend/api/prisma/schema.prisma:1717:  inPlatformService           Boolean                     @default(false)
+backend/api/prisma/schema.prisma:1942:  personalizationEnabled Boolean  @default(false)
+backend/api/prisma/schema.prisma:2223:  usedAI               Boolean               @default(false)
+backend/api/prisma/schema.prisma:2769:  companionReactivationRequired Boolean               @default(false)
+
+=== structural proof: web production candidate refuse ===
+frontend/web/app/discover/page.tsx:3:import { enforcePageSurface } from "../../lib/enforce-web-surface";
+frontend/web/app/discover/page.tsx:13:  enforcePageSurface("/discover");
+frontend/web/lib/web-surface-policy.ts:6: * Production candidates set `WEB_SURFACE_MODE=production` (see .env.example).
+frontend/web/lib/web-surface-policy.ts:71:  explicit = process.env.WEB_SURFACE_MODE,
+frontend/web/lib/web-surface-policy.ts:82:export function isProductionCandidateSurface(
+frontend/web/lib/web-surface-policy.ts:85:  const mode = (env.WEB_SURFACE_MODE || "").trim().toLowerCase();
+frontend/web/lib/web-surface-policy.ts:88:  // Cloudflare/worker production bindings should set WEB_SURFACE_MODE.
+frontend/web/lib/web-surface-policy.ts:89:  // Fall back to NODE_ENV only when WEB_SURFACE_MODE is unset and lock is forced.
+frontend/web/lib/web-surface-policy.ts:130:export function dispositionForPath(
+frontend/web/lib/web-surface-policy.ts:139:    if (isProductionCandidateSurface(env)) return "notFound";
+frontend/web/lib/web-surface-policy.ts:141:    // until an operator explicitly locks the candidate with WEB_SURFACE_MODE.
+frontend/web/lib/web-surface-policy.ts:147:    if (isProductionCandidateSurface(env)) return "notFound";
+frontend/web/lib/web-surface-policy.ts:155:    // routes available for integration tests until WEB_SURFACE_MODE locks them.
+frontend/web/lib/web-surface-policy.ts:156:    if (isProductionCandidateSurface(env)) {
+frontend/web/lib/enforce-web-surface.ts:4:import { dispositionForPath } from "./web-surface-policy";
+frontend/web/lib/enforce-web-surface.ts:8:export function enforcePageSurface(pathname: string): void {
+frontend/web/lib/enforce-web-surface.ts:9:  const disposition = dispositionForPath(pathname);
+frontend/web/lib/enforce-web-surface.ts:15:export function enforceApiSurface(pathname: string): NextResponse | null {
+frontend/web/lib/enforce-web-surface.ts:16:  const disposition = dispositionForPath(pathname);
+frontend/web/app/api/backend/[...path]/route.ts:3:import { enforceApiSurface } from "../../../../lib/enforce-web-surface";
+frontend/web/app/api/backend/[...path]/route.ts:66:  const surfaceRefusal = enforceApiSurface("/api/backend");
+
+=== structural proof: mini text-only ===
+frontend/miniprogram/utils/config.ts:78:const COMMERCIAL_TEXT_ONLY_DEFAULT = true;
+frontend/miniprogram/utils/config.ts:84:  return COMMERCIAL_TEXT_ONLY_DEFAULT;
+frontend/miniprogram/utils/config.ts:97:export function clientVoiceIntroEnabled(): boolean {
+frontend/miniprogram/utils/config.ts:102:export function clientVoiceSkuEnabled(): boolean {
+frontend/miniprogram/pages/consent/index.wxml:4:  <view class="summary">我们使用微信身份完成登录，处理订单与微信支付，并保存站内文字聊天用于服务交付、安全保障和争议处理。本版本仅使用本地规则和经授权审核人员的人工复核，不会把用户原文或上下文发送给外部生成式 AI。首发为文字陪伴：不开放媒体上传、实时语音或 TRTC。</view>
+
+=== gate exits (from logs) ===
+shared_p0: STEP2_EXIT=STEP2_EXIT:0
+web_policy: POLICY_EXIT=POLICY_EXIT:0
+web_check: pass16 x2 in logs
+mini: VALIDATE_EXIT:0 TSC_EXIT:0 SMOKE_EXIT:0 LOCAL_EXIT:0 
+api: PREFLIGHT_EXIT:0 BUILD_EXIT:0 TEST_EXIT:0 DIFFCHECK_EXIT:0 
+e2e: E2E_STATUS: SKIPPED - no DATABASE_URL / default local DB 'taoma' missing; redis PONG only. Plan allows unit-level zero-write + full jest suite.
+
+G2_GATE: BLOCKED
+G3_GATE: No-Go
+EXTERNAL_WRITES: none
+STEP6_OK

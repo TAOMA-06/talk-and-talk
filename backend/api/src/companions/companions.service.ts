@@ -5,6 +5,7 @@ import { ConfigService } from "@nestjs/config";
 
 import { AppException } from "../common/errors/app.exception";
 import { isCommercialTextOnlySurface } from "../config/commercial-surface";
+import { isFirstReleaseCapabilityEnabled } from "../config/first-release-capability-matrix";
 import { PrismaService } from "../database/prisma.service";
 import { AvailabilityReminderCandidateService } from "../favorites/availability-reminder-candidate.service";
 import { ModerationCaseService } from "../moderation/moderation-case.service";
@@ -1030,6 +1031,22 @@ export class CompanionsService {
         HttpStatus.BAD_REQUEST
       );
     }
+    // MP-D05 first-release text-only: refuse voice-intro writes before any profile mutation.
+    if (
+      (voiceIntroAssetRef !== undefined || dto.voiceIntroDurationSeconds !== undefined)
+      && !isFirstReleaseCapabilityEnabled("voiceIntro", this.config)
+    ) {
+      throw new AppException(
+        "VOICE_INTRO_UNAVAILABLE",
+        "Voice introductions are unavailable on the text-only first-release surface",
+        HttpStatus.CONFLICT,
+        {
+          capability: "voiceIntro",
+          commercialSurface: "text_only",
+          publicInteractionBlocked: false
+        }
+      );
+    }
     if ((voiceIntroAssetRef === undefined) !== (dto.voiceIntroDurationSeconds === undefined)) {
       throw new AppException(
         "VOICE_INTRO_METADATA_INCOMPLETE",
@@ -1428,6 +1445,7 @@ export class CompanionsService {
   }
 
   private isVoiceBookingEnabled(): boolean {
+    if (!isFirstReleaseCapabilityEnabled("voiceSkuActivation", this.config)) return false;
     if (isCommercialTextOnlySurface(this.config)) return false;
     return this.config?.get<boolean>("TRTC_ENABLED", false) === true
       && this.config?.get<boolean>("TRTC_EMERGENCY_STOP_ENABLED", false) !== true;
@@ -2390,7 +2408,8 @@ export class CompanionsService {
       && commercialReview.nextReviewDueAt
       && commercialReview.nextReviewDueAt.getTime() > now
     );
-    const voiceIntroApproved = item.voiceIntroStatus === "approved";
+    const voiceIntroCapabilityEnabled = isFirstReleaseCapabilityEnabled("voiceIntro", this.config);
+    const voiceIntroApproved = voiceIntroCapabilityEnabled && item.voiceIntroStatus === "approved";
     return {
       id: item.id,
       name: item.name,
@@ -2414,6 +2433,7 @@ export class CompanionsService {
         durationSeconds: voiceIntroApproved ? item.voiceIntroDurationSeconds ?? null : null,
         // A durable asset reference is never public. Playback stays disabled
         // until a customer-scoped, short-lived read URL can be issued safely.
+        // Text-only first release also fail-closes historical approved intros.
         playbackStatus: voiceIntroApproved ? "secureShortLivedUrlRequired" : "notAvailable",
         playbackUrl: null
       },

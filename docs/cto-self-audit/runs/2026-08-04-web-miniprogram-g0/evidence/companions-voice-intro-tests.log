@@ -1,0 +1,77 @@
+
+> talk-and-talk-api@0.1.0 test
+> npm run prisma:generate && jest --runInBand --testPathPattern=companions.service.spec --runInBand
+
+
+> talk-and-talk-api@0.1.0 prisma:generate
+> prisma generate
+
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma/schema.prisma.
+
+✔ Generated Prisma Client (7.9.0) to ./generated/prisma in 425ms
+
+PASS src/companions/companions.service.spec.ts
+  CompanionsService
+    ✓ lists published companions with filters and pagination (3 ms)
+    ✓ reports expired public training and review truth without exposing private review or KYC material (1 ms)
+    ✓ defaults the public catalog to currently sellable companions while preserving a stable public order
+    ✓ uses companion id as the final deterministic public-catalog tie-breaker for undefined
+    ✓ uses companion id as the final deterministic public-catalog tie-breaker for online
+    ✓ uses companion id as the final deterministic public-catalog tie-breaker for rating
+    ✓ uses companion id as the final deterministic public-catalog tie-breaker for reviewCount
+    ✓ uses companion id as the final deterministic public-catalog tie-breaker for priceAsc
+    ✓ orders price-selected results by the current sellable offering rather than editable profile price
+    ✓ searches only public name, role, tags, or the same current active service title (1 ms)
+    ✓ keeps a discovery result only when the same matching active service has a future structured candidate with capacity
+    ✓ scans capacity candidates in stable bounded keyset batches without truncating matches (3 ms)
+    ✓ orders availability-priority results by each matching service's earliest structured candidate before paging
+    ✓ uses a selected shorter availability window for availability-priority ordering
+    ✓ excludes a full structured window from an availability-filtered discovery query (1 ms)
+    ✓ throws a domain 404 when a published companion is missing
+    ✓ returns only active service offerings from a published companion
+    ✓ hides voice purchase entry points while real-time voice is disabled without changing owner catalog data
+    ✓ does not expose a service catalog for an unpublished or missing companion
+    ✓ lets an eligible companion inspect both active and inactive service offerings (1 ms)
+    ✓ requires both a verified companion profile and a verified active owner for catalog management
+    ✓ creates a moderated, normalized service offering for its verified owner
+    ✓ serializes catalog creation on the profile row and rejects the fifty-first offering (1 ms)
+    ✓ rejects unknown topics before creating a service offering
+    ✓ updates only the current companion's offering while preserving its stable code
+    ✓ does not reveal or update another companion's service offering
+    ✓ screens a retired offering again before it can be reactivated
+    ✓ lists active and retired availability windows for their verified owner (1 ms)
+    ✓ creates a future aligned window and serializes it against overlapping calendar writes
+    ✓ rejects a misaligned or overlapping active availability window (1 ms)
+    ✓ does not reveal another companion's window or silently change a window with an active order
+    ✓ retires an unreserved window after checking its overlap and capacity-safe shape
+    ✓ creates an internal candidate only when a future retired window is reactivated
+    ✓ does not treat an ordinary edit of an already active window as a new candidate
+    ✓ keeps recurring rules and blackouts private to the eligible owner without materializing, publishing, or notifying (1 ms)
+    ✓ rejects a schedule operation before it can reach another companion's data
+    ✓ lists only the verified owner's future generated drafts inside the fixed review horizon
+    ✓ activates one current draft only after rule, blackout, window, and order rechecks without creating a reminder candidate (1 ms)
+    ✓ refuses a draft whose source rule, exception, open order, or ownership is no longer valid
+    ✓ expands structured windows for the selected service and reports remaining capacity (1 ms)
+    ✓ returns legacy availableTimes without fabricating candidates before a profile adopts structured availability
+    ✓ rejects an unavailable service when resolving structured availability
+    ✓ unpublishes a companion
+    ✓ publishes with the global User then CompanionProfile lock order
+    ✓ rejects publication when the owner changes after the preflight read without reversing lock order
+    ✓ does not let a stale publish request overwrite a committed KYC revocation (1 ms)
+    ✓ applies the same locked eligibility recheck when an admin update would publish
+    ✓ blocks create-time owner assignment after account deletion completed under the user lock
+    ✓ blocks an unpublished owner reassignment when deletion starts before the transactional check
+    ✓ locks and rejects the old owner when reassignment races that owner's deletion (2 ms)
+    ✓ lists unpublished profiles with owner eligibility for the admin review queue
+    ✓ blocks an unsafe self-service edit before it changes a public companion profile
+    ✓ refuses voice-intro writes under text-only before any companion profile mutation
+    ✓ hides approved voice-intro playback on public DTO while text-only is active (1 ms)
+    ✓ screens every public field before accepting a companion application
+
+Test Suites: 1 passed, 1 total
+Tests:       55 passed, 55 total
+Snapshots:   0 total
+Time:        2.182 s
+Ran all test suites matching /companions.service.spec/i.

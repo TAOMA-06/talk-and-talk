@@ -1,4 +1,5 @@
 import { ApiError, ensureSession } from "../../../utils/api";
+import { clientVoiceIntroEnabled } from "../../../utils/config";
 import {
   CommercialProfileSubmission,
   CompanionLifecycleOverview,
@@ -19,6 +20,7 @@ function errorMessage(error: unknown, fallback: string): string {
     COMPANION_PROFILE_CONTENT_REQUIRES_REVISION: "公开资料未通过内容安全检查，请修改后重试。",
     SETTLEMENT_RECIPIENT_ALREADY_BOUND: "该结算接收方引用已经绑定其他陪伴者，请联系平台核对。",
     VOICE_INTRO_METADATA_INCOMPLETE: "语音介绍引用和时长必须同时填写。",
+    VOICE_INTRO_UNAVAILABLE: "首发文字陪伴不开放语音介绍，请只完善文字资料。",
     INVALID_COMPANION_PROFILE: "公开资料存在空白或重复项目，请检查。"
   };
   return (apiError.code && messages[apiError.code]) || apiError.message || fallback;
@@ -30,6 +32,7 @@ Page({
     loading: true,
     saving: false,
     error: "",
+    voiceIntroEnabled: clientVoiceIntroEnabled(),
     overview: null as CompanionLifecycleOverview | null,
     statusText: "",
     application: {
@@ -78,6 +81,7 @@ Page({
       this.setData({
         state: "ready",
         loading: false,
+        voiceIntroEnabled: clientVoiceIntroEnabled(),
         overview,
         statusText: statusText[overview.commercialProfile.status] || overview.commercialProfile.status,
         profile: {
@@ -173,7 +177,7 @@ Page({
         cityDistrict: form.cityDistrict.trim(),
         livedExperience: form.livedExperience.trim(),
         serviceBoundaries: splitList(form.serviceBoundaries),
-        ...(form.voiceIntroAssetRef.trim() || duration !== undefined ? {
+        ...(clientVoiceIntroEnabled() && (form.voiceIntroAssetRef.trim() || duration !== undefined) ? {
           voiceIntroAssetRef: form.voiceIntroAssetRef.trim(),
           voiceIntroDurationSeconds: duration
         } : {})

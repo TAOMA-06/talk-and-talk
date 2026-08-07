@@ -175,10 +175,11 @@ export default function DemoExperience({ initialStageId }: { initialStageId?: De
     <div className="marketing-detail-page demo-page">
       <section className="demo-hero">
         <div>
-          <p className="hero-brand"><span>网页产品演示</span><i /> Read-only product tour</p>
+          <p className="hero-brand"><span>网页产品演示</span><i /> 只读结构演示</p>
           <h1>不用登录，也能走完一条可信服务路径。</h1>
           <p>
-            这是一个脱敏的产品结构演示：不创建账号、不提交信息、不发起订单。它用于说明 Talk&amp;Talk 如何把用户体验、陪伴者履约与平台支持放进同一套系统。
+            这是一个脱敏的产品结构演示：不创建账号、不提交信息、不发起订单。
+            它用于说明 Talk&amp;Talk 如何把用户体验、陪伴者履约与平台支持放进同一套系统。
           </p>
           <div className="marketing-detail-actions">
             <Link href="#demo-route" className="button button-primary button-large">

@@ -7,7 +7,6 @@ import {
   Compass,
   Home,
   MessageCircle,
-  MessageCircleHeart,
   ShieldCheck,
   Sparkles,
   UserRound,
@@ -24,6 +23,7 @@ import {
   useState,
 } from "react";
 
+import BrandMark from "./BrandMark";
 import {
   PRIVACY_URL,
   TERMS_URL,
@@ -57,10 +57,10 @@ export function useSession() {
 const publicNavigation = [
   { href: "/", label: "首页", icon: Home },
   { href: "/how-it-works", label: "服务如何运作", icon: CalendarDays },
-  { href: "/business", label: "平台能力", icon: BriefcaseBusiness },
   { href: "/safety", label: "安全与支持", icon: ShieldCheck },
-  { href: "/partners", label: "合作与联系", icon: Sparkles },
   { href: "/about", label: "关于", icon: Building2 },
+  { href: "/partners", label: "合作与联系", icon: Sparkles },
+  { href: "/business", label: "平台能力", icon: BriefcaseBusiness },
 ];
 
 const memberNavigation = [
@@ -146,10 +146,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <header className={isMarketing ? "site-header marketing-header" : "site-header"}>
           <div className="header-inner">
             <Link href="/" className="brand-lockup" aria-label="Talk&Talk 首页">
-              <span className="brand-mark"><MessageCircleHeart size={19} /></span>
+              <BrandMark size={36} className="brand-mark brand-mark-header" priority />
               <span className="brand-wordmark">
                 <strong>Talk&amp;Talk</strong>
-                <small>有边界的陪伴</small>
+                <small>有边界的线上陪伴</small>
               </span>
             </Link>
 
@@ -231,36 +231,37 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <footer className="site-footer">
           <div className="footer-brand-column">
             <div className="brand-lockup footer-brand">
-              <span className="brand-mark"><MessageCircleHeart size={18} /></span>
+              <BrandMark size={36} className="brand-mark brand-mark-footer" />
               <span className="brand-wordmark">
                 <strong>Talk&amp;Talk</strong>
-                <small>有边界的陪伴</small>
+                <small>有边界的线上陪伴</small>
               </span>
             </div>
             <p>
-              女性友好的线上陪伴平台官方网站。网页用于了解产品与体验路径；服务入口以微信小程序页面状态为准。
+              女性友好的线上陪伴平台。网页说明品牌、路径与边界；
+              真实服务请使用微信小程序，App 即将到来。
             </p>
           </div>
           <div className="footer-nav-groups">
             <div>
               <strong>产品</strong>
               <Link href="/how-it-works">服务如何运作</Link>
-              <Link href="/demo">网页产品演示</Link>
+              <Link href="/business">平台能力</Link>
               <span>微信搜索 Talk&amp;Talk</span>
+              <span>App 即将到来</span>
             </div>
             <div>
               <strong>信任</strong>
               <Link href="/safety">安全与支持</Link>
               <Link href="/how-it-works">服务边界与路径</Link>
               <span>重要互动留在平台内</span>
+              <span>仅面向 18+ 用户</span>
             </div>
             <div>
               <strong>公司</strong>
               <Link href="/about">关于我们</Link>
               <Link href="/partners">合作与联系</Link>
-              <Link href="/business">平台能力</Link>
-              <a href="mailto:hello@talkandtalk.app">联系合作</a>
-              <span>仅面向 18+ 用户</span>
+              <a href="mailto:hello@talkandtalk.app">hello@talkandtalk.app</a>
             </div>
             <div>
               <strong>法律与公示</strong>

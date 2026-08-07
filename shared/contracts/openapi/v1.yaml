@@ -1454,6 +1454,8 @@ paths:
                   maxItems: 30
                   items: { type: string, maxLength: 40 }
                 availability: { type: string, enum: [online, available, busy] }
+                voiceIntroAssetRef: { type: string, maxLength: 500 }
+                voiceIntroDurationSeconds: { type: integer, minimum: 1, maximum: 600 }
       responses:
         "200":
           description: Updated companion profile
@@ -1461,6 +1463,14 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuccessEnvelope"
+        "409":
+          description: >
+            First-release text-only refused a voice-intro write
+            (`VOICE_INTRO_UNAVAILABLE`). No companion profile mutation occurs.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
         "422":
           description: Public profile content failed moderation and was not published
           content:
@@ -3020,6 +3030,16 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuccessEnvelope"
+        "403":
+          description: >
+            Public interaction identity hard gate rejected the caller
+            (`PUBLIC_INTERACTION_IDENTITY_REQUIRED`). details include
+            verificationStatus, recoveryPath, and publicInteractionBlocked.
+            No post, moderation case, notification, or audit write occurs.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
         "409":
           description: Community media is fail-closed until the approved media review pipeline is enabled
           content:
@@ -3801,6 +3821,16 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuccessEnvelope"
+        "403":
+          description: >
+            Public interaction identity hard gate or conversation interaction
+            boundary rejected the caller. Identity rejects use
+            `PUBLIC_INTERACTION_IDENTITY_REQUIRED` with recoveryPath and do not
+            write messages, moderation cases, notifications, or order changes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
   /conversations/{id}/media-uploads:
     post:
       tags: [conversations]

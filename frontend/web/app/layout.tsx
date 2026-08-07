@@ -31,17 +31,25 @@ const socialImage = new URL("/og-trust-path.png", siteOrigin).toString();
 export const metadata: Metadata = {
   metadataBase: siteOrigin,
   title: {
-      default: "Talk&Talk｜让每一次倾听，都有安心的边界",
-      template: "%s｜Talk&Talk",
+    default: "Talk&Talk｜有边界的线上陪伴",
+    template: "%s｜Talk&Talk",
   },
-  description: "Talk&Talk 官方网站。女性友好的线上陪伴平台；网页用于了解产品与体验路径，服务入口以微信小程序页面状态为准。",
-  keywords: ["线上陪伴", "情绪倾听", "女性友好", "睡前陪伴", "职场减压", "Talk&Talk官网"],
+  description:
+    "Talk&Talk 官方网站。女性友好的线上陪伴平台：有边界的线上陪伴，从被认真听见开始。官网说明品牌与规则；真实服务请使用微信小程序，App 即将到来。",
+  keywords: ["线上陪伴", "情绪倾听", "女性友好", "睡前陪伴", "职场减压", "Talk&Talk官网", "有边界的陪伴"],
+  icons: {
+    icon: [
+      { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
   alternates: {
     canonical: siteOrigin.toString(),
   },
   openGraph: {
-    title: "Talk&Talk｜认真听你说，也认真守住边界",
-    description: "发现合适的线上陪伴者，平台内预约、沟通与服务。",
+    title: "Talk&Talk｜有边界的线上陪伴，从被认真听见开始",
+    description: "女性友好的线上陪伴平台。服务入口以微信小程序为准，App 即将到来。",
     type: "website",
     locale: "zh_CN",
     url: siteOrigin.toString(),
@@ -57,8 +65,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Talk&Talk｜认真听你说，也认真守住边界",
-    description: "女性友好的线上陪伴服务。",
+    title: "Talk&Talk｜有边界的线上陪伴，从被认真听见开始",
+    description: "女性友好的线上陪伴平台官方网站。服务入口以微信小程序为准，App 即将到来。",
     images: [socialImage],
   },
   robots: {
@@ -74,7 +82,7 @@ const structuredData = {
       "@type": "Organization",
       name: "Talk&Talk",
       url: "https://talkandtalk.app",
-      description: "女性友好的线上陪伴平台官方网站",
+      description: "女性友好的线上陪伴平台：有边界的线上陪伴，从被认真听见开始",
       ...(publicDisclosure.operatorName ? { legalName: publicDisclosure.operatorName } : {}),
       ...(publicDisclosure.contactEmail || publicDisclosure.contactPhone
         ? {
@@ -92,7 +100,7 @@ const structuredData = {
       name: "Talk&Talk",
       url: "https://talkandtalk.app",
       inLanguage: "zh-CN",
-      description: "Talk&Talk 官方网站：有边界的线上陪伴",
+      description: "Talk&Talk 官方网站：女性友好的线上陪伴平台，服务入口以微信小程序为准",
     },
   ],
 };

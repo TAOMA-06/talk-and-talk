@@ -218,7 +218,7 @@ export function ConnectionPulse() {
       onPointerLeave={resetPointer}
     >
       <div className="connection-pulse-topline">
-        <span>Connection signal</span>
+        <span>连接信号</span>
         <span>{activePath.signal}</span>
       </div>
 

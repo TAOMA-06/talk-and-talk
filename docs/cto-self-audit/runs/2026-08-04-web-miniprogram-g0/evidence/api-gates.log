@@ -1,0 +1,670 @@
+=== VERIFICATION PLAN STEP 5: api 2026-08-07T07:27:27Z ===
+HEAD: 9cf5e3849a9654ddfddb8046bf29a580533fa268
+--- e2e env probe ---
+DATABASE_URL set: no
+REDIS_URL set: no
+PONG
+psql: error: connection to server on socket "/tmp/.s.PGSQL.5432" failed: FATAL:  database "taoma" does not exist
+E2E_STATUS: SKIPPED - no DATABASE_URL / default local DB 'taoma' missing; redis PONG only. Plan allows unit-level zero-write + full jest suite.
+--- test:preflight ---
+
+> talk-and-talk-api@0.1.0 test:preflight
+> node --test scripts/deployment-preflight.test.mjs scripts/voice-release-artifacts.test.mjs scripts/cloudbase-template.test.mjs scripts/admin-review-static-assets.test.mjs scripts/staff-offboarding-static-assets.test.mjs scripts/staff-offboarding-concurrency.test.mjs scripts/notification-delivery-claim-concurrency.test.mjs scripts/openapi-controller-contract.test.mjs scripts/finance-terminal-audit-controls.test.mjs scripts/availability-capacity-worker-scale.test.mjs scripts/account-deletion-phased-erasure-scale.test.mjs scripts/account-deletion-auth-tombstone-concurrency.test.mjs scripts/order-refund-policy-snapshots.test.mjs scripts/future-booking-boundary.test.mjs ../../infra/nginx/assert-commercial-surface.mjs
+
+TAP version 13
+# Subtest: nginx example locks /review/ and raises bill-import body size
+ok 1 - nginx example locks /review/ and raises bill-import body size
+  ---
+  duration_ms: 0.682
+  type: 'test'
+  ...
+# Subtest: CloudBase template marks private ingress as required for servicePath=/
+ok 2 - CloudBase template marks private ingress as required for servicePath=/
+  ---
+  duration_ms: 0.144833
+  type: 'test'
+  ...
+# Subtest: account deletion authentication closure is fail-closed in every application layer
+ok 3 - account deletion authentication closure is fail-closed in every application layer
+  ---
+  duration_ms: 3.787125
+  type: 'test'
+  ...
+# Subtest: real PostgreSQL closes login/deletion races and keeps tombstone lookups indexed at scale
+ok 4 - real PostgreSQL closes login/deletion races and keeps tombstone lookups indexed at scale # SKIP set ACCOUNT_DELETION_AUTH_TOMBSTONE_TEST_DATABASE_URL to a disposable PostgreSQL database
+  ---
+  duration_ms: 0.094125
+  type: 'test'
+  ...
+# Subtest: account deletion and retention use persistent bounded erasure controls
+ok 5 - account deletion and retention use persistent bounded erasure controls
+  ---
+  duration_ms: 4.325875
+  type: 'test'
+  ...
+# Subtest: real PostgreSQL keeps high-volume erasure and two-replica claims bounded
+ok 6 - real PostgreSQL keeps high-volume erasure and two-replica claims bounded # SKIP set ACCOUNT_DELETION_TEST_DATABASE_URL, TEST_DATABASE_URL, or DATABASE_URL to a disposable PostgreSQL database
+  ---
+  duration_ms: 0.07875
+  type: 'test'
+  ...
+# Subtest: admin and review static applications preserve separate identity domains
+ok 7 - admin and review static applications preserve separate identity domains
+  ---
+  duration_ms: 0.589667
+  type: 'test'
+  ...
+# Subtest: static HTML is compatible with the same-origin script CSP
+ok 8 - static HTML is compatible with the same-origin script CSP
+  ---
+  duration_ms: 0.335625
+  type: 'test'
+  ...
+# Subtest: commercial admin exposes real queues and controlled mutation safeguards
+ok 9 - commercial admin exposes real queues and controlled mutation safeguards
+  ---
+  duration_ms: 2.317
+  type: 'test'
+  ...
+# Subtest: commercial growth queues paginate independently and assignee search never silently truncates
+ok 10 - commercial growth queues paginate independently and assignee search never silently truncates
+  ---
+  duration_ms: 0.479459
+  type: 'test'
+  ...
+# Subtest: payment reconciliation workbench fails closed and exposes bounded evidence workflows
+ok 11 - payment reconciliation workbench fails closed and exposes bounded evidence workflows
+  ---
+  duration_ms: 1.324125
+  type: 'test'
+  ...
+# Subtest: payment dispute workbench paginates typed evidence and blocks unmatched completion
+ok 12 - payment dispute workbench paginates typed evidence and blocks unmatched completion
+  ---
+  duration_ms: 0.183542
+  type: 'test'
+  ...
+# Subtest: refund and account-deletion queues expose independent bounded pagination
+ok 13 - refund and account-deletion queues expose independent bounded pagination
+  ---
+  duration_ms: 0.870542
+  type: 'test'
+  ...
+# Subtest: data-retention legal holds expose a policy-gated, two-person, paginated admin workbench
+ok 14 - data-retention legal holds expose a policy-gated, two-person, paginated admin workbench
+  ---
+  duration_ms: 0.356417
+  type: 'test'
+  ...
+# Subtest: review workbench exposes assignment, SLA, evidence, and lead-only export controls
+ok 15 - review workbench exposes assignment, SLA, evidence, and lead-only export controls
+  ---
+  duration_ms: 0.308333
+  type: 'test'
+  ...
+# Subtest: review workbench keeps mobile-safe session exit and filter reset on the real client
+ok 16 - review workbench keeps mobile-safe session exit and filter reset on the real client
+  ---
+  duration_ms: 5.575625
+  type: 'test'
+  ...
+# Subtest: review staff operations search and traverse every stable directory page without clearing errors
+ok 17 - review staff operations search and traverse every stable directory page without clearing errors
+  ---
+  duration_ms: 0.361542
+  type: 'test'
+  ...
+# Subtest: commercial staff successor selection uses a bounded endpoint and traverses every reported page
+ok 18 - commercial staff successor selection uses a bounded endpoint and traverses every reported page
+  ---
+  duration_ms: 0.28525
+  type: 'test'
+  ...
+# Subtest: admin and review deep links preserve opaque resource state without URL credentials
+ok 19 - admin and review deep links preserve opaque resource state without URL credentials
+  ---
+  duration_ms: 0.284917
+  type: 'test'
+  ...
+# Subtest: companion appeal controls expose and enforce independent review in the admin workbench
+ok 20 - companion appeal controls expose and enforce independent review in the admin workbench
+  ---
+  duration_ms: 0.183917
+  type: 'test'
+  ...
+# Subtest: ordinary consumer account appeals are a loaded, paginated, independently controlled queue
+ok 21 - ordinary consumer account appeals are a loaded, paginated, independently controlled queue
+  ---
+  duration_ms: 0.348167
+  type: 'test'
+  ...
+# Subtest: customer adult eligibility is an independent, paginated and privacy-bounded review queue
+ok 22 - customer adult eligibility is an independent, paginated and privacy-bounded review queue
+  ---
+  duration_ms: 0.2265
+  type: 'test'
+  ...
+# Subtest: admin and review JavaScript parse without executing
+ok 23 - admin and review JavaScript parse without executing
+  ---
+  duration_ms: 53.509
+  type: 'test'
+  ...
+# Subtest: capacity and reminder workers retain bounded PostgreSQL boundaries
+ok 24 - capacity and reminder workers retain bounded PostgreSQL boundaries
+  ---
+  duration_ms: 3.412792
+  type: 'test'
+  ...
+# Subtest: real PostgreSQL capacity SQL and ten replicas stay bounded and nonoverlapping
+ok 25 - real PostgreSQL capacity SQL and ten replicas stay bounded and nonoverlapping # SKIP set AVAILABILITY_CAPACITY_TEST_DATABASE_URL to a disposable PostgreSQL database
+  ---
+  duration_ms: 0.101041
+  type: 'test'
+  ...
+# Subtest: accepts the reviewed voice-ready CloudBase template
+ok 26 - accepts the reviewed voice-ready CloudBase template
+  ---
+  duration_ms: 1.706625
+  type: 'test'
+  ...
+# Subtest: rejects scale-to-zero and source-controlled runtime credentials
+ok 27 - rejects scale-to-zero and source-controlled runtime credentials
+  ---
+  duration_ms: 7.543959
+  type: 'test'
+  ...
+# Subtest: parses quoted env values without exposing comments
+ok 28 - parses quoted env values without exposing comments
+  ---
+  duration_ms: 0.7395
+  type: 'test'
+  ...
+# Subtest: accepts a complete production Mini Program deployment
+ok 29 - accepts a complete production Mini Program deployment
+  ---
+  duration_ms: 4.075417
+  type: 'test'
+  ...
+# Subtest: fails closed when commercial refund policy approval or bounds are invalid
+ok 30 - fails closed when commercial refund policy approval or bounds are invalid
+  ---
+  duration_ms: 2.138542
+  type: 'test'
+  ...
+# Subtest: uses the authoritative 16-key transactional template manifest
+ok 31 - uses the authoritative 16-key transactional template manifest
+  ---
+  duration_ms: 0.166541
+  type: 'test'
+  ...
+# Subtest: keeps production No-Go until account-deletion retention has external legal approval
+ok 32 - keeps production No-Go until account-deletion retention has external legal approval
+  ---
+  duration_ms: 0.4825
+  type: 'test'
+  ...
+# Subtest: keeps production No-Go until legal-hold policy reasons are externally approved
+ok 33 - keeps production No-Go until legal-hold policy reasons are externally approved
+  ---
+  duration_ms: 0.527541
+  type: 'test'
+  ...
+# Subtest: fails closed for an invalid auth-identity tombstone keyring or re-registration policy
+ok 34 - fails closed for an invalid auth-identity tombstone keyring or re-registration policy
+  ---
+  duration_ms: 0.276334
+  type: 'test'
+  ...
+# Subtest: keeps production No-Go until the crisis resource catalog is approved
+ok 35 - keeps production No-Go until the crisis resource catalog is approved
+  ---
+  duration_ms: 0.226833
+  type: 'test'
+  ...
+# Subtest: keeps production No-Go until daily WeChat bills are approved and bounded
+ok 36 - keeps production No-Go until daily WeChat bills are approved and bounded
+  ---
+  duration_ms: 1.435708
+  type: 'test'
+  ...
+# Subtest: rejects missing, malformed, out-of-range, or inverted consumer JWT TTLs
+ok 37 - rejects missing, malformed, out-of-range, or inverted consumer JWT TTLs
+  ---
+  duration_ms: 0.732625
+  type: 'test'
+  ...
+# Subtest: requires restricted TRTC signing inputs only when real-time voice is enabled
+ok 38 - requires restricted TRTC signing inputs only when real-time voice is enabled
+  ---
+  duration_ms: 0.830834
+  type: 'test'
+  ...
+# Subtest: requires a live availability-reminder template only when the default-off delivery runner is explicitly enabled
+ok 39 - requires a live availability-reminder template only when the default-off delivery runner is explicitly enabled
+  ---
+  duration_ms: 0.383333
+  type: 'test'
+  ...
+# Subtest: rejects external transmission and stale DeepSeek credentials
+ok 40 - rejects external transmission and stale DeepSeek credentials
+  ---
+  duration_ms: 0.234333
+  type: 'test'
+  ...
+# Subtest: fails commercial preflight when the controlled voice-evidence viewer is missing or unsafe
+ok 41 - fails commercial preflight when the controlled voice-evidence viewer is missing or unsafe
+  ---
+  duration_ms: 0.251333
+  type: 'test'
+  ...
+# Subtest: rejects Mini Program release backend or legal constants that drift from production
+ok 42 - rejects Mini Program release backend or legal constants that drift from production
+  ---
+  duration_ms: 0.279416
+  type: 'test'
+  ...
+# Subtest: accepts a CloudBase production deployment with an inline PEM private key
+ok 43 - accepts a CloudBase production deployment with an inline PEM private key
+  ---
+  duration_ms: 0.167375
+  type: 'test'
+  ...
+# Subtest: does not require historical iOS configuration for a Mini Program release
+ok 44 - does not require historical iOS configuration for a Mini Program release
+  ---
+  duration_ms: 0.087292
+  type: 'test'
+  ...
+# Subtest: rejects placeholders, shared JWT secrets, insecure Redis, and missing payment fields
+ok 45 - rejects placeholders, shared JWT secrets, insecure Redis, and missing payment fields
+  ---
+  duration_ms: 0.103709
+  type: 'test'
+  ...
+# Subtest: rejects an unbounded commercial booking horizon
+ok 46 - rejects an unbounded commercial booking horizon
+  ---
+  duration_ms: 0.08425
+  type: 'test'
+  ...
+# Subtest: allows staging Mock payment only when all real payment fields are empty
+ok 47 - allows staging Mock payment only when all real payment fields are empty
+  ---
+  duration_ms: 0.221834
+  type: 'test'
+  ...
+# Subtest: finance terminal migration encodes immutable evidence and concurrency controls
+ok 48 - finance terminal migration encodes immutable evidence and concurrency controls
+  ---
+  duration_ms: 2.490666
+  type: 'test'
+  ...
+# Subtest: real PostgreSQL serializes finance approvals and append races
+ok 49 - real PostgreSQL serializes finance approvals and append races # SKIP set FINANCE_MIGRATION_TEST_DATABASE_URL to a disposable PostgreSQL database
+  ---
+  duration_ms: 0.178375
+  type: 'test'
+  ...
+# Subtest: future-booking boundary stores only the active companion/customer pair
+ok 50 - future-booking boundary stores only the active companion/customer pair
+  ---
+  duration_ms: 0.849625
+  type: 'test'
+  ...
+# Subtest: mutation, order and recommendation paths close the privacy and race boundaries
+ok 51 - mutation, order and recommendation paths close the privacy and race boundaries
+  ---
+  duration_ms: 0.359417
+  type: 'test'
+  ...
+# Subtest: public contract and mini program expose only the companion-owned future-only control
+ok 52 - public contract and mini program expose only the companion-owned future-only control
+  ---
+  duration_ms: 23.7625
+  type: 'test'
+  ...
+# Subtest: notification delivery uses bounded stable SKIP LOCKED claim and recovery
+ok 53 - notification delivery uses bounded stable SKIP LOCKED claim and recovery
+  ---
+  duration_ms: 3.225458
+  type: 'test'
+  ...
+# Subtest: ten PostgreSQL replicas claim 10,000 due deliveries without overlap and recover bounded leases
+ok 54 - ten PostgreSQL replicas claim 10,000 due deliveries without overlap and recover bounded leases # SKIP set NOTIFICATION_DELIVERY_CLAIM_TEST_DATABASE_URL to a disposable PostgreSQL database
+  ---
+  duration_ms: 0.193583
+  type: 'test'
+  ...
+# Subtest: OpenAPI covers every Nest route and its actual success status
+ok 55 - OpenAPI covers every Nest route and its actual success status
+  ---
+  duration_ms: 81.756667
+  type: 'test'
+  ...
+# Subtest: OpenAPI operation ids and local references remain resolvable
+ok 56 - OpenAPI operation ids and local references remain resolvable
+  ---
+  duration_ms: 15.019458
+  type: 'test'
+  ...
+# Subtest: refund review and account deletion list contracts declare bounded pagination
+ok 57 - refund review and account deletion list contracts declare bounded pagination
+  ---
+  duration_ms: 9.919875
+  type: 'test'
+  ...
+# Subtest: review and commercial staff directories declare strict bounded search contracts
+ok 58 - review and commercial staff directories declare strict bounded search contracts
+  ---
+  duration_ms: 9.005834
+  type: 'test'
+  ...
+# Subtest: companion appeal contract declares bounded pagination and a typed queue
+ok 59 - companion appeal contract declares bounded pagination and a typed queue
+  ---
+  duration_ms: 9.536458
+  type: 'test'
+  ...
+# Subtest: account deletion contracts expose the caller status and versioned SLA facts
+ok 60 - account deletion contracts expose the caller status and versioned SLA facts
+  ---
+  duration_ms: 8.759875
+  type: 'test'
+  ...
+# Subtest: consumer login declares generic identity-unavailable and key-coverage failures
+ok 61 - consumer login declares generic identity-unavailable and key-coverage failures
+  ---
+  duration_ms: 9.503667
+  type: 'test'
+  ...
+# Subtest: commercial readiness contract exposes notification, reminder, appeal, and retention blockers
+ok 62 - commercial readiness contract exposes notification, reminder, appeal, and retention blockers
+  ---
+  duration_ms: 8.890125
+  type: 'test'
+  ...
+# Subtest: WeChat reconciliation contract exposes full coverage, provider-time, and two-person evidence gates
+ok 63 - WeChat reconciliation contract exposes full coverage, provider-time, and two-person evidence gates
+  ---
+  duration_ms: 9.017291
+  type: 'test'
+  ...
+# Subtest: finance terminal controls declare all eight bounded and typed operations
+ok 64 - finance terminal controls declare all eight bounded and typed operations
+  ---
+  duration_ms: 8.876166
+  type: 'test'
+  ...
+# Subtest: ordinary-user account actions require private immutable evidence without leaking it publicly
+ok 65 - ordinary-user account actions require private immutable evidence without leaking it publicly
+  ---
+  duration_ms: 8.428667
+  type: 'test'
+  ...
+# Subtest: future-booking boundaries are companion-owned, reason-free and existing-record safe
+ok 66 - future-booking boundaries are companion-owned, reason-free and existing-record safe
+  ---
+  duration_ms: 8.999334
+  type: 'test'
+  ...
+# Subtest: refund policy snapshot migration and decision paths stay fail closed
+ok 67 - refund policy snapshot migration and decision paths stay fail closed
+  ---
+  duration_ms: 4.104959
+  type: 'test'
+  ...
+# Subtest: real PostgreSQL deterministically backfills and enforces immutable refund snapshots
+ok 68 - real PostgreSQL deterministically backfills and enforces immutable refund snapshots # SKIP set REFUND_POLICY_MIGRATION_TEST_DATABASE_URL to a disposable PostgreSQL database
+  ---
+  duration_ms: 0.211833
+  type: 'test'
+  ...
+# Subtest: staff offboarding keeps set handoff and credential-lock concurrency guards
+ok 69 - staff offboarding keeps set handoff and credential-lock concurrency guards
+  ---
+  duration_ms: 2.842542
+  type: 'test'
+  ...
+# Subtest: real PostgreSQL rejects an assignment racing a committed staff suspension
+ok 70 - real PostgreSQL rejects an assignment racing a committed staff suspension # SKIP set STAFF_OFFBOARDING_TEST_DATABASE_URL to a disposable PostgreSQL database
+  ---
+  duration_ms: 0.095416
+  type: 'test'
+  ...
+# Subtest: commercial StaffCredential offboarding is server-authoritative and ReviewStaff-independent
+ok 71 - commercial StaffCredential offboarding is server-authoritative and ReviewStaff-independent
+  ---
+  duration_ms: 4.922083
+  type: 'test'
+  ...
+# Subtest: commercial admin UI and OpenAPI expose a deliberate confirmed handoff flow
+ok 72 - commercial admin UI and OpenAPI expose a deliberate confirmed handoff flow
+  ---
+  duration_ms: 5.126583
+  type: 'test'
+  ...
+# Subtest: accepts a complete backend signer and Mini Program RTC build fixture
+ok 73 - accepts a complete backend signer and Mini Program RTC build fixture
+  ---
+  duration_ms: 16.248292
+  type: 'test'
+  ...
+# Subtest: reports a missing locked signer and Mini Program npm build output
+ok 74 - reports a missing locked signer and Mini Program npm build output
+  ---
+  duration_ms: 8.4935
+  type: 'test'
+  ...
+1..74
+# tests 74
+# suites 0
+# pass 67
+# fail 0
+# cancelled 0
+# skipped 7
+# todo 0
+# duration_ms 422.494334
+PREFLIGHT_EXIT:0
+--- build ---
+
+> talk-and-talk-api@0.1.0 build
+> npm run prisma:generate && tsc -p tsconfig.build.json && node scripts/copy-public-assets.mjs
+
+
+> talk-and-talk-api@0.1.0 prisma:generate
+> prisma generate
+
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma/schema.prisma.
+
+✔ Generated Prisma Client (7.9.0) to ./generated/prisma in 453ms
+
+BUILD_EXIT:0
+--- test ---
+
+> talk-and-talk-api@0.1.0 test
+> npm run prisma:generate && jest --runInBand
+
+
+> talk-and-talk-api@0.1.0 prisma:generate
+> prisma generate
+
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma/schema.prisma.
+
+✔ Generated Prisma Client (7.9.0) to ./generated/prisma in 433ms
+
+PASS src/users/public-interaction-identity.gate.spec.ts
+PASS src/auth/auth.service.spec.ts
+PASS src/payments/wechat/real-wechat-pay.provider.spec.ts
+PASS src/conversations/conversations.delivery.spec.ts
+PASS src/orders/orders.service.spec.ts
+PASS src/auth/auth.controller.spec.ts
+PASS src/recommendations/recommendations.service.spec.ts
+PASS src/admin/admin.controller.roles.spec.ts
+PASS src/review/review-auth.service.spec.ts
+PASS src/commercial/commercial.service.spec.ts
+PASS src/reviews/reviews.controller.spec.ts
+PASS src/payments/wechat-daily-reconciliation.service.spec.ts
+PASS src/users/account-deletion-execution.worker.spec.ts
+PASS src/review/review-moderation.controller.spec.ts
+PASS src/commercial/companion-lifecycle.service.spec.ts
+PASS src/users/users.service.spec.ts
+PASS src/admin/commercial/admin-commercial.controller.spec.ts
+PASS src/attendance-disputes/attendance-disputes.service.spec.ts
+PASS src/payments/wechat/wechat-pay-statements.provider.spec.ts
+PASS src/account-governance/account-governance.service.spec.ts
+PASS src/admin/admin-operations.controller.spec.ts
+PASS src/moderation/moderation.controller.spec.ts
+PASS src/moderation/moderation-case.service.spec.ts
+PASS src/orders/orders.controller.spec.ts
+PASS src/community/community.service.spec.ts
+PASS src/favorites/availability-reminder-delivery.runner.spec.ts
+PASS src/community/community-reports.controller.spec.ts
+[Nest] 62502  - 08/07/2026, 3:27:39 PM     LOG [AvailabilityReminderDeliveryRunner] Availability reminder delivery scanned=2 recovered=2 authorized=0 sent=0 skipped=0 failedBeforeSend=0 rejected=0 uncertain=2 inFlight=0 notReady=0 errors=0 retryScheduled=0 failed=0 leaseLost=0
+[Nest] 62502  - 08/01/2026, 4:00:30 PM     LOG [AvailabilityReminderDeliveryRunner] Availability reminder delivery scanned=2 recovered=0 authorized=2 sent=2 skipped=0 failedBeforeSend=0 rejected=0 uncertain=0 inFlight=0 notReady=0 errors=0 retryScheduled=0 failed=0 leaseLost=0
+[Nest] 62502  - 08/01/2026, 4:02:01 PM     LOG [AvailabilityReminderDeliveryRunner] Availability reminder delivery scanned=1 recovered=0 authorized=0 sent=0 skipped=0 failedBeforeSend=0 rejected=0 uncertain=0 inFlight=0 notReady=0 errors=1 retryScheduled=1 failed=0 leaseLost=0
+PASS src/commercial/companion-lifecycle.controller.spec.ts
+PASS src/favorites/favorites.controller.spec.ts
+PASS src/account-governance/account-governance.controller.spec.ts
+[Nest] 62502  - 08/07/2026, 3:27:40 PM   ERROR [PaymentsService] Failed to reconcile processing refund r-mismatch (AppException)
+[Nest] 62502  - 08/07/2026, 3:27:40 PM   ERROR [PaymentsService] Failed to reconcile expired prepay p-refund (AppException)
+PASS src/payments/payments.service.spec.ts
+PASS src/companions/companions.controller.spec.ts
+PASS src/payments/payments.controller.spec.ts
+PASS src/admin/commercial/admin-payment-reconciliation.controller.spec.ts
+PASS src/favorites/availability-reminder-operations.controller.spec.ts
+PASS src/legal/data-retention.worker.spec.ts
+PASS src/companions/companions.service.spec.ts
+PASS src/legal/data-retention-legal-hold.controller.spec.ts
+PASS src/admin/staff-offboarding.service.spec.ts
+PASS src/users/me.controller.spec.ts
+PASS src/payments/payment-disputes.controller.spec.ts
+PASS src/review/review-case.service.spec.ts
+PASS src/conversations/conversations.service.spec.ts
+PASS src/payments/admin-payment-disputes.controller.spec.ts
+PASS src/crisis-intervention/crisis-intervention.controller.spec.ts
+PASS src/voice/voice.service.spec.ts
+PASS src/account-governance/user-account-actions.service.spec.ts
+PASS src/moderation/media/media-moderation.worker.spec.ts
+PASS src/payments/payments-reconciliation.worker.spec.ts
+PASS src/account-governance/data-export-delivery.controller.spec.ts
+PASS src/legal/data-retention-legal-hold.service.spec.ts
+PASS src/config/configuration.spec.ts
+PASS src/moderation/media/controlled-case-evidence.service.spec.ts
+PASS src/auth/guards/jwt-auth.guard.spec.ts
+PASS src/favorites/availability-reminder-terminal-resolution.service.spec.ts
+PASS src/reviews/reviews.service.spec.ts
+PASS src/orders/order-reschedule-expiry.worker.spec.ts
+PASS src/auth/strategies/jwt.strategy.spec.ts
+PASS src/users/customer-adult-eligibility.service.spec.ts
+PASS src/notifications/notification-delivery.worker.spec.ts
+PASS src/favorites/availability-reminder-preparation.service.spec.ts
+PASS src/moderation/media/media-asset.service.spec.ts
+[Nest] 62502  - 08/07/2026, 3:27:42 PM    WARN [NotificationDeliveryWorker] Notification delivery d1 failed (DELIVERY_UNKNOWN).
+[Nest] 62502  - 08/07/2026, 3:27:42 PM    WARN [NotificationDeliveryWorker] Marked 8 expired notification lease(s) failed to avoid duplicate delivery.
+[Nest] 62502  - 08/07/2026, 3:27:42 PM    WARN [NotificationDeliveryWorker] Notification delivery d-missing-template failed before send (unknown template).
+PASS src/favorites/recently-viewed-companions.controller.spec.ts
+PASS src/review/review-staff-offboarding.service.spec.ts
+PASS src/review/review-moderation.service.spec.ts
+PASS src/payments/payment-disputes.service.spec.ts
+PASS src/health/health.controller.spec.ts
+PASS src/notifications/wechat/wechat-subscribe-message.provider.spec.ts
+PASS src/support/support.service.spec.ts
+PASS src/review/guards/review-jwt-auth.guard.spec.ts
+PASS src/account-governance/data-export-delivery.service.spec.ts
+PASS src/notifications/wechat/wechat-subscription.service.spec.ts
+PASS src/common/audit/audit.service.spec.ts
+PASS src/voice/voice-room-control.service.spec.ts
+PASS src/admin/identity-verification.service.spec.ts
+PASS src/favorites/favorites.service.spec.ts
+[Nest] 62502  - 08/07/2026, 3:27:42 PM    WARN [VoiceRoomControlService] Voice-room termination retry scheduled (provider_invalid_response).
+[Nest] 62502  - 08/07/2026, 3:27:42 PM    WARN [VoiceRoomControlService] Voice-room termination retry scheduled (UnauthorizedOperation.SdkAppId).
+[Nest] 62502  - 08/07/2026, 3:27:42 PM    WARN [VoiceRoomControlService] Voice-room termination retry scheduled (provider_invalid_response).
+[Nest] 62502  - 08/07/2026, 3:27:42 PM    WARN [VoiceRoomControlService] Voice-room termination retry scheduled (http_503).
+PASS src/notifications/notifications.service.spec.ts
+PASS src/moderation/moderation.service.spec.ts
+PASS src/favorites/availability-reminder-preparation.runner.spec.ts
+PASS src/favorites/availability-reminder-preflight.service.spec.ts
+PASS src/favorites/availability-reminder-attempt-consumption.service.spec.ts
+[Nest] 62502  - 08/07/2026, 3:27:43 PM     LOG [AvailabilityReminderPreparationRunner] Availability reminder preparation scanned=4 eligible=4 skipped=0 handedOff=4 alreadyHandedOff=0 disappeared=0 retryScheduled=0 failed=0 leaseLost=0
+[Nest] 62502  - 08/07/2026, 3:27:43 PM     LOG [AvailabilityReminderPreparationRunner] Availability reminder reservation scanned=5 reserved=5 alreadyProcessed=0 skipped=0 disappeared=0 retryScheduled=0 failed=0 leaseLost=0
+PASS src/favorites/availability-reminder-handoff.service.spec.ts
+PASS src/favorites/availability-reminder-attempt-delivery.service.spec.ts
+PASS src/crisis-intervention/crisis-intervention.service.spec.ts
+PASS src/companions/companion-recurring-availability-draft-materializer.service.spec.ts
+PASS src/payments/wechat-daily-reconciliation.worker.spec.ts
+PASS src/legal/legal.controller.spec.ts
+PASS src/companions/companion-availability-schedule-rule.service.spec.ts
+[Nest] 62502  - 08/07/2026, 3:27:43 PM     LOG [WeChatDailyReconciliationWorker] WeChat daily bill reconciliation scheduled 4 and processed 0 run(s).
+[Nest] 62502  - 08/07/2026, 3:27:43 PM    WARN [WeChatDailyReconciliationWorker] WeChat daily bill reconciliation recorded 1 failed run(s).
+[Nest] 62502  - 08/07/2026, 3:27:43 PM     LOG [WeChatDailyReconciliationWorker] WeChat daily bill reconciliation scheduled 4 and processed 4 run(s).
+PASS src/favorites/availability-reminder-fanout.service.spec.ts
+PASS src/legal/legal-document-archive.service.spec.ts
+PASS src/voice/voice-room-termination.worker.spec.ts
+PASS src/support/public-support.controller.spec.ts
+PASS src/favorites/availability-reminder-worker-retry.service.spec.ts
+[Nest] 62502  - 08/07/2026, 3:27:43 PM     LOG [VoiceRoomTerminationWorker] Terminated 2 voice room(s).
+PASS src/favorites/availability-reminder-reservation.service.spec.ts
+PASS src/favorites/availability-reminder-attempt.service.spec.ts
+PASS src/commercial/commercial-funnel.service.spec.ts
+PASS src/moderation/media/controlled-case-evidence.worker.spec.ts
+PASS src/common/validation/sensitive-operational-dtos.spec.ts
+PASS src/moderation/chat-restriction.service.spec.ts
+PASS src/auth/guards/roles.guard.spec.ts
+PASS src/payments/wechat-bill-parser.spec.ts
+PASS src/metrics/metrics.controller.spec.ts
+PASS src/auth/auth-identity-tombstone.service.spec.ts
+PASS src/payments/wechat/payments-provider.factory.spec.ts
+PASS src/common/rate-limit/ip-rate-limit.middleware.spec.ts
+PASS src/review/dto/list-review-staff.dto.spec.ts
+PASS src/payments/dto/review-refund.dto.spec.ts
+PASS src/health/health.service.spec.ts
+PASS src/commercial/dto/companion-lifecycle.dto.spec.ts
+PASS src/users/dto/legal-consent.dto.spec.ts
+PASS src/payments/dto/wechat-daily-reconciliation.dto.spec.ts
+PASS src/admin/dto/staff-offboarding.dto.spec.ts
+PASS src/account-governance/dto/user-account-appeal.dto.spec.ts
+PASS src/review/dto/list-review-conversation-evidence.dto.spec.ts
+PASS src/users/dto/update-me.dto.spec.ts
+PASS src/legal/dto/data-retention-legal-hold.dto.spec.ts
+PASS src/companions/dto/list-companions.dto.spec.ts
+PASS src/common/validation/sensitive-free-text.spec.ts
+PASS src/common/envelope/envelope.interceptor.spec.ts
+PASS src/review/dto/export-review-labels.dto.spec.ts
+PASS src/orders/dto/list-order-timeline.dto.spec.ts
+PASS src/moderation/ai/deepseek.provider.spec.ts
+PASS src/companions/dto/list-service-offerings.dto.spec.ts
+PASS src/admin/dto/account-deletion.dto.spec.ts
+PASS src/favorites/availability-reminder-candidate.service.spec.ts
+PASS src/commercial/companion-commercial-eligibility.spec.ts
+PASS src/review/dto/suspend-review-staff.dto.spec.ts
+PASS src/companions/dto/manage-recurring-availability-draft.dto.spec.ts
+PASS src/companions/dto/companion-profile.dto.spec.ts
+PASS src/common/middleware/request-id.middleware.spec.ts
+PASS src/users/account-deletion-retained-snapshot.registry.spec.ts
+PASS src/common/errors/http-exception.filter.spec.ts
+PASS src/metrics/metrics.service.spec.ts
+PASS src/common/audit/audit-subject-reference.spec.ts
+PASS src/common/privacy/bounded-erasure.spec.ts
+PASS src/legal/account-deletion-retention-legacy-repair.spec.ts
+PASS src/auth/staff-auth.crypto.spec.ts
+PASS src/config/first-release-capability-matrix.spec.ts
+PASS src/common/account-deletion-policy.spec.ts
+PASS src/payments/wechat/mock-wechat-pay.complaints.spec.ts
+PASS src/moderation/rule-engine.spec.ts
+PASS src/common/logging/redact.spec.ts
+PASS src/config/cors.spec.ts
+
+Test Suites: 143 passed, 143 total
+Tests:       1298 passed, 1298 total
+Snapshots:   0 total
+Time:        12.57 s, estimated 13 s
+Ran all test suites.
+TEST_EXIT:0
+--- git diff --check ---
+DIFFCHECK_EXIT:0
+API_GATES_DONE

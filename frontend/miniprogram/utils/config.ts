@@ -92,3 +92,13 @@ export function clientChatMediaEnabled(serverEnabled: boolean): boolean {
 export function clientRealtimeVoiceEnabled(): boolean {
   return !isCommercialTextOnly();
 }
+
+/** Voice intro playback/edit is part of the global text-only fail-closed matrix. */
+export function clientVoiceIntroEnabled(): boolean {
+  return !isCommercialTextOnly();
+}
+
+/** Voice SKU create/activate is unreachable while text-only is on. */
+export function clientVoiceSkuEnabled(): boolean {
+  return !isCommercialTextOnly();
+}

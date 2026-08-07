@@ -1,0 +1,30 @@
+=== SHARED P0 + voice-intro real path 2026-08-07T07:49:57Z ===
+HEAD: 9cf5e3849a9654ddfddb8046bf29a580533fa268
+
+> talk-and-talk-api@0.1.0 test
+> npm run prisma:generate && jest --runInBand --testPathPattern=public-interaction-identity|first-release-capability|community.service.spec|conversations.service.spec|conversations.delivery.spec|recommendations.service.spec|companions.service.spec --runInBand
+
+
+> talk-and-talk-api@0.1.0 prisma:generate
+> prisma generate
+
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma/schema.prisma.
+
+✔ Generated Prisma Client (7.9.0) to ./generated/prisma in 507ms
+
+PASS src/companions/companions.service.spec.ts
+PASS src/users/public-interaction-identity.gate.spec.ts
+PASS src/conversations/conversations.delivery.spec.ts
+PASS src/community/community.service.spec.ts
+PASS src/conversations/conversations.service.spec.ts
+PASS src/recommendations/recommendations.service.spec.ts
+PASS src/config/first-release-capability-matrix.spec.ts
+
+Test Suites: 7 passed, 7 total
+Tests:       115 passed, 115 total
+Snapshots:   0 total
+Time:        2.701 s, estimated 5 s
+Ran all test suites matching /public-interaction-identity|first-release-capability|community.service.spec|conversations.service.spec|conversations.delivery.spec|recommendations.service.spec|companions.service.spec/i.
+STEP2_EXIT:0

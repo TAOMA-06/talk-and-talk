@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { enforcePageSurface } from "../../lib/enforce-web-surface";
 import DemoExperience, { type DemoStageId } from "../../components/DemoExperience";
 
 const demoStages: DemoStageId[] = ["discover", "booking", "delivery", "support"];
@@ -24,6 +25,7 @@ export default async function DemoPage({
 }: {
   searchParams: Promise<{ stage?: string }>;
 }) {
+  enforcePageSurface("/demo");
   const { stage } = await searchParams;
   return <DemoExperience initialStageId={isDemoStageId(stage) ? stage : undefined} />;
 }

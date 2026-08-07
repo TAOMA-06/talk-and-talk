@@ -68,6 +68,7 @@ describe("RecommendationsService", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    delete process.env.RECOMMENDATION_PERSONALIZATION_ENABLED;
     prisma.$transaction.mockImplementation(async (callback: (tx: typeof prisma) => unknown) => callback(prisma));
     prisma.$queryRaw.mockResolvedValue([]);
     prisma.userCompanionRecommendationExclusion.findMany.mockResolvedValue([]);
@@ -81,6 +82,7 @@ describe("RecommendationsService", () => {
   });
 
   it("persists a ranked request snapshot and returns an opaque impression id", async () => {
+    process.env.RECOMMENDATION_PERSONALIZATION_ENABLED = "true";
     const request = {
       id: "request-1",
       algorithmVersion: "companion-ranking-v1",
@@ -219,12 +221,73 @@ describe("RecommendationsService", () => {
     const result = await service.listCompanions("u1", { placement: "discoverHome", pageSize: 10 });
 
     expect(result).toEqual(expect.objectContaining({
-      personalized: true,
+      personalized: false,
       items: [],
       pagination: expect.objectContaining({ pageSize: 10, total: 0, nextCursor: null })
     }));
     expect(prisma.companionProfile.findMany).not.toHaveBeenCalled();
     expect(prisma.recommendationRequest.create).not.toHaveBeenCalled();
+  });
+
+  it("ignores stored personalization opt-in while ranking governance is closed", async () => {
+    prisma.userRecommendationPreference.findUnique.mockResolvedValue({
+      personalizationEnabled: true,
+      topicIds: ["t1"],
+      city: null,
+      maxPricePerHalfHour: null,
+      preferredTimeSlots: []
+    });
+    prisma.userRecommendationTag.findMany.mockResolvedValue([
+      { id: "tag-1", topicId: "t1", weight: 2, source: "behavioral", disabledAt: null, updatedAt: new Date() }
+    ]);
+    prisma.order.findMany.mockResolvedValue([{ themeId: "t1", status: "completed", createdAt: new Date() }]);
+    companions.findSellableCompanions.mockResolvedValue([]);
+
+    await expect(service.getPreferences("u1")).resolves.toEqual(
+      expect.objectContaining({
+        personalizationEnabled: false,
+        personalizationRankingAllowed: false,
+        behavioralTags: []
+      })
+    );
+    await expect(service.listCompanions("u1", { pageSize: 10 })).resolves.toEqual(
+      expect.objectContaining({ personalized: false })
+    );
+  });
+
+  it("defaults personalization off when preference is missing and keeps create opt-in only", async () => {
+    prisma.userRecommendationPreference.findUnique.mockResolvedValue(null);
+    prisma.userRecommendationTag.findMany.mockResolvedValue([]);
+    prisma.order.findMany.mockResolvedValue([]);
+
+    await expect(service.getPreferences("u1")).resolves.toEqual(
+      expect.objectContaining({ personalizationEnabled: false })
+    );
+
+    prisma.userRecommendationPreference.upsert.mockResolvedValue({
+      personalizationEnabled: false,
+      topicIds: [],
+      city: null,
+      maxPricePerHalfHour: null,
+      preferredTimeSlots: []
+    });
+    prisma.userRecommendationPreference.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        personalizationEnabled: false,
+        topicIds: [],
+        city: null,
+        maxPricePerHalfHour: null,
+        preferredTimeSlots: []
+      });
+
+    await service.updatePreferences("u1", {});
+
+    expect(prisma.userRecommendationPreference.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ personalizationEnabled: false })
+      })
+    );
   });
 
   it("excludes a private user-selected companion before candidate ranking while leaving the public catalog out of scope", async () => {
@@ -475,6 +538,7 @@ describe("RecommendationsService", () => {
   });
 
   it("records a first click once and builds behavioral topics without using message content", async () => {
+    process.env.RECOMMENDATION_PERSONALIZATION_ENABLED = "true";
     prisma.userRecommendationPreference.findUnique.mockResolvedValue({ personalizationEnabled: true });
     prisma.recommendationImpression.findMany.mockResolvedValue([{
       id: "00000000-0000-4000-8000-000000000001",

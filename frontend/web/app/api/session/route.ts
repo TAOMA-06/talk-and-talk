@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { enforceApiSurface } from "../../../lib/enforce-web-surface";
 import {
   ACCESS_COOKIE,
   REFRESH_COOKIE,
@@ -12,6 +13,9 @@ import {
 import type { AuthUser } from "../../../lib/types";
 
 export async function GET(request: Request) {
+  const surfaceRefusal = enforceApiSurface("/api/session");
+  if (surfaceRefusal) return surfaceRefusal;
+
   const cookies = parseCookies(request.headers.get("cookie"));
   let accessToken = cookies[ACCESS_COOKIE];
   let refreshToken = cookies[REFRESH_COOKIE];

@@ -26,4 +26,4 @@ export const hasVerifiedPublicDisclosure = Boolean(
   && publicDisclosure.complaintChannel,
 );
 
-export const PUBLIC_SITE_CONTENT_UPDATED_AT = new Date("2026-08-01T00:00:00.000Z");
+export const PUBLIC_SITE_CONTENT_UPDATED_AT = new Date("2026-08-04T00:00:00.000Z");

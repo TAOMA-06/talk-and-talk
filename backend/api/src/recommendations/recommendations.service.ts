@@ -29,6 +29,18 @@ export const MAX_BEHAVIOR_ORDER_FACTS = 1_000;
 const HALF_LIFE_DAYS = 30;
 const MAX_CANDIDATES = 200;
 
+/**
+ * P0-14 / MP-D07: ranking personalization stays off until algorithm governance
+ * explicitly enables it. Stored user preference alone cannot re-open behavioral
+ * ranking for the first-release candidate.
+ */
+export function isRecommendationPersonalizationRankingAllowed(
+  env: NodeJS.ProcessEnv = process.env
+): boolean {
+  const flag = (env.RECOMMENDATION_PERSONALIZATION_ENABLED || "").trim().toLowerCase();
+  return flag === "1" || flag === "true" || flag === "yes";
+}
+
 type CompanionCandidate = {
   id: string;
   name: string;
@@ -142,9 +154,13 @@ export class RecommendationsService {
         updatedAt: null
       }));
 
+    const rankingAllowed = isRecommendationPersonalizationRankingAllowed();
     return {
       ...preference,
-      behavioralTags: [...activeTags, ...inferredTags]
+      // Effective ranking flag: stored opt-in cannot enable ranking while P0-14 is closed.
+      personalizationEnabled: rankingAllowed && preference.personalizationEnabled,
+      personalizationRankingAllowed: rankingAllowed,
+      behavioralTags: rankingAllowed ? [...activeTags, ...inferredTags] : []
     };
   }
 
@@ -159,7 +175,8 @@ export class RecommendationsService {
       where: { userId },
       create: {
         userId,
-        personalizationEnabled: dto.personalizationEnabled ?? true,
+        // MP-D07 / P0-14: personalization stays off unless the caller opts in.
+        personalizationEnabled: dto.personalizationEnabled ?? false,
         topicIds: normalizedTopics ?? [],
         city: city ?? null,
         maxPricePerHalfHour: maxPricePerHalfHour ?? null,
@@ -283,7 +300,9 @@ export class RecommendationsService {
     const placement = query.placement ?? "discoverHome";
     const preferenceRecord = await this.prisma.userRecommendationPreference.findUnique({ where: { userId } });
     const preference = this.asPreference(preferenceRecord);
-    const personalized = preference.personalizationEnabled;
+    // Behavioral tags / order history must not rank until governance re-enables ranking.
+    const personalized =
+      isRecommendationPersonalizationRankingAllowed() && preference.personalizationEnabled;
     const now = new Date();
     const sellableMatches = await this.companions.findSellableCompanions(
       query.themeId ? { topicId: query.themeId } : {},
@@ -389,7 +408,9 @@ export class RecommendationsService {
       this.prisma.userRecommendationPreference.findUnique({ where: { userId } })
     ]);
     const byId = new Map(impressions.map((impression: any) => [impression.id, impression]));
-    const personalizationEnabled = this.asPreference(preference).personalizationEnabled;
+    const personalizationEnabled =
+      isRecommendationPersonalizationRankingAllowed()
+      && this.asPreference(preference).personalizationEnabled;
     const now = new Date();
     let updated = 0;
 
@@ -446,6 +467,7 @@ export class RecommendationsService {
 
   /** A confirmed order is a stronger signal than a card click, unless the user removed that tag. */
   async recordOrderCreated(userId: string, topicIds: string[]) {
+    if (!isRecommendationPersonalizationRankingAllowed()) return;
     const preference = await this.prisma.userRecommendationPreference.findUnique({ where: { userId } });
     if (!this.asPreference(preference).personalizationEnabled) return;
     await this.addBehavioralSignal(userId, topicIds, 3);
@@ -920,7 +942,9 @@ export class RecommendationsService {
 
   private asPreference(value: any): Preference {
     return {
-      personalizationEnabled: value?.personalizationEnabled !== false,
+      // Missing preference rows and non-true values default to off so ranking
+      // never uses behavior tags until the user explicitly enables personalization.
+      personalizationEnabled: value?.personalizationEnabled === true,
       topicIds: normalizeTopicIds(value?.topicIds),
       city: value?.city ?? null,
       maxPricePerHalfHour: value?.maxPricePerHalfHour ?? null,

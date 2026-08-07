@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { enforceApiSurface } from "../../../../lib/enforce-web-surface";
 import {
   ACCESS_COOKIE,
   REFRESH_COOKIE,
@@ -9,6 +10,9 @@ import {
 } from "../../../../lib/server-api";
 
 export async function POST(request: Request) {
+  const surfaceRefusal = enforceApiSurface("/api/session");
+  if (surfaceRefusal) return surfaceRefusal;
+
   const cookies = parseCookies(request.headers.get("cookie"));
   const accessToken = cookies[ACCESS_COOKIE];
   const refreshToken = cookies[REFRESH_COOKIE];

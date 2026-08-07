@@ -3,6 +3,11 @@ import { clientChatMediaEnabled } from "../../utils/config";
 import { openCrisisResources } from "../../utils/crisis-gate";
 import { ChatMessage } from "../../utils/models";
 import { ensurePrivacyAuthorization } from "../../utils/privacy";
+import {
+  isPublicInteractionIdentityError,
+  publicInteractionErrorUserMessage,
+  publicInteractionRecoveryPath
+} from "../../utils/public-interaction-errors";
 import { sha256Hex } from "../../utils/sha256";
 import { requestTransactionalSubscriptions } from "../../utils/subscription";
 
@@ -358,6 +363,21 @@ Page({
     if ((error as ApiError)?.code === "CONVERSATION_INTERACTION_UNAVAILABLE") {
       this.setData({ messageInteractionAvailable: false });
       wx.showToast({ title: "当前会话无法继续收发消息", icon: "none" });
+      return;
+    }
+    if (isPublicInteractionIdentityError(error as ApiError)) {
+      const recoveryPath = publicInteractionRecoveryPath(error as ApiError);
+      wx.showModal({
+        title: "需要完成身份核验",
+        content: publicInteractionErrorUserMessage(error as ApiError),
+        confirmText: "去核验",
+        cancelText: "稍后",
+        success: (result) => {
+          if (result.confirm && recoveryPath?.startsWith("/pages/")) {
+            wx.navigateTo({ url: recoveryPath, fail: () => wx.switchTab({ url: recoveryPath }) });
+          }
+        }
+      });
       return;
     }
     wx.showToast({ title: (error as Error).message || fallback, icon: "none" });

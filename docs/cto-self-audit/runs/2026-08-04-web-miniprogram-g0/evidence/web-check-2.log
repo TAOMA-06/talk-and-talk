@@ -1,0 +1,253 @@
+
+> talk-and-talk-web@1.0.0 check
+> npm run typecheck && npm run lint && npm test
+
+
+> talk-and-talk-web@1.0.0 typecheck
+> tsc --noEmit
+
+
+> talk-and-talk-web@1.0.0 lint
+> eslint . --ignore-pattern dist --ignore-pattern .next
+
+
+> talk-and-talk-web@1.0.0 test
+> node --test tests/web-surface-policy.test.mjs tests/miniprogram-entry.test.mjs && npm run build && node --test tests/rendered-html.test.mjs
+
+TAP version 13
+# Subtest: missing config yields honest search fallback
+ok 1 - missing config yields honest search fallback
+  ---
+  duration_ms: 0.382583
+  type: 'test'
+  ...
+# Subtest: allowlisted https QR is accepted
+ok 2 - allowlisted https QR is accepted
+  ---
+  duration_ms: 0.330417
+  type: 'test'
+  ...
+# Subtest: non-allowlisted QR host falls back
+ok 3 - non-allowlisted QR host falls back
+  ---
+  duration_ms: 0.084917
+  type: 'test'
+  ...
+# Subtest: weixin scheme path is accepted
+ok 4 - weixin scheme path is accepted
+  ---
+  duration_ms: 0.039708
+  type: 'test'
+  ...
+# Subtest: javascript or bare tokens are not promoted to deep links
+ok 5 - javascript or bare tokens are not promoted to deep links
+  ---
+  duration_ms: 0.054542
+  type: 'test'
+  ...
+# Subtest: classifies marketing, private, deferred, and API surfaces
+ok 6 - classifies marketing, private, deferred, and API surfaces
+  ---
+  duration_ms: 0.407916
+  type: 'test'
+  ...
+# Subtest: production candidate refuses deferred trade and private surfaces without flags
+ok 7 - production candidate refuses deferred trade and private surfaces without flags
+  ---
+  duration_ms: 0.145958
+  type: 'test'
+  ...
+# Subtest: BFF/session remain available for local non-candidate builds
+ok 8 - BFF/session remain available for local non-candidate builds
+  ---
+  duration_ms: 0.100375
+  type: 'test'
+  ...
+# Subtest: deferred surfaces require explicit flag and non-production API allowlist
+ok 9 - deferred surfaces require explicit flag and non-production API allowlist
+  ---
+  duration_ms: 0.075291
+  type: 'test'
+  ...
+# Subtest: sitemap only lists public marketing paths and excludes business/demo
+ok 10 - sitemap only lists public marketing paths and excludes business/demo
+  ---
+  duration_ms: 0.315042
+  type: 'test'
+  ...
+1..10
+# tests 10
+# suites 0
+# pass 10
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 53.678416
+
+> talk-and-talk-web@1.0.0 build
+> WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext build
+
+
+  vinext build  (Vite 8.0.13)
+
+[1/5] analyze client references...
+[2Ktransforming...✓ 200 modules transformed.
+rendering chunks...
+✓ built in 278ms
+[2/5] analyze server references...
+[2Ktransforming...✓ 604 modules transformed.
+rendering chunks...
+✓ built in 171ms
+[3/5] build rsc environment...
+[2Ktransforming...✓ 206 modules transformed.
+rendering chunks...
+computing gzip size...
+✓ built in 351ms
+[4/5] build client environment...
+[2Ktransforming...✓ 2119 modules transformed.
+rendering chunks...
+computing gzip size...
+✓ built in 495ms
+[5/5] build ssr environment...
+[2Ktransforming...✓ 674 modules transformed.
+rendering chunks...
+computing gzip size...
+✓ built in 263ms
+[0m
+  Route (app)
+  ┌ ? /                     
+  ├ ? /about                
+  ├ λ /api/backend/:path+   
+  ├ λ /api/session          
+  ├ λ /api/session/login    
+  ├ λ /api/session/logout   
+  ├ λ /api/session/send-code
+  ├ ? /business             
+  ├ ? /community            
+  ├ ƒ /companions/:id       
+  ├ ? /demo                 
+  ├ ? /discover             
+  ├ ? /how-it-works         
+  ├ ? /login                
+  ├ ? /messages             
+  ├ ? /orders               
+  ├ ? /partners             
+  ├ ? /profile              
+  ├ ? /safety               
+  └ ? /workbench            
+
+  λ API  ƒ Dynamic  ? Unknown
+
+  ? Some routes could not be classified. vinext currently uses static analysis
+    and cannot detect dynamic API usage (headers(), cookies(), etc.) at build time.
+    Automatic classification will be improved in a future release.
+
+  Build complete. Run `vinext start` to start the production server.
+
+TAP version 13
+# Subtest: server-renders the Talk&Talk official marketing home
+ok 1 - server-renders the Talk&Talk official marketing home
+  ---
+  duration_ms: 92.396667
+  type: 'test'
+  ...
+# Subtest: serves every primary product route with route-specific metadata
+ok 2 - serves every primary product route with route-specific metadata
+  ---
+  duration_ms: 310.480834
+  type: 'test'
+  ...
+# Subtest: separates the indexable official site from transactional product routes
+ok 3 - separates the indexable official site from transactional product routes
+  ---
+  duration_ms: 1.938417
+  type: 'test'
+  ...
+# Subtest: keeps official-site canonicals distinct and resilient to forwarded hosts
+ok 4 - keeps official-site canonicals distinct and resilient to forwarded hosts
+  ---
+  duration_ms: 0.725625
+  type: 'test'
+  ...
+# Subtest: keeps the official shell usable without a Web-account entry
+ok 5 - keeps the official shell usable without a Web-account entry
+  ---
+  duration_ms: 0.536
+  type: 'test'
+  ...
+# Subtest: keeps light marketing copy on solid forest bands, not bright mint fills
+ok 6 - keeps light marketing copy on solid forest bands, not bright mint fills
+  ---
+  duration_ms: 1.126417
+  type: 'test'
+  ...
+# Subtest: safety page keeps evidence-bounded support paths and miniprogram CTA
+ok 7 - safety page keeps evidence-bounded support paths and miniprogram CTA
+  ---
+  duration_ms: 22.062459
+  type: 'test'
+  ...
+# Subtest: keeps public browsing open while requiring consent at login
+ok 8 - keeps public browsing open while requiring consent at login
+  ---
+  duration_ms: 0.429166
+  type: 'test'
+  ...
+# Subtest: renders an investor-ready but evidence-bounded platform brief
+ok 9 - renders an investor-ready but evidence-bounded platform brief
+  ---
+  duration_ms: 24.402541
+  type: 'test'
+  ...
+# Subtest: offers a no-login, read-only product tour for commercial evaluation
+ok 10 - offers a no-login, read-only product tour for commercial evaluation
+  ---
+  duration_ms: 25.49675
+  type: 'test'
+  ...
+# Subtest: keeps motion causal, performant and the commercial tour deep-linkable
+ok 11 - keeps motion causal, performant and the commercial tour deep-linkable
+  ---
+  duration_ms: 2.211542
+  type: 'test'
+  ...
+# Subtest: keeps official-company facts configurable without fabricating a public disclosure
+ok 12 - keeps official-company facts configurable without fabricating a public disclosure
+  ---
+  duration_ms: 1.239958
+  type: 'test'
+  ...
+# Subtest: contains no disposable starter preview
+ok 13 - contains no disposable starter preview
+  ---
+  duration_ms: 0.895375
+  type: 'test'
+  ...
+# Subtest: keeps privileged and cross-site mutations outside the browser proxy
+ok 14 - keeps privileged and cross-site mutations outside the browser proxy
+  ---
+  duration_ms: 38.399458
+  type: 'test'
+  ...
+# Subtest: rejects malformed or stale login consent before contacting auth
+ok 15 - rejects malformed or stale login consent before contacting auth
+  ---
+  duration_ms: 16.022333
+  type: 'test'
+  ...
+# Subtest: keeps web legal-consent metadata aligned with the current release definition
+ok 16 - keeps web legal-consent metadata aligned with the current release definition
+  ---
+  duration_ms: 0.94925
+  type: 'test'
+  ...
+1..16
+# tests 16
+# suites 0
+# pass 16
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 585.695417

@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Check, Copy, QrCode, Smartphone } from "lucide-react";
+import { ArrowRight, Check, Copy, QrCode, Smartphone, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { miniprogramEntryUrl, miniprogramQrUrl } from "../lib/miniprogram-entry";
@@ -10,6 +10,8 @@ type MiniprogramCtaProps = {
   secondaryHref?: string;
   secondaryLabel?: string;
   className?: string;
+  /** Show an honest “App coming soon” cue next to the miniprogram entry. */
+  showAppComingSoon?: boolean;
 };
 
 export default function MiniprogramCta({
@@ -17,6 +19,7 @@ export default function MiniprogramCta({
   secondaryHref = "/how-it-works",
   secondaryLabel = "了解服务路径",
   className = "",
+  showAppComingSoon = false,
 }: MiniprogramCtaProps) {
   const hasQr = Boolean(miniprogramQrUrl);
   const [copyState, setCopyState] = useState<"idle" | "copied" | "manual">("idle");
@@ -42,6 +45,18 @@ export default function MiniprogramCta({
     </button>
   );
 
+  const primaryAction = miniprogramEntryUrl ? (
+    <a
+      className={`button button-primary${large ? " button-large" : ""}`}
+      href={miniprogramEntryUrl}
+      rel="noreferrer"
+    >
+      打开微信小程序 <Smartphone size={large ? 18 : 17} />
+    </a>
+  ) : (
+    fallbackAction
+  );
+
   const copyStatus = copyState === "idle"
     ? null
     : (
@@ -50,20 +65,22 @@ export default function MiniprogramCta({
       </span>
     );
 
+  const appCue = showAppComingSoon ? (
+    <p className="miniprogram-app-cue">
+      <Sparkles size={14} aria-hidden="true" />
+      <span>App 即将到来 · 上线后将在官网公布</span>
+    </p>
+  ) : null;
+
   if (variant === "inline") {
     return (
       <div className={`miniprogram-cta inline ${className}`.trim()}>
-        {miniprogramEntryUrl ? (
-          <a className="button button-primary" href={miniprogramEntryUrl} rel="noreferrer">
-            打开微信小程序 <Smartphone size={17} />
-          </a>
-        ) : (
-          fallbackAction
-        )}
+        {primaryAction}
         <Link href={secondaryHref} className="button button-secondary">
           {secondaryLabel} <ArrowRight size={16} />
         </Link>
         {copyStatus}
+        {appCue}
       </div>
     );
   }
@@ -71,17 +88,12 @@ export default function MiniprogramCta({
   return (
     <div className={`miniprogram-cta ${variant} ${className}`.trim()}>
       <div className="miniprogram-cta-actions">
-        {miniprogramEntryUrl ? (
-          <a className="button button-primary button-large" href={miniprogramEntryUrl} rel="noreferrer">
-            打开微信小程序 <Smartphone size={18} />
-          </a>
-        ) : (
-          fallbackAction
-        )}
-        <Link href={secondaryHref} className="button button-secondary button-large">
-          {secondaryLabel} <ArrowRight size={18} />
+        {primaryAction}
+        <Link href={secondaryHref} className={`button button-secondary${large ? " button-large" : ""}`}>
+          {secondaryLabel} <ArrowRight size={large ? 18 : 16} />
         </Link>
         {copyStatus}
+        {appCue}
       </div>
 
       <aside className="miniprogram-qr-panel" aria-label="微信小程序入口">
@@ -91,7 +103,7 @@ export default function MiniprogramCta({
         ) : (
           <div className="miniprogram-qr-placeholder">
             <QrCode size={36} strokeWidth={1.5} />
-            <span>配置二维码后可扫码打开</span>
+            <span>微信搜索 Talk&amp;Talk</span>
           </div>
         )}
         <div>
@@ -99,7 +111,7 @@ export default function MiniprogramCta({
           <p>
             {hasQr
               ? "扫码后请以小程序页面展示的服务范围与可用状态为准。"
-              : "请在微信中搜索「Talk&Talk」。网页用于了解产品与浏览体验，服务入口以小程序页面状态为准。"}
+              : "请在微信中搜索「Talk&Talk」。官网只说明产品与边界，真实服务以小程序页面状态为准。App 即将到来。"}
           </p>
         </div>
       </aside>

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { enforcePageSurface } from "../../lib/enforce-web-surface";
 import WorkbenchScreen from "../../components/WorkbenchScreen";
 
 export const metadata: Metadata = {
@@ -9,5 +10,6 @@ export const metadata: Metadata = {
 };
 
 export default function WorkbenchPage() {
+  enforcePageSurface("/workbench");
   return <WorkbenchScreen />;
 }

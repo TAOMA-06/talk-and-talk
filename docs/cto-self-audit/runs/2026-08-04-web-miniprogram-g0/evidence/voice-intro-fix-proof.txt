@@ -1,0 +1,19 @@
+=== voice-intro fail-closed proof 2026-08-07T07:50:34Z ===
+HEAD: 9cf5e3849a9654ddfddb8046bf29a580533fa268
+1037:      && !isFirstReleaseCapabilityEnabled("voiceIntro", this.config)
+1040:        "VOICE_INTRO_UNAVAILABLE",
+2410:    const voiceIntroCapabilityEnabled = isFirstReleaseCapabilityEnabled("voiceIntro", this.config);
+2008:  it("refuses voice-intro writes under text-only before any companion profile mutation", async () => {
+2041:  it("hides approved voice-intro playback on public DTO while text-only is active", async () => {
+/Users/taoma/Documents/talk and talk/frontend/miniprogram/pages/companion/onboarding/index.ts:2:import { clientVoiceIntroEnabled } from "../../../utils/config";
+/Users/taoma/Documents/talk and talk/frontend/miniprogram/pages/companion/onboarding/index.ts:35:    voiceIntroEnabled: clientVoiceIntroEnabled(),
+/Users/taoma/Documents/talk and talk/frontend/miniprogram/pages/companion/onboarding/index.ts:84:        voiceIntroEnabled: clientVoiceIntroEnabled(),
+/Users/taoma/Documents/talk and talk/frontend/miniprogram/pages/companion/onboarding/index.ts:180:        ...(clientVoiceIntroEnabled() && (form.voiceIntroAssetRef.trim() || duration !== undefined) ? {
+/Users/taoma/Documents/talk and talk/frontend/miniprogram/pages/companion/onboarding/index.wxml:76:      <view wx:if="{{voiceIntroEnabled}}" class="subsection">语音介绍元数据</view>
+/Users/taoma/Documents/talk and talk/frontend/miniprogram/pages/companion/onboarding/index.wxml:77:      <view wx:if="{{voiceIntroEnabled}}" class="status-line">审核状态：{{overview.companion.voiceIntro.status}}</view>
+/Users/taoma/Documents/talk and talk/frontend/miniprogram/pages/companion/onboarding/index.wxml:78:      <view wx:if="{{voiceIntroEnabled}}" class="hint">这里只接受受控媒体服务生成的外部引用；不会把本地路径或未审核音频当作已上线内容。</view>
+/Users/taoma/Documents/talk and talk/frontend/miniprogram/pages/companion/onboarding/index.wxml:79:      <input wx:if="{{voiceIntroEnabled}}" class="field" value="{{profile.voiceIntroAssetRef}}" data-field="voiceIntroAssetRef" bindinput="setProfileField" placeholder="外部媒体引用，例如 media/audio/..." />
+/Users/taoma/Documents/talk and talk/frontend/miniprogram/pages/companion/onboarding/index.wxml:80:      <input wx:if="{{voiceIntroEnabled}}" class="field" type="number" value="{{profile.voiceIntroDurationSeconds}}" data-field="voiceIntroDurationSeconds" bindinput="setProfileField" placeholder="时长（秒，1–600）" />
+/Users/taoma/Documents/talk and talk/frontend/miniprogram/pages/companion/onboarding/index.wxml:81:      <view wx:if="{{!voiceIntroEnabled}}" class="hint">首发文字陪伴不开放语音介绍；请完善文字资料后提交审核。</view>
+SHARED: Tests:       115 passed
+MINI: VALIDATE_EXIT:0 TSC_EXIT:0 SMOKE_EXIT:0 LOCAL_EXIT:0 

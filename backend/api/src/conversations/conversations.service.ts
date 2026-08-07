@@ -12,6 +12,7 @@ import { MediaModerationWorker } from "../moderation/media/media-moderation.work
 import { ModerationCaseService } from "../moderation/moderation-case.service";
 import { ModerationService, ModerationResult } from "../moderation/moderation.service";
 import { NotificationsService } from "../notifications/notifications.service";
+import { assertPublicInteractionIdentity } from "../users/public-interaction-identity.gate";
 import { ListConversationsDto } from "./dto/list-conversations.dto";
 import { ListMessagesQueryDto } from "./dto/list-messages.dto";
 import { ReserveMediaUploadDto } from "./dto/reserve-media-upload.dto";
@@ -475,6 +476,9 @@ export class ConversationsService {
     if (!user) {
       throw new AppException("UNAUTHORIZED", "User not found", HttpStatus.UNAUTHORIZED);
     }
+    // Real-time messaging requires the server identity signal before moderation,
+    // message rows, cases, or notifications are written.
+    assertPublicInteractionIdentity(user);
     const isCompanion = conversation.companion.ownerUserId === userId;
 
     const [recentMessages, recentHighRiskBlocks] = await Promise.all([

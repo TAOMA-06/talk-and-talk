@@ -46,9 +46,25 @@ assert.match(
 );
 assert.match(
   readFileSync(join(root, "pages/consent/index.wxml"), "utf8"),
-  /TRTC 仅在你进入实时语音并再次确认后初始化[\s\S]*默认不录音或启用 AI 转写/,
-  "first-use consent must disclose delayed TRTC initialization and the no-recording boundary"
+  /首发为文字陪伴[\s\S]*不开放媒体上传、实时语音或 TRTC/,
+  "first-use consent must state text-only first release without current TRTC processing"
 );
+assert.doesNotMatch(
+  readFileSync(join(root, "pages/consent/index.wxml"), "utf8"),
+  /TRTC 仅在你进入实时语音并再次确认后初始化/,
+  "first-use consent must not describe TRTC as a current first-release processing path"
+);
+assert.match(
+  readFileSync(join(root, "pages/companion/onboarding/index.wxml"), "utf8"),
+  /wx:if="\{\{voiceIntroEnabled\}\}"[\s\S]*voiceIntroAssetRef/,
+  "companion onboarding must hide voice-intro fields behind voiceIntroEnabled"
+);
+assert.match(
+  readFileSync(join(root, "pages/companion/onboarding/index.ts"), "utf8"),
+  /voiceIntroEnabled:\s*clientVoiceIntroEnabled\(\)/,
+  "companion onboarding must bind voiceIntroEnabled from clientVoiceIntroEnabled"
+);
+
 assert.match(
   readFileSync(join(root, "sitemap.json"), "utf8"),
   /"action":\s*"disallow"[\s\S]*pages\/voice\/index/,
@@ -227,7 +243,7 @@ const favoriteReminderUpdatedAts = new Map();
 let nextSubscriptionGrantNumber = 1;
 let recentlyViewedCompanionIds = [];
 let recommendationPreference = {
-  personalizationEnabled: true,
+  personalizationEnabled: false,
   topicIds: ["t1"],
   city: null,
   maxPricePerHalfHour: 50,
@@ -4575,7 +4591,7 @@ assert.equal(profile.data.user.role, "companion");
 assert.equal(profile.data.hasCompanionProfile, true);
 profile.openCompanionWorkbench();
 assert.ok(navigations.includes("/pages/companion/workbench/index"));
-assert.equal(profile.data.recommendationPreferences.personalizationEnabled, true);
+assert.equal(profile.data.recommendationPreferences.personalizationEnabled, false);
 profile.toggleRecommendationTopic({ currentTarget: { dataset: { id: "t2" } } });
 await profile.saveRecommendations();
 assert.ok(recommendationPreference.topicIds.includes("t2"));
@@ -4703,6 +4719,8 @@ delete globalThis.__TALK_AND_TALK_COMMERCIAL_TEXT_ONLY__;
 assert.equal(configModule.isCommercialTextOnly(), true, "shipping default must fail closed to text-only");
 assert.equal(configModule.clientChatMediaEnabled(true), false, "text-only scope must hide chat attachments even if the server flag is true");
 assert.equal(configModule.clientRealtimeVoiceEnabled(), false, "text-only scope must hide realtime voice entry points");
+assert.equal(configModule.clientVoiceIntroEnabled(), false, "text-only scope must hide voice intro entry points");
+assert.equal(configModule.clientVoiceSkuEnabled(), false, "text-only scope must hide voice SKU activation");
 globalThis.__TALK_AND_TALK_COMMERCIAL_TEXT_ONLY__ = false;
 assert.equal(configModule.backendConfig().baseUrl, "https://api.talkandtalk.app/api/v1");
 environmentVersion = "trial";

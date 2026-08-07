@@ -1,0 +1,94 @@
+TAP version 13
+# Subtest: missing config yields honest search fallback
+ok 1 - missing config yields honest search fallback
+  ---
+  duration_ms: 0.451208
+  type: 'test'
+  ...
+# Subtest: allowlisted https QR is accepted
+ok 2 - allowlisted https QR is accepted
+  ---
+  duration_ms: 0.270417
+  type: 'test'
+  ...
+# Subtest: non-allowlisted QR host falls back
+ok 3 - non-allowlisted QR host falls back
+  ---
+  duration_ms: 0.074042
+  type: 'test'
+  ...
+# Subtest: weixin scheme path is accepted (query tokens allowed)
+ok 4 - weixin scheme path is accepted (query tokens allowed)
+  ---
+  duration_ms: 0.03775
+  type: 'test'
+  ...
+# Subtest: allowlisted https entry path is accepted without injection
+ok 5 - allowlisted https entry path is accepted without injection
+  ---
+  duration_ms: 0.039042
+  type: 'test'
+  ...
+# Subtest: https entry path with non-allowlisted host falls back
+ok 6 - https entry path with non-allowlisted host falls back
+  ---
+  duration_ms: 0.069125
+  type: 'test'
+  ...
+# Subtest: credentials, fragments, and https query strings are rejected
+ok 7 - credentials, fragments, and https query strings are rejected
+  ---
+  duration_ms: 0.083417
+  type: 'test'
+  ...
+# Subtest: javascript or bare tokens are not promoted to deep links
+ok 8 - javascript or bare tokens are not promoted to deep links
+  ---
+  duration_ms: 0.0435
+  type: 'test'
+  ...
+# Subtest: classifies marketing, private, deferred, and API surfaces
+ok 9 - classifies marketing, private, deferred, and API surfaces
+  ---
+  duration_ms: 0.455458
+  type: 'test'
+  ...
+# Subtest: NODE_ENV=production fail-closes deferred trade without explicit open mode
+ok 10 - NODE_ENV=production fail-closes deferred trade without explicit open mode
+  ---
+  duration_ms: 0.109083
+  type: 'test'
+  ...
+# Subtest: WEB_SURFACE_MODE=production refuses deferred trade and private surfaces
+ok 11 - WEB_SURFACE_MODE=production refuses deferred trade and private surfaces
+  ---
+  duration_ms: 0.077916
+  type: 'test'
+  ...
+# Subtest: WEB_SURFACE_MODE=open keeps deferred pages for local/html tests
+ok 12 - WEB_SURFACE_MODE=open keeps deferred pages for local/html tests
+  ---
+  duration_ms: 0.035292
+  type: 'test'
+  ...
+# Subtest: deferred surfaces require explicit flag and non-production API allowlist
+ok 13 - deferred surfaces require explicit flag and non-production API allowlist
+  ---
+  duration_ms: 0.100334
+  type: 'test'
+  ...
+# Subtest: sitemap only lists public marketing paths and excludes business/demo
+ok 14 - sitemap only lists public marketing paths and excludes business/demo
+  ---
+  duration_ms: 0.253
+  type: 'test'
+  ...
+1..14
+# tests 14
+# suites 0
+# pass 14
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 51.68

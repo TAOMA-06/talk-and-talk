@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 
+import { enforceApiSurface } from "../../../../lib/enforce-web-surface";
 import { backendRequest, errorEnvelope, responseJson } from "../../../../lib/server-api";
 
 export async function POST(request: Request) {
+  const surfaceRefusal = enforceApiSurface("/api/session");
+  if (surfaceRefusal) return surfaceRefusal;
+
   try {
     const input = await request.json() as { phone?: unknown };
     const phone = typeof input.phone === "string" ? input.phone.trim() : "";

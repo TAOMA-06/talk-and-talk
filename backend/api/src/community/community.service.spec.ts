@@ -83,8 +83,35 @@ describe("CommunityService", () => {
     expect(prisma.communityPost.create).not.toHaveBeenCalled();
   });
 
+  it("rejects an unverified femaleRequest before moderation or any write", async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: "user-1",
+      accountStatus: "active",
+      profile: { displayName: "小安", isVerified: false },
+      companionProfile: null
+    });
+
+    await expect(service.create("user-1", {
+      kind: "femaleRequest",
+      topic: "聊天",
+      content: "今晚想找人聊聊"
+    })).rejects.toMatchObject({
+      code: "PUBLIC_INTERACTION_IDENTITY_REQUIRED",
+      status: 403
+    });
+    expect(moderation.moderateAsync).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.communityPost.create).not.toHaveBeenCalled();
+    expect(moderationCases.createFromResult).not.toHaveBeenCalled();
+  });
+
   it("persists allowed posts after moderation", async () => {
-    prisma.user.findUnique.mockResolvedValue({ id: "user-1", profile: { displayName: "小安" }, companionProfile: null });
+    prisma.user.findUnique.mockResolvedValue({
+      id: "user-1",
+      accountStatus: "active",
+      profile: { displayName: "小安", isVerified: true },
+      companionProfile: null
+    });
     moderation.moderateAsync.mockResolvedValue({ decision: "allow" });
     prisma.communityPost.create.mockResolvedValue({
       id: "post-1", authorId: "user-1", kind: "femaleRequest", topic: "聊天", content: "今晚想找人聊聊",
@@ -100,7 +127,12 @@ describe("CommunityService", () => {
   });
 
   it("throttles a new community post under the caller lock without changing account or content state", async () => {
-    prisma.user.findUnique.mockResolvedValue({ id: "user-1", profile: { displayName: "小安" }, companionProfile: null });
+    prisma.user.findUnique.mockResolvedValue({
+      id: "user-1",
+      accountStatus: "active",
+      profile: { displayName: "小安", isVerified: true },
+      companionProfile: null
+    });
     moderation.moderateAsync.mockResolvedValue({ decision: "allow" });
     prisma.communityPost.count.mockResolvedValue(3);
 
@@ -130,7 +162,12 @@ describe("CommunityService", () => {
   });
 
   it("keeps warned community posts out of the public feed and creates a review case", async () => {
-    prisma.user.findUnique.mockResolvedValue({ id: "user-1", profile: { displayName: "小安" }, companionProfile: null });
+    prisma.user.findUnique.mockResolvedValue({
+      id: "user-1",
+      accountStatus: "active",
+      profile: { displayName: "小安", isVerified: true },
+      companionProfile: null
+    });
     moderation.moderateAsync.mockResolvedValue({
       decision: "warn",
       riskLevel: "medium",

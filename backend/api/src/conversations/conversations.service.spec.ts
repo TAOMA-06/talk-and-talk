@@ -466,3 +466,128 @@ describe("ConversationsService.ensureConversation", () => {
     });
   });
 });
+
+describe("ConversationsService.send identity hard gate", () => {
+  const prisma = {
+    conversation: {
+      findFirst: jest.fn(),
+      update: jest.fn()
+    },
+    conversationBlock: {
+      findFirst: jest.fn()
+    },
+    user: { findUnique: jest.fn() },
+    message: {
+      findMany: jest.fn(),
+      create: jest.fn()
+    },
+    moderationCase: { count: jest.fn() },
+    $transaction: jest.fn(),
+    $queryRaw: jest.fn()
+  } as any;
+  const moderation = { moderateAsync: jest.fn() } as any;
+  const moderationCases = { createFromResult: jest.fn() } as any;
+  const chatRestrictions = { assertCanSend: jest.fn(), activeForUser: jest.fn() } as any;
+  const mediaAssets = {
+    isFeatureEnabled: jest.fn(() => false),
+    attachmentsForMessage: jest.fn().mockResolvedValue([]),
+    bindUploadedAssets: jest.fn()
+  } as any;
+  const mediaWorker = { enqueue: jest.fn() } as any;
+  const notifications = { createConversationMessageReceivedIfUnmuted: jest.fn() } as any;
+  const audit = { record: jest.fn() } as any;
+  const crisisIntervention = { recordCriticalChatSignal: jest.fn().mockResolvedValue(null) } as any;
+  let service: ConversationsService;
+
+  const conversation = {
+    id: "conv-1",
+    externalId: "c1",
+    userId: "u1",
+    companionId: "comp-1",
+    companion: { ownerUserId: "companion-owner", name: "林屿" }
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    prisma.$queryRaw.mockResolvedValue([{ available: true }]);
+    prisma.$transaction.mockImplementation(async (fn: any) => fn(prisma));
+    prisma.conversation.findFirst.mockResolvedValue(conversation);
+    prisma.conversationBlock.findFirst.mockResolvedValue(null);
+    prisma.message.findMany.mockResolvedValue([]);
+    prisma.moderationCase.count.mockResolvedValue(0);
+    service = new ConversationsService(
+      prisma,
+      moderation,
+      moderationCases,
+      chatRestrictions,
+      mediaAssets,
+      mediaWorker,
+      notifications,
+      audit,
+      crisisIntervention
+    );
+  });
+
+  it("rejects an unverified sender before moderation, message, case, or notification writes", async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: "u1",
+      accountStatus: "active",
+      profile: { displayName: "小安", isVerified: false, safetyScore: 80 }
+    });
+
+    await expect(service.send("u1", "c1", { content: "你好" })).rejects.toMatchObject({
+      code: "PUBLIC_INTERACTION_IDENTITY_REQUIRED",
+      status: 403
+    });
+
+    expect(chatRestrictions.assertCanSend).toHaveBeenCalledWith("u1");
+    expect(moderation.moderateAsync).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.message.create).not.toHaveBeenCalled();
+    expect(moderationCases.createFromResult).not.toHaveBeenCalled();
+    expect(notifications.createConversationMessageReceivedIfUnmuted).not.toHaveBeenCalled();
+    expect(crisisIntervention.recordCriticalChatSignal).not.toHaveBeenCalled();
+  });
+
+  it("allows a verified sender to proceed into the moderation path", async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: "u1",
+      accountStatus: "active",
+      profile: { displayName: "小安", isVerified: true, safetyScore: 80 }
+    });
+    moderation.moderateAsync.mockResolvedValue({
+      decision: "allow",
+      riskLevel: "low",
+      priority: "normal",
+      score: 0.01,
+      reasons: [],
+      matchedRules: [],
+      categories: ["normal"],
+      policyVersion: "chat-v2",
+      usedAI: false
+    });
+    const createdMessage = {
+      id: "m1",
+      conversationId: "conv-1",
+      senderId: "u1",
+      senderName: "小安",
+      content: "你好",
+      type: "text",
+      moderationStatus: "published",
+      visibility: "participants",
+      moderationDecision: "allow",
+      policyVersion: "chat-v2",
+      reviewedAt: new Date(),
+      createdAt: new Date()
+    };
+    prisma.message.create.mockResolvedValue(createdMessage);
+    prisma.conversation.update.mockResolvedValue(conversation);
+    mediaAssets.attachmentsForMessage.mockResolvedValue([]);
+
+    const result = await service.send("u1", "c1", { content: "你好" });
+
+    expect(moderation.moderateAsync).toHaveBeenCalled();
+    expect(prisma.message.create).toHaveBeenCalled();
+    expect(result.message).toEqual(expect.objectContaining({ id: "m1", content: "你好" }));
+  });
+});

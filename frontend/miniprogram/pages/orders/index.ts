@@ -1970,6 +1970,11 @@ Page({
   },
   async startService(event: any) {
     const id = String(event.currentTarget.dataset.id || "");
+    const context = this.orderContext(id);
+    if (!context || context.viewerRole !== "companion") {
+      wx.showToast({ title: "仅陪伴者可开始服务", icon: "none" });
+      return;
+    }
     try {
       const started = await api.startService(id);
       await this.load();
@@ -2007,17 +2012,29 @@ Page({
     catch (error) { wx.showToast({ title: (error as Error).message || "无法确认预约", icon: "none" }); }
   },
   async rejectServiceOrder(event: any) {
+    const id = String(event.currentTarget.dataset.id || "");
+    const context = this.orderContext(id);
+    if (!context || context.viewerRole !== "companion") {
+      wx.showToast({ title: "仅陪伴者可拒绝预约", icon: "none" });
+      return;
+    }
     const confirmation = await new Promise<any>((resolve) => wx.showModal({
       title: "拒绝本次预约",
       content: "拒绝后订单会取消且客户不会被扣款。",
       success: resolve
     }));
     if (!confirmation.confirm) return;
-    try { await api.rejectServiceOrder(event.currentTarget.dataset.id); await this.load(); }
+    try { await api.rejectServiceOrder(id); await this.load(); }
     catch (error) { wx.showToast({ title: (error as Error).message || "无法拒绝预约", icon: "none" }); }
   },
   async completeService(event: any) {
-    try { await api.completeService(event.currentTarget.dataset.id); await this.load(); }
+    const id = String(event.currentTarget.dataset.id || "");
+    const context = this.orderContext(id);
+    if (!context || context.viewerRole !== "companion") {
+      wx.showToast({ title: "仅陪伴者可完成服务", icon: "none" });
+      return;
+    }
+    try { await api.completeService(id); await this.load(); }
     catch (error) {
       const apiError = error as ApiError;
       wx.showToast({ title: fulfillmentActionFailureMessage(apiError, "complete"), icon: "none" });

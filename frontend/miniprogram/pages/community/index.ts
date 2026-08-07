@@ -2,6 +2,11 @@ import { api, ensureSession } from "../../utils/api";
 import { CatalogDisplay, withCatalogDisplays } from "../../utils/catalog";
 import { CommunityPost, CommunityReportReceipt, RecommendedCompanion } from "../../utils/models";
 import { ensurePrivacyAuthorization } from "../../utils/privacy";
+import {
+  isPublicInteractionIdentityError,
+  publicInteractionErrorUserMessage,
+  publicInteractionRecoveryPath
+} from "../../utils/public-interaction-errors";
 import { flushRecommendationEvents, queueRecommendationEvent, trackRecommendationCardViews } from "../../utils/recommendations";
 
 type CommunityReportReceiptView = CommunityReportReceipt & { submittedAtText: string };
@@ -23,7 +28,27 @@ function communityWriteErrorMessage(error: unknown, fallback: string): string {
   if ((error as { code?: string } | null)?.code === "COMMUNITY_WRITE_RATE_LIMITED") {
     return "操作较频繁，请稍后再试";
   }
+  if (isPublicInteractionIdentityError(error as { code?: string })) {
+    return publicInteractionErrorUserMessage(error as { code?: string; details?: Record<string, unknown> });
+  }
   return (error as Error)?.message || fallback;
+}
+
+function offerIdentityRecovery(error: unknown): void {
+  if (!isPublicInteractionIdentityError(error as { code?: string })) return;
+  const recoveryPath = publicInteractionRecoveryPath(error as { code?: string; details?: Record<string, unknown> });
+  if (!recoveryPath?.startsWith("/pages/")) return;
+  wx.showModal({
+    title: "需要完成身份核验",
+    content: publicInteractionErrorUserMessage(error as { code?: string; details?: Record<string, unknown> }),
+    confirmText: "去核验",
+    cancelText: "稍后",
+    success: (result) => {
+      if (result.confirm) {
+        wx.navigateTo({ url: recoveryPath, fail: () => wx.switchTab({ url: recoveryPath }) });
+      }
+    }
+  });
 }
 
 Page({
@@ -198,7 +223,13 @@ Page({
           duration: 2600
         });
       }
-    } catch (error) { wx.showToast({ title: communityWriteErrorMessage(error, "发布失败"), icon: "none" }); }
+    } catch (error) {
+      if (isPublicInteractionIdentityError(error as { code?: string })) {
+        offerIdentityRecovery(error);
+      } else {
+        wx.showToast({ title: communityWriteErrorMessage(error, "发布失败"), icon: "none" });
+      }
+    }
     finally { this.setData({ submitting: false }); }
   },
   async toggleLike(event: any) {

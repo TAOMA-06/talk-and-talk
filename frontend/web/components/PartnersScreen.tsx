@@ -49,10 +49,11 @@ export default function PartnersScreen() {
     <div className="marketing-detail-page partners-page">
       <section className="marketing-detail-hero marketing-detail-hero-split partners-hero">
         <div className="marketing-detail-hero-copy">
-          <p className="hero-brand"><span>合作与联系</span><i /> Partnerships with boundaries</p>
+          <p className="hero-brand"><span>合作与联系</span><i /> 边界清楚的合作</p>
           <h1>有价值的合作，先从边界清楚开始。</h1>
           <p>
-            Talk&amp;Talk 希望把线上陪伴做成可持续、可治理的服务体验。我们更重视明确的服务范围、隐私隔离与真实的履约价值。
+            Talk&amp;Talk 希望把线上陪伴做成可持续、可治理的服务体验。
+            我们更重视明确的服务范围、隐私隔离与真实的履约价值，不使用未经核验的规模叙事。
           </p>
           <div className="marketing-detail-actions">
             <a href="mailto:hello@talkandtalk.app" className="button button-primary button-large">

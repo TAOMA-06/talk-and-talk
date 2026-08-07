@@ -2005,6 +2005,70 @@ describe("CompanionsService", () => {
     expect(prisma.companionProfile.update).not.toHaveBeenCalled();
   });
 
+  it("refuses voice-intro writes under text-only before any companion profile mutation", async () => {
+    const textOnlyConfig = {
+      get: jest.fn((key: string, fallback?: unknown) => {
+        if (key === "COMMERCIAL_SURFACE") return "text_only";
+        if (key === "TRTC_ENABLED") return false;
+        return fallback;
+      })
+    } as any;
+    const textOnlyService = new CompanionsService(
+      prisma,
+      moderation,
+      moderationCases,
+      availabilityReminderCandidates,
+      availabilityScheduleRules,
+      textOnlyConfig
+    );
+    prisma.companionProfile.findUnique.mockResolvedValue({
+      ...companionRecord,
+      ownerUserId: "owner-1",
+      voiceIntroStatus: "none"
+    } as any);
+
+    await expect(textOnlyService.updateOwn("owner-1", {
+      voiceIntroAssetRef: "media/audio/intro-1",
+      voiceIntroDurationSeconds: 30
+    })).rejects.toMatchObject({
+      code: "VOICE_INTRO_UNAVAILABLE",
+      status: 409
+    });
+    expect(prisma.companionProfile.update).not.toHaveBeenCalled();
+    expect(moderation.moderateAsync).not.toHaveBeenCalled();
+  });
+
+  it("hides approved voice-intro playback on public DTO while text-only is active", async () => {
+    const textOnlyConfig = {
+      get: jest.fn((key: string, fallback?: unknown) => {
+        if (key === "COMMERCIAL_SURFACE") return "text_only";
+        return fallback;
+      })
+    } as any;
+    const textOnlyService = new CompanionsService(
+      prisma,
+      moderation,
+      moderationCases,
+      availabilityReminderCandidates,
+      availabilityScheduleRules,
+      textOnlyConfig
+    );
+    prisma.companionProfile.findFirst.mockResolvedValue({
+      ...companionRecord,
+      voiceIntroStatus: "approved",
+      voiceIntroDurationSeconds: 24
+    } as any);
+    prisma.companionProfile.findMany.mockResolvedValueOnce([] as any);
+
+    const result = await textOnlyService.getPublished("c1");
+    expect(result.voiceIntro).toEqual(expect.objectContaining({
+      available: false,
+      status: "unavailable",
+      playbackUrl: null,
+      playbackStatus: "notAvailable"
+    }));
+  });
+
   it("screens every public field before accepting a companion application", async () => {
     prisma.user.findUnique.mockResolvedValue({
       id: "owner-1",

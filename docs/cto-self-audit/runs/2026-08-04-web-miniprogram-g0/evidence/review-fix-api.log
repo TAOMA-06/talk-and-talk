@@ -1,0 +1,26 @@
+
+> talk-and-talk-api@0.1.0 test
+> npm run prisma:generate && jest --runInBand --testPathPattern=public-interaction-identity|first-release-capability|recommendations.service.spec|companions.service.spec|community.service.spec|conversations.service.spec --runInBand
+
+
+> talk-and-talk-api@0.1.0 prisma:generate
+> prisma generate
+
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma/schema.prisma.
+
+✔ Generated Prisma Client (7.9.0) to ./generated/prisma in 529ms
+
+PASS src/companions/companions.service.spec.ts
+PASS src/recommendations/recommendations.service.spec.ts
+PASS src/community/community.service.spec.ts
+PASS src/conversations/conversations.service.spec.ts
+PASS src/users/public-interaction-identity.gate.spec.ts
+PASS src/config/first-release-capability-matrix.spec.ts
+
+Test Suites: 6 passed, 6 total
+Tests:       107 passed, 107 total
+Snapshots:   0 total
+Time:        3.245 s
+Ran all test suites matching /public-interaction-identity|first-release-capability|recommendations.service.spec|companions.service.spec|community.service.spec|conversations.service.spec/i.

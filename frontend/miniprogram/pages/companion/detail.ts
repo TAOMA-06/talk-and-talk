@@ -1,6 +1,6 @@
 import { api, ApiError, ensureSession } from "../../utils/api";
 import { handleCustomerAdultEligibilityError } from "../../utils/adult-eligibility-recovery";
-import { clientRealtimeVoiceEnabled } from "../../utils/config";
+import { clientRealtimeVoiceEnabled, clientVoiceIntroEnabled } from "../../utils/config";
 import { openCrisisResources, passCrisisGate } from "../../utils/crisis-gate";
 import {
   Companion, CompanionAvailabilityCandidate, CompanionAvailabilityResponse, OrderServiceIntentCode,
@@ -270,7 +270,8 @@ function publicProfileDisplay(companion: Companion): PublicProfileDisplay {
     reviewDetailText: platformReview
       ? `最近核验 ${publicDate(platformReview.verifiedAt)} · 下次复审 ${publicDate(platformReview.nextReviewDueAt)}`
       : "平台暂未提供可公开的复审日期",
-    voiceIntroPlayable: voiceIntro?.available === true
+    voiceIntroPlayable: clientVoiceIntroEnabled()
+      && voiceIntro?.available === true
       && voiceIntro.status === "approved"
       && typeof voiceIntro.playbackUrl === "string"
       && voiceIntro.playbackUrl.startsWith("https://"),
@@ -1078,6 +1079,10 @@ Page({
     } finally { this.setData({ booking: false }); }
   },
   playVoiceIntro() {
+    if (!clientVoiceIntroEnabled()) {
+      wx.showToast({ title: "首发仅支持文字介绍", icon: "none" });
+      return;
+    }
     const url = this.data.publicProfile?.voiceIntroPlaybackUrl || "";
     if (!url.startsWith("https://")) return;
     const player = wx.createInnerAudioContext();

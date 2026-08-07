@@ -1,0 +1,127 @@
+=== VERIFICATION PLAN STEP 1: G0 revalidate 2026-08-07T07:27:07Z ===
+HEAD: 9cf5e3849a9654ddfddb8046bf29a580533fa268
+BRANCH: main
+=== status --short ===
+ M backend/api/prisma/schema.prisma
+ M backend/api/src/community/community.service.spec.ts
+ M backend/api/src/community/community.service.ts
+ M backend/api/src/conversations/conversations.delivery.spec.ts
+ M backend/api/src/conversations/conversations.service.spec.ts
+ M backend/api/src/conversations/conversations.service.ts
+ M backend/api/src/recommendations/recommendations.service.spec.ts
+ M backend/api/src/recommendations/recommendations.service.ts
+ M frontend/miniprogram/pages/chat/index.ts
+ M frontend/miniprogram/pages/community/index.ts
+ M frontend/miniprogram/pages/companion/detail.ts
+ M frontend/miniprogram/pages/companion/onboarding/index.ts
+ M frontend/miniprogram/pages/companion/services/index.ts
+ M frontend/miniprogram/pages/consent/index.wxml
+ M frontend/miniprogram/pages/orders/index.ts
+ M frontend/miniprogram/scripts/smoke.mjs
+ M frontend/miniprogram/utils/config.ts
+ M frontend/web/.env.example
+ M frontend/web/README.md
+ M frontend/web/app/about/page.tsx
+ M frontend/web/app/api/backend/[...path]/route.ts
+ M frontend/web/app/api/session/login/route.ts
+ M frontend/web/app/api/session/logout/route.ts
+ M frontend/web/app/api/session/route.ts
+ M frontend/web/app/api/session/send-code/route.ts
+ M frontend/web/app/business/page.tsx
+ M frontend/web/app/community/page.tsx
+ M frontend/web/app/companions/[id]/page.tsx
+ M frontend/web/app/demo/page.tsx
+ M frontend/web/app/discover/page.tsx
+ M frontend/web/app/globals.css
+ M frontend/web/app/how-it-works/page.tsx
+ M frontend/web/app/icon.svg
+ M frontend/web/app/layout.tsx
+ M frontend/web/app/login/page.tsx
+ M frontend/web/app/messages/page.tsx
+ M frontend/web/app/orders/page.tsx
+ M frontend/web/app/page.tsx
+ M frontend/web/app/profile/page.tsx
+ M frontend/web/app/safety/page.tsx
+ M frontend/web/app/sitemap.ts
+ M frontend/web/app/workbench/page.tsx
+ M frontend/web/components/AboutScreen.tsx
+ M frontend/web/components/AppShell.tsx
+ M frontend/web/components/BusinessScreen.tsx
+ M frontend/web/components/DemoExperience.tsx
+ M frontend/web/components/HowItWorksScreen.tsx
+ M frontend/web/components/MarketingHomeScreen.tsx
+ M frontend/web/components/MiniprogramCta.tsx
+ M frontend/web/components/PartnersScreen.tsx
+ M frontend/web/components/SafetyScreen.tsx
+ M frontend/web/components/motion/ConnectionPulse.tsx
+ M frontend/web/lib/miniprogram-entry.ts
+ M frontend/web/lib/public-disclosure.ts
+ M frontend/web/package.json
+ M frontend/web/tests/rendered-html.test.mjs
+ M shared/contracts/openapi/v1.yaml
+?? backend/api/prisma/migrations/20260807010000_recommendation_personalization_default_off/
+?? backend/api/src/config/first-release-capability-matrix.spec.ts
+?? backend/api/src/config/first-release-capability-matrix.ts
+?? backend/api/src/users/public-interaction-identity.gate.spec.ts
+?? backend/api/src/users/public-interaction-identity.gate.ts
+?? docs/cto-self-audit/
+?? frontend/miniprogram/utils/public-interaction-errors.ts
+?? frontend/web/components/BrandMark.tsx
+?? frontend/web/components/motion/BubbleField.tsx
+?? frontend/web/components/motion/BubbleNetwork.tsx
+?? frontend/web/components/motion/IconOrbit.tsx
+?? frontend/web/lib/enforce-web-surface.ts
+?? frontend/web/lib/web-surface-policy.ts
+?? frontend/web/public/apple-touch-icon.png
+?? frontend/web/public/brand/
+?? frontend/web/public/favicon-32.png
+?? frontend/web/public/icon-64.png
+?? frontend/web/public/icon.png
+?? frontend/web/tests/miniprogram-entry.test.mjs
+?? frontend/web/tests/web-surface-policy.test.mjs
+=== dirty tracked Web SHA-256 (must match ownership map) ===
+2a816fa9f4a0c4f6fe03436b94b7035ee814ad16190d499694113737a7b50526  frontend/web/app/about/page.tsx
+132b597329907d3e7bb357cc2073aebaa35e10f01d1d756446bd7d4605f3a0b9  frontend/web/app/globals.css
+30b7c435f0d78d26cfb6f2940ebf992b868c15d8ad8dd0796ede5b2422675db2  frontend/web/app/how-it-works/page.tsx
+a9c2f22c2911393af70826c0e3abe25ca6a7c3d51c33d193fe8c9f301ed176f8  frontend/web/app/icon.svg
+97d05b6c731e619fc8d4386c5d35f84a773ee6fce29b70db85584d1c11f9a379  frontend/web/app/layout.tsx
+3a6064a08275acbcf0bf06906e6016dc10d19cc2d58aa3cec25352cd2d44151f  frontend/web/app/page.tsx
+330dc10a5f74cf86adfaf031a0aa0d1b952ec3cea18feed72afbb5fab6b04204  frontend/web/app/safety/page.tsx
+015367c77c701c8b77716882c4d33d38f06b3980008e7171b1008aa0b3788a19  frontend/web/components/AboutScreen.tsx
+df427a2f4b7c043a7842f04fdfd52177221734d2659f1cbe109ca43977da683f  frontend/web/components/AppShell.tsx
+d3ca964e5ed7e40f44de1f729f4155733f265ad31a15e74117d279965e86974f  frontend/web/components/BusinessScreen.tsx
+c50e3e38a25ba80cea98d8cfd03dcf9d4299a80cb3ac9847fd6acd38f0b3946e  frontend/web/components/DemoExperience.tsx
+c1b534cb7f6671f49d09b420e98fe470a19d43871ed1e06d2cf13ca1bcd50aa0  frontend/web/components/HowItWorksScreen.tsx
+6c5135d02471f67e6bdc2e8ebee56ee10fc3b0b24d9f4d8d4d5fb4d549e8f42b  frontend/web/components/MarketingHomeScreen.tsx
+68bd421f7080cddc1778ecebc5cbc96861bb9ac41950bb6f4d739b5bcde6edbc  frontend/web/components/MiniprogramCta.tsx
+92e85f2f18e8ae2c2e443a903a6fddd55d4f00cb3d201b31cd9b3785d63fa6fe  frontend/web/components/PartnersScreen.tsx
+1f935b76f08c3bd35a0ea39abb886c4a20356ff31c880e74f4244786850424c5  frontend/web/components/SafetyScreen.tsx
+9dbd562c782e0e2c68516cd6679d8a5a500e261f5decb841c046df45f14ae136  frontend/web/components/motion/ConnectionPulse.tsx
+e0a603614bf90ab55abe77bc945d4e8647cca67e6c0269c6b2547d25e79c6904  frontend/web/lib/public-disclosure.ts
+553c993513903851cfed66f1b35e961408afc31e4461c5b429976058e95ef2ae  frontend/web/tests/rendered-html.test.mjs
+=== untracked user assets ===
+8db867713ff99837ea1be0ad7d7f3abbe6702e6599c3bf8aa628102bf6f21d21  frontend/web/components/BrandMark.tsx
+68d8a83f9b75733ac76206fc47eaf062462e88f776a760d76b0d1f8b60fe7775  frontend/web/components/motion/BubbleField.tsx
+88254878a892bc042cfce0f2e4a5a02ace4f1dad927fc045e161a409ba2e720c  frontend/web/components/motion/BubbleNetwork.tsx
+51ca3c05aa586873c9ccd008cb5bad579e9b3e51063e86d8fa6d345b42395408  frontend/web/components/motion/IconOrbit.tsx
+2a76a9f6468db31ec7a3e3808341e6e3d2569e4b0540bce27d6c2c811d5146b1  frontend/web/public/apple-touch-icon.png
+85752067d8d09d65354b6ea1b0efa57d3accf8592181260b2b33dc8dac7a2859  frontend/web/public/favicon-32.png
+a2748515a2ec8f32134ad21fb25320981dd1d144673cf6e6c3304fa7c21c606a  frontend/web/public/icon-64.png
+f95a35f6f6bf073dbf041f63f35e61283a0a540a07b9d82d821684fd7df838c5  frontend/web/public/icon.png
+=== external actions unauthorized check (state excerpt) ===
+3:> Task ID：`2026-08-04-web-miniprogram-g0`。2026-08-07 Grok 续跑：MODEL-D06 按目标 OBJECTIVE 放弃；按指南默认冻结 MP-D05/D07/D08；完成 SHARED-01 / WEB-01 / Mini G1 blockers 实现与本地门禁；G2 仍 BLOCKED，无外部写操作。
+8:- Objective：在无逐项外部授权的前提下，把官网公共面与微信小程序服务面推进到同一候选的 Implementation complete / G1 Go，并准备 G2-ready 材料。
+30:- Phase：`Implementation complete / G1 Go / G2-ready`
+31:- Work status：`completed`（实现切片）；G2 external `blocked`
+32:- User-facing：`G1 local Go；G2-ready 材料已备；G2 Gate BLOCKED；G3 No-Go`
+35:- Integration next exact action：等待用户授权 Phase 7 外部动作前保持 G2 BLOCKED；可选提交/push 工作树（需单独授权）
+45:| G2 | BLOCKED | `candidate-manifest.md` G2 package | 未授权 staging/体验版/真机 | Phase 7 逐项授权 |
+46:| G3 | BLOCKED | 生产资质/真钱/值班 | 范围外 | 独立立项 |
+67:| `QA-01` | completed | PASS (G2 BLOCKED) | `E1-CANDIDATE-20260807` |
+68:| `G2-OPTIONAL-01` | blocked | BLOCKED | unauthorized |
+84:| R0-04 external G2 | P0 | BLOCKED |
+91:| R0-13 G2 package secrets | P1 | OPEN placeholders only |
+95:全部 Not authorized / not run（push/PR/deploy/DNS/WeChat/真钱）。
+100:- Next exact action：G2 保持 BLOCKED；若需进入 staging/体验版/真机，用户逐项精确授权 Phase 7
+=== git diff --check ===
+STEP1_OK

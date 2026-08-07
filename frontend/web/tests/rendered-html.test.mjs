@@ -50,15 +50,30 @@ test("server-renders the Talk&Talk official marketing home", async () => {
 
   const html = await response.text();
   assert.match(html, /<html lang="zh-CN"/i);
-  assert.match(html, /<title>Talk&amp;Talk 官方网站｜有边界的陪伴｜Talk&amp;Talk<\/title>/i);
-  assert.match(html, /可信陪伴链/);
+  // Absolute home title must not double-append the layout template brand suffix.
+  assert.match(html, /<title>Talk&amp;Talk 官方网站｜有边界的陪伴<\/title>/i);
+  assert.doesNotMatch(html, /<title>Talk&amp;Talk 官方网站｜有边界的陪伴｜Talk&amp;Talk<\/title>/i);
+  // Hero states concrete job-to-be-done within first meaningful paint.
+  assert.match(html, /有边界的线上陪伴/);
+  assert.match(html, /被认真听见/);
+  assert.match(html, /女性友好的线上陪伴/);
+  assert.match(html, /连接空泡/);
   assert.match(html, /微信小程序/);
   assert.match(html, /了解服务路径/);
-  assert.match(html, /先认识规则，再放心开始/);
-  assert.match(html, /role="tablist"/);
+  assert.match(html, /先认识规则，再进入小程序/);
+  assert.match(html, /hero-trust-strip/);
+  assert.match(html, /App 即将到来/);
+  assert.match(html, /bubble-hero|icon-orbit|app-icon/);
+  assert.match(html, /非医疗|非急救|年满 18/);
+  // Brand signature retained (symbol section + orbit caption).
+  assert.match(html, /两枚对话相遇|形成一颗温柔的心/);
+  // next/image may encode the path as /brand/app-icon.png or %2Fbrand%2Fapp-icon.png
+  assert.match(html, /app-icon\.png/);
   assert.doesNotMatch(html, /style="[^"]*opacity:0(?:[;"])/);
   assert.doesNotMatch(html, /在开始之前|同意并进入/);
   assert.doesNotMatch(html, /Your site is taking shape|react-loading-skeleton|codex-preview/i);
+  assert.doesNotMatch(html, /重新定义未来|赋能无限可能|全球领先|行业第一/);
+  assert.doesNotMatch(html, /用户数|GMV|融资额/);
 });
 
 test("serves every primary product route with route-specific metadata", async () => {
@@ -139,23 +154,94 @@ test("keeps official-site canonicals distinct and resilient to forwarded hosts",
 });
 
 test("keeps the official shell usable without a Web-account entry", async () => {
-  const [shell, cta, reveal] = await Promise.all([
+  const [shell, cta, reveal, home] = await Promise.all([
     readFile(new URL("../components/AppShell.tsx", import.meta.url), "utf8"),
     readFile(new URL("../components/MiniprogramCta.tsx", import.meta.url), "utf8"),
     readFile(new URL("../components/motion/Reveal.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/MarketingHomeScreen.tsx", import.meta.url), "utf8"),
   ]);
 
   assert.match(shell, /marketing-mobile-nav/);
   assert.match(shell, /官网导航/);
-  assert.match(shell, /网页产品演示/);
+  assert.match(shell, /App 即将到来/);
   assert.match(shell, /isMarketing \? \(/);
   assert.match(shell, /if \(isMarketing\)/);
+  assert.match(shell, /有边界的线上陪伴/);
+  assert.match(home, /bubble-hero/);
+  assert.match(home, /hero-trust-strip/);
+  assert.match(home, /IconOrbit/);
+  assert.match(home, /MiniprogramCta/);
+  assert.match(home, /showAppComingSoon/);
+  assert.match(home, /secondaryHref="\/how-it-works"/);
+  assert.match(home, /\/brand\/app-icon\.png/);
+  assert.match(home, /有边界的线上陪伴/);
+  assert.match(home, /被认真听见/);
+  assert.match(home, /home-values|home-trust|home-moment/);
+  assert.match(shell, /BrandMark|app-icon\.png/);
   assert.match(cta, /复制名称并在微信搜索/);
+  assert.match(cta, /showAppComingSoon/);
   assert.match(cta, /<button/);
   assert.match(reveal, /useScrollEntrance/);
   assert.match(reveal, /IntersectionObserver/);
   assert.match(reveal, /startsInInitialView/);
   assert.match(reveal, /revealState = "static"/);
+});
+
+test("keeps light marketing copy on solid forest bands, not bright mint fills", async () => {
+  const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+
+  // Light text sits on path / primary channel / closing bands — those fills must stay dark forest.
+  const ruleBodies = [
+    [/\.mint-path\s+\.bubble-path-inner\s*,\s*\.home-path\s+\.bubble-path-inner\s*\{([^}]+)\}/s, "mint/home path"],
+    [/\.mint-channel-primary\s*\{([^}]+)\}/s, "mint channel primary"],
+    [/\.mint-closing\s*\{([^}]+)\}/s, "mint closing"],
+    [/\.bubble-channel-card\.primary\s*\{([^}]+)\}/s, "channel primary"],
+    [/\.bubble-closing\s*\{([^}]+)\}/s, "bubble closing"],
+  ];
+
+  for (const [pattern, label] of ruleBodies) {
+    const match = styles.match(pattern);
+    assert.ok(match, `${label} rule must exist`);
+    const body = match[1];
+    assert.match(body, /#0c241c|#0c2a22|#0f2e24|#12352a|#134636/i, `${label} must use solid forest ink`);
+    assert.doesNotMatch(
+      body,
+      /#7ee0a8|#3fd18c|#6fd4a0|rgba\(\s*22\s*,\s*154\s*,\s*95\s*,\s*0\.[1-6]/i,
+      `${label} must not use bright mint fills under light copy`,
+    );
+  }
+});
+
+test("safety page keeps evidence-bounded support paths and miniprogram CTA", async () => {
+  const [safetySource, styles, response] = await Promise.all([
+    readFile(new URL("../components/SafetyScreen.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+    render("/safety"),
+  ]);
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(safetySource, /MiniprogramCta/);
+  assert.match(safetySource, /safety-closing-cta/);
+  assert.match(safetySource, /site-safety-page|marketing-detail-page/);
+  assert.match(html, /选择正确的入口/);
+  assert.match(html, /进入小程序后使用对应页面的举报与售后入口/);
+  assert.match(html, /不能提供紧急响应/);
+  assert.match(html, /举报是线索，不是结论/);
+  assert.doesNotMatch(html, /用户数|GMV|融资/);
+  // Safety principle / help-path copy must stay at readable body sizes (not microtype).
+  // Prefer the last matching rule (later cascade / page-specific reinforcements).
+  const helpCardsStrong = [...styles.matchAll(/\.help-cards strong\s*\{[^}]*font-size:\s*([\d.]+)px/gs)].at(-1);
+  const helpCardsSmall = [...styles.matchAll(/\.help-cards small\s*\{[^}]*font-size:\s*([\d.]+)px/gs)].at(-1);
+  const safetyGridP = [...styles.matchAll(/\.safety-grid p\s*\{[^}]*font-size:\s*([\d.]+)px/gs)].at(-1);
+  const safetyGridH3 = [...styles.matchAll(/\.safety-grid h3\s*\{[^}]*font-size:\s*([\d.]+)px/gs)].at(-1);
+  assert.ok(helpCardsStrong, "help-cards strong size must be declared");
+  assert.ok(helpCardsSmall, "help-cards small size must be declared");
+  assert.ok(safetyGridP, "safety-grid p size must be declared");
+  assert.ok(safetyGridH3, "safety-grid h3 size must be declared");
+  assert.ok(Number(helpCardsStrong[1]) >= 14, `help-cards strong too small: ${helpCardsStrong[1]}px`);
+  assert.ok(Number(helpCardsSmall[1]) >= 13, `help-cards small too small: ${helpCardsSmall[1]}px`);
+  assert.ok(Number(safetyGridP[1]) >= 13, `safety-grid p too small: ${safetyGridP[1]}px`);
+  assert.ok(Number(safetyGridH3[1]) >= 14, `safety-grid h3 too small: ${safetyGridH3[1]}px`);
 });
 
 test("keeps public browsing open while requiring consent at login", async () => {

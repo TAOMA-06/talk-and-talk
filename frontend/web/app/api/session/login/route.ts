@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { enforceApiSurface } from "../../../../lib/enforce-web-surface";
 import {
   ACCESS_COOKIE,
   REFRESH_COOKIE,
@@ -41,6 +42,9 @@ function validConsent(consent?: Record<string, unknown>): boolean {
 }
 
 export async function POST(request: Request) {
+  const surfaceRefusal = enforceApiSurface("/api/session");
+  if (surfaceRefusal) return surfaceRefusal;
+
   let input: LoginBody;
   try {
     input = await request.json() as LoginBody;

@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 
 import { AppException } from "../../common/errors/app.exception";
 import { isCommercialTextOnlySurface } from "../../config/commercial-surface";
+import { isFirstReleaseCapabilityEnabled } from "../../config/first-release-capability-matrix";
 import { PrismaService } from "../../database/prisma.service";
 import {
   MEDIA_ANALYSIS_PROVIDER,
@@ -68,6 +69,8 @@ export class MediaAssetService {
   ) {}
 
   isFeatureEnabled(): boolean {
+    // Matrix is the first-release authority; commercial surface remains the default input.
+    if (!isFirstReleaseCapabilityEnabled("chatMediaUpload", this.config)) return false;
     if (isCommercialTextOnlySurface(this.config)) return false;
     return this.storage.isConfigured && this.analysis.isConfigured;
   }

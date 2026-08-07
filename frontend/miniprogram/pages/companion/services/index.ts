@@ -1,5 +1,5 @@
 import { api, ApiError, ensureSession } from "../../../utils/api";
-import { clientRealtimeVoiceEnabled } from "../../../utils/config";
+import { clientRealtimeVoiceEnabled, clientVoiceSkuEnabled } from "../../../utils/config";
 import {
   CreateOwnServiceOfferingInput, OwnServiceOffering, RecommendationTopic
 } from "../../../utils/models";
@@ -84,7 +84,7 @@ Page({
     formTitle: "",
     formDescription: "",
     formDeliveryMode: "text" as "text" | "voice",
-    voiceDeliveryModeAvailable: clientRealtimeVoiceEnabled(),
+    voiceDeliveryModeAvailable: clientVoiceSkuEnabled(),
     formDurationIndex: 0,
     formPriceYuan: "",
     formTopicIds: [] as string[],
@@ -213,7 +213,7 @@ Page({
       editingId: offering.id,
       formTitle: offering.title,
       formDescription: offering.description || "",
-      formDeliveryMode: offering.deliveryMode === "voice" && clientRealtimeVoiceEnabled() ? "voice" : "text",
+      formDeliveryMode: offering.deliveryMode === "voice" && clientVoiceSkuEnabled() ? "voice" : "text",
       formDurationIndex: durationIndex,
       formPriceYuan: formatCny(offering.priceCents),
       formTopicIds: offering.topicIds,
@@ -231,7 +231,7 @@ Page({
   setFormDescription(event: any) { this.setData({ formDescription: event.detail.value }); },
   setFormDeliveryMode(event: any) {
     const deliveryMode = event.currentTarget.dataset.mode === "voice" ? "voice" : "text";
-    if (deliveryMode === "voice" && !clientRealtimeVoiceEnabled()) {
+    if (deliveryMode === "voice" && !clientVoiceSkuEnabled()) {
       wx.showToast({ title: "首发仅开放文字服务", icon: "none" });
       return;
     }
@@ -275,7 +275,7 @@ Page({
       this.setData({ formError: "请选择服务时长。" });
       return;
     }
-    if (this.data.formDeliveryMode === "voice" && !clientRealtimeVoiceEnabled()) {
+    if (this.data.formDeliveryMode === "voice" && !clientVoiceSkuEnabled()) {
       this.setData({ formError: "首发仅开放文字服务，暂不能保存语音商品。" });
       return;
     }

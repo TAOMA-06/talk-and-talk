@@ -3,11 +3,20 @@ import type { Metadata } from "next";
 import MarketingHomeScreen from "../components/MarketingHomeScreen";
 
 export const metadata: Metadata = {
-  title: "Talk&Talk 官方网站｜有边界的陪伴",
+  // Absolute title: root layout uses `template: "%s｜Talk&Talk"` for child routes.
+  title: {
+    absolute: "Talk&Talk 官方网站｜有边界的陪伴",
+  },
   description:
-    "Talk&Talk 官方网站。了解女性友好的线上陪伴产品如何通过清楚的规则、平台内沟通与支持路径承接每一次连接。",
+    "Talk&Talk 官方网站。女性友好的线上陪伴平台：有边界的线上陪伴，从被认真听见开始。官网说明规则与边界；真实服务请使用微信小程序，App 即将到来。",
   alternates: {
     canonical: "/",
+  },
+  openGraph: {
+    title: "Talk&Talk｜有边界的线上陪伴，从被认真听见开始",
+    description:
+      "女性友好的线上陪伴平台官方网站。了解产品路径与边界；服务入口以微信小程序为准，App 即将到来。",
+    url: "/",
   },
 };
 

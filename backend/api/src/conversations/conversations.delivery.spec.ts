@@ -31,7 +31,13 @@ describe("ConversationsService moderation delivery state machine", () => {
       }) },
       companionProfile: { findFirst: jest.fn() },
       order: { findMany: jest.fn().mockResolvedValue([activeOrder]) },
-      user: { findUnique: jest.fn().mockResolvedValue({ id: "user-1", profile: { displayName: "用户", safetyScore: 80 } }) },
+      user: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "user-1",
+          accountStatus: "active",
+          profile: { displayName: "用户", safetyScore: 80, isVerified: true }
+        })
+      },
       message: { findMany: jest.fn().mockResolvedValue([]) },
       moderationCase: { count: jest.fn().mockResolvedValue(0) },
       conversationBlock: { findFirst: jest.fn().mockResolvedValue(null) },
