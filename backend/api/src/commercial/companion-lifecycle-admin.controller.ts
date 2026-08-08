@@ -6,12 +6,15 @@ import { Roles } from "../auth/decorators/roles.decorator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import {
+  AddRemediationTaskDto,
   CreateCompanionAccountActionDto,
+  CreateCompanionQualityCaseDto,
   ListCompanionLifecycleAdminDto,
   ResolveCompanionAppealDto,
   ResolveCompanionIncidentDto,
   ReviewCompanionVoiceIntroDto,
-  UpdateWithdrawalRequestDto
+  UpdateWithdrawalRequestDto,
+  WaiveRemediationTaskDto
 } from "./dto/companion-lifecycle.dto";
 import { CompanionLifecycleService } from "./companion-lifecycle.service";
 
@@ -28,6 +31,54 @@ export class CompanionLifecycleAdminController {
     @Body() dto: CreateCompanionAccountActionDto
   ) {
     return this.lifecycle.createAccountAction(actor.id, dto);
+  }
+
+  @Post("quality-cases")
+  @Roles("supply", "admin")
+  createQualityCase(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Body() dto: CreateCompanionQualityCaseDto
+  ) {
+    return this.lifecycle.createQualityCase(actor.id, dto);
+  }
+
+  @Get("quality-cases")
+  @Roles("supply", "admin")
+  qualityCases(@Query() query: ListCompanionLifecycleAdminDto) {
+    return this.lifecycle.listQualityCasesAdmin(
+      query.qualityCaseStatus,
+      query.page,
+      query.pageSize
+    );
+  }
+
+  @Post("quality-cases/:id/remediation-tasks")
+  @Roles("supply", "admin")
+  addRemediationTask(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param("id") caseId: string,
+    @Body() dto: AddRemediationTaskDto
+  ) {
+    return this.lifecycle.addRemediationTask(actor.id, caseId, dto);
+  }
+
+  @Post("remediation-tasks/:id/waive")
+  @Roles("supply", "admin")
+  waiveRemediationTask(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param("id") taskId: string,
+    @Body() dto: WaiveRemediationTaskDto
+  ) {
+    return this.lifecycle.waiveRemediationTask(actor.id, taskId, dto.reason);
+  }
+
+  @Post("quality-cases/:id/close")
+  @Roles("supply", "admin")
+  closeQualityCase(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param("id") caseId: string
+  ) {
+    return this.lifecycle.closeQualityCase(actor.id, caseId);
   }
 
   @Post("appeals/:id/resolution")

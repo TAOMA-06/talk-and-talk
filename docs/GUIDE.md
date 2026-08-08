@@ -151,6 +151,7 @@ xcodebuild test \
 - [core-tolerance-and-expansion-matrix.md](./core-tolerance-and-expansion-matrix.md)
 - 契约冻结：[shared/contracts](../shared/contracts)
 - 未交付范围：[NEXT_PHASE.md](../NEXT_PHASE.md)
+- 后端商业化差距审查：[backend-commercialization-gap-audit.md](./backend-commercialization-gap-audit.md)
 
 ## 7. 常见误区
 

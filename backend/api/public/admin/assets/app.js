@@ -140,6 +140,7 @@
     accountDeletionAuthTombstoneUnknownKeys: "存在当前密钥环无法验证的登录标识保护摘要，新身份注册已关闭",
     overdueUserAccountAppeals: "普通用户账号申诉复核超时",
     overdueCompanionAccountAppeals: "陪伴者账号申诉复核超时",
+    overdueCompanionRemediationTasks: "陪伴者整改任务逾期",
     failedNotifications: "用户通知失败",
     staleNotificationLeases: "通知任务租约过期",
     notificationDeliveryDisabledWithPending: "通知队列有待投递任务，但投递工作进程未启用",
@@ -1005,24 +1006,29 @@
   async function loadOverview() {
     const readinessList = document.querySelector("#readinessList");
     const funnelStages = document.querySelector("#funnelStages");
+    const opsMetricsGrid = document.querySelector("#opsMetricsGrid");
     const capabilityList = document.querySelector("#capabilityList");
     const canReadReadiness = hasCapability("commercial.readiness.read");
     const canReadFunnel = hasCapability("commercial.funnel.read");
+    const canReadOpsMetrics = hasCapability("commercial.ops-metrics.read");
     readinessList.closest(".panel")?.classList.toggle("hidden", !canReadReadiness);
     funnelStages.closest(".panel")?.classList.toggle("hidden", !canReadFunnel);
+    opsMetricsGrid?.closest(".panel")?.classList.toggle("hidden", !canReadOpsMetrics);
     document.querySelector("#metricReadiness")?.closest(".metric-card")?.classList.toggle("hidden", !canReadReadiness);
     for (const selector of ["#metricRequested", "#metricCollected", "#metricRepeat"]) {
       document.querySelector(selector)?.closest(".metric-card")?.classList.toggle("hidden", !canReadFunnel);
     }
     if (canReadReadiness) setContainerState(readinessList, "loading", "正在检查运行门禁…");
     if (canReadFunnel) setContainerState(funnelStages, "loading", "正在读取订单事实…");
+    if (canReadOpsMetrics) setContainerState(opsMetricsGrid, "loading", "正在读取经营聚合…");
     setContainerState(capabilityList, "loading", "正在验证管理员权限…");
     const results = await Promise.allSettled([
       canReadReadiness ? request("/admin/commercial/readiness") : Promise.resolve(null),
       canReadFunnel ? request("/admin/commercial/funnel") : Promise.resolve(null),
+      canReadOpsMetrics ? request("/admin/commercial/ops-metrics") : Promise.resolve(null),
       state.context ? Promise.resolve(state.context) : request("/admin/operations/context")
     ]);
-    const [readinessResult, funnelResult, contextResult] = results;
+    const [readinessResult, funnelResult, opsMetricsResult, contextResult] = results;
 
     if (canReadReadiness && readinessResult.status === "fulfilled") {
       const readiness = readinessResult.value;
@@ -1069,6 +1075,28 @@
       document.querySelector("#metricCollected").textContent = "—";
       document.querySelector("#metricRepeat").textContent = "—";
       setContainerState(funnelStages, "error", funnelResult.reason.message || "服务漏斗加载失败");
+    }
+
+    if (canReadOpsMetrics && opsMetricsResult.status === "fulfilled") {
+      const metrics = opsMetricsResult.value;
+      document.querySelector("#opsMetricsRange").textContent = `${formatTime(metrics.range?.from)} — ${formatTime(metrics.range?.to)}${metrics.truncated ? " · 已截断" : ""}`;
+      const reminder = metrics.availabilityReminders || {};
+      const cards = [
+        ["确认率", percent(metrics.response?.confirmationRate), `拒单 ${percent(metrics.response?.rejectRate)} · 超时 ${percent(metrics.response?.responseTimeoutRate)}`],
+        ["时段占用", percent(metrics.slots?.utilizationRate), `放出 ${metrics.slots?.releasedCapacity ?? 0} · 空闲 ${metrics.slots?.idleCapacity ?? 0}`],
+        ["退款单率", percent(metrics.refunds?.refundOrderRate), `成功退款单 ${metrics.refunds?.refundedOrders ?? 0}`],
+        ["投诉首响达标", percent(metrics.complaints?.firstResponseHitRate), `逾期首响 ${metrics.complaints?.overdueFirstResponse ?? 0}`],
+        ["同陪伴者复购", percent(metrics.repurchase?.sameCompanionRepurchaseRate), `复购对 ${metrics.repurchase?.repeatPairs ?? 0}`],
+        ["收藏转化", percent(metrics.bookmarks?.conversionRate), `收藏 ${metrics.bookmarks?.favoritesCreated ?? 0}`],
+        ["审核积压", String(metrics.moderation?.openCases ?? 0), `逾期案件 ${metrics.moderation?.overdueCases ?? 0} · 申诉 ${metrics.moderation?.openAppeals ?? 0}`],
+        ["可约提醒", String(reminder.status || "—"), `终态待核 ${reminder.pipeline?.unresolvedTerminalAttempts ?? 0} · 投递 ${reminder.pipeline?.deliveryRunnerEnabled ? "开" : "关"}`],
+        ["供给已发布", String(metrics.supplyFunnel?.published ?? 0), `核验 ${metrics.supplyFunnel?.profilesVerified ?? 0} · 有未来容量 ${metrics.supplyFunnel?.withFutureCapacity ?? 0}`]
+      ];
+      opsMetricsGrid.innerHTML = cards.map(([label, value, note]) =>
+        `<div class="funnel-step"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(note)}</small></div>`
+      ).join("");
+    } else if (canReadOpsMetrics) {
+      setContainerState(opsMetricsGrid, "error", opsMetricsResult.reason.message || "经营看板加载失败");
     }
 
     if (contextResult.status === "fulfilled") {
@@ -2099,9 +2127,11 @@
   function renderAvailabilityReminderReadiness(container, readiness) {
     const pipeline = readiness.pipeline || {};
     const terminalAttempts = pipeline.terminalAttempts || {};
+    const unresolved = Number(terminalAttempts.unresolved || 0);
+    const deliveryOff = pipeline.deliveryRunnerEnabled !== true;
     const rows = [
       ["准备 runner", pipeline.preparationRunnerEnabled ? "已开启" : "未开启"],
-      ["投递 runner", pipeline.deliveryRunnerEnabled ? "已开启" : "未开启"],
+      ["投递 runner", pipeline.deliveryRunnerEnabled ? "已开启" : "默认关闭（需模板审批 + staging 演练后才可开）"],
       ["待准备候选", pipeline.pendingCandidates || 0],
       ["已到期待准备", pipeline.dueCandidates || 0],
       ["待预留交接", pipeline.pending || 0],
@@ -2119,12 +2149,21 @@
       ["预留 claim 租约过期", pipeline.expiredReservationLeases || 0],
       ["投递 claim 租约过期", pipeline.expiredDeliveryClaimLeases || 0],
       ["发送租约过期", pipeline.expiredAttemptLeases || 0],
-      ["终态待人工核对", terminalAttempts.unresolved || 0],
+      ["终态待人工核对", unresolved],
       ["终态已人工核对", terminalAttempts.resolved || 0],
       ["积压时效", pipeline.backlogSlaBreached ? `超出 ${pipeline.backlogSlaSeconds || 300} 秒` : "未超出代码阈值"]
     ];
-    container.innerHTML = `<article class="compact-item ${readiness.status === "attentionRequired" ? "urgent" : ""}"><div class="compact-item-head"><h3>运行状态</h3>${statusPill(readiness.status || "unknown")}</div><p>检查于 ${escapeHtml(formatTime(pipeline.checkedAt || readiness.checkedAt))}；代码 readiness 不等于微信后台模板或主体审批。</p></article>`
-      + rows.map(([label, value]) => `<div class="stack-row"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join("");
+    const callouts = [
+      unresolved > 0
+        ? `<div class="section-callout"><strong>终态待人工核对 ${escapeHtml(unresolved)}</strong><span>不得自动重发；使用下方“标记终态已人工核对”并保全证据。代码 readiness 不等于微信模板已审批。</span></div>`
+        : "",
+      deliveryOff
+        ? `<div class="section-callout"><strong>投递默认关闭</strong><span>仅在 availabilityReminder 模板审批、staging 真链演练与指标值班就绪后，才可将 AVAILABILITY_REMINDER_DELIVERY_ENABLED 设为 true。</span></div>`
+        : ""
+    ].join("");
+    container.innerHTML = `<article class="compact-item ${readiness.status === "attentionRequired" || unresolved > 0 ? "urgent" : ""}"><div class="compact-item-head"><h3>运行状态</h3>${statusPill(readiness.status || "unknown")}</div><p>检查于 ${escapeHtml(formatTime(pipeline.checkedAt || readiness.checkedAt))}；代码 readiness 不等于微信后台模板或主体审批。</p></article>`
+      + callouts
+      + rows.map(([label, value]) => `<div class="stack-row ${label === "终态待人工核对" && unresolved > 0 ? "alert" : ""}"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join("");
   }
 
   async function loadGrowth() {

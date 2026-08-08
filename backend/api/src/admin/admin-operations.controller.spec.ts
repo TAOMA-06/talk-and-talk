@@ -86,6 +86,7 @@ describe("AdminOperationsController", () => {
     expect(finance.capabilities).toContain("companion.withdrawal.manage");
     expect(finance.capabilities).toContain("payment-dispute.financial.read");
     expect(finance.capabilities).toContain("payment-reconciliation.manage");
+    expect(finance.capabilities).toContain("commercial.ops-metrics.read");
     expect(finance.dataScopes.paymentDisputes).toBe("financialFactsOnly");
     expect(finance.capabilities).not.toContain("companion.lifecycle.supply.manage");
   });

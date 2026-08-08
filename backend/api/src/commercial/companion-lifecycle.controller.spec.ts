@@ -10,6 +10,8 @@ describe("Companion lifecycle controllers", () => {
     training: jest.fn(),
     submitTrainingAttempt: jest.fn(),
     quality: jest.fn(),
+    listQualityCasesForCompanion: jest.fn(),
+    completeRemediationTask: jest.fn(),
     actions: jest.fn(),
     appeal: jest.fn(),
     incidents: jest.fn(),
@@ -18,6 +20,11 @@ describe("Companion lifecycle controllers", () => {
     requestWithdrawal: jest.fn(),
     cancelWithdrawal: jest.fn(),
     createAccountAction: jest.fn(),
+    createQualityCase: jest.fn(),
+    listQualityCasesAdmin: jest.fn(),
+    addRemediationTask: jest.fn(),
+    waiveRemediationTask: jest.fn(),
+    closeQualityCase: jest.fn(),
     resolveAppeal: jest.fn(),
     adminAppeals: jest.fn(),
     adminVoiceIntros: jest.fn(),
@@ -42,11 +49,12 @@ describe("Companion lifecycle controllers", () => {
     await companionController.overview(companionUser);
     await companionController.training(companionUser);
     await companionController.quality(companionUser);
+    await companionController.qualityCases(companionUser);
     await companionController.actions(companionUser);
     await companionController.incidents(companionUser);
     await companionController.withdrawals(companionUser);
 
-    for (const method of [lifecycle.overview, lifecycle.training, lifecycle.quality]) {
+    for (const method of [lifecycle.overview, lifecycle.training, lifecycle.quality, lifecycle.listQualityCasesForCompanion]) {
       expect(method).toHaveBeenCalledWith("owner-1");
     }
     expect(lifecycle.actions).toHaveBeenCalledWith("owner-1", undefined, 1, 50, undefined);
@@ -113,6 +121,11 @@ describe("Companion lifecycle controllers", () => {
     const prototype = CompanionLifecycleAdminController.prototype;
     for (const method of [
       prototype.createAction,
+      prototype.createQualityCase,
+      prototype.qualityCases,
+      prototype.addRemediationTask,
+      prototype.waiveRemediationTask,
+      prototype.closeQualityCase,
       prototype.resolveAppeal,
       prototype.appeals,
       prototype.voiceIntros,

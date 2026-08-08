@@ -452,6 +452,25 @@ enum CompanionAccountActionKind {
   suspension
 }
 
+enum CompanionQualityGrade {
+  noIssue
+  needsRemediation
+  restrictIntake
+  delist
+}
+
+enum CompanionQualityCaseStatus {
+  open
+  closed
+}
+
+enum CompanionRemediationTaskStatus {
+  open
+  completed
+  overdue
+  waived
+}
+
 enum CompanionAppealStatus {
   pending
   upheld
@@ -996,6 +1015,7 @@ model CompanionProfile {
   accountActions                   CompanionAccountAction[]
   accountAppeals                   CompanionAccountAppeal[]
   incidentReports                  CompanionIncidentReport[]
+  qualityCases                     CompanionQualityCase[]
   evidenceUploadAssets             MediaAsset[]                           @relation("CompanionIncidentEvidenceScope")
   withdrawalRequests               CompanionWithdrawalRequest[]
   favorites                        CompanionFavorite[]
@@ -2524,8 +2544,9 @@ model CompanionAccountAction {
   createdAt        DateTime                   @default(now())
   updatedAt        DateTime                   @updatedAt
 
-  companion CompanionProfile         @relation(fields: [companionId], references: [id], onDelete: Cascade)
-  appeals   CompanionAccountAppeal[]
+  companion    CompanionProfile         @relation(fields: [companionId], references: [id], onDelete: Cascade)
+  appeals      CompanionAccountAppeal[]
+  qualityCases CompanionQualityCase[]
 
   @@index([companionId, revokedAt, startsAt])
   @@index([kind, revokedAt, createdAt])
@@ -2571,10 +2592,58 @@ model CompanionIncidentReport {
   companion           CompanionProfile                   @relation(fields: [companionId], references: [id], onDelete: Cascade)
   order               Order?                             @relation(fields: [orderId], references: [id], onDelete: SetNull)
   evidenceAttachments ControlledCaseEvidenceAttachment[]
+  qualityCases        CompanionQualityCase[]
 
   @@index([companionId, status, createdAt])
   @@index([status, createdAt])
   @@index([orderId])
+}
+
+model CompanionQualityCase {
+  id               String                     @id @default(uuid())
+  companionId      String
+  grade            CompanionQualityGrade
+  reasonCode       String
+  summary          String
+  sourceIncidentId String?
+  sourceActionId   String?
+  createdById      String
+  status           CompanionQualityCaseStatus @default(open)
+  closedAt         DateTime?
+  closedById       String?
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
+
+  companion      CompanionProfile           @relation(fields: [companionId], references: [id], onDelete: Cascade)
+  sourceIncident CompanionIncidentReport?   @relation(fields: [sourceIncidentId], references: [id], onDelete: SetNull)
+  sourceAction   CompanionAccountAction?    @relation(fields: [sourceActionId], references: [id], onDelete: SetNull)
+  tasks          CompanionRemediationTask[]
+
+  @@index([companionId, status])
+  @@index([status, createdAt])
+  @@index([grade, status])
+}
+
+model CompanionRemediationTask {
+  id                   String                         @id @default(uuid())
+  caseId               String
+  title                String
+  moduleCode           String?
+  dueAt                DateTime
+  status               CompanionRemediationTaskStatus @default(open)
+  completedAt          DateTime?
+  evidenceRef          String?
+  completedByCompanion Boolean                        @default(false)
+  waivedAt             DateTime?
+  waivedById           String?
+  waiverReason         String?
+  createdAt            DateTime                       @default(now())
+  updatedAt            DateTime                       @updatedAt
+
+  case CompanionQualityCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId, status])
+  @@index([status, dueAt])
 }
 
 model CompanionWithdrawalRequest {

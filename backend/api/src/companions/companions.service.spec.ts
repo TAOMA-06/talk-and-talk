@@ -225,6 +225,12 @@ describe("CompanionsService", () => {
     companionCommercialProfile: {
       findUnique: jest.fn()
     },
+    companionAccountAction: {
+      count: jest.fn()
+    },
+    companionRemediationTask: {
+      count: jest.fn()
+    },
     companionAvailabilityWindow: {
       findMany: jest.fn(),
       count: jest.fn(),
@@ -289,6 +295,8 @@ describe("CompanionsService", () => {
       return [];
     });
     prisma.accountDeletionRequest.findFirst.mockResolvedValue(null);
+    prisma.companionAccountAction.count.mockResolvedValue(0);
+    prisma.companionRemediationTask.count.mockResolvedValue(0);
     moderation.moderateAsync.mockResolvedValue({ decision: "allow" });
     availabilityReminderCandidates.recordWindowBecameAvailable.mockResolvedValue({ created: 0 });
     service = new CompanionsService(
@@ -1754,6 +1762,53 @@ describe("CompanionsService", () => {
     expect(prisma.companionProfile.update).toHaveBeenCalledWith({
       where: { id: "c1" },
       data: { isPublished: true }
+    });
+  });
+
+  it("blocks publish when an active service restriction or outstanding remediation exists", async () => {
+    const unpublished = {
+      ...companionRecord,
+      ownerUserId: "owner-1",
+      isPublished: false
+    };
+    prisma.companionProfile.findUnique
+      .mockResolvedValueOnce(unpublished as any)
+      .mockResolvedValueOnce({
+        id: "c1",
+        ownerUserId: "owner-1",
+        isVerified: true,
+        updatedAt: unpublished.updatedAt
+      } as any);
+    prisma.user.findUnique.mockResolvedValue({
+      id: "owner-1",
+      role: "companion",
+      accountStatus: "active",
+      profile: { isVerified: true }
+    } as any);
+    prisma.companionCommercialProfile.findUnique.mockResolvedValue({
+      status: "verified",
+      adultEligibilityVerdict: "adult",
+      adultEligibilityValidUntil: new Date(Date.now() + 24 * 60 * 60_000)
+    } as any);
+    prisma.companionAccountAction.count.mockResolvedValue(1);
+
+    await expect(service.publish("c1")).rejects.toMatchObject({
+      code: "COMPANION_SERVICE_RESTRICTED"
+    });
+
+    prisma.companionAccountAction.count.mockResolvedValue(0);
+    prisma.companionRemediationTask.count.mockResolvedValue(2);
+    prisma.companionProfile.findUnique
+      .mockResolvedValueOnce(unpublished as any)
+      .mockResolvedValueOnce({
+        id: "c1",
+        ownerUserId: "owner-1",
+        isVerified: true,
+        updatedAt: unpublished.updatedAt
+      } as any);
+
+    await expect(service.publish("c1")).rejects.toMatchObject({
+      code: "COMPANION_REMEDIATION_OUTSTANDING"
     });
   });
 

@@ -5,6 +5,7 @@
 - 新人请先读 [docs/GUIDE.md](./docs/GUIDE.md)
 - **v0.1 已冻结 `/api/v1` 契约**：[shared/contracts](./shared/contracts)
 - 未交付能力见 [NEXT_PHASE.md](./NEXT_PHASE.md)（不在本发行范围）
+- 后端商业化差距审查（CTO 视角）见 [docs/backend-commercialization-gap-audit.md](./docs/backend-commercialization-gap-audit.md)
 
 ## 仓库结构
 
@@ -31,6 +32,7 @@ talk-and-talk/
 | [docs/deploy-rollback.md](./docs/deploy-rollback.md) | 部署与回滚 |
 | [docs/production-checklist.md](./docs/production-checklist.md) | 生产检查清单 |
 | [docs/COMMERCIAL_RELEASE.md](./docs/COMMERCIAL_RELEASE.md) | 正式商用交易模型、代码控制、外部 P0 与放行流程 |
+| [docs/backend-commercialization-gap-audit.md](./docs/backend-commercialization-gap-audit.md) | CTO 视角后端商业化差距、竞品反向对照与 P0–P2 优先级 |
 | [docs/core-tolerance-and-expansion-matrix.md](./docs/core-tolerance-and-expansion-matrix.md) | CTO + 商务负责人视角的核心宽容度、硬边界、扩展触发器与放量规则 |
 | [docs/wechat-backend-selection.md](./docs/wechat-backend-selection.md) | 微信后端方案选型、云托管部署与真机验收 |
 | [docs/app-store-metadata.md](./docs/app-store-metadata.md) | App Store Connect 元数据 |

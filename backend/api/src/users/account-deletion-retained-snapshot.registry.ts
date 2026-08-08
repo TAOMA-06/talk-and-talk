@@ -772,5 +772,19 @@ readonly AccountDeletionRetainedSnapshotSource[] = Object.freeze([
     FROM "CompanionAccountAppeal" target
     WHERE ${subject.companionId}::TEXT IS NOT NULL
       AND target."companionId" = ${subject.companionId}
+  `),
+  retainedSnapshotSource("consent_rights_account_governance", "companion_quality_cases", "createdAt", (subject) => Prisma.sql`
+    SELECT target."id", target."createdAt" AS "stableTime"
+    FROM "CompanionQualityCase" target
+    WHERE ${subject.companionId}::TEXT IS NOT NULL
+      AND target."companionId" = ${subject.companionId}
+  `),
+  retainedSnapshotSource("consent_rights_account_governance", "companion_remediation_tasks", "createdAt", (subject) => Prisma.sql`
+    SELECT target."id", target."createdAt" AS "stableTime"
+    FROM "CompanionRemediationTask" target
+    INNER JOIN "CompanionQualityCase" quality_case
+      ON quality_case."id" = target."caseId"
+    WHERE ${subject.companionId}::TEXT IS NOT NULL
+      AND quality_case."companionId" = ${subject.companionId}
   `)
 ]);

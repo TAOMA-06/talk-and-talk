@@ -39,7 +39,8 @@ const CAPABILITIES_BY_ROLE: Record<string, string[]> = {
     "companion.withdrawal.manage",
     "payment-reconciliation.manage",
     "payment-dispute.financial.read",
-    "payment-dispute.sync"
+    "payment-dispute.sync",
+    "commercial.ops-metrics.read"
   ],
   supply: [
     "companion.commercial.manage",
@@ -50,12 +51,14 @@ const CAPABILITIES_BY_ROLE: Record<string, string[]> = {
   operations: [
     "commercial.readiness.read",
     "commercial.funnel.read",
+    "commercial.ops-metrics.read",
     "order.read.operational-redacted",
     "supply.aggregate.read"
   ],
   admin: [
     "commercial.readiness.read",
     "commercial.funnel.read",
+    "commercial.ops-metrics.read",
     "companion.commercial.manage",
     "companion.lifecycle.manage",
     "companion.lifecycle.supply.manage",
