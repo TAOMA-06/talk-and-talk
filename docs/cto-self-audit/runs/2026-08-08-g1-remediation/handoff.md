@@ -9,7 +9,7 @@ automated local validation and independent static review: `SHARED-02A`
 (contract/refund/role boundaries), `SHARED-02D-R/B-R` (customer-sync and
 attendance projection closure), `SHARED-02G` (first-release refund/configuration/
 recommendation hard-lock), `WEB-01`, `WEB-03`, `WEB-04`, `WEB-05`, `MINI-02`,
-`VALIDATION-02`, `G1-FOLLOWUP-01/02/03/04/05/06/07/10/11/12`, and `QA-02A/B/C/D/OPS/E-A-R`. `G1-FOLLOWUP-13` is now locally implemented and owner-validated under `USER-AUTH-ALL-20260811`, but has no independent F13/candidate review and therefore is not closed as candidate or G1 evidence. `QA-02E-A` is reopened and
+`VALIDATION-02`, `G1-FOLLOWUP-01/02/03/04/05/06/07/10/11/12`, and `QA-02A/B/C/D/OPS/E-A-R`. `G1-FOLLOWUP-13` is now locally implemented and owner-validated under `USER-AUTH-ALL-20260811`, but has no independent F13/candidate review. Its first preparation commit `83a9ec6aa4e67c65997baa4ae4fa786a00654560` is superseded after two clean detached captures exposed only Vinext per-build security-nonce/runtime-cache differences in the Web artifact. `G1-FOLLOWUP-14` is the active narrow reproducibility correction and must produce a replacement SHA and fresh captures before any candidate claim. `QA-02E-A` is reopened and
 superseded; `QA-02E-A-R` is completed at static/local source-contract scope.
 `QA-02E-B-A` is completed at static/local metadata-hygiene scope: ordinary
 API/Mini/Web/iOS/G1 workflows now execute only fixed Git metadata checks, not
@@ -117,6 +117,15 @@ discovery, and privileged operations remain available where they do not
 contradict those choices. This is locally validated implementation, not an
 independent candidate review or external runtime result.
 
+The first two detached local captures of `83a9ec6` independently installed all
+three npm lock roots and produced the same canonical source-tree SHA-256, API
+and Prisma artifact trees, and deterministic SBOM. They did not produce the
+same raw Web tree because Vinext deliberately generates random draft/build/
+prerender security material and the Worker test writes a `.wrangler` cache.
+F14 schema v6 compares a declared normalized Web snapshot while preserving
+those random runtime values; any other byte still invalidates the comparison,
+and the exact raw deployment artifact remains an external OCI-custody fact.
+
 ## User action needed to unblock implementation
 
 No further product-choice reply is required for F13. The user's blanket
@@ -157,7 +166,9 @@ All local source, test, harness, and documentation slices through
 `G1-FOLLOWUP-12` are closed at static/local scope and independently reviewed.
 `G1-FOLLOWUP-13` has completed implementation and owner validation under the
 user's blanket authority; it remains explicitly pending independent
-F13/candidate review.
+F13/candidate review. `G1-FOLLOWUP-14` is active until its replacement commit,
+two fresh detached captures, and local comparison finish; it also lacks an
+independent candidate reviewer.
 `G1-FOLLOWUP-09` remains explicitly reopened/superseded by
 `G1-FOLLOWUP-11`: the shared parser now trusts only complete terminal Jest/TAP
 summaries, ignores real console diagnostics that resemble result lines, and

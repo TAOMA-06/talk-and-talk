@@ -12,6 +12,7 @@ import {
   compareEvidenceManifests,
   finalizeCapture,
   generateSbomForFreeze,
+  hashCandidateArtifact,
   hashDirectory,
   REQUIRED_GATES,
   runGate,
@@ -139,9 +140,7 @@ function createFixture({ detach = true, gitlink = false, miniValidateContent, om
 }
 
 function writeRequiredArtifacts(root) {
-  write(root, "frontend/web/dist/server/index.js");
-  write(root, "frontend/web/dist/server/wrangler.json", "{}\n");
-  write(root, "frontend/web/dist/client/_headers");
+  writeVinextWebArtifacts(root);
   write(root, "backend/api/dist/src/main.js");
   write(root, "backend/api/dist/src/database/seed.js");
   write(root, "backend/api/dist/src/database/bootstrap-staff.js");
@@ -152,12 +151,50 @@ function writeRequiredArtifacts(root) {
   write(root, "backend/api/generated/prisma/internal/class.ts");
 }
 
+function writeVinextWebArtifacts(root, {
+  draftSecret = "11111111-1111-4111-8111-111111111111",
+  buildId = "22222222-2222-4222-8222-222222222222",
+  prerenderSecret = "3".repeat(64),
+  runtimeMarker = "runtime-a",
+} = {}) {
+  write(root, "frontend/web/dist/server/index.js", [
+    `function getDraftSecret() { return "${draftSecret}"; }`,
+    `const request = { get buildId() { return "${buildId}"; } };`,
+    `function appIsrCacheKey(pathname, suffix, buildId = "${buildId}") { return [pathname, suffix, buildId]; }`,
+    `const render = { deploymentVersion: "${buildId}", rootBoundaryId };`,
+    "const stableApplicationCode = true;",
+    "",
+  ].join("\n"));
+  write(root, "frontend/web/dist/server/wrangler.json", "{}\n");
+  write(root, "frontend/web/dist/server/vinext-server.json", JSON.stringify({ prerenderSecret }));
+  write(root, "frontend/web/dist/server/ssr/vinext-server.json", JSON.stringify({ prerenderSecret }));
+  write(root, "frontend/web/dist/server/.wrangler/cache/cf.json", JSON.stringify({ runtimeMarker }));
+  write(root, "frontend/web/dist/client/_headers");
+}
+
 function validArtifact(treeSha256 = "c".repeat(64)) {
   return { root: "fixture", entries: [{ path: "output", kind: "file", bytes: 1, sha256: "d".repeat(64) }], treeSha256 };
 }
 
+function validWebArtifact(treeSha256 = "c".repeat(64)) {
+  return {
+    ...validArtifact(treeSha256),
+    normalization: {
+      policy: "vinext-ephemeral-security-material-v1",
+      ignoredRuntimePaths: ["server/.wrangler"],
+      excludedSecurityMaterialPaths: [
+        "server/vinext-server.json",
+        "server/ssr/vinext-server.json",
+      ],
+      normalizedBundlePaths: ["server/index.js"],
+      normalizedFields: ["draftSecret", "buildId"],
+    },
+  };
+}
+
 function validManifest(overrides = {}) {
   const artifact = validArtifact();
+  const webArtifact = validWebArtifact();
   const gates = REQUIRED_GATES.map((gate) => ({
     gate,
     exitCode: 0,
@@ -165,7 +202,7 @@ function validManifest(overrides = {}) {
     logSha256: "e".repeat(64),
     command: `allowlisted:${gate}`,
     ...(gate === "MINI_RELEASE" ? { miniAppIdRef: "vault://talk-and-talk/wechat-app-id#candidate" } : {}),
-    ...(gate === "WEB_CHECK" ? { generatedArtifacts: { web: artifact } } : {}),
+    ...(gate === "WEB_CHECK" ? { generatedArtifacts: { web: webArtifact } } : {}),
     ...(gate === "API_BUILD" ? { generatedArtifacts: { api: artifact, apiGenerated: artifact } } : {}),
   }));
   return {
@@ -190,7 +227,7 @@ function validManifest(overrides = {}) {
     cleanupEvidence: "E1-CLEANUP-20260809",
     gates,
     artifacts: {
-      web: artifact,
+      web: webArtifact,
       api: artifact,
       apiGenerated: artifact,
       miniReleaseSource: artifact,
@@ -469,8 +506,66 @@ test("directory hashing is sorted and comparison accepts only complete structura
     assert.throws(() => compareEvidenceManifests(base, { ...base, sourceTreeSha256: "changed" }), /source or freeze hash|source tree|differ/);
     assert.throws(() => validateEvidenceManifest({ ...base, gates: [] }), /exactly one record/);
     assert.throws(() => validateEvidenceManifest({ ...base, schemaVersion: 2 }), /unsupported schema/);
+    const missingWebNormalization = structuredClone(base);
+    delete missingWebNormalization.artifacts.web.normalization;
+    assert.throws(() => validateEvidenceManifest(missingWebNormalization), /Vinext normalization policy/);
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("Web artifact snapshots normalize only Vinext per-build security material", () => {
+  const left = mkdtempSync(join(tmpdir(), "talkandtalk-web-artifact-left-"));
+  const right = mkdtempSync(join(tmpdir(), "talkandtalk-web-artifact-right-"));
+  try {
+    writeVinextWebArtifacts(left, {
+      draftSecret: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      buildId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      prerenderSecret: "c".repeat(64),
+      runtimeMarker: "left-runtime",
+    });
+    writeVinextWebArtifacts(right, {
+      draftSecret: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      buildId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+      prerenderSecret: "f".repeat(64),
+      runtimeMarker: "right-runtime",
+    });
+
+    const leftSnapshot = hashCandidateArtifact(left, "web");
+    const rightSnapshot = hashCandidateArtifact(right, "web");
+    assert.deepEqual(leftSnapshot, rightSnapshot);
+    assert.equal(leftSnapshot.normalization.policy, "vinext-ephemeral-security-material-v1");
+    assert.ok(!leftSnapshot.entries.some((entry) => entry.path.includes(".wrangler")));
+    assert.ok(!leftSnapshot.entries.some((entry) => entry.path.endsWith("vinext-server.json")));
+
+    write(right, "frontend/web/dist/client/stable.js", "changed application bytes\n");
+    assert.notEqual(hashCandidateArtifact(right, "web").treeSha256, leftSnapshot.treeSha256);
+
+    writeVinextWebArtifacts(right, {
+      buildId: "22222222-2222-4222-8222-222222222222",
+      prerenderSecret: "3".repeat(64),
+    });
+    const bundlePath = join(right, "frontend/web/dist/server/index.js");
+    writeFileSync(
+      bundlePath,
+      readFileSync(bundlePath, "utf8").replace(
+        'deploymentVersion: "22222222-2222-4222-8222-222222222222"',
+        'deploymentVersion: "99999999-9999-4999-8999-999999999999"',
+      ),
+      "utf8",
+    );
+    assert.throws(() => hashCandidateArtifact(right, "web"), /build IDs must match/);
+
+    writeVinextWebArtifacts(right);
+    write(
+      right,
+      "frontend/web/dist/server/ssr/vinext-server.json",
+      JSON.stringify({ prerenderSecret: "4".repeat(64) }),
+    );
+    assert.throws(() => hashCandidateArtifact(right, "web"), /prerender secrets must match/);
+  } finally {
+    rmSync(left, { recursive: true, force: true });
+    rmSync(right, { recursive: true, force: true });
   }
 });
 
@@ -632,10 +727,8 @@ test("candidate SBOM generation accepts only the build artifacts already registe
   const sbom = `${fixture.root}-candidate-sbom.json`;
   try {
     const begun = beginCapture({ root: fixture.root, candidateSha: fixture.sha, sourceRef: "HEAD", output });
-    write(fixture.root, "frontend/web/dist/server/index.js");
-    write(fixture.root, "frontend/web/dist/server/wrangler.json", "{}\n");
-    write(fixture.root, "frontend/web/dist/client/_headers");
-    const web = hashDirectory(fixture.root, "frontend/web/dist");
+    writeVinextWebArtifacts(fixture.root);
+    const web = hashCandidateArtifact(fixture.root, "web");
     writeFileSync(join(output, "gates", "WEB_CHECK.json"), JSON.stringify({
       schemaVersion: SCHEMA_VERSION,
       kind: "talk-and-talk-candidate-gate-record",

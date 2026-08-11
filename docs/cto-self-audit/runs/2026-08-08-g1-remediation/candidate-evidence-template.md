@@ -5,6 +5,12 @@
 
 ## Candidate commit / freeze authorization
 
+`CANDIDATE-COMMIT-R01` was consumed by commit
+`83a9ec6aa4e67c65997baa4ae4fa786a00654560`. The first detached-checkout
+comparison then exposed non-deterministic Vinext security material, so that
+commit is **superseded and is not the release candidate**. It must not be
+tagged, pushed as a candidate, or used as G1/G2 evidence.
+
 Before staging or committing, obtain one non-secret
 `CANDIDATE-COMMIT-R01` record. It is a **local repository-write authorization**,
 not a protected-tag, push, CI, deployment, or external-action authorization.
@@ -27,12 +33,32 @@ Any changed path/mode, expired record, modified final diff, or need for a second
 commit invalidates this record and requires a new authorization. Do not infer
 authorization from this blank template or from the later protected-tag row.
 
+The user supplied that replacement authorization in the same active task. The
+resulting non-secret `CANDIDATE-COMMIT-R02` record is:
+
+| Required field | Authorized replacement value |
+|---|---|
+| Evidence ID / issued / expiry | `USER-AUTH-ALL-20260811`; issued in the active 2026-08-11 task before replacement staging; task-local expiry `2026-08-11 23:59:59 CST` |
+| Baseline SHA and local branch/ref | superseded local commit `83a9ec6aa4e67c65997baa4ae4fa786a00654560`; `codex/g1-text-only-release-candidate` |
+| Final reviewed `git diff --name-status -z` hash and change-map hash | 8-path NUL manifest SHA-256 `077f219bb24b1ed9d58f4f3620c9e53ca3102bc8ea7883248ca9033432e86b61`; change-map SHA-256 `1c93e03c4047135de865e6ca5abc3e36adfe882103ae15435df5cabf9ca8425a` |
+| Exact allowed path and file-mode list | `scripts/candidate-evidence.mjs`; `scripts/candidate-evidence.test.mjs`; and `docs/cto-self-audit/runs/2026-08-08-g1-remediation/{candidate-evidence-template.md,change-map.md,handoff.md,scope.md,state.md,validation.md}`; all eight remain regular `100644`; no addition, deletion, rename, or mode change |
+| Authorized signer and exact one-commit message | `taoma <taomahj834225@outlook.com>`; `fix(release): normalize ephemeral web build evidence` |
+| Independent reviewer | not supplied; `/root` owner review is recorded but does not satisfy independent candidate review |
+| Expected result | one new full commit SHA whose parent is `83a9ec6aa4e67c65997baa4ae4fa786a00654560`, followed by a clean local worktree and two new detached-checkout captures |
+| Explicitly excluded actions | no amend/reset/clean/history rewrite; the record permits only the exact replacement staging and one normal commit. Push remains the separately authorized later non-force branch push; protected tag, CI dispatch, deployment, provider, database, and external writes remain separately evidenced actions |
+
+Any additional changed path or mode invalidates `CANDIDATE-COMMIT-R02` and
+requires another record. A documentation edit within the already authorized
+eight-path set does not change the path/status manifest; the content-level
+change-map hash above remains the controlling reviewed scope record.
+
 ## Freeze protocol
 
 1. Finish all code, test, contract, workflow, and documentation changes.
-2. Obtain the complete `CANDIDATE-COMMIT-R01` record only after the final diff
-   and change map are supplied for review. It authorizes at most the exact
-   local staging and one commit described above.
+2. Obtain the latest applicable complete `CANDIDATE-COMMIT-R0x` record only
+   after the final diff and change map are supplied for review. It authorizes
+   at most the exact local staging and one commit described above. For the
+   current replacement candidate, that record is `CANDIDATE-COMMIT-R02`.
 3. Under that record, commit the complete candidate once. Record its full SHA
    and parent SHA below. Then, under a **separate** protected-tag/ref
    authorization, create a protected immutable candidate tag/ref that resolves
@@ -54,8 +80,14 @@ authorization from this blank template or from the later protected-tag row.
 5. Run the complete gate suite. Capture each full log outside source control or
    as a hash-addressed, redacted evidence artifact.
 6. Recompute all tree/bundle hashes from a second clean checkout. Any byte
-   difference, failed test, skip, missing artifact, or mismatched checksum
-   invalidates the candidate and requires a new SHA and full rerun.
+   difference outside the declared `vinext-ephemeral-security-material-v1`
+   policy, failed test, skip, missing artifact, or mismatched checksum
+   invalidates the candidate and requires a new SHA and full rerun. That policy
+   verifies but excludes the two matching per-build `prerenderSecret` manifests,
+   normalizes only Vinext's random `draftSecret` and `buildId` fields in the
+   server-bundle hash, and excludes only the test-created `.wrangler` runtime
+   cache. It does not normalize application bytes. The external OCI custody
+   receipt must still bind the exact raw built artifact and image digest.
 
 The no-dependency capture tool turns the local, non-destructive portion of
 these requirements into a fail-closed workflow. Capture metadata/logs are

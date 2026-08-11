@@ -44,7 +44,7 @@ export { sha256, stableJson };
 // preflight from its separately authorized PostgreSQL runtime suite, and
 // requires a deterministic, lockfile-bound CycloneDX SBOM. A syntactically
 // valid Evidence ID is an audit reference, not authority to create resources.
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 export const REQUIRED_GATES = Object.freeze([
   "WEB_CHECK",
@@ -108,7 +108,14 @@ const REQUIRED_SOURCE_PATHS = Object.freeze([
 const ARTIFACT_REQUIREMENTS = Object.freeze({
   web: {
     root: "frontend/web/dist",
-    required: ["server/index.js", "server/wrangler.json", "client/_headers"],
+    required: [
+      "server/index.js",
+      "server/wrangler.json",
+      "server/vinext-server.json",
+      "server/ssr/vinext-server.json",
+      "client/_headers",
+    ],
+    snapshotPolicy: "vinext-ephemeral-security-material-v1",
   },
   api: {
     root: "backend/api/dist",
@@ -136,6 +143,18 @@ const SHA256_PATTERN = /^[0-9a-f]{64}$/;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const EVIDENCE_ID_PATTERN = /^E[A-Z0-9]*(?:-[A-Z0-9][A-Z0-9._-]*)+$/;
 const VAULT_REFERENCE_PATTERN = /^vault:\/\/[A-Za-z0-9][A-Za-z0-9._/-]{2,159}(?:#[A-Za-z0-9._-]+)?$/;
+const VINEXT_UUID_SOURCE = "[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
+const NORMALIZED_VINEXT_UUID = "00000000-0000-4000-8000-000000000000";
+const WEB_ARTIFACT_NORMALIZATION = Object.freeze({
+  policy: "vinext-ephemeral-security-material-v1",
+  ignoredRuntimePaths: ["server/.wrangler"],
+  excludedSecurityMaterialPaths: [
+    "server/vinext-server.json",
+    "server/ssr/vinext-server.json",
+  ],
+  normalizedBundlePaths: ["server/index.js"],
+  normalizedFields: ["draftSecret", "buildId"],
+});
 const GENERATED_ARTIFACTS_BY_GATE = Object.freeze({
   WEB_CHECK: ["web"],
   API_BUILD: ["api", "apiGenerated"],
@@ -398,19 +417,24 @@ export function ensureCandidateState(root, candidateSha, sourceRef, options = {}
   };
 }
 
-function fileEntry(root, absolutePath, relativePath) {
+function fileEntry(root, absolutePath, relativePath, transformFile = undefined) {
   const stat = lstatSync(absolutePath);
   if (stat.isSymbolicLink()) {
     const target = readlinkSync(absolutePath, "utf8");
     return { path: relativePath, kind: "symlink", mode: stat.mode & 0o777, sha256: sha256(target) };
   }
   if (!stat.isFile()) fail(`Expected a regular file: ${relative(root, absolutePath)}`);
+  const source = readFileSync(absolutePath);
+  const normalized = transformFile ? transformFile(relativePath, source) : source;
+  if (!Buffer.isBuffer(normalized) || normalized.length !== source.length) {
+    fail(`Artifact normalization must preserve file bytes length: ${relative(root, absolutePath)}`);
+  }
   return {
     path: relativePath,
     kind: "file",
     mode: stat.mode & 0o777,
     bytes: stat.size,
-    sha256: sha256(readFileSync(absolutePath)),
+    sha256: sha256(normalized),
   };
 }
 
@@ -420,24 +444,120 @@ export function hashDirectory(root, directory, options = {}) {
     fail(`Required artifact directory is missing: ${normalizeRelative(directory)}`);
   }
   const ignoredNames = options.ignoredNames || new Set();
+  const ignoredPaths = options.ignoredPaths || new Set();
   const entries = [];
   const visit = (absolute, localRelative) => {
     for (const child of readdirSync(absolute, { withFileTypes: true }).sort((left, right) => left.name.localeCompare(right.name))) {
       if (ignoredNames.has(child.name)) continue;
       const nextAbsolute = join(absolute, child.name);
       const nextRelative = normalizeRelative(join(localRelative, child.name));
+      if (ignoredPaths.has(nextRelative)) continue;
       if (child.isDirectory()) {
         visit(nextAbsolute, nextRelative);
       } else {
         if (child.isSymbolicLink()) fail(`Artifact contains a symbolic link: ${normalizeRelative(join(directory, nextRelative))}`);
-        entries.push(fileEntry(root, nextAbsolute, nextRelative));
+        entries.push(fileEntry(root, nextAbsolute, nextRelative, options.transformFile));
       }
     }
   };
   visit(absoluteDirectory, "");
   if (!entries.length) fail(`Artifact directory is empty: ${normalizeRelative(directory)}`);
-  const treeSha256 = sha256(stableJson(entries));
-  return { root: normalizeRelative(directory), entries, treeSha256 };
+  const normalization = options.normalization;
+  const treeSha256 = sha256(stableJson(normalization ? { entries, normalization } : entries));
+  return {
+    root: normalizeRelative(directory),
+    entries,
+    ...(normalization ? { normalization } : {}),
+    treeSha256,
+  };
+}
+
+function validateVinextPrerenderSecretFiles(root, requirement) {
+  const paths = WEB_ARTIFACT_NORMALIZATION.excludedSecurityMaterialPaths;
+  let expected;
+  for (const path of paths) {
+    const absolute = join(root, requirement.root, path);
+    if (!existsSync(absolute) || !lstatSync(absolute).isFile() || lstatSync(absolute).isSymbolicLink()) {
+      fail(`Vinext security manifest must be a regular non-symbolic-link file: ${normalizeRelative(join(requirement.root, path))}`);
+    }
+    const manifest = readJson(absolute);
+    if (
+      !manifest
+      || typeof manifest !== "object"
+      || Array.isArray(manifest)
+      || Object.keys(manifest).length !== 1
+      || !/^[0-9a-f]{64}$/.test(manifest.prerenderSecret || "")
+    ) {
+      fail(`Vinext security manifest is invalid: ${normalizeRelative(join(requirement.root, path))}`);
+    }
+    if (expected === undefined) expected = manifest.prerenderSecret;
+    if (manifest.prerenderSecret !== expected) {
+      fail("Vinext server and SSR prerender secrets must match within one build");
+    }
+  }
+}
+
+function normalizeVinextServerBundle(relativePath, bytes) {
+  if (relativePath !== "server/index.js") return bytes;
+  const source = bytes.toString("utf8");
+  const patterns = [
+    {
+      field: "draftSecret",
+      pattern: new RegExp(`(function getDraftSecret\\(\\)\\s*\\{\\s*return\\s*")(${VINEXT_UUID_SOURCE})(";\\s*\\})`, "g"),
+    },
+    {
+      field: "buildId",
+      pattern: new RegExp(`(get buildId\\(\\)\\s*\\{\\s*return\\s*")(${VINEXT_UUID_SOURCE})(";\\s*\\})`, "g"),
+    },
+    {
+      field: "buildId",
+      pattern: new RegExp(`(function appIsrCacheKey\\(pathname, suffix, buildId\\s*=\\s*")(${VINEXT_UUID_SOURCE})("\\)\\s*\\{)`, "g"),
+    },
+    {
+      field: "buildId",
+      pattern: new RegExp(`(deploymentVersion:\\s*")(${VINEXT_UUID_SOURCE})(",\\s*rootBoundaryId)`, "g"),
+    },
+  ];
+  let buildId;
+  let normalized = source;
+  for (const { field, pattern } of patterns) {
+    const matches = [...source.matchAll(pattern)];
+    if (matches.length !== 1) {
+      fail(`Vinext server bundle must contain exactly one recognized ${field} field`);
+    }
+    if (field === "buildId") {
+      if (buildId === undefined) buildId = matches[0][2];
+      if (matches[0][2] !== buildId) fail("Vinext server bundle build IDs must match");
+    }
+    normalized = normalized.replace(
+      pattern,
+      (_match, prefix, _value, suffix) => `${prefix}${NORMALIZED_VINEXT_UUID}${suffix}`,
+    );
+  }
+  return Buffer.from(normalized, "utf8");
+}
+
+function artifactHashOptions(root, name, requirement) {
+  if (name !== "web") {
+    return { ignoredNames: requirement.ignoredNames };
+  }
+  if (requirement.snapshotPolicy !== WEB_ARTIFACT_NORMALIZATION.policy) {
+    fail("Unsupported Web artifact snapshot policy");
+  }
+  validateVinextPrerenderSecretFiles(root, requirement);
+  return {
+    ignoredNames: new Set([...(requirement.ignoredNames || []), ".wrangler"]),
+    ignoredPaths: new Set(WEB_ARTIFACT_NORMALIZATION.excludedSecurityMaterialPaths),
+    transformFile: normalizeVinextServerBundle,
+    normalization: WEB_ARTIFACT_NORMALIZATION,
+  };
+}
+
+export function hashCandidateArtifact(root, name) {
+  const requirement = ARTIFACT_REQUIREMENTS[name];
+  if (!requirement) fail(`Unknown candidate artifact: ${name}`);
+  assertRequiredArtifactFiles(root, requirement);
+  return hashDirectory(root, requirement.root, artifactHashOptions(root, name, requirement));
 }
 
 export function hashGitTree(root) {
@@ -453,11 +573,7 @@ function producedArtifactNames(gate) {
 }
 
 function artifactSnapshots(root, names) {
-  return Object.fromEntries(names.map((name) => {
-    const requirement = ARTIFACT_REQUIREMENTS[name];
-    assertRequiredArtifactFiles(root, requirement);
-    return [name, hashDirectory(root, requirement.root, { ignoredNames: requirement.ignoredNames })];
-  }));
+  return Object.fromEntries(names.map((name) => [name, hashCandidateArtifact(root, name)]));
 }
 
 function assertArtifactSnapshots(root, artifacts, label) {
@@ -469,7 +585,7 @@ function assertArtifactSnapshots(root, artifacts, label) {
     if (!requirement || !recorded || typeof recorded !== "object" || !SHA256_PATTERN.test(recorded.treeSha256 || "")) {
       fail(`${label} has an invalid generated-artifact entry: ${name}`);
     }
-    const current = hashDirectory(root, requirement.root, { ignoredNames: requirement.ignoredNames });
+    const current = hashCandidateArtifact(root, name);
     if (current.treeSha256 !== recorded.treeSha256 || stableJson(current) !== stableJson(recorded)) {
       fail(`${label} generated artifact changed after its recorded build gate: ${name}`);
     }
@@ -1056,9 +1172,8 @@ export function finalizeCapture({
   const normalizedCleanupEvidence = requireEvidenceId(cleanupEvidence, "--cleanup-evidence");
 
   const artifacts = {};
-  for (const [name, requirement] of Object.entries(ARTIFACT_REQUIREMENTS)) {
-    assertRequiredArtifactFiles(state.repoRoot, requirement);
-    artifacts[name] = hashDirectory(state.repoRoot, requirement.root, { ignoredNames: requirement.ignoredNames });
+  for (const name of Object.keys(ARTIFACT_REQUIREMENTS)) {
+    artifacts[name] = hashCandidateArtifact(state.repoRoot, name);
     writeJson(join(loaded.outputDirectory, "manifests", `${name}.json`), artifacts[name]);
   }
   artifacts.sbom = validateSbom(sbom, state.repoRoot, {
@@ -1118,6 +1233,9 @@ function assertManifestArtifact(name, artifact) {
   }
   if (!Number.isInteger(artifact.bytes) && !Array.isArray(artifact.entries)) {
     fail(`Candidate manifest artifact ${name} has no size or entries`);
+  }
+  if ((name === "web" || name.endsWith(".web")) && stableJson(artifact.normalization) !== stableJson(WEB_ARTIFACT_NORMALIZATION)) {
+    fail(`Candidate manifest Web artifact ${name} is missing the required Vinext normalization policy`);
   }
   if (name === "sbom") {
     if (

@@ -92,6 +92,25 @@ pass. It does not authorize force-push, history rewrite, cleanup of unrelated
 worktrees, a direct main push, production deployment, real-money action, shared
 database/Redis mutation, or fabricated evidence.
 
+## G1-FOLLOWUP-14 Web artifact reproducibility lease
+
+`G1-FOLLOWUP-14` is the narrow correction opened by the two authorized clean
+detached captures of preparation SHA
+`83a9ec6aa4e67c65997baa4ae4fa786a00654560`. It may edit only
+`scripts/candidate-evidence.{mjs,test.mjs}`, the candidate evidence template,
+and this run's `scope/state/change-map/validation/handoff` records. It may stage
+and commit that correction, replace the superseded candidate SHA, and rerun the
+two external local capture directories.
+
+The contract may normalize only Vinext's recognized random `draftSecret` and
+`buildId` fields when hashing `server/index.js`; it must validate and exclude
+only the two matching per-build `vinext-server.json` prerender-secret files and
+ignore only the test-created `server/.wrangler` cache. A changed application
+byte, malformed/mismatched security manifest, unrecognized bundle layout, or
+different API/Prisma/source/SBOM byte must still fail closed. This local
+normalization never substitutes for the protected OCI builder's raw artifact,
+image digest, signature, or custody receipt.
+
 ## Ownership and continuation rule
 
 `state.md` is the only current-phase source of truth. `validation.md` is
