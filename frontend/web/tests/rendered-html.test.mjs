@@ -4,13 +4,13 @@ import test from "node:test";
 
 const templateRoot = new URL("../", import.meta.url);
 
-async function render(pathname = "/") {
+async function render(pathname = "/", { origin = "http://localhost" } = {}) {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
   const { default: worker } = await import(workerUrl.href);
 
   return worker.fetch(
-    new Request(new URL(pathname, "http://localhost"), {
+    new Request(new URL(pathname, origin), {
       headers: { accept: "text/html" },
     }),
     {
@@ -25,6 +25,39 @@ async function render(pathname = "/") {
   );
 }
 
+async function renderWithoutBindings(pathname = "/") {
+  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
+  workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}-no-bindings`);
+  const { default: worker } = await import(workerUrl.href);
+
+  return worker.fetch(
+    new Request(new URL(pathname, "http://localhost"), {
+      headers: { accept: "text/html" },
+    }),
+    undefined,
+    {
+      waitUntil() {},
+      passThroughOnException() {},
+    },
+  );
+}
+
+async function withEnvironment(values, run) {
+  const previous = new Map(Object.keys(values).map((key) => [key, process.env[key]]));
+  for (const [key, value] of Object.entries(values)) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+  try {
+    return await run();
+  } finally {
+    for (const [key, value] of previous) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+}
+
 async function request(pathname, init) {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}-${Math.random()}`);
@@ -36,6 +69,35 @@ async function request(pathname, init) {
         fetch: async () => new Response("Not found", { status: 404 }),
       },
     },
+    {
+      waitUntil() {},
+      passThroughOnException() {},
+    },
+  );
+}
+
+async function optimizedImageRequest({ width = 32, ...overrides } = {}) {
+  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
+  workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}-image`);
+  const { default: worker } = await import(workerUrl.href);
+  const bindings = {
+    ASSETS: {
+      fetch: async () => new Response("asset", { headers: { "content-type": "image/png" } }),
+    },
+    IMAGES: {
+      input: () => ({
+        transform: () => ({
+          output: async () => ({
+            response: () => new Response("image", { headers: { "content-type": "image/png" } }),
+          }),
+        }),
+      }),
+    },
+    ...overrides,
+  };
+  return worker.fetch(
+    new Request(`https://talkandtalk.app/_vinext/image?url=%2Fbrand%2Fapp-icon.png&w=${width}&q=75`),
+    bindings,
     {
       waitUntil() {},
       passThroughOnException() {},
@@ -62,7 +124,8 @@ test("server-renders the Talk&Talk official marketing home", async () => {
   assert.match(html, /了解服务路径/);
   assert.match(html, /先认识规则，再进入小程序/);
   assert.match(html, /hero-trust-strip/);
-  assert.match(html, /App 即将到来/);
+  assert.match(html, /文字互动/);
+  assert.doesNotMatch(html, /App 即将到来/);
   assert.match(html, /bubble-hero|icon-orbit|app-icon/);
   assert.match(html, /非医疗|非急救|年满 18/);
   // Brand signature retained (symbol section + orbit caption).
@@ -76,22 +139,18 @@ test("server-renders the Talk&Talk official marketing home", async () => {
   assert.doesNotMatch(html, /用户数|GMV|融资额/);
 });
 
-test("serves every primary product route with route-specific metadata", async () => {
+test("built public Worker tolerates a missing local binding object", async () => {
+  const response = await renderWithoutBindings("/");
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
+});
+
+test("serves every public marketing route with route-specific metadata", async () => {
   const routes = [
-    ["/discover", "发现陪伴｜Talk&amp;Talk"],
     ["/about", "关于我们｜Talk&amp;Talk"],
-    ["/login", "登录｜Talk&amp;Talk"],
-    ["/community", "广场｜Talk&amp;Talk"],
-    ["/orders", "订单｜Talk&amp;Talk"],
-    ["/messages", "消息｜Talk&amp;Talk"],
-    ["/profile", "我的｜Talk&amp;Talk"],
-    ["/workbench", "陪伴者工作台｜Talk&amp;Talk"],
-    ["/demo", "网页产品演示｜Talk&amp;Talk"],
     ["/safety", "安全与支持｜Talk&amp;Talk"],
-    ["/business", "平台与合作｜Talk&amp;Talk"],
     ["/how-it-works", "产品如何运作｜Talk&amp;Talk"],
     ["/partners", "合作与联系｜Talk&amp;Talk"],
-    ["/companions/preview-linyu", "陪伴者资料｜Talk&amp;Talk"],
   ];
 
   for (const [pathname, title] of routes) {
@@ -101,6 +160,32 @@ test("serves every primary product route with route-specific metadata", async ()
     assert.match(html, new RegExp(`<title>${title}</title>`, "i"), pathname);
   }
 });
+
+const lockedRuntime = process.env.NODE_ENV === "production" || process.env.WEB_DEFAULT_SURFACE_TEST === "1";
+
+test("candidate check explicitly invokes both locked-worker runtime suites", async () => {
+  const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
+  assert.match(packageJson.scripts.test, /test:default-surface/);
+  assert.match(packageJson.scripts.test, /test:production-surface/);
+  assert.match(packageJson.scripts["test:default-surface"], /WEB_DEFAULT_SURFACE_TEST=1/);
+  assert.match(packageJson.scripts["test:production-surface"], /NODE_ENV=production/);
+});
+
+// The local-open render suite intentionally exercises development HTML. Register
+// this assertion only in the dedicated locked-runtime suites instead of emitting
+// a skip that could be confused with candidate evidence.
+if (lockedRuntime) {
+  test("the built locked worker rejects private, deferred, and BFF surfaces", async () => {
+    for (const pathname of ["/business", "/demo", "/discover", "/companions/preview-linyu", "/login"]) {
+      const response = await render(pathname);
+      assert.equal(response.status, 404, pathname);
+    }
+    const sessionResponse = await request("/api/session/login", { method: "POST" });
+    assert.equal(sessionResponse.status, 403, "/api/session/login");
+    const backendResponse = await request("/api/backend/orders");
+    assert.equal(backendResponse.status, 403, "/api/backend/orders");
+  });
+}
 
 test("separates the indexable official site from transactional product routes", async () => {
   const [robots, sitemap, discover, login, workbench, companion, demo] = await Promise.all([
@@ -119,7 +204,8 @@ test("separates the indexable official site from transactional product routes", 
   assert.match(robots, /"\/companions\/"/);
   assert.match(sitemap, /how-it-works/);
   assert.match(sitemap, /partners/);
-  assert.match(sitemap, /\$\{base\}\/demo/);
+  assert.match(sitemap, /sitemapPublicPaths/);
+  assert.match(sitemap, /isProductionCandidateSurface/);
   assert.doesNotMatch(sitemap, /\$\{base\}\/discover/);
   assert.doesNotMatch(sitemap, /\$\{base\}\/login/);
 
@@ -163,15 +249,17 @@ test("keeps the official shell usable without a Web-account entry", async () => 
 
   assert.match(shell, /marketing-mobile-nav/);
   assert.match(shell, /官网导航/);
-  assert.match(shell, /App 即将到来/);
+  assert.doesNotMatch(shell, /App 即将到来/);
   assert.match(shell, /isMarketing \? \(/);
   assert.match(shell, /if \(isMarketing\)/);
   assert.match(shell, /有边界的线上陪伴/);
+  assert.match(shell, /resolveMiniprogramEntry/);
+  assert.doesNotMatch(shell, /miniprogramEntryUrl/);
   assert.match(home, /bubble-hero/);
   assert.match(home, /hero-trust-strip/);
   assert.match(home, /IconOrbit/);
   assert.match(home, /MiniprogramCta/);
-  assert.match(home, /showAppComingSoon/);
+  assert.doesNotMatch(home, /showAppComingSoon/);
   assert.match(home, /secondaryHref="\/how-it-works"/);
   assert.match(home, /\/brand\/app-icon\.png/);
   assert.match(home, /有边界的线上陪伴/);
@@ -179,7 +267,9 @@ test("keeps the official shell usable without a Web-account entry", async () => 
   assert.match(home, /home-values|home-trust|home-moment/);
   assert.match(shell, /BrandMark|app-icon\.png/);
   assert.match(cta, /复制名称并在微信搜索/);
-  assert.match(cta, /showAppComingSoon/);
+  assert.match(cta, /resolveMiniprogramEntry/);
+  assert.match(cta, /resolveMiniprogramQr/);
+  assert.doesNotMatch(cta, /miniprogramEntryUrl|miniprogramQrUrl|showAppComingSoon/);
   assert.match(cta, /<button/);
   assert.match(reveal, /useScrollEntrance/);
   assert.match(reveal, /IntersectionObserver/);
@@ -256,40 +346,12 @@ test("keeps public browsing open while requiring consent at login", async () => 
   assert.match(login, /不是心理治疗或紧急救援服务/);
 });
 
-test("renders an investor-ready but evidence-bounded platform brief", async () => {
-  const response = await render("/business");
-  assert.equal(response.status, 200);
-  const html = await response.text();
-  assert.match(html, /可信的服务基础设施/);
-  assert.match(html, /已经实现并可联调/);
-  assert.match(html, /需要部署方完成/);
-  assert.match(html, /不使用未经核验的用户数、GMV 或增长率/);
-});
-
-test("offers a no-login, read-only product tour for commercial evaluation", async () => {
-  const [response, bookingResponse] = await Promise.all([
-    render("/demo"),
-    render("/demo?stage=booking"),
-  ]);
-  assert.equal(response.status, 200);
-  assert.equal(bookingResponse.status, 200);
-  const html = await response.text();
-  const bookingHtml = await bookingResponse.text();
-  assert.match(html, /不创建账号、不提交信息、不发起订单/);
-  assert.match(html, /产品演示阶段/);
-  assert.match(html, /脱敏示例/);
-  assert.match(html, /平台共同状态/);
-  assert.match(bookingHtml, /把一次约定写进同一条状态/);
-});
-
-test("keeps motion causal, performant and the commercial tour deep-linkable", async () => {
-  const [hero, heroStyles, journey, signal, demo, business] = await Promise.all([
+test("keeps marketing motion causal and performant", async () => {
+  const [hero, heroStyles, journey, signal] = await Promise.all([
     readFile(new URL("../components/motion/HeroOrchestration.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../components/motion/TrustJourney.tsx", import.meta.url), "utf8"),
     readFile(new URL("../components/motion/ConnectionPulse.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../components/DemoExperience.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../components/BusinessScreen.tsx", import.meta.url), "utf8"),
   ]);
 
   assert.match(hero, /hero-entrance-title/);
@@ -303,11 +365,84 @@ test("keeps motion causal, performant and the commercial tour deep-linkable", as
   assert.match(signal, /visibilitychange/);
   assert.match(signal, /requestAnimationFrame/);
   assert.match(signal, /isSignalTraveling/);
-  assert.match(demo, /new URLSearchParams\(window\.location\.search\)/);
-  assert.match(demo, /demo-status-bridge/);
-  assert.match(business, /stage=booking/);
-  assert.match(business, /stage=delivery/);
-  assert.match(business, /stage=support/);
+});
+
+test("public HTML never promotes private product routes or unsafe Mini Program config", async () => {
+  for (const pathname of ["/", "/how-it-works", "/safety", "/about", "/partners"]) {
+    const response = await render(pathname);
+    assert.equal(response.status, 200, pathname);
+    const html = await response.text();
+    assert.doesNotMatch(html, /href=["']\/business(?:["'#?]|$)/, pathname);
+    assert.doesNotMatch(html, /href=["']\/demo(?:["'#?]|$)/, pathname);
+  }
+
+  await withEnvironment({
+    NEXT_PUBLIC_MINIPROGRAM_PATH: "https://evil.example/mp?token=unsafe",
+    NEXT_PUBLIC_MINIPROGRAM_QR_URL: "https://evil.example/qr.png#unsafe",
+  }, async () => {
+    const response = await render("/");
+    const html = await response.text();
+    assert.doesNotMatch(html, /evil\.example|token=unsafe|#unsafe/);
+  });
+});
+
+test("built worker emits security headers for public HTML", async () => {
+  const response = await render("/", { origin: "https://talkandtalk.app" });
+  const csp = response.headers.get("content-security-policy") ?? "";
+  assert.match(csp, /default-src 'self'/);
+  assert.match(csp, /object-src 'none'/);
+  assert.match(csp, /frame-ancestors 'none'/);
+  assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+  assert.equal(response.headers.get("x-frame-options"), "DENY");
+  assert.equal(response.headers.get("referrer-policy"), "strict-origin-when-cross-origin");
+  assert.match(response.headers.get("permissions-policy") ?? "", /camera=\(\), geolocation=\(\), microphone=\(\)/);
+  assert.match(response.headers.get("strict-transport-security") ?? "", /max-age=31536000/);
+});
+
+test("built worker emits the same security boundary for optimized images", async () => {
+  const response = await optimizedImageRequest();
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-security-policy") ?? "", /default-src 'self'/);
+  assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+  assert.equal(response.headers.get("x-frame-options"), "DENY");
+  assert.equal(response.headers.get("referrer-policy"), "strict-origin-when-cross-origin");
+  assert.match(response.headers.get("permissions-policy") ?? "", /camera=\(\)/);
+  assert.match(response.headers.get("strict-transport-security") ?? "", /max-age=31536000/);
+});
+
+test("image transformation is opt-in after a configured binding is verified", async () => {
+  const response = await optimizedImageRequest({ TALKTALK_IMAGE_TRANSFORM_ENABLED: "true" });
+  assert.equal(response.status, 200);
+  assert.equal(await response.text(), "image");
+});
+
+test("built Worker declares the bindings required for local public image requests", async () => {
+  const config = JSON.parse(await readFile(new URL("../dist/server/wrangler.json", import.meta.url), "utf8"));
+  assert.equal(config.assets?.binding, "ASSETS");
+  assert.equal(config.assets?.not_found_handling, "none");
+  assert.equal(config.images?.binding, "IMAGES");
+});
+
+test("optimized images safely use the original asset without a local transformer", async () => {
+  const response = await optimizedImageRequest({ IMAGES: undefined });
+  assert.equal(response.status, 200);
+  assert.equal(await response.text(), "asset");
+  assert.match(response.headers.get("cache-control") ?? "", /immutable/);
+});
+
+test("optimized image endpoint accepts every emitted public brand width", async () => {
+  for (const width of [36, 44, 220, 420, 640]) {
+    const response = await optimizedImageRequest({ width, IMAGES: undefined });
+    assert.equal(response.status, 200, `width=${width}`);
+    assert.equal(await response.text(), "asset", `width=${width}`);
+  }
+});
+
+test("optimized image endpoint fails closed when the required assets binding is absent", async () => {
+  const response = await optimizedImageRequest({ ASSETS: undefined, IMAGES: undefined });
+  assert.equal(response.status, 503);
+  assert.match(await response.text(), /Image assets are unavailable/);
+  assert.equal(response.headers.get("x-content-type-options"), "nosniff");
 });
 
 test("keeps official-company facts configurable without fabricating a public disclosure", async () => {
@@ -323,7 +458,8 @@ test("keeps official-company facts configurable without fabricating a public dis
   assert.match(disclosure, /verifiedPublicValue/);
   assert.match(disclosure, /NEXT_PUBLIC_LEGAL_OPERATOR_NAME/);
   assert.match(about, /hasVerifiedPublicDisclosure/);
-  assert.match(shell, /miniprogramEntryUrl/);
+  assert.match(shell, /resolveMiniprogramEntry/);
+  assert.doesNotMatch(shell, /miniprogramEntryUrl|miniprogramQrUrl/);
   assert.match(layout, /og-trust-path\.png/);
   assert.match(layout, /metadataBase: siteOrigin/);
   assert.match(sitemap, /PUBLIC_SITE_CONTENT_UPDATED_AT/);
@@ -385,6 +521,13 @@ test("rejects malformed or stale login consent before contacting auth", async ()
       },
     }),
   });
+
+  if (process.env.NODE_ENV === "production" || process.env.WEB_DEFAULT_SURFACE_TEST === "1") {
+    assert.equal(response.status, 403);
+    const body = await response.json();
+    assert.equal(body.error.code, "ROUTE_NOT_ALLOWED");
+    return;
+  }
 
   assert.equal(response.status, 400);
   const body = await response.json();

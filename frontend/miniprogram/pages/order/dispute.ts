@@ -10,12 +10,14 @@ import {
   approvedControlledEvidenceIds,
   chooseEvidenceAudio,
   chooseEvidenceImage,
+  controlledEvidenceEnabled,
   ControlledEvidenceDraft,
   loadControlledEvidenceDrafts,
   LocalEvidenceFile,
   refreshControlledEvidenceDrafts,
   saveControlledEvidenceDrafts,
-  uploadControlledEvidence
+  uploadControlledEvidence,
+  TEXT_ONLY_EVIDENCE_MESSAGE
 } from "../../utils/controlled-evidence";
 
 const ISSUE_OPTIONS: Array<{ value: AttendanceIssue; label: string; help: string }> = [
@@ -64,6 +66,7 @@ function timeText(value?: string | null): string {
 
 function present(dispute: AttendanceDispute | null) {
   if (!dispute) return null;
+  const evidenceEnabled = controlledEvidenceEnabled();
   const deadlineOpen = (value?: string | null) => {
     const timestamp = Date.parse(value || "");
     return Number.isFinite(timestamp) && timestamp > Date.now();
@@ -100,6 +103,7 @@ function present(dispute: AttendanceDispute | null) {
     canAppealRespond,
     statements: dispute.statements.map((item) => ({
       ...item,
+      evidenceAttachments: evidenceEnabled ? item.evidenceAttachments : [],
       roleText: ROLE_TEXT[item.participantRole],
       kindText: STATEMENT_KIND_TEXT[item.kind] || item.kind,
       timeText: timeText(item.createdAt)
@@ -134,6 +138,7 @@ Page({
     loading: true,
     action: "",
     error: "",
+    textOnly: !controlledEvidenceEnabled(),
     evidenceDrafts: [] as ControlledEvidenceDraft[],
     evidenceUploading: false
   },
@@ -169,6 +174,12 @@ Page({
         dispute = mine.item;
         if (dispute) this.disputeId = dispute.id;
       }
+      if (dispute && !controlledEvidenceEnabled()) {
+        dispute = {
+          ...dispute,
+          statements: dispute.statements.map((item) => ({ ...item, evidenceAttachments: [] }))
+        };
+      }
       const resolvedOrderId = this.orderId || dispute?.order.id || "";
       if (resolvedOrderId && !this.orderId) {
         this.orderId = resolvedOrderId;
@@ -180,7 +191,7 @@ Page({
           .catch(() => ({ order: null as Order | null, available: false as const }))
         : { order: null as Order | null, available: false as const };
       const policyResult = await policyPromise;
-      const evidenceDrafts = dispute
+      const evidenceDrafts = dispute && controlledEvidenceEnabled()
         ? await refreshControlledEvidenceDrafts(loadControlledEvidenceDrafts(this.evidenceStorageKey(dispute.id)))
         : [];
       if (dispute) saveControlledEvidenceDrafts(this.evidenceStorageKey(dispute.id), evidenceDrafts);
@@ -293,14 +304,26 @@ Page({
     }
   },
   async addEvidenceImage() {
+    if (!controlledEvidenceEnabled()) {
+      wx.showToast({ title: TEXT_ONLY_EVIDENCE_MESSAGE, icon: "none" });
+      return;
+    }
     const file = await chooseEvidenceImage();
     if (file) await this.uploadEvidence(file);
   },
   async addEvidenceAudio() {
+    if (!controlledEvidenceEnabled()) {
+      wx.showToast({ title: TEXT_ONLY_EVIDENCE_MESSAGE, icon: "none" });
+      return;
+    }
     const file = await chooseEvidenceAudio();
     if (file) await this.uploadEvidence(file);
   },
   async uploadEvidence(file: LocalEvidenceFile) {
+    if (!controlledEvidenceEnabled()) {
+      wx.showToast({ title: TEXT_ONLY_EVIDENCE_MESSAGE, icon: "none" });
+      return;
+    }
     if (!this.disputeId || this.data.evidenceUploading || this.data.evidenceDrafts.length >= 3) return;
     this.setData({ evidenceUploading: true });
     try {
@@ -324,17 +347,30 @@ Page({
     }
   },
   async refreshEvidence() {
+    if (!controlledEvidenceEnabled()) {
+      this.setData({ evidenceDrafts: [] });
+      wx.showToast({ title: TEXT_ONLY_EVIDENCE_MESSAGE, icon: "none" });
+      return;
+    }
     const evidenceDrafts = await refreshControlledEvidenceDrafts(this.data.evidenceDrafts);
     saveControlledEvidenceDrafts(this.evidenceStorageKey(), evidenceDrafts);
     this.setData({ evidenceDrafts });
   },
   removeEvidence(event: any) {
+    if (!controlledEvidenceEnabled()) {
+      this.setData({ evidenceDrafts: [] });
+      return;
+    }
     const assetId = String(event.currentTarget.dataset.id || "");
     const evidenceDrafts = this.data.evidenceDrafts.filter((item) => item.assetId !== assetId);
     saveControlledEvidenceDrafts(this.evidenceStorageKey(), evidenceDrafts);
     this.setData({ evidenceDrafts });
   },
   async openBoundEvidence(event: any) {
+    if (!controlledEvidenceEnabled()) {
+      wx.showToast({ title: TEXT_ONLY_EVIDENCE_MESSAGE, icon: "none" });
+      return;
+    }
     try {
       const result = await api.caseEvidenceReadUrl(String(event.currentTarget.dataset.id || ""));
       if (result.kind === "image") {

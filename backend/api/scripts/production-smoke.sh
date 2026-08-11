@@ -1,16 +1,70 @@
 #!/usr/bin/env bash
-# Strict production smoke. It never uses mock SMS or mock payment fulfillment.
-# Usage: ./scripts/production-smoke.sh https://api.talkandtalk.app
+# Controlled production smoke. It is read-only: it never uses mock SMS or
+# mock-payment fulfillment. A syntactically valid Evidence ID is only an
+# auditable reference, not proof that an external authorization exists.
+# Usage requires a separately approved per-action record; this script fails
+# before its first HTTP request if that record's non-secret bindings are absent.
 set -euo pipefail
 
-BASE_URL="${1:-https://api.talkandtalk.app}"
+BASE_URL="${1:-}"
+if [[ -z "$BASE_URL" ]]; then
+  echo "Usage: $0 <approved https API origin>" >&2
+  exit 2
+fi
+BASE_URL="${BASE_URL%/}"
 API="$BASE_URL/api/v1"
+CURL_BIN="/usr/bin/curl"
+PYTHON_BIN="/usr/bin/python3"
+
+if [[ ! -x "$CURL_BIN" || ! -x "$PYTHON_BIN" ]]; then
+  echo "controlled production smoke requires trusted system curl and python executables" >&2
+  exit 2
+fi
+# Do not let a shell's ambient proxy configuration receive short-lived bearer
+# tokens. An approved target must be contacted directly over HTTPS. Every curl
+# call below begins with `-q`, which disables user-provided curl configuration
+# before it can alter the method, destination, headers, or proxy behavior.
+unset ALL_PROXY all_proxy HTTP_PROXY http_proxy HTTPS_PROXY https_proxy NO_PROXY no_proxy
+
+: "${PRODUCTION_SMOKE_AUTHORIZATION_EVIDENCE:?Set the non-secret per-action Evidence ID}"
+: "${PRODUCTION_SMOKE_AUTHORIZATION_EXPIRES_AT:?Set the UTC expiry from the approved action record}"
+: "${PRODUCTION_SMOKE_ALLOWED_BASE_URL:?Set the exact approved API origin}"
+
+if [[ ! "$PRODUCTION_SMOKE_AUTHORIZATION_EVIDENCE" =~ ^E[A-Z0-9]*(-[A-Z0-9][A-Z0-9._-]*)+$ ]]; then
+  echo "PRODUCTION_SMOKE_AUTHORIZATION_EVIDENCE must be a canonical non-secret Evidence ID" >&2
+  exit 2
+fi
+if [[ ! "$BASE_URL" =~ ^https://[A-Za-z0-9.-]+(:[0-9]{1,5})?$ ]]; then
+  echo "approved production smoke target must be an HTTPS origin without path, query, credentials, or fragment" >&2
+  exit 2
+fi
+if [[ "$BASE_URL" != "$PRODUCTION_SMOKE_ALLOWED_BASE_URL" ]]; then
+  echo "production smoke target does not match the approved action record" >&2
+  exit 2
+fi
+"$PYTHON_BIN" - "$PRODUCTION_SMOKE_AUTHORIZATION_EXPIRES_AT" <<'PY'
+from datetime import datetime, timezone
+import sys
+
+value = sys.argv[1]
+if not value.endswith("Z"):
+    raise SystemExit("PRODUCTION_SMOKE_AUTHORIZATION_EXPIRES_AT must be RFC3339 UTC with Z")
+try:
+    expiry = datetime.fromisoformat(value.replace("Z", "+00:00"))
+except ValueError as error:
+    raise SystemExit(f"PRODUCTION_SMOKE_AUTHORIZATION_EXPIRES_AT must be RFC3339 UTC: {error}")
+if expiry.tzinfo is None or expiry.utcoffset() is None:
+    raise SystemExit("PRODUCTION_SMOKE_AUTHORIZATION_EXPIRES_AT must include an offset")
+if expiry.astimezone(timezone.utc) <= datetime.now(timezone.utc):
+    raise SystemExit("production smoke authorization is expired")
+PY
+
 : "${METRICS_TOKEN:?Set METRICS_TOKEN to the production metrics bearer token}"
 : "${PRODUCTION_ADMIN_ACCESS_TOKEN:?Set a short-lived production admin access token}"
 
 echo "==> Health liveness and authenticated readiness"
-HEALTH=$(curl -fsS "$API/health")
-python3 - "$HEALTH" <<'PY'
+HEALTH=$("$CURL_BIN" -q --noproxy '*' -fsS "$API/health")
+"$PYTHON_BIN" - "$HEALTH" <<'PY'
 import json, sys
 data = json.loads(sys.argv[1])["data"]
 assert data["status"] == "ok", data
@@ -18,19 +72,20 @@ assert "dependencies" not in data, data
 print(f"health liveness ok: {data['service']} {data['version']}")
 PY
 
-READY=$(curl -fsS -H "Authorization: Bearer $METRICS_TOKEN" "$API/health/ready")
-python3 - "$READY" <<'PY'
+READY=$("$CURL_BIN" -q --noproxy '*' -fsS -H "Authorization: Bearer $METRICS_TOKEN" "$API/health/ready")
+"$PYTHON_BIN" - "$READY" <<'PY'
 import json, sys
 data = json.loads(sys.argv[1])["data"]
 assert data["status"] == "ok", data
 assert data["dependencies"]["database"]["status"] == "ok", data
 assert data["dependencies"]["redis"]["status"] == "ok", data
-print(f"health ready ok: env={data.get('appEnv')}")
+assert data.get("appEnv") == "production", data
+print("health ready ok: env=production")
 PY
 
 echo "==> WeChat Mini Program configuration"
-WECHAT_STATUS=$(curl -fsS "$API/auth/wechat/mini-program/status")
-python3 - "$WECHAT_STATUS" <<'PY'
+WECHAT_STATUS=$("$CURL_BIN" -q --noproxy '*' -fsS "$API/auth/wechat/mini-program/status")
+"$PYTHON_BIN" - "$WECHAT_STATUS" <<'PY'
 import json, sys
 data = json.loads(sys.argv[1])["data"]
 assert data == {"module": "wechatMiniProgram", "status": "configured", "configured": True}, data
@@ -38,8 +93,8 @@ print("Mini Program credentials are configured")
 PY
 
 echo "==> Real WeChat Pay provider"
-PAYMENTS_STATUS=$(curl -fsS "$API/payments/status")
-python3 - "$PAYMENTS_STATUS" <<'PY'
+PAYMENTS_STATUS=$("$CURL_BIN" -q --noproxy '*' -fsS "$API/payments/status")
+"$PYTHON_BIN" - "$PAYMENTS_STATUS" <<'PY'
 import json, sys
 data = json.loads(sys.argv[1])["data"]
 assert data["provider"] == "real", data
@@ -49,8 +104,8 @@ print("real WeChat Pay provider active")
 PY
 
 echo "==> Local-only user-content moderation privacy boundary"
-MODERATION_STATUS=$(curl -fsS "$API/moderation/status")
-python3 - "$MODERATION_STATUS" <<'PY'
+MODERATION_STATUS=$("$CURL_BIN" -q --noproxy '*' -fsS "$API/moderation/status")
+"$PYTHON_BIN" - "$MODERATION_STATUS" <<'PY'
 import json, sys
 data = json.loads(sys.argv[1])["data"]
 assert data["status"] == "active", data
@@ -62,10 +117,10 @@ print("user-authored content remains on local rules and authorized human review"
 PY
 
 echo "==> Commercial operational readiness"
-COMMERCIAL_READINESS=$(curl -fsS \
+COMMERCIAL_READINESS=$("$CURL_BIN" -q --noproxy '*' -fsS \
   -H "Authorization: Bearer $PRODUCTION_ADMIN_ACCESS_TOKEN" \
   "$API/admin/commercial/readiness")
-python3 - "$COMMERCIAL_READINESS" <<'PY'
+"$PYTHON_BIN" - "$COMMERCIAL_READINESS" <<'PY'
 import json, sys
 data = json.loads(sys.argv[1])["data"]
 assert data["status"] == "clear", data
@@ -73,69 +128,35 @@ assert all(value == 0 for value in data["blockers"].values()), data
 print("commercial operational readiness is clear")
 PY
 
-echo "==> Production SMS policy"
-HTTP_CODE=$(curl -sS -o /tmp/tat-prod-sms.json -w "%{http_code}" \
-  -X POST "$API/auth/sms/send-code" \
-  -H 'Content-Type: application/json' \
-  -d '{"phone":"13800138000"}' || true)
-if [[ "$HTTP_CODE" != "503" ]]; then
-  echo "expected SMS_UNAVAILABLE HTTP 503, got $HTTP_CODE" >&2
-  cat /tmp/tat-prod-sms.json >&2 || true
-  exit 1
-fi
-python3 - /tmp/tat-prod-sms.json <<'PY'
-import json, sys
-with open(sys.argv[1], encoding="utf-8") as handle:
-    payload = json.load(handle)
-assert payload["error"]["code"] == "SMS_UNAVAILABLE", payload
-assert "devCode" not in json.dumps(payload), payload
-PY
-
 echo "==> Public legal pages"
-PRIVACY_HTML=$(curl -fsS "$API/legal/privacy")
-TERMS_HTML=$(curl -fsS "$API/legal/terms")
-STATIC_PRIVACY_HTML=$(curl -fsSL "$BASE_URL/legal/privacy.html")
-STATIC_TERMS_HTML=$(curl -fsSL "$BASE_URL/legal/terms.html")
+PRIVACY_HTML=$("$CURL_BIN" -q --noproxy '*' -fsS "$API/legal/privacy")
+TERMS_HTML=$("$CURL_BIN" -q --noproxy '*' -fsS "$API/legal/terms")
+STATIC_PRIVACY_HTML=$("$CURL_BIN" -q --noproxy '*' -fsSL "$BASE_URL/legal/privacy.html")
+STATIC_TERMS_HTML=$("$CURL_BIN" -q --noproxy '*' -fsSL "$BASE_URL/legal/terms.html")
 printf '%s' "$PRIVACY_HTML" | grep -q "个人信息处理者"
 printf '%s' "$TERMS_HTML" | grep -q "平台撮合"
 printf '%s' "$STATIC_PRIVACY_HTML" | grep -q "个人信息处理者"
 printf '%s' "$STATIC_TERMS_HTML" | grep -q "平台撮合"
-curl -fsS "$API/legal/platform-rules" | grep -q "平台规则"
+"$CURL_BIN" -q --noproxy '*' -fsS "$API/legal/platform-rules" | grep -q "平台规则"
 if [[ ! "$PRIVACY_HTML" =~ 版本[[:space:]]([A-Za-z0-9._-]+) ]]; then
   echo "could not determine the published legal document version" >&2
   exit 1
 fi
 LEGAL_VERSION="${BASH_REMATCH[1]}"
-curl -fsS "$API/legal/privacy/versions/$LEGAL_VERSION" | grep -q "个人信息处理者"
-curl -fsS "$API/legal/terms/versions/$LEGAL_VERSION" | grep -q "平台撮合"
+"$CURL_BIN" -q --noproxy '*' -fsS "$API/legal/privacy/versions/$LEGAL_VERSION" | grep -q "个人信息处理者"
+"$CURL_BIN" -q --noproxy '*' -fsS "$API/legal/terms/versions/$LEGAL_VERSION" | grep -q "平台撮合"
 
 echo "==> Metrics authentication"
-METRICS_PUBLIC_CODE=$(curl -sS -o /dev/null -w "%{http_code}" "$API/metrics" || true)
+METRICS_PUBLIC_CODE=$("$CURL_BIN" -q --noproxy '*' -sS -o /dev/null -w "%{http_code}" "$API/metrics" || true)
 if [[ "$METRICS_PUBLIC_CODE" == "200" ]]; then
   echo "metrics must not be readable without a bearer token" >&2
   exit 1
 fi
-METRICS_AUTH_CODE=$(curl -sS -o /tmp/tat-prod-metrics.txt -w "%{http_code}" \
+METRICS_AUTH_CODE=$("$CURL_BIN" -q --noproxy '*' -sS -o /tmp/tat-prod-metrics.txt -w "%{http_code}" \
   -H "Authorization: Bearer $METRICS_TOKEN" "$API/metrics" || true)
 if [[ "$METRICS_AUTH_CODE" != "200" ]]; then
   echo "authenticated metrics probe failed (HTTP $METRICS_AUTH_CODE)" >&2
   exit 1
 fi
 
-if [[ -n "${PRODUCTION_ACCESS_TOKEN:-}" ]]; then
-  echo "==> Authenticated mock payment endpoint rejection"
-  MOCK_CODE=$(curl -sS -o /tmp/tat-prod-mock.json -w "%{http_code}" \
-    -X POST "$API/payments/wechat/mock-notify" \
-    -H "Authorization: Bearer $PRODUCTION_ACCESS_TOKEN" \
-    -H 'Content-Type: application/json' \
-    -d '{"outTradeNo":"T_probe"}' || true)
-  [[ "$MOCK_CODE" == "403" ]] || {
-    echo "expected MOCK_PAY_DISABLED HTTP 403, got $MOCK_CODE" >&2
-    cat /tmp/tat-prod-mock.json >&2 || true
-    exit 1
-  }
-else
-  echo "Authenticated mock-notify probe skipped (set a short-lived PRODUCTION_ACCESS_TOKEN to enable)"
-fi
-
-echo "==> Production smoke OK"
+echo "==> Controlled read-only production smoke OK"

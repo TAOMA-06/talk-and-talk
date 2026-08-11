@@ -335,9 +335,6 @@ export type Order = {
   customerConfirmedAt?: string | null;
   customerServiceGuidelinesConfirmedAt?: string | null;
   companionServiceGuidelinesConfirmedAt?: string | null;
-  platformFeeBps?: number;
-  platformFeeCents?: number;
-  companionPayableCents?: number;
   updatedAt?: string;
   refund?: OrderRefund | null;
   attendanceDispute?: {
@@ -441,13 +438,15 @@ export type MediaAttachment = {
 
 export type ChatMessage = {
   id: string;
+  /** Server-scoped conversation identifier; required by the v1 message contract. */
+  conversationId: string;
   content: string;
   senderId: string;
-  senderName?: string;
-  type: "text" | "image" | "audio" | "system" | "safety" | string;
-  moderationStatus?: "queued" | "pendingReview" | "published" | "blocked" | "removed";
-  visibility?: "participants" | "senderOnly" | "staffOnly";
-  attachments?: MediaAttachment[];
+  senderName?: string | null;
+  type: "text" | "image" | "audio" | "system" | "safety";
+  moderationStatus: "queued" | "pendingReview" | "published" | "blocked" | "removed";
+  visibility: "participants" | "senderOnly" | "staffOnly";
+  attachments: MediaAttachment[];
   timestamp: string;
 };
 

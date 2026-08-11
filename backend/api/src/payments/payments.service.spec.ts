@@ -302,6 +302,169 @@ describe("PaymentsService", () => {
     expect(prisma.refundTransaction.updateMany).not.toHaveBeenCalled();
   });
 
+  it("projects customer refund responses without provider reconciliation details", async () => {
+    const internalResult = {
+      created: false,
+      order: {
+        id: "o1",
+        status: "paid",
+        amountCents: 3900,
+        companionId: "c1",
+        createdAt: "2026-08-09T00:00:00.000Z",
+        updatedAt: "2026-08-09T00:00:00.000Z"
+      },
+      refund: {
+        id: "r-customer",
+        outRefundNo: "R-customer",
+        amountCents: 3900,
+        status: "processing",
+        reason: "服务与约定不符",
+        reviewNote: null,
+        failureReason: null,
+        reviewDueAt: "2026-08-10T00:00:00.000Z",
+        resolutionDueAt: "2026-08-12T00:00:00.000Z",
+        providerRefundId: "wx-refund-private",
+        providerRefundAcceptedAt: "2026-08-09T00:00:00.000Z",
+        providerRefundSucceededAt: null,
+        providerQueryAttempts: 7,
+        nextReconcileAt: "2026-08-09T01:00:00.000Z",
+        orderId: "o1",
+        createdAt: "2026-08-09T00:00:00.000Z",
+        updatedAt: "2026-08-09T00:00:00.000Z"
+      }
+    };
+    const requestRefund = jest.spyOn(service, "requestRefund").mockResolvedValue(internalResult as any);
+
+    const result = await service.requestCustomerRefund("u1", "o1", "服务与约定不符");
+
+    expect(result).toEqual({
+      created: false,
+      order: {
+        id: "o1",
+        status: "paid",
+        amountCents: 3900,
+        companionId: "c1",
+        createdAt: "2026-08-09T00:00:00.000Z",
+        updatedAt: "2026-08-09T00:00:00.000Z"
+      },
+      refund: {
+        id: "r-customer",
+        outRefundNo: "R-customer",
+        amountCents: 3900,
+        status: "processing",
+        reason: "服务与约定不符",
+        reviewNote: null,
+        failureReason: null,
+        reviewDueAt: "2026-08-10T00:00:00.000Z",
+        resolutionDueAt: "2026-08-12T00:00:00.000Z"
+      }
+    });
+    for (const privateField of [
+      "providerRefundId",
+      "providerRefundAcceptedAt",
+      "providerRefundSucceededAt",
+      "providerQueryAttempts",
+      "nextReconcileAt",
+      "orderId",
+      "createdAt",
+      "updatedAt"
+    ]) {
+      expect(result.refund).not.toHaveProperty(privateField);
+    }
+    expect(result.order).toBe(internalResult.order);
+    for (const privateField of [
+      "settlementRecipientRefSnapshot",
+      "taxProfileRefSnapshot",
+      "identityEvidenceRefSnapshot",
+      "serviceAgreementEvidenceRefSnapshot"
+    ]) {
+      expect(result.order).not.toHaveProperty(privateField);
+    }
+    requestRefund.mockRestore();
+  });
+
+  it("projects customer refund-sync responses without provider reconciliation details", async () => {
+    const currentRefund = {
+      id: "r-customer-sync",
+      orderId: "o1",
+      outRefundNo: "R-customer-sync",
+      amountCents: 3900,
+      status: "failed",
+      reason: "服务与约定不符",
+      reviewNote: "等待人工复核",
+      failureReason: "退款处理暂未完成",
+      reviewDueAt: "2026-08-10T00:00:00.000Z",
+      resolutionDueAt: "2026-08-12T00:00:00.000Z",
+      providerRefundId: "wx-refund-private",
+      providerRefundAcceptedAt: "2026-08-09T00:00:00.000Z",
+      providerRefundSucceededAt: null,
+      providerQueryAttempts: 7,
+      nextReconcileAt: "2026-08-09T01:00:00.000Z",
+      createdAt: "2026-08-09T00:00:00.000Z",
+      updatedAt: "2026-08-09T00:00:00.000Z",
+      order: { ...baseOrder, status: "paid" }
+    };
+    prisma.refundTransaction.findFirst.mockResolvedValue({
+      id: currentRefund.id,
+      orderId: currentRefund.orderId,
+      outRefundNo: currentRefund.outRefundNo,
+      status: currentRefund.status
+    });
+    prisma.refundTransaction.findUnique.mockResolvedValue(currentRefund);
+    const providerQuery = jest.spyOn(wechat, "queryRefund");
+
+    const result = await service.syncRefund("u1", "o1");
+
+    expect(prisma.refundTransaction.findFirst).toHaveBeenCalledWith({
+      where: { orderId: "o1", order: { userId: "u1" } },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }]
+    });
+    expect(result).toEqual({
+      order: expect.objectContaining({ id: "o1", status: "paid" }),
+      refund: {
+        id: "r-customer-sync",
+        outRefundNo: "R-customer-sync",
+        amountCents: 3900,
+        status: "failed",
+        reason: "服务与约定不符",
+        reviewNote: "等待人工复核",
+        failureReason: "退款处理暂未完成",
+        reviewDueAt: "2026-08-10T00:00:00.000Z",
+        resolutionDueAt: "2026-08-12T00:00:00.000Z"
+      }
+    });
+    for (const privateField of [
+      "providerRefundId",
+      "providerRefundAcceptedAt",
+      "providerRefundSucceededAt",
+      "providerQueryAttempts",
+      "nextReconcileAt",
+      "orderId",
+      "createdAt",
+      "updatedAt"
+    ]) {
+      expect(result.refund).not.toHaveProperty(privateField);
+    }
+    expect(providerQuery).not.toHaveBeenCalled();
+  });
+
+  it("refuses a refund sync for a non-owner before querying the provider", async () => {
+    prisma.refundTransaction.findFirst.mockResolvedValue(null);
+    const providerQuery = jest.spyOn(wechat, "queryRefund");
+
+    await expect(service.syncRefund("other-user", "o1")).rejects.toMatchObject({
+      code: "REFUND_NOT_FOUND",
+      status: HttpStatus.NOT_FOUND
+    });
+
+    expect(prisma.refundTransaction.findFirst).toHaveBeenCalledWith({
+      where: { orderId: "o1", order: { userId: "other-user" } },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }]
+    });
+    expect(prisma.refundTransaction.findUnique).not.toHaveBeenCalled();
+    expect(providerQuery).not.toHaveBeenCalled();
+  });
+
   it("cancels a pending reschedule inside the same transaction that creates a customer refund", async () => {
     const voiceRoomControl = { terminateForOrder: jest.fn().mockResolvedValue({ state: "terminated" }) } as any;
     service = new PaymentsService(prisma, config, ordersService, wechat, notifications, audit, metrics, voiceRoomControl);

@@ -4,7 +4,7 @@ import { CompanionLifecycleService } from "./companion-lifecycle.service";
 
 describe("CompanionLifecycleService", () => {
   const prisma = {
-    companionProfile: { findUnique: jest.fn() },
+    companionProfile: { findUnique: jest.fn(), findMany: jest.fn(), count: jest.fn() },
     companionTrainingRecord: { findMany: jest.fn() },
     companionAccountAction: { findFirst: jest.fn(), count: jest.fn() },
     companionAccountAppeal: { create: jest.fn(), findMany: jest.fn(), count: jest.fn() },
@@ -22,6 +22,7 @@ describe("CompanionLifecycleService", () => {
   const caseEvidence = {
     attachmentInclude: jest.fn().mockReturnValue({ evidenceAttachments: { include: { mediaAsset: true } } }),
     attachmentDtos: jest.fn().mockReturnValue([]),
+    assertAttachmentsAllowed: jest.fn(),
     bindCompanionIncident: jest.fn().mockResolvedValue([])
   } as any;
   let configValues: Record<string, unknown>;
@@ -52,11 +53,13 @@ describe("CompanionLifecycleService", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     configValues = {
+      COMMERCIAL_SURFACE: "full",
       COMPANION_VOICE_EVIDENCE_VIEWER_URL: "",
       COMPANION_VOICE_EVIDENCE_SIGNING_SECRET: "",
       COMPANION_VOICE_EVIDENCE_URL_TTL_SECONDS: 300
     };
     config.get.mockImplementation((key: string) => configValues[key]);
+    caseEvidence.assertAttachmentsAllowed.mockReturnValue(undefined);
     prisma.companionProfile.findUnique.mockResolvedValue(companion);
     prisma.order.findMany.mockResolvedValue([]);
     prisma.order.count.mockResolvedValue(0);
@@ -629,6 +632,28 @@ describe("CompanionLifecycleService", () => {
     expect(prisma.companionIncidentReport.create).not.toHaveBeenCalled();
   });
 
+  it("rejects media evidence before resolving a companion or creating an incident transaction", async () => {
+    const unavailable = Object.assign(new Error("case evidence disabled"), {
+      code: "MEDIA_FEATURE_DISABLED",
+      status: 503
+    });
+    caseEvidence.assertAttachmentsAllowed.mockImplementation(() => {
+      throw unavailable;
+    });
+
+    await expect(service.createIncident("owner-1", {
+      category: "technicalIssue",
+      summary: "通话开始后持续无声音，重连仍未恢复。",
+      evidenceAssetIds: ["55555555-5555-4555-8555-555555555555"]
+    })).rejects.toBe(unavailable);
+
+    expect(prisma.companionProfile.findUnique).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(caseEvidence.bindCompanionIncident).not.toHaveBeenCalled();
+    expect(audit.record).not.toHaveBeenCalled();
+    expect(notifications.createTransactional).not.toHaveBeenCalled();
+  });
+
   it("does not mark a withdrawal paid until every earning is independently paid", async () => {
     const now = new Date();
     const db = {
@@ -676,6 +701,7 @@ describe("CompanionLifecycleService", () => {
       voiceIntroStatus: "pendingReview"
     });
     configValues = {
+      COMMERCIAL_SURFACE: "full",
       COMPANION_VOICE_EVIDENCE_VIEWER_URL: "https://evidence.example.com/listen",
       COMPANION_VOICE_EVIDENCE_SIGNING_SECRET: signingSecret,
       COMPANION_VOICE_EVIDENCE_URL_TTL_SECONDS: 300
@@ -733,8 +759,70 @@ describe("CompanionLifecycleService", () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
+  it("fails closed before database reads, queueing, signing, or review mutations on text-only", async () => {
+    configValues = {
+      ...configValues,
+      COMMERCIAL_SURFACE: "text_only",
+      COMPANION_VOICE_EVIDENCE_VIEWER_URL: "https://evidence.example.com/listen",
+      COMPANION_VOICE_EVIDENCE_SIGNING_SECRET: "controlled-viewer-secret"
+    };
+
+    await expect(service.createVoiceIntroReadUrl("admin-1", companion.id)).rejects.toMatchObject({
+      code: "VOICE_INTRO_UNAVAILABLE",
+      status: 503
+    });
+    await expect(service.reviewVoiceIntro("admin-1", companion.id, {
+      status: "rejected",
+      reviewedAssetReference: "evidence/voice/current.aac"
+    })).rejects.toMatchObject({
+      code: "VOICE_INTRO_UNAVAILABLE",
+      status: 503
+    });
+    await expect(service.adminVoiceIntros()).rejects.toMatchObject({
+      code: "VOICE_INTRO_UNAVAILABLE",
+      status: 503
+    });
+
+    expect(prisma.companionProfile.findUnique).not.toHaveBeenCalled();
+    expect(prisma.companionProfile.findMany).not.toHaveBeenCalled();
+    expect(prisma.companionProfile.count).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(audit.record).not.toHaveBeenCalled();
+  });
+
+  it("redacts historical voice references from the owner overview on text-only", async () => {
+    configValues = { ...configValues, COMMERCIAL_SURFACE: "text_only" };
+    const internal = service as any;
+    jest.spyOn(internal, "ownCompanion").mockResolvedValue({
+      ...companion,
+      voiceIntroAssetRef: "evidence/voice/current.aac",
+      voiceIntroDurationSeconds: 18,
+      voiceIntroStatus: "pendingReview"
+    });
+    for (const method of [
+      "commercialProfileForCompanion",
+      "trainingForCompanion",
+      "qualityForCompanion",
+      "actionsForCompanion",
+      "incidentsForCompanion",
+      "withdrawalsForCompanion",
+      "operationalSummaryForCompanion"
+    ]) {
+      jest.spyOn(internal, method).mockResolvedValue({});
+    }
+
+    const result = await service.overview("owner-1");
+
+    expect(result.companion.voiceIntro).toEqual({
+      assetReference: null,
+      durationSeconds: null,
+      status: "pendingReview"
+    });
+  });
+
   it("rejects a stale voice-intro approval even when the evidence viewer is configured", async () => {
     configValues = {
+      COMMERCIAL_SURFACE: "full",
       COMPANION_VOICE_EVIDENCE_VIEWER_URL: "https://evidence.example.com/listen",
       COMPANION_VOICE_EVIDENCE_SIGNING_SECRET: "controlled-viewer-secret",
       COMPANION_VOICE_EVIDENCE_URL_TTL_SECONDS: 300

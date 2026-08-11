@@ -1,17 +1,20 @@
 "use client";
 
-import { ArrowRight, Check, Copy, QrCode, Smartphone, Sparkles } from "lucide-react";
+import { ArrowRight, Check, Copy, QrCode, Smartphone } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import { miniprogramEntryUrl, miniprogramQrUrl } from "../lib/miniprogram-entry";
+import {
+  miniprogramCtaCopy,
+  miniprogramSearchName,
+  resolveMiniprogramEntry,
+  resolveMiniprogramQr,
+} from "../lib/miniprogram-entry";
 
 type MiniprogramCtaProps = {
   variant?: "hero" | "panel" | "inline";
   secondaryHref?: string;
   secondaryLabel?: string;
   className?: string;
-  /** Show an honest “App coming soon” cue next to the miniprogram entry. */
-  showAppComingSoon?: boolean;
 };
 
 export default function MiniprogramCta({
@@ -19,15 +22,18 @@ export default function MiniprogramCta({
   secondaryHref = "/how-it-works",
   secondaryLabel = "了解服务路径",
   className = "",
-  showAppComingSoon = false,
 }: MiniprogramCtaProps) {
-  const hasQr = Boolean(miniprogramQrUrl);
+  const entry = resolveMiniprogramEntry();
+  const qr = resolveMiniprogramQr();
+  const copy = miniprogramCtaCopy(entry);
+  const hasQr = qr.kind === "qr";
+  const searchName = entry.kind === "fallback" ? entry.searchName : miniprogramSearchName;
   const [copyState, setCopyState] = useState<"idle" | "copied" | "manual">("idle");
   const large = variant !== "inline";
 
   const copySearchTerm = async () => {
     try {
-      await navigator.clipboard.writeText("Talk&Talk");
+      await navigator.clipboard.writeText(searchName);
       setCopyState("copied");
     } catch {
       setCopyState("manual");
@@ -40,15 +46,15 @@ export default function MiniprogramCta({
       className={`button button-primary${large ? " button-large" : ""}`}
       onClick={() => void copySearchTerm()}
     >
-      {copyState === "copied" ? "已复制 Talk&Talk" : "复制名称并在微信搜索"}
+      {copyState === "copied" ? `已复制 ${searchName}` : "复制名称并在微信搜索"}
       {copyState === "copied" ? <Check size={large ? 18 : 17} /> : <Copy size={large ? 18 : 17} />}
     </button>
   );
 
-  const primaryAction = miniprogramEntryUrl ? (
+  const primaryAction = entry.kind === "path" ? (
     <a
       className={`button button-primary${large ? " button-large" : ""}`}
-      href={miniprogramEntryUrl}
+      href={entry.href}
       rel="noreferrer"
     >
       打开微信小程序 <Smartphone size={large ? 18 : 17} />
@@ -65,13 +71,6 @@ export default function MiniprogramCta({
       </span>
     );
 
-  const appCue = showAppComingSoon ? (
-    <p className="miniprogram-app-cue">
-      <Sparkles size={14} aria-hidden="true" />
-      <span>App 即将到来 · 上线后将在官网公布</span>
-    </p>
-  ) : null;
-
   if (variant === "inline") {
     return (
       <div className={`miniprogram-cta inline ${className}`.trim()}>
@@ -80,7 +79,6 @@ export default function MiniprogramCta({
           {secondaryLabel} <ArrowRight size={16} />
         </Link>
         {copyStatus}
-        {appCue}
       </div>
     );
   }
@@ -93,13 +91,12 @@ export default function MiniprogramCta({
           {secondaryLabel} <ArrowRight size={large ? 18 : 16} />
         </Link>
         {copyStatus}
-        {appCue}
       </div>
 
       <aside className="miniprogram-qr-panel" aria-label="微信小程序入口">
-        {hasQr ? (
+        {qr.kind === "qr" ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={miniprogramQrUrl} alt="Talk&Talk 微信小程序二维码" width={132} height={132} />
+          <img src={qr.href} alt="Talk&Talk 微信小程序二维码" width={132} height={132} />
         ) : (
           <div className="miniprogram-qr-placeholder">
             <QrCode size={36} strokeWidth={1.5} />
@@ -110,8 +107,8 @@ export default function MiniprogramCta({
           <strong>微信小程序服务入口</strong>
           <p>
             {hasQr
-              ? "扫码后请以小程序页面展示的服务范围与可用状态为准。"
-              : "请在微信中搜索「Talk&Talk」。官网只说明产品与边界，真实服务以小程序页面状态为准。App 即将到来。"}
+              ? "扫码后请以小程序页面展示的文本服务范围与可用状态为准。"
+              : copy.secondary}
           </p>
         </div>
       </aside>

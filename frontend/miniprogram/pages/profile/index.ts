@@ -288,7 +288,11 @@ Page({
     const current = this.data.recommendationPreferences;
     if (!current) return;
     const personalizationEnabled = Boolean(event.detail.value);
-    this.setData({ recommendationPreferences: { ...current, personalizationEnabled } });
+    this.setData({ recommendationPreferences: { ...current, personalizationEnabled: false } });
+    if (personalizationEnabled) {
+      wx.showToast({ title: "首发阶段暂不开放个性化排序", icon: "none" });
+      return;
+    }
     await this.saveRecommendations();
   },
   toggleRecommendationTopic(event: any) {
@@ -326,7 +330,7 @@ Page({
     this.setData({ recommendationSaving: true });
     try {
       const preference = await api.updateRecommendationPreferences({
-        personalizationEnabled: current.personalizationEnabled,
+        personalizationEnabled: false,
         topicIds: this.data.recommendationTopicIds,
         city: this.data.recommendationCity.trim() || null,
         maxPricePerHalfHour: price,

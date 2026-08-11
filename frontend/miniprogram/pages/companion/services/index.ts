@@ -59,7 +59,8 @@ function errorMessage(error: unknown, fallback: string): string {
     INVALID_SERVICE_OFFERING_DURATION: "服务时长需为 30 至 240 分钟之间的半小时档位。",
     INVALID_SERVICE_OFFERING_PRICE: "价格应在 ¥1.00 至 ¥20,000.00 之间。",
     SERVICE_OFFERING_LIMIT_REACHED: "每位陪伴者最多保留 50 项服务，请编辑或复用现有商品。",
-    SERVICE_OFFERING_NOT_FOUND: "该服务商品已不存在或不属于当前账号，请刷新后重试。"
+    SERVICE_OFFERING_NOT_FOUND: "该服务商品已不存在或不属于当前账号，请刷新后重试。",
+    COMMERCIAL_SURFACE_TEXT_ONLY: "首发仅开放文字服务，暂不能上架语音商品。"
   };
   return (apiError.code && messages[apiError.code]) || apiError.message || fallback;
 }
@@ -309,6 +310,10 @@ Page({
     const id = event.currentTarget.dataset.id as string;
     const offering = this.data.offerings.find((item) => item.id === id);
     if (!offering || this.data.changingOfferingId) return;
+    if (!offering.isActive && offering.deliveryMode === "voice" && !clientVoiceSkuEnabled()) {
+      wx.showToast({ title: "首发仅开放文字服务，历史语音服务不能上架", icon: "none" });
+      return;
+    }
     const confirmation = await new Promise<any>((resolve) => wx.showModal({
       title: offering.isActive ? "暂停上架" : "上架服务",
       content: offering.isActive

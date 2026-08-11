@@ -165,6 +165,100 @@ for (const file of walk(root).filter((path) => [".ts", ".wxml", ".json"].include
 
 const apiConfig = readFileSync(join(root, "utils/config.ts"), "utf8");
 
+/**
+ * Release is a text-only security boundary. Runtime smoke verifies behavior,
+ * but it does not render WXML or catch a future removal of these UI guards.
+ * Keep a cheap static gate here so the release CI rejects that drift before an
+ * experience build can be uploaded.
+ */
+function validateTextOnlyReleaseBoundary() {
+  const files = {
+    config: apiConfig,
+    controlledEvidence: readFileSync(join(root, "utils/controlled-evidence.ts"), "utf8"),
+    models: readFileSync(join(root, "utils/models.ts"), "utf8"),
+    api: readFileSync(join(root, "utils/api.ts"), "utf8"),
+    attendance: readFileSync(join(root, "utils/attendance-disputes-api.ts"), "utf8"),
+    chatSource: readFileSync(join(root, "pages/chat/index.ts"), "utf8"),
+    chatTemplate: readFileSync(join(root, "pages/chat/index.wxml"), "utf8"),
+    supportSource: readFileSync(join(root, "pages/support/detail.ts"), "utf8"),
+    supportTemplate: readFileSync(join(root, "pages/support/detail.wxml"), "utf8"),
+    disputeSource: readFileSync(join(root, "pages/order/dispute.ts"), "utf8"),
+    disputeTemplate: readFileSync(join(root, "pages/order/dispute.wxml"), "utf8"),
+    safetySource: readFileSync(join(root, "pages/companion/safety/index.ts"), "utf8"),
+    safetyTemplate: readFileSync(join(root, "pages/companion/safety/index.wxml"), "utf8"),
+  };
+  const functionStartsWith = (source, name, expected) => {
+    const match = new RegExp(`(?:export\\s+)?(?:async\\s+)?function\\s+${name}\\s*\\(`).exec(source);
+    if (!match || match.index === undefined) return false;
+    const bodyStart = source.indexOf("{", match.index);
+    return bodyStart >= 0 && source.slice(bodyStart, bodyStart + 360).includes(expected);
+  };
+  const methodStartsWith = (source, name, expected) => {
+    const match = new RegExp(`\\n\\s*(?:async\\s+)?${name}\\s*\\(`).exec(source);
+    if (!match || match.index === undefined) return false;
+    const bodyStart = source.indexOf("{", match.index);
+    return bodyStart >= 0 && source.slice(bodyStart, bodyStart + 360).includes(expected);
+  };
+
+  if (!/function\s+isExplicitDevelopmentEnvironment\s*\([\s\S]*?envVersion\s*===\s*["']develop["'][\s\S]*?if\s*\(!isExplicitDevelopmentEnvironment\(\)\)\s*return\s+true/.test(files.config)) {
+    errors.push("utils/config.ts must force trial, release, and unknown environments to text-only before any global override");
+  }
+  if (!/export\s+type\s+ChatMessage\s*=\s*\{[\s\S]*?\bconversationId\s*:\s*string\s*;[\s\S]*?\bsenderName\?\s*:\s*string\s*\|\s*null\s*;[\s\S]*?\btype\s*:\s*[\s\S]*?"safety"\s*;[\s\S]*?\bmoderationStatus\s*:\s*[\s\S]*?"removed"\s*;[\s\S]*?\bvisibility\s*:\s*[\s\S]*?"staffOnly"\s*;[\s\S]*?\battachments\s*:\s*MediaAttachment\[\]\s*;/.test(files.models)) {
+    errors.push("utils/models.ts ChatMessage must match required v1 message fields and closed enums");
+  }
+  if (!/messages:\s*\([^)]*\)[\s\S]*?pagination:\s*\{\s*limit:\s*number;\s*nextCursor:\s*string\s*\|\s*null;\s*hasMore:\s*boolean\s*\}/.test(files.api)) {
+    errors.push("utils/api.ts messages contract must require pagination.limit and pagination.nextCursor");
+  }
+  if (!/function\s+assertControlledEvidenceEnabled\s*\(/.test(files.controlledEvidence)) {
+    errors.push("utils/controlled-evidence.ts must retain the text-only fail-closed assertion");
+  }
+  for (const utility of ["chooseEvidenceImage", "chooseEvidenceAudio"]) {
+    if (!functionStartsWith(files.controlledEvidence, utility, "!controlledEvidenceEnabled()")) {
+      errors.push(`utils/controlled-evidence.ts ${utility} must not open a local media chooser in text-only mode`);
+    }
+  }
+  for (const utility of ["uploadControlledEvidence", "pollControlledEvidence"]) {
+    if (!functionStartsWith(files.controlledEvidence, utility, "assertControlledEvidenceEnabled()")) {
+      errors.push(`utils/controlled-evidence.ts ${utility} must reject before local media or network work in text-only mode`);
+    }
+  }
+  if (!/function\s+permittedEvidenceAssetIds\s*\([^)]*\)[\s\S]*?isCommercialTextOnly\(\)\s*\?\s*\[\]/.test(files.attendance)) {
+    errors.push("utils/attendance-disputes-api.ts must drop stale evidence asset IDs in text-only mode");
+  }
+  for (const method of ["statement", "appeal"]) {
+    if (!new RegExp(`${method}:\\s*\\([^)]*evidenceAssetIds[^)]*\\)[\\s\\S]*?permittedEvidenceAssetIds\\(evidenceAssetIds\\)`, "s").test(files.attendance)) {
+      errors.push(`utils/attendance-disputes-api.ts ${method} must use the text-only evidence projection`);
+    }
+  }
+
+  for (const handler of ["chooseImage", "toggleRecord", "sendMedia", "previewImage", "playAudio"]) {
+    if (!methodStartsWith(files.chatSource, handler, "if (isCommercialTextOnly())")) {
+      errors.push(`pages/chat/index.ts ${handler} must fail closed in text-only mode`);
+    }
+  }
+  if (!/wx:if="\{\{mediaEnabled\s*&&\s*!textOnly\}\}"/.test(files.chatTemplate)) {
+    errors.push("pages/chat/index.wxml must hide media entry points when textOnly");
+  }
+  if (!/wx:if="\{\{!textOnly\s*&&\s*item\.attachments\.length\}\}"/.test(files.chatTemplate)) {
+    errors.push("pages/chat/index.wxml must hide historic attachments when textOnly");
+  }
+
+  for (const [label, source, template] of [
+    ["pages/support/detail", files.supportSource, files.supportTemplate],
+    ["pages/order/dispute", files.disputeSource, files.disputeTemplate],
+    ["pages/companion/safety/index", files.safetySource, files.safetyTemplate],
+  ]) {
+    if (!/controlledEvidenceEnabled\(\)/.test(source)) {
+      errors.push(`${label}.ts must use the controlled-evidence text-only gate`);
+    }
+    if (!/textOnly/.test(template) || !/wx:if="\{\{!textOnly/.test(template)) {
+      errors.push(`${label}.wxml must hide evidence actions and reads when textOnly`);
+    }
+  }
+}
+
+validateTextOnlyReleaseBoundary();
+
 function recordString(source, recordName, key) {
   const body = source.match(new RegExp(`const\\s+${recordName}\\b[^=]*=\\s*\\{([\\s\\S]*?)\\n\\}(?:\\s+as\\s+const)?;`))?.[1];
   return body?.match(new RegExp(`${key}\\s*:\\s*[\"']([^\"']+)[\"']`))?.[1] || null;

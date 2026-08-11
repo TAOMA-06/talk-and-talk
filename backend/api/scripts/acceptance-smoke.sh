@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 #
-# Local development acceptance test.  It deliberately uses mock SMS and the
-# mock WeChat provider; never point it at production.
+# Local development acceptance test. It deliberately uses mock SMS and the
+# mock WeChat provider; it is not a staging/production command and refuses any
+# non-loopback target before its first HTTP request.
 #
 # Prerequisites:
-#   - APP_ENV=development (or an explicitly opted-in staging environment)
+#   - APP_ENV=development
 #   - SMS_PROVIDER=mock
 #   - a seeded database (`npm run db:seed`), including c1 and its owner
 #   - a running API, PostgreSQL, and Redis
@@ -18,6 +19,24 @@ umask 077
 
 BASE_URL="${1:-${BASE_URL:-http://127.0.0.1:3000}}"
 BASE_URL="${BASE_URL%/}"
+if [[ "${ACCEPTANCE_SMOKE_LOCAL_EXECUTION:-}" != "1" ]]; then
+  printf 'Refusing acceptance smoke without ACCEPTANCE_SMOKE_LOCAL_EXECUTION=1. This mock script is development/loopback only.\n' >&2
+  exit 2
+fi
+if [[ ! "$BASE_URL" =~ ^http://127\.0\.0\.1(:[0-9]{1,5})?$ ]]; then
+  printf 'Refusing non-127.0.0.1 acceptance smoke target (%s). This mock script is development/local only.\n' "$BASE_URL" >&2
+  exit 2
+fi
+CURL_BIN="/usr/bin/curl"
+if [[ ! -x "$CURL_BIN" ]]; then
+  printf 'Local acceptance smoke requires the trusted system curl executable.\n' >&2
+  exit 2
+fi
+# A numeric loopback URL check is not sufficient on its own: a shell's proxy or
+# curl config can redirect an otherwise local mock request. Every call below
+# begins with `-q` and bypasses proxies, so user curl configuration cannot turn
+# this local-only harness into an external write path.
+unset ALL_PROXY all_proxy HTTP_PROXY http_proxy HTTPS_PROXY https_proxy NO_PROXY no_proxy
 API_PREFIX="${API_PREFIX:-api/v1}"
 API_PREFIX="${API_PREFIX#/}"
 API_PREFIX="${API_PREFIX%/}"
@@ -84,7 +103,7 @@ api_request() {
   local output="$TMP_DIR/$name.json"
   local status_file="$TMP_DIR/$name.status"
   local status
-  local -a args=(--silent --show-error --connect-timeout 5 --max-time 30 --request "$method" "$API$path" --output "$output" --write-out '%{http_code}')
+  local -a args=(-q --noproxy '*' --silent --show-error --connect-timeout 5 --max-time 30 --request "$method" "$API$path" --output "$output" --write-out '%{http_code}')
 
   if [[ -n "$token" ]]; then
     args+=(--header "Authorization: Bearer $token")
@@ -93,7 +112,7 @@ api_request() {
     args+=(--header 'Content-Type: application/json' --data "$body")
   fi
 
-  if ! status="$(curl "${args[@]}")"; then
+  if ! status="$("$CURL_BIN" "${args[@]}")"; then
     printf 'Request failed: %s %s\n' "$method" "$path" >&2
     return 1
   fi
@@ -446,8 +465,8 @@ if [[ "$APP_ENV" == 'production' ]]; then
   printf 'Refusing to run acceptance smoke against APP_ENV=production.\n' >&2
   exit 1
 fi
-if [[ "$APP_ENV" != 'development' && "${ALLOW_NON_DEVELOPMENT_SMOKE:-}" != '1' ]]; then
-  printf 'Refusing non-development environment (%s). Set ALLOW_NON_DEVELOPMENT_SMOKE=1 only for an isolated staging environment.\n' "$APP_ENV" >&2
+if [[ "$APP_ENV" != 'development' ]]; then
+  printf 'Refusing non-development environment (%s). This mock script is development/loopback only.\n' "$APP_ENV" >&2
   exit 1
 fi
 

@@ -15,6 +15,24 @@ RUN npm run build
 
 FROM node:22-alpine AS runtime
 WORKDIR /app
+ARG OCI_IMAGE_REVISION=""
+ARG OCI_SOURCE_TREE_SHA256=""
+ARG OCI_ARTIFACT_PROVENANCE_SHA256=""
+ARG OCI_PROVENANCE_KIND="unverified"
+LABEL org.opencontainers.image.revision="${OCI_IMAGE_REVISION}" \
+  io.talkandtalk.source-tree-sha256="${OCI_SOURCE_TREE_SHA256}" \
+  io.talkandtalk.artifact-provenance-sha256="${OCI_ARTIFACT_PROVENANCE_SHA256}" \
+  io.talkandtalk.provenance-kind="${OCI_PROVENANCE_KIND}"
+# A generic local/CI build is deliberately not eligible for migration proof.
+# Only an externally approved candidate builder may opt into this strict label
+# contract; the runner independently verifies the immutable image digest and
+# each label before it creates a disposable target.
+RUN case "$OCI_PROVENANCE_KIND" in \
+    approved-candidate) \
+      test -n "$OCI_IMAGE_REVISION" && test -n "$OCI_SOURCE_TREE_SHA256" && test -n "$OCI_ARTIFACT_PROVENANCE_SHA256" ;; \
+    unverified|unverified-ci) ;; \
+    *) echo "Unsupported OCI_PROVENANCE_KIND: $OCI_PROVENANCE_KIND" >&2; exit 64 ;; \
+  esac
 ENV NODE_ENV=production
 RUN apk add --no-cache curl
 COPY package*.json ./

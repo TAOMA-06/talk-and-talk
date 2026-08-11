@@ -1,3 +1,4 @@
+import * as publicInteractionIdentity from "../users/public-interaction-identity.gate";
 import { CommunityService } from "./community.service";
 
 describe("CommunityService", () => {
@@ -17,6 +18,17 @@ describe("CommunityService", () => {
     appendCommunityReportToCase: jest.fn().mockResolvedValue(undefined)
   } as any;
   const service = new CommunityService(prisma, moderation, moderationCases);
+
+  async function withApprovedIdentityAdapter<T>(run: () => Promise<T>): Promise<T> {
+    const identityGateSpy = jest
+      .spyOn(publicInteractionIdentity, "assertPublicInteractionIdentity")
+      .mockImplementation(() => undefined);
+    try {
+      return await run();
+    } finally {
+      identityGateSpy.mockRestore();
+    }
+  }
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -42,6 +54,27 @@ describe("CommunityService", () => {
       })
     }));
     expect(result.items[0]).toEqual(expect.objectContaining({ id: "post-1", isLiked: true, likeCount: 1 }));
+  });
+
+  it("redacts a historical community cover URL from both list and like responses", async () => {
+    const legacyCoverUrl = "https://legacy.example/private-cover.jpg";
+    const legacyPost = {
+      id: "post-legacy-cover", authorId: "author-1", kind: "femaleRequest", topic: "聊天", content: "今晚想找人聊聊",
+      coverImageUrl: legacyCoverUrl, status: "approved", createdAt: new Date("2026-07-12T00:00:00Z"),
+      author: { profile: { displayName: "小安" }, companionProfile: null }, likes: [{ userId: "viewer-1" }],
+      _count: { likes: 1 }
+    };
+    prisma.communityPost.findMany.mockResolvedValue([legacyPost]);
+    prisma.communityPost.findFirst.mockResolvedValue(legacyPost);
+    prisma.communityPost.findUnique.mockResolvedValue(legacyPost);
+
+    const listed = await service.list("viewer-1");
+    const liked = await service.setLike("viewer-1", legacyPost.id, true);
+
+    expect(listed.items[0]).toEqual(expect.objectContaining({ coverImageUrl: null }));
+    expect(liked).toEqual(expect.objectContaining({ coverImageUrl: null }));
+    expect(JSON.stringify(listed)).not.toContain(legacyCoverUrl);
+    expect(JSON.stringify(liked)).not.toContain(legacyCoverUrl);
   });
 
   it("lists only the caller's private report receipt ids and submission times", async () => {
@@ -74,20 +107,24 @@ describe("CommunityService", () => {
       }
     });
 
-    await expect(service.create("companion-user", {
-      kind: "malePromotion",
-      topic: "情绪倾听",
-      content: "今晚可预约"
-    })).rejects.toMatchObject({ code: "COMPANION_PROFILE_REQUIRED" });
+    await withApprovedIdentityAdapter(async () => {
+      await expect(service.create("companion-user", {
+        kind: "malePromotion",
+        topic: "情绪倾听",
+        content: "今晚可预约"
+      })).rejects.toMatchObject({ code: "COMPANION_PROFILE_REQUIRED" });
+    });
     expect(moderation.moderateAsync).not.toHaveBeenCalled();
     expect(prisma.communityPost.create).not.toHaveBeenCalled();
   });
 
-  it("rejects an unverified femaleRequest before moderation or any write", async () => {
+  it.each([false, true])(
+    "rejects a legacy identity boolean (%s) before moderation or any write",
+    async (legacyIsVerified) => {
     prisma.user.findUnique.mockResolvedValue({
       id: "user-1",
       accountStatus: "active",
-      profile: { displayName: "小安", isVerified: false },
+      profile: { displayName: "小安", isVerified: legacyIsVerified },
       companionProfile: null
     });
 
@@ -103,7 +140,8 @@ describe("CommunityService", () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
     expect(prisma.communityPost.create).not.toHaveBeenCalled();
     expect(moderationCases.createFromResult).not.toHaveBeenCalled();
-  });
+    }
+  );
 
   it("persists allowed posts after moderation", async () => {
     prisma.user.findUnique.mockResolvedValue({
@@ -119,7 +157,10 @@ describe("CommunityService", () => {
       author: { profile: { displayName: "小安" }, companionProfile: null }, likes: []
     });
 
-    const result = await service.create("user-1", { kind: "femaleRequest", topic: "聊天", content: "今晚想找人聊聊" });
+    const result = await withApprovedIdentityAdapter(() => service.create(
+      "user-1",
+      { kind: "femaleRequest", topic: "聊天", content: "今晚想找人聊聊" }
+    ));
 
     expect(moderation.moderateAsync).toHaveBeenCalledWith("聊天 今晚想找人聊聊", "community");
     expect(result.moderationStatus).toBe("approved");
@@ -136,11 +177,13 @@ describe("CommunityService", () => {
     moderation.moderateAsync.mockResolvedValue({ decision: "allow" });
     prisma.communityPost.count.mockResolvedValue(3);
 
-    await expect(service.create("user-1", {
-      kind: "femaleRequest",
-      topic: "聊天",
-      content: "想找人聊聊"
-    })).rejects.toMatchObject({ code: "COMMUNITY_WRITE_RATE_LIMITED", status: 429 });
+    await withApprovedIdentityAdapter(async () => {
+      await expect(service.create("user-1", {
+        kind: "femaleRequest",
+        topic: "聊天",
+        content: "想找人聊聊"
+      })).rejects.toMatchObject({ code: "COMMUNITY_WRITE_RATE_LIMITED", status: 429 });
+    });
 
     expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
     expect(prisma.communityPost.count).toHaveBeenCalledWith({
@@ -185,7 +228,10 @@ describe("CommunityService", () => {
       author: { profile: { displayName: "小安" }, companionProfile: null }, likes: []
     });
 
-    const result = await service.create("user-1", { kind: "femaleRequest", topic: "兼职", content: "请私聊我" });
+    const result = await withApprovedIdentityAdapter(() => service.create(
+      "user-1",
+      { kind: "femaleRequest", topic: "兼职", content: "请私聊我" }
+    ));
 
     expect(result.moderationStatus).toBe("pending");
     expect(moderationCases.createFromResult).toHaveBeenCalledWith(expect.objectContaining({

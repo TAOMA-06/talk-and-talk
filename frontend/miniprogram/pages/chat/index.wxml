@@ -1,5 +1,6 @@
 <view class="page chat-page">
   <view class="notice">请在平台内完成沟通，勿交换私人联系方式、线下见面或私下转账。</view>
+  <view wx:if="{{textOnly}}" class="notice">当前首发版本仅支持文字消息；图片和语音消息暂未开放。</view>
   <view wx:if="{{hasConversation && messageInteractionAvailable}}" class="message-notification-setting">
     <view class="message-notification-copy">
       <view class="message-notification-title">本会话消息提醒</view>
@@ -58,11 +59,13 @@
       <view class="sender">{{item.senderName || item.senderId}}</view>
       <view class="bubble" bindlongpress="reportMessage" data-message-id="{{item.id}}">
         <view wx:if="{{item.content}}" class="message-content">{{item.content}}</view>
-        <view wx:for="{{item.attachments}}" wx:for-item="attachment" wx:key="id" class="attachment">
-          <image wx:if="{{attachment.kind === 'image' && attachment.url}}" class="attachment-image" mode="widthFix" src="{{attachment.url}}" bindtap="previewImage" data-url="{{attachment.url}}" aria-role="button" aria-label="预览聊天图片" tabindex="0" />
-          <button wx:elif="{{attachment.kind === 'audio' && attachment.url}}" class="audio-play" size="mini" bindtap="playAudio" data-url="{{attachment.url}}">播放语音</button>
-          <view wx:else class="attachment-placeholder">{{attachment.kind === 'image' ? '图片' : '语音'}}{{attachment.status === 'expired' ? '已过期' : '审核中，暂不展示'}}</view>
-        </view>
+        <block wx:if="{{!textOnly && item.attachments.length}}">
+          <view wx:for="{{item.attachments}}" wx:for-item="attachment" wx:key="id" class="attachment">
+            <image wx:if="{{attachment.kind === 'image' && attachment.url}}" class="attachment-image" mode="widthFix" src="{{attachment.url}}" bindtap="previewImage" data-url="{{attachment.url}}" aria-role="button" aria-label="预览聊天图片" tabindex="0" />
+            <button wx:elif="{{attachment.kind === 'audio' && attachment.url}}" class="audio-play" size="mini" bindtap="playAudio" data-url="{{attachment.url}}">播放语音</button>
+            <view wx:else class="attachment-placeholder">{{attachment.kind === 'image' ? '图片' : '语音'}}{{attachment.status === 'expired' ? '已过期' : '审核中，暂不展示'}}</view>
+          </view>
+        </block>
       </view>
       <button wx:if="{{item.type === 'safety'}}" class="message-emergency-help" bindtap="openMessageEmergencyHelp">查看紧急帮助</button>
       <view wx:if="{{item.moderationStatus === 'queued' || item.moderationStatus === 'pendingReview'}}" class="delivery-status">审核中，仅自己可见</view>
@@ -73,8 +76,8 @@
   </view>
   <view wx:if="{{hasLoadedInitial && messageInteractionAvailable}}" class="composer">
     <input value="{{draft}}" bindinput="setDraft" maxlength="2000" placeholder="输入消息…" confirm-type="send" bindconfirm="send" disabled="{{restrictionEndsAt !== ''}}" />
-    <button wx:if="{{mediaEnabled}}" class="media" disabled="{{sending || mediaUploading || restrictionEndsAt}}" bindtap="chooseImage">图片</button>
-    <button wx:if="{{mediaEnabled}}" class="media {{recording ? 'recording' : ''}}" disabled="{{sending || mediaUploading || restrictionEndsAt}}" bindtap="toggleRecord">{{recording ? '结束' : '语音'}}</button>
+    <button wx:if="{{mediaEnabled && !textOnly}}" class="media" disabled="{{sending || mediaUploading || restrictionEndsAt}}" bindtap="chooseImage">图片</button>
+    <button wx:if="{{mediaEnabled && !textOnly}}" class="media {{recording ? 'recording' : ''}}" disabled="{{sending || mediaUploading || restrictionEndsAt}}" bindtap="toggleRecord">{{recording ? '结束' : '语音'}}</button>
     <button class="send" loading="{{sending || mediaUploading}}" disabled="{{restrictionEndsAt !== ''}}" bindtap="send">发送</button>
   </view>
 </view>

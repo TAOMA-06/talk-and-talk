@@ -41,7 +41,8 @@
       <view class="topic-line">关联主题：{{item.topicText}}</view>
       <view class="offering-actions">
         <button class="plain-button action-button" bindtap="editOffering" data-id="{{item.id}}">编辑</button>
-        <button class="plain-button action-button" loading="{{changingOfferingId === item.id}}" bindtap="toggleOfferingActive" data-id="{{item.id}}">{{item.isActive ? '暂停' : '上架'}}</button>
+        <button wx:if="{{item.isActive || item.deliveryMode === 'text' || voiceDeliveryModeAvailable}}" class="plain-button action-button" loading="{{changingOfferingId === item.id}}" bindtap="toggleOfferingActive" data-id="{{item.id}}">{{item.isActive ? '暂停' : '上架'}}</button>
+        <view wx:else class="muted">首发仅开放文字服务，历史语音服务不能上架。</view>
         <button class="plain-button direction-button" disabled="{{!item.canMoveUp || reorderingId !== '' || offerings.length < offeringTotal}}" loading="{{reorderingId === item.id}}" bindtap="moveOffering" data-id="{{item.id}}" data-direction="-1">上移</button>
         <button class="plain-button direction-button" disabled="{{!item.canMoveDown || reorderingId !== '' || offerings.length < offeringTotal}}" loading="{{reorderingId === item.id}}" bindtap="moveOffering" data-id="{{item.id}}" data-direction="1">下移</button>
       </view>

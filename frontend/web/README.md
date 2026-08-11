@@ -9,18 +9,20 @@ Talk&Talk 官方网站。公共面负责品牌、产品说明、安全与公示�
 | 面 | 责任 |
 |---|---|
 | 公共营销路由 `/` `/how-it-works` `/safety` `/about` `/partners` | 官网交付 |
-| `/business` `/demo` | 默认私密；需 `WEB_ENABLE_PRIVATE_SURFACES=true` 或非生产候选 |
+| `/business` `/demo` | 私密延期页；生产进程始终返回 404，只有非生产隔离环境可查看 |
 | `/discover` `/login` `/community` `/orders` `/messages` `/profile` `/workbench` `/companions/*` | 生产暂停的延期 Web App |
 | `/api/session/*` `/api/backend/*` | 仅隔离开发联调 |
 
-生产候选默认 fail-closed：`NODE_ENV=production` 即锁定延期交易面与 BFF。
-也可显式设置：
+生产候选 fail-closed：`NODE_ENV=production` 即锁定延期交易面与 BFF，且
+`WEB_SURFACE_MODE=open|development|test`、`WEB_ENABLE_PRIVATE_SURFACES`、
+`WEB_ENABLE_DEFERRED_SURFACES` 和 `WEB_ALLOW_PRODUCTION_API` 都不能重新打开它们。
+可额外显式设置：
 
 ```dotenv
 WEB_SURFACE_MODE=production
 ```
 
-本地 HTML/联调需要延期面时再打开：
+只有非生产本地 HTML/联调需要延期面时才打开：
 
 ```dotenv
 WEB_SURFACE_MODE=open
@@ -34,7 +36,8 @@ WEB_ENABLE_DEFERRED_SURFACES=true
 TALKTALK_API_BASE_URL=http://127.0.0.1:3101/api/v1
 ```
 
-禁止在生产候选中把 `TALKTALK_API_BASE_URL` 指向正式 API 后打开延期面，除非另有 `WEB_ALLOW_PRODUCTION_API` 的精确授权。
+不得把生产候选的延期面或 BFF/session 指向任何 API；即使设置
+`WEB_ALLOW_PRODUCTION_API`，生产进程也保持关闭。隔离开发默认也应使用非生产 API。
 
 ## 小程序入口
 
@@ -65,7 +68,9 @@ npm run check
 
 该命令会完成严格类型检查、代码规范检查、surface policy 单测、生产构建和渲染验证。
 
-生产候选拒绝证据由 `tests/web-surface-policy.test.mjs` 驱动已上线的 `lib/web-surface-policy.ts`（`WEB_SURFACE_MODE=production`）。
+生产候选拒绝证据由 `tests/web-surface-policy.test.mjs` 和已构建 Worker 的
+`tests/rendered-html.test.mjs` 驱动：即使 `NODE_ENV=production` 同时被注入
+`WEB_SURFACE_MODE=open`，延期页、BFF 与 session 仍被拒绝。
 
 真实后端联调使用独立的开发 API、PostgreSQL 与 Redis，并显式打开延期面开关：
 
@@ -79,6 +84,7 @@ npm run test:integration
 
 ## 上线注意
 
-- 生产候选：`WEB_SURFACE_MODE=production`；sitemap 仅含公共营销路径。
+- 生产候选：`NODE_ENV=production`；sitemap 仅含公共营销路径。环境变量不能
+  重新启用私密、延期或 BFF/session 路由。
 - 后端必须先执行需要的数据库迁移。
 - 正式 API 地址默认为 `https://api.talkandtalk.app/api/v1`，官网生产候选不应代理交易写路径。

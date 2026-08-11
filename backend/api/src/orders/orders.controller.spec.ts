@@ -39,4 +39,19 @@ describe("OrdersController", () => {
       { page: 2, pageSize: 10 }
     );
   });
+
+  it("forwards the authenticated customer and order id to the refund-sync service", async () => {
+    const expected = { refund: { id: "refund-1", status: "processing" }, order: { id: "order-1" } };
+    const paymentsService = { syncRefund: jest.fn().mockResolvedValue(expected) };
+    const controller = new OrdersController(
+      {} as any,
+      paymentsService as any,
+      {} as any,
+      { getOrThrow: () => "development" } as any
+    );
+
+    await expect(controller.syncRefund({ id: "customer-1" } as any, "order-1"))
+      .resolves.toEqual(expected);
+    expect(paymentsService.syncRefund).toHaveBeenCalledWith("customer-1", "order-1");
+  });
 });

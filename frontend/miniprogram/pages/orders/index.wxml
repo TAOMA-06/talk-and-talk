@@ -151,12 +151,12 @@
         <view class="reschedule-response-row"><text class="reschedule-response-label">响应截止</text><text>{{item.pendingRescheduleDeadlineText}}</text></view>
         <view class="reschedule-response-note">接受后会再次核对时段和订单状态；拒绝则保留原预约。</view>
         <view class="reschedule-response-actions">
-          <button class="primary-button reschedule-response-button" disabled="{{item.rescheduleResponseAction !== ''}}" loading="{{item.rescheduleResponseAction === 'accept'}}" bindtap="respondReschedule" data-id="{{item.id}}" data-action="accept">接受改期</button>
+          <button wx:if="{{item.canAcceptReschedule}}" class="primary-button reschedule-response-button" disabled="{{item.rescheduleResponseAction !== ''}}" loading="{{item.rescheduleResponseAction === 'accept'}}" bindtap="respondReschedule" data-id="{{item.id}}" data-action="accept">接受改期</button>
           <button class="plain reschedule-response-button" disabled="{{item.rescheduleResponseAction !== ''}}" loading="{{item.rescheduleResponseAction === 'reject'}}" bindtap="respondReschedule" data-id="{{item.id}}" data-action="reject">保持原预约</button>
         </view>
         <view wx:if="{{item.rescheduleResponseError}}" class="reschedule-response-error">{{item.rescheduleResponseError}}</view>
       </view>
-      <view wx:if="{{item.rescheduleOpen}}" class="reschedule-panel">
+      <view wx:if="{{item.rescheduleOpen && !item.isTextOnlyHistoricalVoiceOrder}}" class="reschedule-panel">
         <view class="reschedule-heading">改期协商</view>
         <view wx:if="{{item.rescheduleState === 'loading'}}" class="reschedule-state">正在核对协商与可约时段…</view>
         <view wx:elif="{{item.rescheduleState === 'pending'}}" class="reschedule-state">{{item.pendingRescheduleText || item.rescheduleMessage}}</view>
@@ -182,7 +182,7 @@
           <view class="reschedule-summary">拟议时间：{{item.rescheduleDate}} {{item.rescheduleTime}}（北京时间）</view>
         </view>
         <view wx:else class="reschedule-state">{{item.rescheduleMessage}}</view>
-        <view wx:if="{{item.rescheduleState === 'structured' || item.rescheduleState === 'legacy'}}" class="reschedule-submit-row">
+        <view wx:if="{{(item.rescheduleState === 'structured' || item.rescheduleState === 'legacy') && !item.isTextOnlyHistoricalVoiceOrder}}" class="reschedule-submit-row">
           <button class="primary-button reschedule-submit" disabled="{{!item.rescheduleSubmitEnabled}}" loading="{{item.rescheduleSubmitting}}" bindtap="submitReschedule" data-id="{{item.id}}">{{item.rescheduleSubmitText}}</button>
         </view>
         <button wx:if="{{item.rescheduleState === 'empty' || item.rescheduleState === 'unavailable'}}" class="reschedule-refresh" bindtap="reloadReschedule" data-id="{{item.id}}">重新读取可约时段</button>
@@ -190,7 +190,7 @@
       <view class="actions">
         <button wx:if="{{(item.status === 'pending' || item.status === 'paying') && item.companionConfirmedAt}}" class="primary-button action" loading="{{payingId === item.id}}" bindtap="pay" data-id="{{item.id}}">去支付</button>
         <button wx:if="{{item.status === 'pending' || item.status === 'paying'}}" class="plain action" bindtap="cancel" data-id="{{item.id}}">取消订单</button>
-        <button wx:if="{{item.canInitiateReschedule && !item.pendingReschedule}}" class="plain action" bindtap="toggleReschedule" data-id="{{item.id}}">{{item.rescheduleToggleText}}</button>
+        <button wx:if="{{item.canInitiateReschedule && !item.pendingReschedule && !item.isTextOnlyHistoricalVoiceOrder}}" class="plain action" bindtap="toggleReschedule" data-id="{{item.id}}">{{item.rescheduleToggleText}}</button>
         <button wx:if="{{item.canOpenRealtimeVoice}}" class="primary-button action" bindtap="openVoiceRoom" data-id="{{item.id}}">进入实时语音</button>
         <button wx:if="{{item.canRequestRefund}}" class="plain action" bindtap="refund" data-id="{{item.id}}">{{item.refundActionText}}</button>
         <view wx:if="{{item.status === 'completed' && item.refundRequestDeadlineAt}}" class="muted">自助售后截止：{{item.refundDeadlineText}}；截止后仍可提交客服争议。</view>
@@ -340,12 +340,12 @@
         <view class="reschedule-response-row"><text class="reschedule-response-label">响应截止</text><text>{{item.pendingRescheduleDeadlineText}}</text></view>
         <view class="reschedule-response-note">接受后会再次核对时段和订单状态；拒绝则保留原预约。</view>
         <view class="reschedule-response-actions">
-          <button class="primary-button reschedule-response-button" disabled="{{item.rescheduleResponseAction !== ''}}" loading="{{item.rescheduleResponseAction === 'accept'}}" bindtap="respondReschedule" data-id="{{item.id}}" data-action="accept">接受改期</button>
+          <button wx:if="{{item.canAcceptReschedule}}" class="primary-button reschedule-response-button" disabled="{{item.rescheduleResponseAction !== ''}}" loading="{{item.rescheduleResponseAction === 'accept'}}" bindtap="respondReschedule" data-id="{{item.id}}" data-action="accept">接受改期</button>
           <button class="plain reschedule-response-button" disabled="{{item.rescheduleResponseAction !== ''}}" loading="{{item.rescheduleResponseAction === 'reject'}}" bindtap="respondReschedule" data-id="{{item.id}}" data-action="reject">保持原预约</button>
         </view>
         <view wx:if="{{item.rescheduleResponseError}}" class="reschedule-response-error">{{item.rescheduleResponseError}}</view>
       </view>
-      <view wx:if="{{item.rescheduleOpen}}" class="reschedule-panel">
+      <view wx:if="{{item.rescheduleOpen && !item.isTextOnlyHistoricalVoiceOrder}}" class="reschedule-panel">
         <view class="reschedule-heading">改期协商</view>
         <view wx:if="{{item.rescheduleState === 'loading'}}" class="reschedule-state">正在核对协商与可约时段…</view>
         <view wx:elif="{{item.rescheduleState === 'pending'}}" class="reschedule-state">{{item.pendingRescheduleText || item.rescheduleMessage}}</view>
@@ -371,17 +371,17 @@
           <view class="reschedule-summary">拟议时间：{{item.rescheduleDate}} {{item.rescheduleTime}}（北京时间）</view>
         </view>
         <view wx:else class="reschedule-state">{{item.rescheduleMessage}}</view>
-        <view wx:if="{{item.rescheduleState === 'structured' || item.rescheduleState === 'legacy'}}" class="reschedule-submit-row">
+        <view wx:if="{{(item.rescheduleState === 'structured' || item.rescheduleState === 'legacy') && !item.isTextOnlyHistoricalVoiceOrder}}" class="reschedule-submit-row">
           <button class="primary-button reschedule-submit" disabled="{{!item.rescheduleSubmitEnabled}}" loading="{{item.rescheduleSubmitting}}" bindtap="submitReschedule" data-id="{{item.id}}">{{item.rescheduleSubmitText}}</button>
         </view>
         <button wx:if="{{item.rescheduleState === 'empty' || item.rescheduleState === 'unavailable'}}" class="reschedule-refresh" bindtap="reloadReschedule" data-id="{{item.id}}">重新读取可约时段</button>
       </view>
       <view class="actions">
-        <button wx:if="{{item.status === 'pending' && !item.companionConfirmedAt}}" class="primary-button action" bindtap="confirmServiceOrder" data-id="{{item.id}}">确认预约</button>
+        <button wx:if="{{item.status === 'pending' && !item.companionConfirmedAt && !item.isTextOnlyHistoricalVoiceOrder}}" class="primary-button action" bindtap="confirmServiceOrder" data-id="{{item.id}}">确认预约</button>
         <button wx:if="{{item.status === 'pending' && !item.companionConfirmedAt}}" class="plain action" bindtap="rejectServiceOrder" data-id="{{item.id}}">无法接单</button>
-        <button wx:if="{{item.canInitiateReschedule && !item.pendingReschedule}}" class="plain action" bindtap="toggleReschedule" data-id="{{item.id}}">{{item.rescheduleToggleText}}</button>
+        <button wx:if="{{item.canInitiateReschedule && !item.pendingReschedule && !item.isTextOnlyHistoricalVoiceOrder}}" class="plain action" bindtap="toggleReschedule" data-id="{{item.id}}">{{item.rescheduleToggleText}}</button>
         <view wx:if="{{item.status === 'pending' && item.companionConfirmedAt}}" class="muted">已确认，客户需在 {{item.paymentDeadlineText}} 前支付，超时自动释放时段</view>
-        <button wx:if="{{item.status === 'paid' && item.canStartService}}" class="primary-button action" bindtap="startService" data-id="{{item.id}}">开始服务</button>
+        <button wx:if="{{item.status === 'paid' && item.canStartService && !item.isTextOnlyHistoricalVoiceOrder}}" class="primary-button action" bindtap="startService" data-id="{{item.id}}">开始服务</button>
         <button wx:if="{{item.canOpenRealtimeVoice}}" class="primary-button action" bindtap="openVoiceRoom" data-id="{{item.id}}">进入实时语音</button>
         <view wx:if="{{item.status === 'paid' && !item.canStartService && item.startServiceNotice}}" class="muted">{{item.startServiceNotice}}</view>
         <button wx:if="{{item.status === 'inService' && item.canCompleteService}}" class="primary-button action" bindtap="completeService" data-id="{{item.id}}">完成服务</button>

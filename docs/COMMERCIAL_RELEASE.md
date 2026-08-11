@@ -1,5 +1,24 @@
 # Talk&Talk 正式商用方案与放行门禁
 
+> 当前状态：`G1 NO-GO`、`G2-ready NO-GO`、`G2 BLOCKED`。本文件说明商业边界与
+> 未来放行条件，不是可执行的 staging/production 发布手册，也不授权配置、迁移、
+> 部署、真机上传、真实支付、退款、消息或数据写入。任何外部动作均须先有与
+> [G2 执行包](./cto-self-audit/runs/2026-08-08-g1-remediation/g2-execution-package.md)
+> 对应的逐项授权记录和独立复核；不得使用当前工作树、分支、浮动 tag 或 `--build`。
+
+## 每项外部动作的必填记录
+
+| 字段 | 必填内容 |
+|---|---|
+| Evidence ID | 只授权当前动作、可由审批系统核验的非秘密 ID。 |
+| 目标与数据/provider 范围 | 环境/资源 ID、账户别名、是否触发微信/支付/消息、数据清理或保留边界。 |
+| 冻结输入 | 候选 SHA/source-tree、不可变 Web/API/OCI digest、制品构建与保管证明。 |
+| 有效期与人员 | 签发/到期、执行人、独立复核人，以及禁止自审/绕过控制。 |
+| 预期/结果/复核 | 场景、金额上限和停止条件、脱敏收据/校验和、结果与独立复核结论。 |
+
+缺失、过期、目标/制品不匹配或没有结果复核均为 `BLOCKED`。本文件不会存储凭据、
+数据库 URL、OpenID、支付签名或真实客户数据。
+
 本方案把“代码达到可商用控制强度”和“企业已经获得对外经营资格”分开验收。仓库负责前者；经营主体、微信审批、税务选择、真实证据和生产运维必须由责任人签字确认。只有两层同时通过，才可把 `COMMERCIAL_RELEASE_MODE` 切换为 `commercial` 并开放真实付费流量。
 
 本轮唯一消费者发行面是微信小程序，普通用户与陪伴者在同一小程序内使用角色化界面；商业员工使用 `/admin/`，独立审核部门使用 `/review/`，权威 API 为 NestJS `/api/v1`。`frontend/ios`、消费者 Web 和本地演示不参与商用放行。当前市场交叉审查、仓库红线及刻意不复制项见 [商用界面市场交叉审查（2026-08-02 复审）](./commercial-market-cross-audit-2026-08-02.md)。
@@ -55,21 +74,20 @@
 - 真实链路：在隔离 staging 完成微信登录、订阅授权、确认后支付、重复/乱序回调、取消、服务、退款成功/失败/重试、工单冻结、结算双人复核、追偿和账号注销；生产只做一笔受控真钱验收，不允许自动化使用生产商户或生产 Redis。
 - 历史数据：迁移只可根据既有完整小时截止时间确定性写入 `legacy-inferred-v1`，其余记录明确写入 `legacy-72h-v1`；这只是技术兼容标记，不代表政策已经批准。逐笔处置历史 `paid`、`inService`、`completed`、失败退款、未结工单、退款快照缺口及无收款快照的结算记录。历史订单不得自动补造成“已完成商业核验”。
 
-## 放行步骤
+## 未来放行记录必须证明的结果
 
-1. 复制 `backend/api/.env.production.example` 到保密配置，填写真实值；配置 `COMMERCIAL_RELEASE_MODE=commercial`、经批准费率、`REFUND_POLICY_VERSION`、`REFUND_POLICY_APPROVED=true`、非秘密 `REFUND_POLICY_APPROVAL_REFERENCE`、退款期、结算期、订单容量和订单/结算硬开关。生产示例故意保持退款政策未批准；没有真实外部批准不得把它改为 `true`。每日账单必须设置 `WECHAT_DAILY_BILL_RECONCILIATION_ENABLED=true`、`WECHAT_DAILY_BILL_RECONCILIATION_APPROVED=true`、非秘密批准引用、经财务确认且不晚于最新可取账期的 `WECHAT_DAILY_BILL_RECONCILIATION_START_DATE`，以及 10–23 点的上海时间执行小时；没有真实财务批准或起始日期时示例配置会故意保持 No-Go。另将 `COMPANION_VOICE_EVIDENCE_VIEWER_URL` 指向外部 HTTPS 受控查看器，并用独立 32+ 位密钥签发 60–900 秒的管理员试听地址；查看器未配置或不可用时，语音介绍批准必须保持 No-Go。容量必须来自当班运营、客服和财务真实承载能力，不能照抄示例。
-2. 在生产部署前执行：
+未来获批准的 production change record（而非本文件）必须逐项证明：
 
-   ```sh
-   cd backend/api
-   npm run preflight:deployment -- .env.production
-   npm run verify:prod-artifacts
-   npm run prisma:deploy
-   ```
-
-3. 先访问并核对 `/api/v1/legal/terms`、`/api/v1/legal/privacy`、`/api/v1/legal/platform-rules` 及小程序使用的 `/legal/*.html`，确认版本快照已经创建且旧版本可访问。
-4. 签发一个短时 admin access token，与 `METRICS_TOKEN` 一并只通过当前 shell 环境传入，运行 `scripts/production-smoke.sh https://真实域名`。脚本会核验用户内容保持本地处理、`externalUserContentTransmission=false`，并要求商用运营门禁为 `clear`；它不会向 DeepSeek 或其他外部生成式 AI 发送探测文本。随后完成一笔受控真钱订单，核对微信账单、订单、支付、通知、退款、应结款、审计和客服记录。执行后立即撤销 token 并清理 shell 历史。
-5. 管理后台 `/admin/commercial/readiness` 必须为 `clear`；外部 P0 签字项、迁移备份和回滚负责人齐全后，由产品、工程、运营/客服、财务和法律/合规共同签署 Go。
+1. 受控配置与商用/退款/账单批准引用、容量和 text-only 不变量与批准记录一致；
+   不得把示例配置改写为真实配置，也不得临时打开媒体、TRTC 或语音能力。
+2. 冻结候选和不可变制品已经完成同 SHA 零跳过门禁、保管、迁移/回滚前置证据，且
+   环境预检、法律文本和路由边界的脱敏结果已归档。
+3. 任何受保护 smoke、真实支付/退款、微信消息或真机验证都受独立 Evidence ID、
+   账户/金额上限、停止条件和结果复核约束。`production-smoke.sh` 只是未来受控模板，
+   不能从本文件直接运行；`acceptance-smoke.sh` 是 development/local mock 工具，
+   永远不是 production 或 staging 放行证据。
+4. `/admin/commercial/readiness`、外部 P0 签字、迁移备份/恢复责任和独立 Go 复核均
+   必须记录在获批准的 change record 中。没有这些记录，结论仍为 No-Go。
 
 ## 可约提醒的受控放行与异常核查
 

@@ -69,13 +69,14 @@
         <view wx:if="{{view.statements.length}}" class="statement-item" wx:for="{{view.statements}}" wx:key="id">
           <view class="statement-meta"><text>{{item.roleText}} · {{item.kindText}}</text><text>{{item.timeText}}</text></view>
           <view class="statement-copy">{{item.statement}}</view>
-          <view wx:if="{{item.evidenceAttachments.length}}" class="evidence-list">
+          <view wx:if="{{!textOnly && item.evidenceAttachments.length}}" class="evidence-list">
             <button wx:for="{{item.evidenceAttachments}}" wx:for-item="attachment" wx:key="id" class="evidence-chip" size="mini" data-id="{{attachment.id}}" bindtap="openBoundEvidence">{{attachment.kind === 'image' ? '查看图片证据' : '播放音频证据'}}</button>
           </view>
         </view>
         <view wx:else class="hint">暂未提交文字陈述。平台仍会保留订单与供应商出席摘要。</view>
         <textarea wx:if="{{view.canAddEvidence || view.canRespond || view.canAppeal || view.canAppealRespond}}" class="statement" value="{{statement}}" bindinput="inputStatement" maxlength="2000" placeholder="填写时间、履约或技术事实，不要提交敏感身份/支付信息" aria-label="案件陈述或申诉理由" />
-        <view wx:if="{{view.canAddEvidence || view.canRespond || view.canAppeal || view.canAppealRespond}}" class="evidence-panel">
+        <view wx:if="{{textOnly && (view.canAddEvidence || view.canRespond || view.canAppeal || view.canAppealRespond)}}" class="hint">当前首发版本只接收文字陈述和申诉理由；图片、音频证据暂未开放。</view>
+        <view wx:if="{{!textOnly && (view.canAddEvidence || view.canRespond || view.canAppeal || view.canAppealRespond)}}" class="evidence-panel">
           <view class="evidence-toolbar">
             <button size="mini" disabled="{{evidenceUploading || evidenceDrafts.length >= 3}}" bindtap="addEvidenceImage">添加图片</button>
             <button size="mini" disabled="{{evidenceUploading || evidenceDrafts.length >= 3}}" bindtap="addEvidenceAudio">添加音频</button>

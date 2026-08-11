@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 import pg from "pg";
+import { assertIsolatedPostgresPreflightEnvironment, POSTGRES_PREFLIGHT_SUITE } from "./isolated-postgres-preflight-environment.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const apiRoot = join(here, "..");
@@ -104,12 +105,12 @@ test("notification delivery uses bounded stable SKIP LOCKED claim and recovery",
 const integrationUrl = String(
   process.env.NOTIFICATION_DELIVERY_CLAIM_TEST_DATABASE_URL ?? ""
 ).trim();
+const postgresPreflight = process.env.E2E_RUNNER_SUITE === POSTGRES_PREFLIGHT_SUITE
+  ? assertIsolatedPostgresPreflightEnvironment()
+  : null;
 
-test("ten PostgreSQL replicas claim 10,000 due deliveries without overlap and recover bounded leases", {
-  skip: integrationUrl
-    ? false
-    : "set NOTIFICATION_DELIVERY_CLAIM_TEST_DATABASE_URL to a disposable PostgreSQL database"
-}, async (t) => {
+if (postgresPreflight) test("ten PostgreSQL replicas claim 10,000 due deliveries without overlap and recover bounded leases", async (t) => {
+  await postgresPreflight;
   const schema = `notification_claim_${randomBytes(8).toString("hex")}`;
   const admin = new pg.Client({ connectionString: integrationUrl });
   const replicas = Array.from(

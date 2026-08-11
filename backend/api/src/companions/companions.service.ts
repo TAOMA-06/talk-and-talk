@@ -436,6 +436,12 @@ export class CompanionsService {
     if (Object.keys(update).length === 0) {
       throw new AppException("INVALID_SERVICE_OFFERING", "At least one service offering field is required", HttpStatus.BAD_REQUEST);
     }
+    // Legacy voice offerings can remain in the owner catalog so they can be
+    // retired, but a partial `{ isActive: true }` update must not bypass the
+    // delivery-mode validation that guards new voice offerings.
+    if (existing.deliveryMode === "voice" && update.isActive === true) {
+      this.assertVoiceServiceOfferingEnabled();
+    }
 
     const next = { ...existing, ...update };
     const contentChanged = update.title !== undefined || update.description !== undefined;
@@ -1764,16 +1770,19 @@ export class CompanionsService {
 
   private normalizeServiceOfferingDeliveryMode(value: unknown): "text" | "voice" {
     if (value === "text" || value === "voice") {
-      if (value === "voice" && !this.isVoiceBookingEnabled()) {
-        throw new AppException(
-          "COMMERCIAL_SURFACE_TEXT_ONLY",
-          "Voice service offerings are disabled for the current commercial surface",
-          HttpStatus.UNPROCESSABLE_ENTITY
-        );
-      }
+      if (value === "voice") this.assertVoiceServiceOfferingEnabled();
       return value;
     }
     throw new AppException("INVALID_SERVICE_OFFERING", "deliveryMode must be text or voice", HttpStatus.BAD_REQUEST);
+  }
+
+  private assertVoiceServiceOfferingEnabled() {
+    if (this.isVoiceBookingEnabled()) return;
+    throw new AppException(
+      "COMMERCIAL_SURFACE_TEXT_ONLY",
+      "Voice service offerings are disabled for the current commercial surface",
+      HttpStatus.UNPROCESSABLE_ENTITY
+    );
   }
 
   private normalizeServiceOfferingDuration(value: unknown): number {

@@ -1,3 +1,4 @@
+import * as publicInteractionIdentity from "../users/public-interaction-identity.gate";
 import { ConversationsService } from "./conversations.service";
 
 function moderationResult(decision: "allow" | "warn" | "review" | "block") {
@@ -14,7 +15,22 @@ function moderationResult(decision: "allow" | "warn" | "review" | "block") {
   } as any;
 }
 
-describe("ConversationsService moderation delivery state machine", () => {
+describe("ConversationsService moderation delivery state machine behind an approved identity adapter", () => {
+  let identityGateSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    // The first release deliberately rejects every legacy identity boolean. These
+    // tests isolate the downstream delivery state machine that remains ready for
+    // a future approved, independently bound identity adapter.
+    identityGateSpy = jest
+      .spyOn(publicInteractionIdentity, "assertPublicInteractionIdentity")
+      .mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    identityGateSpy.mockRestore();
+  });
+
   function setup(decision: "allow" | "warn" | "review" | "block") {
     const activeOrder = {
       status: "paid",
@@ -52,6 +68,7 @@ describe("ConversationsService moderation delivery state machine", () => {
     } as any;
     const mediaAssets = {
       isFeatureEnabled: jest.fn(() => false),
+      assertChatMediaUploadEnabled: jest.fn(),
       bindUploadedAssets: jest.fn(),
       attachmentsForMessage: jest.fn().mockResolvedValue([])
     } as any;

@@ -9,19 +9,19 @@ import {
 } from "./public-interaction-identity.gate";
 
 describe("public-interaction-identity.gate", () => {
-  it("accepts only an active account with profile.isVerified true", () => {
+  it("treats an unproven legacy profile.isVerified true as notVerified", () => {
     expect(
       resolvePublicInteractionIdentityStatus({
         accountStatus: "active",
         profile: { isVerified: true }
       })
-    ).toBe("verified");
+    ).toBe("notVerified");
     expect(
       isPublicInteractionIdentityVerified({
         accountStatus: "active",
         profile: { isVerified: true }
       })
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("rejects missing, false, or non-boolean verification as notVerified", () => {
@@ -74,12 +74,12 @@ describe("public-interaction-identity.gate", () => {
     }
   });
 
-  it("does not throw for a verified active account", () => {
+  it("keeps public interaction blocked for a legacy true value", () => {
     expect(() =>
       assertPublicInteractionIdentity({
         accountStatus: "active",
         profile: { isVerified: true }
       })
-    ).not.toThrow();
+    ).toThrow(expect.objectContaining({ code: PUBLIC_INTERACTION_IDENTITY_REQUIRED }));
   });
 });

@@ -155,6 +155,19 @@ describe("VoiceService", () => {
     expect(mockSignerConstructor).not.toHaveBeenCalled();
   });
 
+  it("rejects text-only voice access as unavailable before any transaction, lookup, signing, or audit", async () => {
+    configValues.COMMERCIAL_SURFACE = "text_only";
+
+    await expect(service.issueRoomAccess("customer-user-123", "order-1"))
+      .rejects.toMatchObject({ code: "COMMERCIAL_SURFACE_TEXT_ONLY", status: 503 });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.order.findUnique).not.toHaveBeenCalled();
+    expect(prisma.order.findFirst).not.toHaveBeenCalled();
+    expect(prisma.voiceSession.upsert).not.toHaveBeenCalled();
+    expect(mockSignerConstructor).not.toHaveBeenCalled();
+    expect(audit.record).not.toHaveBeenCalled();
+  });
+
   it("fails closed before data access when the TRTC disclosure approval is absent", async () => {
     configValues.TRTC_PRIVACY_DISCLOSURE_APPROVED = false;
 

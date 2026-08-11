@@ -198,6 +198,34 @@ describe("CommercialService", () => {
       pendingOrHeldCents: 15_000,
       paidCents: 27_000
     });
+    expect(result.items[0]).toEqual(expect.objectContaining({ hold: null }));
+    expect(result.items[0]).not.toHaveProperty("holdReason");
+  });
+
+  it("projects internal hold reasons to a typed companion-safe category without echoing the code", async () => {
+    const held = earning({
+      id: "earning-held",
+      status: "held",
+      holdReason: "payment_dispute_provider_outcome_unknown"
+    });
+    prisma.companionProfile = { findUnique: jest.fn().mockResolvedValue({ id: "c1" }) };
+    prisma.companionEarning = {
+      findMany: jest.fn().mockResolvedValue([held]),
+      count: jest.fn().mockResolvedValue(1),
+      groupBy: jest.fn().mockResolvedValue([])
+    };
+
+    const result = await service.listForCompanion("owner-1", { status: "held" });
+
+    expect(result.items[0]).toEqual(expect.objectContaining({
+      hold: {
+        category: "afterSalesReview",
+        status: "underReview",
+        nextAction: "waitForReview"
+      }
+    }));
+    expect(result.items[0]).not.toHaveProperty("holdReason");
+    expect(JSON.stringify(result)).not.toContain("provider_outcome_unknown");
   });
 
   it("binds an adult-eligibility verdict and validity window to commercial verification", async () => {

@@ -3,8 +3,10 @@ import { ConfigService } from "@nestjs/config";
 import { randomUUID } from "node:crypto";
 
 import { AppException } from "../../common/errors/app.exception";
-import { isCommercialTextOnlySurface } from "../../config/commercial-surface";
-import { isFirstReleaseCapabilityEnabled } from "../../config/first-release-capability-matrix";
+import {
+  FirstReleaseCapability,
+  isFirstReleaseCapabilityEnabled
+} from "../../config/first-release-capability-matrix";
 import { PrismaService } from "../../database/prisma.service";
 import {
   MEDIA_ANALYSIS_PROVIDER,
@@ -69,10 +71,29 @@ export class MediaAssetService {
   ) {}
 
   isFeatureEnabled(): boolean {
-    // Matrix is the first-release authority; commercial surface remains the default input.
-    if (!isFirstReleaseCapabilityEnabled("chatMediaUpload", this.config)) return false;
-    if (isCommercialTextOnlySurface(this.config)) return false;
-    return this.storage.isConfigured && this.analysis.isConfigured;
+    // Retained for existing chat-status and worker callers. New call sites must
+    // choose their explicit capability rather than treating media as one switch.
+    return this.isChatMediaUploadEnabled();
+  }
+
+  isChatMediaUploadEnabled(): boolean {
+    return this.isCapabilityEnabled("chatMediaUpload");
+  }
+
+  isChatMediaPlaybackEnabled(): boolean {
+    return this.isCapabilityEnabled("chatMediaPlayback");
+  }
+
+  isCaseEvidenceMediaEnabled(): boolean {
+    return this.isCapabilityEnabled("caseEvidenceMedia");
+  }
+
+  assertChatMediaUploadEnabled() {
+    this.assertCapabilityEnabled("chatMediaUpload");
+  }
+
+  assertCaseEvidenceMediaEnabled() {
+    this.assertCapabilityEnabled("caseEvidenceMedia");
   }
 
   async reserve(input: {
@@ -84,7 +105,7 @@ export class MediaAssetService {
     sha256: string;
     durationMs?: number;
   }) {
-    this.assertEnabled();
+    this.assertChatMediaUploadEnabled();
     this.validateInput(input);
 
     const id = randomUUID();
@@ -137,7 +158,7 @@ export class MediaAssetService {
     sha256: string;
     durationMs?: number;
   }) {
-    this.assertEnabled();
+    this.assertCaseEvidenceMediaEnabled();
     this.validateInput(input);
     const scopeData = this.controlledScopeData(input.purpose, input.scope);
     const id = randomUUID();
@@ -215,7 +236,7 @@ export class MediaAssetService {
   }
 
   async complete(assetId: string, uploaderId: string, conversationId: string) {
-    this.assertEnabled();
+    this.assertChatMediaUploadEnabled();
     const asset: any = await this.prisma.mediaAsset.findFirst({
       where: { id: assetId, uploaderId, conversationId }
     } as any);
@@ -241,7 +262,7 @@ export class MediaAssetService {
   }
 
   async completeControlled(assetId: string, uploaderId: string) {
-    this.assertEnabled();
+    this.assertCaseEvidenceMediaEnabled();
     const asset: any = await this.prisma.mediaAsset.findFirst({
       where: {
         id: assetId,
@@ -293,6 +314,7 @@ export class MediaAssetService {
   }
 
   async controlledStatus(assetId: string, uploaderId: string) {
+    this.assertCaseEvidenceMediaEnabled();
     const asset: any = await this.prisma.mediaAsset.findFirst({
       where: {
         id: assetId,
@@ -307,6 +329,7 @@ export class MediaAssetService {
   }
 
   async approvedReadUrl(asset: any): Promise<string> {
+    this.assertCaseEvidenceMediaEnabled();
     if (
       asset?.status !== "approved"
       || asset.storageDeletedAt
@@ -331,6 +354,7 @@ export class MediaAssetService {
   }
 
   controlledAttachmentDto(attachment: any) {
+    this.assertCaseEvidenceMediaEnabled();
     const asset = attachment.mediaAsset;
     return {
       id: attachment.id,
@@ -351,6 +375,7 @@ export class MediaAssetService {
     db?: { mediaAsset: PrismaService["mediaAsset"] };
   }) {
     if (!input.assetIds.length) return [];
+    this.assertChatMediaUploadEnabled();
     const client = input.db ?? this.prisma;
     const assets: any[] = await client.mediaAsset.findMany({
       where: {
@@ -393,6 +418,10 @@ export class MediaAssetService {
   }
 
   async attachmentsForMessage(messageId: string, includeReadUrl = true) {
+    // Historical rows may outlive a release-surface change. Returning an empty
+    // attachment collection before querying prevents both metadata disclosure
+    // and signed playback URL issuance in text-only production candidates.
+    if (!this.isChatMediaPlaybackEnabled()) return [];
     const assets: any[] = await this.prisma.mediaAsset.findMany({
       where: { messageId },
       orderBy: [{ createdAt: "asc" }, { id: "asc" }]
@@ -402,7 +431,7 @@ export class MediaAssetService {
 
   async toAttachmentDto(asset: any, includeReadUrl = true) {
     const readable = asset.status === "approved";
-    const url = includeReadUrl && readable && asset.status !== "expired"
+    const url = includeReadUrl && this.isChatMediaPlaybackEnabled() && readable && asset.status !== "expired"
       ? await this.storage.createReadUrl(this.toReference(asset))
       : null;
     return {
@@ -616,11 +645,17 @@ export class MediaAssetService {
     };
   }
 
-  private assertEnabled() {
-    if (!this.isFeatureEnabled()) {
+  private isCapabilityEnabled(capability: FirstReleaseCapability): boolean {
+    return isFirstReleaseCapabilityEnabled(capability, this.config)
+      && this.storage.isConfigured
+      && this.analysis.isConfigured;
+  }
+
+  private assertCapabilityEnabled(capability: FirstReleaseCapability) {
+    if (!this.isCapabilityEnabled(capability)) {
       throw new AppException(
         "MEDIA_FEATURE_DISABLED",
-        "Image and audio messaging is not configured for this environment",
+        "Media is disabled for this release surface",
         HttpStatus.SERVICE_UNAVAILABLE
       );
     }

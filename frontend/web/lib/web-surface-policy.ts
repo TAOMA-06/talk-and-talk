@@ -4,10 +4,10 @@
  * (not robots/noindex alone). Pure helpers so unit tests drive shipped policy.
  *
  * Fail-closed defaults:
- * - `NODE_ENV=production` (or WEB_SURFACE_MODE=production|candidate) locks deferred
- *   trade surfaces unless explicitly reopened for isolated development.
- * - Local/dev and automated rendered-html checks must set `WEB_SURFACE_MODE=open`
- *   (or development) when deferred pages must remain reachable.
+ * - A production process, or an explicit `production`/`candidate` mode, always
+ *   locks deferred trade surfaces. No other flag can reopen them in that process.
+ * - Local/dev and automated rendered-html checks may use `WEB_SURFACE_MODE=open`
+ *   (or development), but only outside a production process.
  */
 
 export type WebSurfaceKind =
@@ -73,6 +73,7 @@ export function resolveWebRuntimeMode(
   nodeEnv = process.env.NODE_ENV,
   explicit = process.env.WEB_SURFACE_MODE,
 ): WebRuntimeMode {
+  if ((nodeEnv || "").trim().toLowerCase() === "production") return "production";
   const mode = (explicit || nodeEnv || "production").trim().toLowerCase();
   if (mode === "development" || mode === "dev" || mode === "open") return "development";
   if (mode === "test") return "test";
@@ -83,22 +84,26 @@ export function resolveWebRuntimeMode(
 
 /**
  * True when this process is a production/candidate public website.
- * Fail-closed: NODE_ENV=production locks unless WEB_SURFACE_MODE explicitly
- * opens the surface (development|open|test).
+ * Fail-closed: `NODE_ENV=production` always locks the surface. An explicit
+ * development/open/test mode is meaningful only for a non-production process;
+ * it must never turn a deployed production candidate back into a Web App.
  */
 export function isProductionCandidateSurface(
   env: NodeJS.ProcessEnv = process.env,
 ): boolean {
   const mode = (env.WEB_SURFACE_MODE || "").trim().toLowerCase();
+  const nodeEnv = (env.NODE_ENV || "").trim().toLowerCase();
+  if (nodeEnv === "production") return true;
+  if (mode === "production" || mode === "candidate") return true;
+  if (flagEnabled(env.WEB_SURFACE_LOCK)) return true;
+  // A Worker deployment may not expose NODE_ENV. Only an intentional local
+  // development/test mode can open deferred routes; an unset or unknown runtime
+  // must remain a production candidate instead of silently publishing them.
   if (mode === "development" || mode === "open" || mode === "test" || mode === "dev") {
     return false;
   }
-  if (mode === "production" || mode === "candidate") return true;
-  if (flagEnabled(env.WEB_SURFACE_LOCK)) return true;
-  const nodeEnv = (env.NODE_ENV || "").trim().toLowerCase();
-  // Production runtime without explicit open mode is a candidate lock.
-  if (nodeEnv === "production") return true;
-  return false;
+  if (nodeEnv === "development" || nodeEnv === "test") return false;
+  return true;
 }
 
 /**
@@ -108,6 +113,7 @@ export function isProductionCandidateSurface(
 export function isDeferredWebSurfaceEnabled(
   env: NodeJS.ProcessEnv = process.env,
 ): boolean {
+  if (isProductionCandidateSurface(env)) return false;
   if (!flagEnabled(env.WEB_ENABLE_DEFERRED_SURFACES)) return false;
   const api =
     env.TALKTALK_API_BASE_URL?.trim() ||
@@ -134,7 +140,7 @@ export function isDeferredWebSurfaceEnabled(
 export function isPrivateConditionalSurfaceEnabled(
   env: NodeJS.ProcessEnv = process.env,
 ): boolean {
-  return flagEnabled(env.WEB_ENABLE_PRIVATE_SURFACES);
+  return !isProductionCandidateSurface(env) && flagEnabled(env.WEB_ENABLE_PRIVATE_SURFACES);
 }
 
 export function dispositionForPath(
@@ -145,8 +151,8 @@ export function dispositionForPath(
   if (kind === "publicMarketing") return "allow";
 
   if (kind === "privateConditional") {
-    if (isPrivateConditionalSurfaceEnabled(env)) return "allow";
     if (isProductionCandidateSurface(env)) return "notFound";
+    if (isPrivateConditionalSurfaceEnabled(env)) return "allow";
     return "allow";
   }
 
@@ -162,9 +168,7 @@ export function dispositionForPath(
 
   if (kind === "devOnlyApi") {
     if (isProductionCandidateSurface(env)) {
-      return isDeferredWebSurfaceEnabled(env) && flagEnabled(env.WEB_ALLOW_PRODUCTION_API)
-        ? "allow"
-        : "routeNotAllowed";
+      return "routeNotAllowed";
     }
     return "allow";
   }

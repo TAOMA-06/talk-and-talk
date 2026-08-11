@@ -83,12 +83,167 @@ Compose starts:
 ```bash
 npm run build
 npm test                 # unit
-npm run test:preflight   # deployment preflight validator tests
-npm run test:e2e         # integration-level HTTP tests (alias: test:integration)
-npm run test:integration
+npm run test:preflight:static # zero-skip static preflight
+# test:preflight 的 PostgreSQL 部分和 test:e2e/test:integration 必须由获授权的 sealed runner 创建目标
 ```
 
-E2E/integration tests require Postgres and Redis. Start dependencies with `docker compose -f infra/docker-compose.yml up postgres redis` (from repo root) before running them.
+E2E/integration tests require a dedicated disposable Postgres database and
+Redis instance. They refuse to run unless `NODE_ENV=test`, both explicit reset
+grants, a canonical non-secret `E2E_EXECUTION_AUTHORIZATION_EVIDENCE` reference,
+loopback transports, a per-run ID/token, and a PostgreSQL database named
+exactly `talk_and_talk_<run-id>_e2e` are present. The Evidence ID is an audit
+handle for an operator or CI authorization; the repository only validates its
+format and must not be treated as proof that the referenced approval exists.
+Test data is fixed to Redis DB `15`; the matching ownership marker lives on the
+same Redis transport in DB `14`, so a test flush cannot erase its own proof of
+ownership. Both the PostgreSQL and Redis markers must match the current run ID,
+token hash, and resource identities before a migration, `deleteMany`, or Redis
+flush can run.
+Run the regression suite without connecting to a service:
+
+```bash
+npm run test:e2e:guard
+```
+
+`npm run assert:e2e:environment` validates the current variables without
+connecting (including rejection of `?host=`/`?path=` overrides). `npm run
+verify:e2e:ownership` reads the two matching markers. Before either marker is
+written, the low-level claim command re-parses the raw environment and rejects
+any PostgreSQL target with user objects and any Redis DB `15` with data, so a
+name/token or caller-constructed target alone cannot authorize cleanup of a
+pre-existing test target. The low-level marker commands are runner/CI plumbing,
+not a manual environment-provisioning workflow.
+
+```bash
+npm run assert:e2e:environment
+```
+
+For local E2E, use the runner instead of the shared development compose stack.
+This is an externally authorized action, not a developer convenience command.
+Before any Docker activity, the approved record must bind a fresh local target,
+the exact candidate SHA and canonical source-tree SHA-256, a protected-environment
+approval reference, a trusted absolute Node executable, immutable PostgreSQL/Redis
+`@sha256` inputs already present on the local daemon, their infrastructure-custody
+Evidence ID, and one new external receipt path. The per-run execution Evidence ID
+must either equal the protected approval reference or extend it as
+`<approval-reference>-CI-<nonempty-evidence-suffix>`; it is still an audit handle,
+not proof that the external approval exists. The following is an input shape only;
+do not execute it without that approval:
+
+```bash
+E2E_CANDIDATE_SHA=<40-lowercase-hex> \
+E2E_CANDIDATE_SOURCE_TREE_SHA256=<64-lowercase-hex> \
+E2E_ENVIRONMENT_APPROVAL_REFERENCE=E1-LOCAL-E2E-APPROVED \
+E2E_EXECUTION_AUTHORIZATION_EVIDENCE=E1-LOCAL-E2E-APPROVED-CI-API-E2E-1 \
+E2E_INFRA_IMAGES_EVIDENCE=E1-INFRA-IMAGES-CUSTODY \
+E2E_POSTGRES_IMAGE=postgres@sha256:<approved-digest> \
+E2E_REDIS_IMAGE=redis@sha256:<approved-digest> \
+E2E_RUNNER_NODE_EXECUTABLE=/absolute/path/to/trusted/node \
+E2E_RECEIPT_OUT=/absolute/external-evidence-directory/e2e-receipt.json \
+E2E_RUNNER_SUITE=e2e \
+DOCKER_HOST=unix:///path/to/docker.sock \
+/bin/sh backend/api/scripts/run-isolated-e2e.sh
+```
+
+It creates a randomly named Docker Compose project with a new loopback-only
+PostgreSQL database and Redis instance, creates and verifies its matching
+ownership markers, runs committed migrations and E2E, then removes only that
+project and its volumes. It rejects a mutable/missing image, verifies exact
+local RepoDigests before and after, and invokes Compose with `--pull never`
+and `--no-build`. It requires an explicit Unix-socket address; remote,
+tunnelable TCP, mutable Docker contexts, and Windows/npipe transports are
+rejected. A Unix socket is only a local transport constraint; it does not prove
+the daemon itself is not a deliberately configured proxy. The POSIX launcher
+rejects `NODE_OPTIONS` and `NODE_PATH` before it starts the runner's Node
+process, and it requires the operator or controlled CI job to supply an audited
+absolute Node executable rather than looking one up through `PATH` or npm. The
+runner then uses sealed per-run HOME/TMP/Docker config plus canonical absolute
+Docker/Node/npm paths. `SIGINT` and `SIGTERM` stop the active command tree and
+then run the same one-time cleanup. The runner uses a sealed test-only
+application environment; inherited provider credentials, worker switches,
+`.env` values, and Prisma shadow targets are not passed through. Do not invoke
+`run-isolated-e2e.mjs` directly or use an npm package script as the secure
+launcher. Before the runner resolves Docker, reserves a port, creates a workspace,
+or starts a child command, it verifies a clean detached checkout, candidate input
+policy, `HEAD`, and the canonical source-tree hash against those sealed candidate
+inputs; it repeats the checkout verification after the test stage. Its redacted
+schema-v2 receipt records `candidate.sha`, `candidate.sourceTreeSha256`,
+`authorization.approvalReference`, and `authorization.executionEvidence`, but never
+the target URL, ownership token, or Docker host.
+Do not point `npm run test:e2e` at a development, staging, production, or
+shared database/Redis target.
+The ordinary `npm test` command deliberately excludes `test/*.e2e-spec.ts`;
+those destructive specs only run through `npm run test:e2e`, which loads the
+environment guard before test cleanup.
+
+### Forward-migration compatibility harness
+
+`/bin/sh scripts/run-migration-compatibility.sh` is a separate,
+**local-operator-only**, future runner for a narrowly scoped fresh-schema
+forward-migration check. It is **not** part of `npm run test:e2e`, candidate
+capture, a staging deployment, a rollback drill, the future external control
+plane, or OCI builder/custody evidence. Do not invoke its `.mjs` entrypoint or
+create a convenience npm script that bypasses the POSIX launcher. The marker
+that catches a bare direct Node invocation is a misuse guard, not a substitute
+for the separately required external execution authorization.
+
+Run it only after a separately recorded authorization covers one new local,
+disposable Docker target and after all of the following non-secret references
+are available:
+
+- an absolute trusted Node path plus its exact non-secret SHA-256 in
+  `MIGRATION_COMPATIBILITY_RUNNER_NODE_SHA256`, and an explicit local Unix
+  `DOCKER_HOST`;
+- matching `MIGRATION_COMPATIBILITY_EXECUTION_AUTHORIZATION_EVIDENCE` and
+  `MIGRATION_COMPATIBILITY_ENVIRONMENT_APPROVAL_REFERENCE` values, plus
+  `MIGRATION_COMPATIBILITY_TARGET_KIND=local-disposable`;
+- distinct prior/candidate Git SHA and source-tree SHA-256 values, immutable
+  prior/candidate OCI `@sha256` images, and their artifact Evidence IDs and
+  provenance SHA-256 values;
+- already-local digest-pinned PostgreSQL/Redis images and their infrastructure
+  evidence reference; and
+- a new absolute `MIGRATION_COMPATIBILITY_RECEIPT_OUT` path outside the
+  candidate checkout, reserved for one non-secret, owner-readable **local
+  operation record**. The runner never creates a directory or overwrites a
+  receipt.
+
+The Evidence IDs are auditable handles only; repository code can validate their
+format and equality but cannot establish that an external approval exists. The
+launcher rejects preload/module-path variables, Node execution arguments, host
+DB/Redis/Compose overrides, and Docker contexts before it starts Node. It hashes
+the explicit Node executable, and the runner rechecks the canonical executable
+before creating a workspace or touching Docker. The runner then requires a clean,
+detached candidate checkout; checks prior ancestry; accepts only local Unix
+Docker; uses absolute Docker/Git/Node paths and a sealed temp HOME/Docker config;
+and refuses any image that is absent locally, uses a floating tag, lacks the
+expected approved digest, or lacks the required OCI provenance labels including
+`io.talkandtalk.provenance-kind=approved-candidate`. A generic local/CI image
+is deliberately not eligible: an external artifact builder, immutable registry
+digest, provenance manifest, and custody receipt are still required before a
+real run can be authorized. The local runner cannot produce or validate those
+external facts; its output remains a local operation record.
+
+On an approved run it creates no host database port. It starts a fresh internal
+PostgreSQL/Redis pair, proves PostgreSQL plus Redis ownership DB `14` **and**
+application-data DB `15` are empty, writes and rechecks paired ownership
+markers, runs previous migrations, starts the previous artifact through its
+normal entrypoint, runs candidate migrations/status, and rechecks the still-
+running previous replica. It then stops that replica, separately checks the
+previous compiled binary (with only its expected old-entrypoint migration-status
+guard bypassed), stops it, and only then starts the candidate artifact. Every API
+readiness probe and Compose healthcheck authenticates with a temporary
+in-container `METRICS_TOKEN`; the token is never written to the receipt. Before
+`down --volumes`, the runner verifies every discovered container/network/volume
+belongs to the exact random Compose project, run ID, and ownership marker. It
+never builds, pulls, tags, logs into, or deploys images. It emits a redacted
+local operation record only after its cleanup phase, and a failed record is
+never success evidence.
+
+This demonstrates only forward compatibility of approved immutable artifacts on
+a fresh disposable schema. It does not accept a fixture and does not prove
+historical-data migration semantics. It does not prove a previous production
+entrypoint will accept a newer migration directory, does not prove rollback,
+backup/restore, RTO/RPO, staging, or production readiness.
 
 Acceptance smoke:
 
@@ -145,14 +300,19 @@ when the snapshot is malformed. Migration `20260801007500_order_refund_policy_sn
 labels deterministic legacy rows explicitly and does not turn those labels into
 commercial approval evidence.
 
-Run the static contract test as part of `npm run test:preflight`. To replay all
-earlier migrations and exercise the backfill, constraints, and immutability trigger
-against a disposable PostgreSQL database, use:
-
-```bash
-REFUND_POLICY_MIGRATION_TEST_DATABASE_URL=postgresql://... \
-  node --test scripts/order-refund-policy-snapshots.test.mjs
-```
+Run the static contract test as part of `npm run test:preflight:static`. The
+PostgreSQL-dependent preflight set is deliberately separate and must run only
+through the sealed disposable runner with `E2E_RUNNER_SUITE=postgres-preflight`.
+The protected candidate-CI `api-preflight-postgres` job invokes only
+`backend/api/scripts/run-isolated-e2e.sh`; it supplies the sealed candidate SHA,
+source-tree SHA-256, protected-environment approval reference, per-run execution
+Evidence ID, infrastructure custody inputs, and new external receipt path. That
+runner registers the real PostgreSQL cases only after its disposable-target and
+checkout admission checks pass. A standalone `node --test
+scripts/order-refund-policy-snapshots.test.mjs` command is static-only and is never
+PostgreSQL-runtime evidence; passing
+`REFUND_POLICY_MIGRATION_TEST_DATABASE_URL` alone cannot authorize or create a
+runtime preflight.
 
 ## WeChat daily financial reconciliation
 
@@ -188,20 +348,19 @@ edited. One finance/admin operator proposes the WeChat account and expected stat
 a second operator approves or rejects it. Pending bill imports and unclassified cash entries
 are explicit release-gate blockers.
 
-The finance migration contract can be checked without a database:
+The finance migration contract can be checked without a database; this command
+covers only its static branch:
 
 ```bash
 node --test scripts/finance-terminal-audit-controls.test.mjs
 ```
 
-To exercise real PostgreSQL row locks and approval/append races, point the same test at a
-disposable database. It creates and drops only a random schema and applies migrations through
-`20260731239000_finance_terminal_audit_controls` inside that schema:
-
-```bash
-FINANCE_MIGRATION_TEST_DATABASE_URL=postgresql://... \
-  node --test scripts/finance-terminal-audit-controls.test.mjs
-```
+Real PostgreSQL row-lock and approval/append-race coverage belongs only to the
+same protected candidate-CI `api-preflight-postgres` route above. It uses the
+sealed `backend/api/scripts/run-isolated-e2e.sh` launcher with
+`E2E_RUNNER_SUITE=postgres-preflight`, never a standalone database URL or direct
+Node test command. Passing `FINANCE_MIGRATION_TEST_DATABASE_URL` alone is not
+runtime evidence and must not be recorded as such.
 
 ## API contract (frozen v1)
 

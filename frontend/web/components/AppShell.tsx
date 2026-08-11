@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  BriefcaseBusiness,
   Building2,
   CalendarDays,
   Compass,
@@ -32,7 +31,7 @@ import {
   logout,
 } from "../lib/api-client";
 import { initials } from "../lib/format";
-import { miniprogramEntryUrl } from "../lib/miniprogram-entry";
+import { resolveMiniprogramEntry } from "../lib/miniprogram-entry";
 import { publicDisclosure } from "../lib/public-disclosure";
 import type { AuthUser } from "../lib/types";
 
@@ -60,7 +59,6 @@ const publicNavigation = [
   { href: "/safety", label: "安全与支持", icon: ShieldCheck },
   { href: "/about", label: "关于", icon: Building2 },
   { href: "/partners", label: "合作与联系", icon: Sparkles },
-  { href: "/business", label: "平台能力", icon: BriefcaseBusiness },
 ];
 
 const memberNavigation = [
@@ -79,7 +77,7 @@ const mobileNavigation = [
   { href: "/profile", label: "我的", icon: UserRound },
 ];
 
-const marketingPaths = ["/", "/about", "/business", "/demo", "/how-it-works", "/partners", "/safety"];
+const marketingPaths = ["/", "/about", "/how-it-works", "/partners", "/safety"];
 
 function pathIsActive(pathname: string, href: string) {
   if (href === "/") return pathname === "/";
@@ -92,6 +90,7 @@ function pathIsActive(pathname: string, href: string) {
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const miniprogramEntry = resolveMiniprogramEntry();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const isMarketing = marketingPaths.some(
@@ -194,8 +193,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   </span>
                 </Link>
               ) : isMarketing ? (
-                miniprogramEntryUrl ? (
-                  <a href={miniprogramEntryUrl} rel="noreferrer" className="button button-primary button-compact">
+                miniprogramEntry.kind === "path" ? (
+                  <a href={miniprogramEntry.href} rel="noreferrer" className="button button-primary button-compact">
                     打开小程序
                   </a>
                 ) : (
@@ -239,16 +238,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </div>
             <p>
               女性友好的线上陪伴平台。网页说明品牌、路径与边界；
-              真实服务请使用微信小程序，App 即将到来。
+              真实服务请使用微信小程序。
             </p>
           </div>
           <div className="footer-nav-groups">
             <div>
               <strong>产品</strong>
               <Link href="/how-it-works">服务如何运作</Link>
-              <Link href="/business">平台能力</Link>
+              <Link href="/about">公开信息</Link>
               <span>微信搜索 Talk&amp;Talk</span>
-              <span>App 即将到来</span>
+              <span>官网不提供预约、支付或聊天</span>
             </div>
             <div>
               <strong>信任</strong>

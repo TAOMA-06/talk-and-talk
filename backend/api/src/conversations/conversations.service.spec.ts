@@ -54,6 +54,7 @@ describe("ConversationsService.ensureConversation", () => {
   const chatRestrictions = { assertCanSend: jest.fn(), activeForUser: jest.fn() } as any;
   const mediaAssets = {
     isFeatureEnabled: jest.fn(() => false),
+    assertChatMediaUploadEnabled: jest.fn(),
     attachmentsForMessage: jest.fn().mockResolvedValue([]),
     reserve: jest.fn(),
     complete: jest.fn()
@@ -266,6 +267,56 @@ describe("ConversationsService.ensureConversation", () => {
         ]
       })
     }));
+  });
+
+  it("returns the documented cursor envelope with a public conversation id", async () => {
+    prisma.conversation.findFirst.mockResolvedValue({
+      id: "conv-1",
+      externalId: "c1",
+      userId: "u1",
+      companion: { ownerUserId: "companion-owner" }
+    });
+    const createdAt = new Date("2026-08-09T10:00:00.000Z");
+    prisma.message.findMany.mockResolvedValue([
+      {
+        id: "message-3",
+        senderId: "companion-owner",
+        senderName: "林屿",
+        content: "最新一条",
+        type: "text",
+        moderationStatus: "published",
+        visibility: "participants",
+        createdAt: new Date(createdAt.getTime() + 2_000)
+      },
+      {
+        id: "message-2",
+        senderId: "u1",
+        senderName: "顾客",
+        content: "中间一条",
+        type: "text",
+        moderationStatus: "published",
+        visibility: "participants",
+        createdAt: new Date(createdAt.getTime() + 1_000)
+      },
+      {
+        id: "message-1",
+        senderId: "companion-owner",
+        senderName: "林屿",
+        content: "更早一条",
+        type: "text",
+        moderationStatus: "published",
+        visibility: "participants",
+        createdAt
+      }
+    ]);
+
+    await expect(service.messages("u1", "c1", { limit: 2 })).resolves.toEqual({
+      messages: [
+        expect.objectContaining({ id: "message-2", conversationId: "c1", attachments: [] }),
+        expect.objectContaining({ id: "message-3", conversationId: "c1", attachments: [] })
+      ],
+      pagination: { limit: 2, nextCursor: "message-2", hasMore: true }
+    });
   });
 
   it("keeps completed-order history readable while closing every new-message path", async () => {
@@ -490,6 +541,7 @@ describe("ConversationsService.send identity hard gate", () => {
   const chatRestrictions = { assertCanSend: jest.fn(), activeForUser: jest.fn() } as any;
   const mediaAssets = {
     isFeatureEnabled: jest.fn(() => false),
+    assertChatMediaUploadEnabled: jest.fn(),
     attachmentsForMessage: jest.fn().mockResolvedValue([]),
     bindUploadedAssets: jest.fn()
   } as any;
@@ -509,6 +561,7 @@ describe("ConversationsService.send identity hard gate", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mediaAssets.assertChatMediaUploadEnabled.mockImplementation(() => undefined);
     prisma.$queryRaw.mockResolvedValue([{ available: true }]);
     prisma.$transaction.mockImplementation(async (fn: any) => fn(prisma));
     prisma.conversation.findFirst.mockResolvedValue(conversation);
@@ -549,7 +602,27 @@ describe("ConversationsService.send identity hard gate", () => {
     expect(crisisIntervention.recordCriticalChatSignal).not.toHaveBeenCalled();
   });
 
-  it("allows a verified sender to proceed into the moderation path", async () => {
+  it("rejects attachment input before any chat, identity, moderation, or message work on text-only", async () => {
+    mediaAssets.assertChatMediaUploadEnabled.mockImplementation(() => {
+      throw Object.assign(new Error("media disabled"), { code: "MEDIA_FEATURE_DISABLED", status: 503 });
+    });
+
+    await expect(service.send("u1", "c1", { attachmentIds: ["asset-1"] })).rejects.toMatchObject({
+      code: "MEDIA_FEATURE_DISABLED",
+      status: 503
+    });
+
+    expect(chatRestrictions.assertCanSend).not.toHaveBeenCalled();
+    expect(prisma.conversation.findFirst).not.toHaveBeenCalled();
+    expect(prisma.user.findUnique).not.toHaveBeenCalled();
+    expect(moderation.moderateAsync).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.message.create).not.toHaveBeenCalled();
+    expect(moderationCases.createFromResult).not.toHaveBeenCalled();
+    expect(notifications.createConversationMessageReceivedIfUnmuted).not.toHaveBeenCalled();
+  });
+
+  it("rejects a legacy verified sender before moderation because the boolean has no authority binding", async () => {
     prisma.user.findUnique.mockResolvedValue({
       id: "u1",
       accountStatus: "active",
@@ -584,10 +657,18 @@ describe("ConversationsService.send identity hard gate", () => {
     prisma.conversation.update.mockResolvedValue(conversation);
     mediaAssets.attachmentsForMessage.mockResolvedValue([]);
 
-    const result = await service.send("u1", "c1", { content: "你好" });
+    await expect(service.send("u1", "c1", { content: "你好" })).rejects.toMatchObject({
+      code: "PUBLIC_INTERACTION_IDENTITY_REQUIRED",
+      status: 403,
+      details: expect.objectContaining({
+        verificationStatus: "notVerified",
+        publicInteractionBlocked: true
+      })
+    });
 
-    expect(moderation.moderateAsync).toHaveBeenCalled();
-    expect(prisma.message.create).toHaveBeenCalled();
-    expect(result.message).toEqual(expect.objectContaining({ id: "m1", content: "你好" }));
+    expect(moderation.moderateAsync).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.message.create).not.toHaveBeenCalled();
+    expect(notifications.createConversationMessageReceivedIfUnmuted).not.toHaveBeenCalled();
   });
 });

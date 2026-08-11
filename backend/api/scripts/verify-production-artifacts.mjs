@@ -64,6 +64,19 @@ if (!dockerfile.includes(staticAssetsCopy)) {
 if (!/^USER node$/m.test(dockerfile)) {
   throw new Error("Docker runtime must switch to the non-root node user");
 }
+for (const requiredOciLabel of [
+  "org.opencontainers.image.revision",
+  "io.talkandtalk.source-tree-sha256",
+  "io.talkandtalk.artifact-provenance-sha256",
+  "io.talkandtalk.provenance-kind"
+]) {
+  if (!dockerfile.includes(requiredOciLabel)) {
+    throw new Error(`Dockerfile must define immutable-candidate provenance label: ${requiredOciLabel}`);
+  }
+}
+if (!dockerfile.includes("approved-candidate") || !dockerfile.includes("OCI_PROVENANCE_KIND")) {
+  throw new Error("Dockerfile must fail closed when an approved-candidate image lacks provenance inputs");
+}
 
 for (const ignored of [".env.*", "node_modules", "dist", "backups", "*.pem", "*.key"]) {
   if (!dockerignore.split(/\r?\n/).includes(ignored)) {

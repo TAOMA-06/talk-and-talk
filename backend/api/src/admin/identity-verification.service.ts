@@ -31,6 +31,7 @@ export class IdentityVerificationService {
     dto: UpdateUserVerificationDto
   ) {
     this.assertKycActor(actor);
+    this.assertIdentityGrantAllowed(dto.isVerified);
     const reason = this.normalizeReason(dto.reason);
     const evidenceReference = this.normalizeEvidenceReference(dto.evidenceReference);
 
@@ -205,6 +206,10 @@ export class IdentityVerificationService {
         );
       }
 
+      if (decision === "approved") {
+        this.assertIdentityGrantAllowed(request.requestedIsVerified);
+      }
+
       let unpublishedCompanions = 0;
       if (decision === "approved") {
         // Orders lock CompanionProfile before reading the owner's verification
@@ -357,6 +362,19 @@ export class IdentityVerificationService {
     if (!(KYC_STAFF_ROLES as readonly string[]).includes(actor.role)) {
       throw new AppException("FORBIDDEN", "Insufficient permissions", HttpStatus.FORBIDDEN);
     }
+  }
+
+  private assertIdentityGrantAllowed(requestedIsVerified: boolean): void {
+    if (!requestedIsVerified) return;
+    throw new AppException(
+      "IDENTITY_VERIFICATION_GRANT_FROZEN",
+      "New identity-verification grants are frozen until an approved authority and revocation lifecycle are configured",
+      HttpStatus.CONFLICT,
+      {
+        recoveryOwner: "support",
+        recoveryPath: "/pages/profile/index"
+      }
+    );
   }
 
   private normalizeReason(value: string): string {

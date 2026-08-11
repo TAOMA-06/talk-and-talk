@@ -1,5 +1,12 @@
 import { request } from "./api";
+import { isCommercialTextOnly } from "./config";
 import { MediaAttachment } from "./models";
+
+function permittedEvidenceAssetIds(evidenceAssetIds: string[]): string[] {
+  // Keep text statements and appeals available in the first release while
+  // making it impossible for a stale client draft to bind binary evidence.
+  return isCommercialTextOnly() ? [] : evidenceAssetIds;
+}
 
 export type AttendanceIssue =
   | "companionAbsent"
@@ -45,7 +52,7 @@ export type AttendanceDispute = {
   decision: { outcome: "noRefund" | "fullRefund"; reason: string; decidedAt: string | null } | null;
   appeal: { appealedByRole: "customer" | "companion"; appealedAt: string; independentlyAssigned: boolean } | null;
   finalDecision: { outcome: "noRefund" | "fullRefund"; reason: string; finalizedAt: string | null } | null;
-  refund: { id: string; status: string; amountCents: number; providerRefundId: string | null; successConfirmedAt: string | null } | null;
+  refund: { id: string; status: string; amountCents: number; successConfirmedAt: string | null } | null;
   recording: "notRecordedByDefault";
 };
 
@@ -104,12 +111,18 @@ export const attendanceDisputesApi = {
     `/attendance-disputes/${encodeURIComponent(id)}/evidence-completion`,
     { method: "POST" }
   ),
-  statement: (id: string, statement: string, evidenceAssetIds: string[] = []) => request<AttendanceDispute>(
-    `/attendance-disputes/${encodeURIComponent(id)}/statements`,
-    { method: "POST", data: { statement: statement.trim(), ...(evidenceAssetIds.length ? { evidenceAssetIds } : {}) } }
-  ),
-  appeal: (id: string, statement: string, evidenceAssetIds: string[] = []) => request<AttendanceDispute>(
-    `/attendance-disputes/${encodeURIComponent(id)}/appeals`,
-    { method: "POST", data: { statement: statement.trim(), ...(evidenceAssetIds.length ? { evidenceAssetIds } : {}) } }
-  )
+  statement: (id: string, statement: string, evidenceAssetIds: string[] = []) => {
+    const allowedEvidenceAssetIds = permittedEvidenceAssetIds(evidenceAssetIds);
+    return request<AttendanceDispute>(
+      `/attendance-disputes/${encodeURIComponent(id)}/statements`,
+      { method: "POST", data: { statement: statement.trim(), ...(allowedEvidenceAssetIds.length ? { evidenceAssetIds: allowedEvidenceAssetIds } : {}) } }
+    );
+  },
+  appeal: (id: string, statement: string, evidenceAssetIds: string[] = []) => {
+    const allowedEvidenceAssetIds = permittedEvidenceAssetIds(evidenceAssetIds);
+    return request<AttendanceDispute>(
+      `/attendance-disputes/${encodeURIComponent(id)}/appeals`,
+      { method: "POST", data: { statement: statement.trim(), ...(allowedEvidenceAssetIds.length ? { evidenceAssetIds: allowedEvidenceAssetIds } : {}) } }
+    );
+  }
 };

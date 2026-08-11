@@ -14,18 +14,18 @@ import { Reveal, RevealItem, RevealStagger } from "./motion/Reveal";
 const pathways = [
   {
     eyebrow: "陪伴者协作",
-    title: "让服务、时段与履约有一套共同语言",
-    copy: "具有平台陪伴者身份状态的账号可使用同一工作台管理服务商品、可约时间、订单和履约信息。",
-    href: "/demo?stage=delivery#demo-route",
-    action: "查看工作台产品演示",
+    title: "协作前，先把服务边界说清楚",
+    copy: "如需讨论陪伴者协作，请先通过官方邮箱说明场景与准备情况；当前真实服务以微信小程序内的文字互动页面为准。",
+    href: "/how-it-works",
+    action: "了解当前服务路径",
     Icon: BriefcaseBusiness,
   },
   {
     eyebrow: "组织与社群",
     title: "从明确范围的关怀场景开始探索",
-    copy: "面向员工关怀、女性社区与品牌公益等方向，合作必须先确认独立合同、隐私隔离与服务边界。",
-    href: "/business",
-    action: "了解平台能力",
+    copy: "面向员工关怀、女性社区与品牌公益等方向的合作，需要先确认独立合同、隐私隔离与服务边界。",
+    href: "/about",
+    action: "查看公开信息",
     Icon: Building2,
   },
   {
@@ -59,8 +59,8 @@ export default function PartnersScreen() {
             <a href="mailto:hello@talkandtalk.app" className="button button-primary button-large">
               联系合作 <Mail size={18} aria-hidden="true" />
             </a>
-            <Link href="/business" className="button button-secondary button-large">
-              查看平台能力 <ArrowRight size={18} aria-hidden="true" />
+            <Link href="/about" className="button button-secondary button-large">
+              查看公开信息 <ArrowRight size={18} aria-hidden="true" />
             </Link>
           </div>
         </div>

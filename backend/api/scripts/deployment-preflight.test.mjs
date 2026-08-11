@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import transactionalTemplateManifest from "../config/transactional-template-manifest.js";
 import {
@@ -8,6 +11,8 @@ import {
   validateDeploymentConfig,
   validateMiniProgramReleaseConfig
 } from "./deployment-preflight.mjs";
+
+const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 
 const legalHoldReasonCatalog = JSON.stringify([{
   code: "LITIGATION_NOTICE",
@@ -57,6 +62,7 @@ function validProduction() {
     SMS_PROVIDER: "none",
     SEED_ON_STARTUP: "false",
     COMMERCIAL_RELEASE_MODE: "commercial",
+    COMMERCIAL_SURFACE: "text_only",
     COMPANION_VOICE_EVIDENCE_VIEWER_URL: "https://evidence.talkandtalk.app/voice-intro",
     COMPANION_VOICE_EVIDENCE_SIGNING_SECRET: "voice-evidence-secret-that-is-longer-than-32-characters",
     COMPANION_VOICE_EVIDENCE_URL_TTL_SECONDS: "300",
@@ -357,59 +363,20 @@ test("rejects missing, malformed, out-of-range, or inverted consumer JWT TTLs", 
   );
 });
 
-test("requires restricted TRTC signing inputs only when real-time voice is enabled", () => {
-  const enabled = { ...validProduction(), COMMERCIAL_SURFACE: "full", TRTC_ENABLED: "true" };
-  assert.match(validateDeploymentConfig(enabled).join("\n"), /TRTC_SDK_APP_ID is required/);
-
-  Object.assign(enabled, {
-    TRTC_SDK_APP_ID: "1400000001",
-    TRTC_SDK_SECRET_KEY: "trtc-production-secret-material",
-    TRTC_CALLBACK_SIGNING_KEY: "CallbackKey1234567890",
-    TRTC_PRIVATE_MAP_KEY_ENABLED: "true",
-    TRTC_USER_SIG_TTL_SECONDS: "300",
-    TRTC_PRIVACY_DISCLOSURE_APPROVED: "true",
-    TRTC_PRIVACY_DISCLOSURE_REFERENCE: "legal:trtc-disclosure-2026-08",
-    TRTC_ROOM_CONTROL_ENABLED: "true",
-    TRTC_CONTROL_REGION: "ap-guangzhou",
-    TRTC_CONTROL_TIMEOUT_MS: "5000",
-    TRTC_ROOM_CONTROL_INTERVAL_SECONDS: "15",
-    TRTC_ROOM_CONTROL_BATCH_SIZE: "10",
-    TENCENTCLOUD_SECRET_ID: "AKID_test_voice_control",
-    TENCENTCLOUD_SECRET_KEY: "tencent-cloud-control-secret-material"
-  });
-  assert.deepEqual(validateDeploymentConfig(enabled), []);
+test("hard-locks the first-release deployment surface and behavioral personalization", () => {
   assert.match(
-    validateDeploymentConfig({ ...validProduction(), COMMERCIAL_SURFACE: "text_only", TRTC_ENABLED: "true" }).join("\n"),
+    validateDeploymentConfig({ ...validProduction(), COMMERCIAL_SURFACE: "full" }).join("\n"),
+    /First-release staging\/production requires COMMERCIAL_SURFACE=text_only/
+  );
+  for (const value of ["true", "1", "yes"]) {
+    assert.match(
+      validateDeploymentConfig({ ...validProduction(), RECOMMENDATION_PERSONALIZATION_ENABLED: value }).join("\n"),
+      /First-release staging\/production requires RECOMMENDATION_PERSONALIZATION_ENABLED to be unset or false/
+    );
+  }
+  assert.match(
+    validateDeploymentConfig({ ...validProduction(), TRTC_ENABLED: "true" }).join("\n"),
     /COMMERCIAL_SURFACE=text_only forbids TRTC_ENABLED=true/
-  );
-  assert.match(
-    validateDeploymentConfig({ ...enabled, TRTC_PRIVACY_DISCLOSURE_APPROVED: "false" }).join("\n"),
-    /TRTC_PRIVACY_DISCLOSURE_APPROVED must be true/
-  );
-  assert.match(
-    validateDeploymentConfig({ ...enabled, TRTC_PRIVACY_DISCLOSURE_REFERENCE: "" }).join("\n"),
-    /TRTC_PRIVACY_DISCLOSURE_REFERENCE is required/
-  );
-  assert.deepEqual(validateDeploymentConfig({ ...enabled, TRTC_EMERGENCY_STOP_ENABLED: "true" }), []);
-  assert.match(
-    validateDeploymentConfig({ ...enabled, TRTC_PRIVATE_MAP_KEY_ENABLED: "false" }).join("\n"),
-    /TRTC_PRIVATE_MAP_KEY_ENABLED must be true/
-  );
-  assert.match(
-    validateDeploymentConfig({ ...enabled, TRTC_USER_SIG_TTL_SECONDS: "901" }).join("\n"),
-    /TRTC_USER_SIG_TTL_SECONDS/
-  );
-  assert.match(
-    validateDeploymentConfig({ ...enabled, TRTC_ROOM_CONTROL_ENABLED: "false" }).join("\n"),
-    /TRTC_ROOM_CONTROL_ENABLED must be true/
-  );
-  assert.match(
-    validateDeploymentConfig({ ...enabled, TRTC_ENABLED: "false", TRTC_EMERGENCY_STOP_ENABLED: "true" }).join("\n"),
-    /TRTC_EMERGENCY_STOP_ENABLED=true requires/
-  );
-  assert.match(
-    validateDeploymentConfig({ ...enabled, TRTC_CONTROL_REGION: "ap-shanghai" }).join("\n"),
-    /TRTC_CONTROL_REGION must be ap-beijing or ap-guangzhou/
   );
 });
 
@@ -574,4 +541,14 @@ test("allows staging Mock payment only when all real payment fields are empty", 
   assert.deepEqual(validateDeploymentConfig(env), []);
   env.WECHAT_PAY_APP_ID = "wx1234567890abcdef";
   assert.match(validateDeploymentConfig(env).join("\n"), /all together or all left empty/);
+});
+
+test("keeps the forward-only historical personalization reset migration", () => {
+  const migration = readFileSync(resolve(
+    scriptDirectory,
+    "../prisma/migrations/20260811010000_reset_historical_recommendation_personalization/migration.sql"
+  ), "utf8");
+  assert.match(migration, /UPDATE "UserRecommendationPreference"/);
+  assert.match(migration, /SET "personalizationEnabled" = false/);
+  assert.match(migration, /WHERE "personalizationEnabled" = true/);
 });

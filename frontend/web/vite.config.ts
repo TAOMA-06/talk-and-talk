@@ -14,6 +14,18 @@ const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
 const localBindingConfig = {
   main: "./worker/index.ts",
   compatibility_flags: ["nodejs_compat"],
+  // vinext's custom Worker image route reads original local assets through
+  // this binding. The Cloudflare Vite plugin rewrites the directory for the
+  // emitted server config, so this source path is only a build-time marker.
+  assets: {
+    directory: "./dist/client",
+    binding: "ASSETS",
+    not_found_handling: "none" as const,
+  },
+  // Cloudflare provides this binding in deployed Workers. Local Miniflare
+  // installations may omit its transformer implementation; the Worker then
+  // serves the validated original asset rather than failing the public page.
+  images: { binding: "IMAGES" },
   d1_databases: d1
     ? [
         {

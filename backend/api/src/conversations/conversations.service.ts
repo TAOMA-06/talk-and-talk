@@ -464,6 +464,10 @@ export class ConversationsService {
     if ((!content && !attachmentIds.length) || attachmentIds.length > 3) {
       throw new AppException("EMPTY_MESSAGE", "Message content or an attachment is required", HttpStatus.BAD_REQUEST);
     }
+    // Reject attachments before any conversation lookup, moderation, message,
+    // case, or notification work. A text-only surface must not make historical
+    // upload rows reachable through the ordinary send endpoint.
+    if (attachmentIds.length) this.mediaAssets.assertChatMediaUploadEnabled();
 
     await this.chatRestrictions.assertCanSend(userId);
 

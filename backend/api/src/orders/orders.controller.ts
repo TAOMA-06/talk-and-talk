@@ -177,7 +177,7 @@ export class OrdersController {
     @Param("id") id: string,
     @Body() dto: CreateRefundDto
   ) {
-    return this.paymentsService.requestRefund(user.id, id, dto.reason);
+    return this.paymentsService.requestCustomerRefund(user.id, id, dto.reason);
   }
 
   @Post(":id/refund/sync")

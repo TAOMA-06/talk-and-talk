@@ -6,6 +6,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
 
 import pg from "pg";
+import { assertIsolatedPostgresPreflightEnvironment, POSTGRES_PREFLIGHT_SUITE } from "./isolated-postgres-preflight-environment.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const apiRoot = join(here, "..");
@@ -69,12 +70,12 @@ test("capacity and reminder workers retain bounded PostgreSQL boundaries", async
 });
 
 const integrationUrl = String(process.env.AVAILABILITY_CAPACITY_TEST_DATABASE_URL ?? "").trim();
+const postgresPreflight = process.env.E2E_RUNNER_SUITE === POSTGRES_PREFLIGHT_SUITE
+  ? assertIsolatedPostgresPreflightEnvironment()
+  : null;
 
-test("real PostgreSQL capacity SQL and ten replicas stay bounded and nonoverlapping", {
-  skip: integrationUrl
-    ? false
-    : "set AVAILABILITY_CAPACITY_TEST_DATABASE_URL to a disposable PostgreSQL database"
-}, async (t) => {
+if (postgresPreflight) test("real PostgreSQL capacity SQL and ten replicas stay bounded and nonoverlapping", async (t) => {
+  await postgresPreflight;
   const schema = `availability_scale_${randomBytes(8).toString("hex")}`;
   const admin = new pg.Client({ connectionString: integrationUrl });
   const replicas = Array.from({ length: 10 }, () => new pg.Client({ connectionString: integrationUrl }));

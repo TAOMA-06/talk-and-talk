@@ -721,6 +721,21 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
   const commercialSurface = parseCommercialSurface(
     typeof env.COMMERCIAL_SURFACE === "string" ? env.COMMERCIAL_SURFACE : undefined
   );
+  // This recovery task prepares only the first text-only release. Development
+  // and test may retain full-mode fixtures, but an environment that can be
+  // deployed to a staging or production candidate must never reopen media,
+  // voice, or TRTC through one configuration value.
+  if ((appEnv === "staging" || appEnv === "production") && commercialSurface !== "text_only") {
+    throw new Error("First-release staging/production requires COMMERCIAL_SURFACE=text_only");
+  }
+  if (
+    (appEnv === "staging" || appEnv === "production")
+    && parseBoolean(env.RECOMMENDATION_PERSONALIZATION_ENABLED, false)
+  ) {
+    throw new Error(
+      "First-release staging/production forbids RECOMMENDATION_PERSONALIZATION_ENABLED=true pending PERSONALIZATION-R01"
+    );
+  }
   if (commercialSurface === "text_only") {
     if (parseBoolean(env.TRTC_ENABLED, false)) {
       throw new Error("COMMERCIAL_SURFACE=text_only forbids TRTC_ENABLED=true");

@@ -108,15 +108,11 @@ Docker（本地）：
 docker compose -f infra/docker-compose.yml up --build
 ```
 
-Staging 部署：
-
-```bash
-cp backend/api/.env.staging.example backend/api/.env.staging
-cd backend/api && npm run preflight:deployment -- .env.staging && cd ../..
-DEPLOY_ENV_FILE=../backend/api/.env.staging \
-  docker compose -f infra/docker-compose.prod.yml --env-file backend/api/.env.staging up -d --build
-./backend/api/scripts/acceptance-smoke.sh https://api-staging.talkandtalk.app
-```
+Staging 部署：当前首发 G2 仍阻断，不能把本地 Compose、`--build`、
+`acceptance-smoke.sh` 或本地 `.env` 当作 staging 执行配方。每个 staging 动作必须
+先在 [部署与回滚控制参考](./deploy-rollback.md) 和 G2 执行包中登记独立授权、冻结
+SHA/不可变制品、目标范围、有效期、执行人、结果和独立复核。`acceptance-smoke.sh`
+仅支持 development/mock，不能证明 staging 或真实 provider。
 
 生产部署默认加载 `backend/api/.env.production`（见 `infra/docker-compose.prod.yml` 中 `DEPLOY_ENV_FILE`，路径相对 `infra/`）。
 
@@ -129,8 +125,8 @@ DEPLOY_ENV_FILE=../backend/api/.env.staging \
 ```bash
 cd backend/api
 npm test
-npm run test:preflight
-npm run test:e2e         # 同 npm run test:integration；需 Postgres + Redis
+npm run test:preflight:static # 零跳过本地静态 preflight
+# test:preflight 的 PostgreSQL 部分与 test:e2e 仅能由获授权、密封的 disposable runner 执行
 ./scripts/acceptance-smoke.sh http://127.0.0.1:3000
 ```
 

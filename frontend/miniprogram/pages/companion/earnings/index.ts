@@ -28,15 +28,22 @@ function earningStatusText(status: CompanionEarning["status"]): string {
   } as Record<string, string>)[status] || status;
 }
 
-function holdReasonText(reason: string | null): string {
-  if (!reason) return "";
-  return ({
-    unresolved_support_ticket: "关联订单有未结客服工单",
-    active_refund: "关联订单正在退款",
-    recovery_due: "存在待核销追偿",
-    payout_execution_claimed: "财务人员已领取付款任务",
-    payout_verification_pending: "外部付款证据等待第二人复核"
-  } as Record<string, string>)[reason] || `平台暂缓原因：${reason}`;
+function holdText(hold: CompanionEarning["hold"]): string {
+  if (!hold) return "";
+  const categories: Record<NonNullable<CompanionEarning["hold"]>["category"], string> = {
+    afterSalesReview: "售后复核中",
+    serviceReview: "服务事实复核中",
+    eligibilityReview: "结算资格待更新",
+    paymentProcessing: "结算处理核验中",
+    accountReview: "账户结算复核中"
+  };
+  const nextActions: Record<NonNullable<CompanionEarning["hold"]>["nextAction"], string> = {
+    waitForReview: "请等待当前复核完成",
+    openServiceCase: "可在案件中心查看或补充已有事项",
+    updateEligibility: "请在陪伴者工作台更新所需资料",
+    contactSupport: "如需了解进度，请从案件中心联系平台"
+  };
+  return `${categories[hold.category]} · ${nextActions[hold.nextAction]}`;
 }
 
 function withdrawalStatus(status: CompanionWithdrawal["status"]) {
@@ -129,7 +136,7 @@ Page({
         amountText: money(earning.payableCents),
         statusText: earningStatusText(earning.status),
         timeText: formatDateTime(earning.availableAt),
-        holdText: holdReasonText(earning.holdReason),
+        holdText: holdText(earning.hold),
         selected: earning.status === "available" && selected.has(earning.id)
       }));
       const withdrawals = withdrawalsResult.items.map((request) => {

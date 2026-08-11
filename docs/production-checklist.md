@@ -1,7 +1,25 @@
 # 生产环境检查清单
 
+> 当前状态：`G1 NO-GO`、`G2-ready NO-GO`、`G2 BLOCKED`。本清单是受控参考，
+> 不是 production 操作手册，也不授权部署、迁移、配置、支付、退款、微信上传、
+> 烟测或数据写入。每个外部动作必须由
+> [G2 执行包](./cto-self-audit/runs/2026-08-08-g1-remediation/g2-execution-package.md)
+> 中的独立记录授权；禁止使用浮动 tag、`--build` 或当前工作树。
+
 上线前在 **staging 验证通过** 后，对 production 逐项勾选。  
 本清单只检查配置与运维门禁，**不扩展产品功能**。正式交易模型、停机红线和外部签字责任见 [COMMERCIAL_RELEASE.md](./COMMERCIAL_RELEASE.md)；市场对标、正式发行边界和仓库红线见 [商用界面市场交叉审查（2026-08-02 复审）](./commercial-market-cross-audit-2026-08-02.md)（[2026-08-01 历史快照](./commercial-market-cross-audit-2026-08-01.md)）；已知未完成能力见 [NEXT_PHASE.md](../NEXT_PHASE.md)。
+
+## 每项外部动作的必填记录
+
+| 字段 | 必填内容 |
+|---|---|
+| Evidence ID | 仅本次动作的非秘密授权 ID，能够关联审批与独立复核。 |
+| 目标与冻结输入 | 明确 production 资源范围、候选 SHA/source-tree、不可变制品/OCI digest 与保管证明；不得用分支、浮动 tag 或本地重建。 |
+| 有效期与人员 | 签发/到期时间、执行人、独立复核人，以及禁止自审/绕过的控制。 |
+| 预期与结果 | 精确动作、数据/支付/provider 边界、停止条件、脱敏收据/校验和、结果和独立复核。 |
+
+记录不完整或过期即为 `BLOCKED`；凭据、连接串、OpenID、支付签名和聊天内容不得写入
+本文件或 Git。
 
 ## 商用界面与交叉审查门禁
 
@@ -190,11 +208,16 @@
 
 ## 发布后冒烟
 
-```bash
-METRICS_TOKEN='<production token>' \
-  ./backend/api/scripts/production-smoke.sh https://api.talkandtalk.app
-```
+只有在对应的独立授权记录已经绑定冻结候选、不可变制品、目标环境、短时运行时
+凭据、停止条件和独立复核人后，才可由获授权执行人使用
+`production-smoke.sh` 模板。该模板可能发起真实网络请求；本文件不提供可直接复制的
+目标或令牌，也不授予执行权。
 
-`acceptance-smoke.sh` 依赖 mock SMS / mock 支付，仅允许在 development 或 staging 使用，禁止用于 production 放行。
+`acceptance-smoke.sh` 依赖 mock SMS / mock 支付，只用于 development/local mock
+工程检查；它不得作为 staging、production、真实微信、真实支付或 provider 放行证据。
 
-生产烟测严格要求 health/database/redis 全部为 `ok`、小程序凭证已配置、支付 provider 为 `real`、短信 Mock 关闭、法律页可访问且公网 metrics 被阻断。可提供短期 `PRODUCTION_ACCESS_TOKEN` 额外验证 authenticated mock-notify 返回 403。
+未来获授权的只读 production smoke 严格要求 health/database/redis 全部为 `ok`、
+`appEnv=production`、小程序凭证已配置、支付 provider 为 `real`、短信 Mock 关闭、
+法律页可访问且公网 metrics 被阻断。该模板不再发送 SMS 或 mock-notify POST；任何
+需要写入型拒绝验证的场景必须另有目标、时效、账户/数据边界和 Evidence ID，不得由
+production smoke 隐式触发。

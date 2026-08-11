@@ -36,7 +36,7 @@ const valueProps = [
   {
     code: "03",
     title: "服务入口真实可到达",
-    copy: "官网说明品牌、规则与路径；真实服务以微信小程序页面状态为准，App 即将到来。",
+    copy: "官网说明品牌、规则与路径；当前真实服务以微信小程序内的文字互动页面为准。",
   },
 ];
 
@@ -123,7 +123,7 @@ export default function MarketingHomeScreen() {
             <>
               <p className="hero-lead">
                 Talk&amp;Talk 面向需要情绪倾听、减压与陪伴的成年人。发现、预约与沟通在平台内完成；
-                官网说明规则与边界，真实服务请进入微信小程序。App 即将到来。
+                官网说明规则与边界，真实服务请进入微信小程序，并以文字互动为限。
               </p>
               <ul className="hero-trust-strip" aria-label="产品可信要点">
                 {trustSignals.map((item) => (
@@ -140,7 +140,6 @@ export default function MarketingHomeScreen() {
               variant="hero"
               secondaryHref="/how-it-works"
               secondaryLabel="了解服务路径"
-              showAppComingSoon
             />
           }
           visual={<IconOrbit />}
@@ -197,7 +196,7 @@ export default function MarketingHomeScreen() {
           <header className="bubble-heading bubble-heading-light">
             <p className="eyebrow">如何开始</p>
             <h2 id="path-title">官网说明规则，小程序完成连接。</h2>
-            <p>我们不把完整服务功能放在网页里。服务入口以微信小程序为准，App 也在路上。</p>
+            <p>官网不提供预约、支付、聊天或售后；当前服务入口以微信小程序内的文字互动页面为准。</p>
           </header>
           <ol className="bubble-path-steps">
             {pathSteps.map((step) => (
@@ -215,7 +214,6 @@ export default function MarketingHomeScreen() {
               variant="inline"
               secondaryHref="/safety"
               secondaryLabel="阅读安全说明"
-              showAppComingSoon
             />
           </div>
         </Reveal>
@@ -275,7 +273,7 @@ export default function MarketingHomeScreen() {
             <p className="eyebrow">当前主入口</p>
             <h3>微信小程序</h3>
             <p>
-              浏览、预约、沟通与支持以小程序实际页面状态为准。可在微信中搜索「Talk&amp;Talk」。
+              当前文字互动服务及其可用状态，以小程序实际页面展示为准。可在微信中搜索「Talk&amp;Talk」。
             </p>
             <MiniprogramCta
               variant="inline"
@@ -287,12 +285,14 @@ export default function MarketingHomeScreen() {
             <span className="bubble-channel-icon">
               <Smartphone size={22} aria-hidden="true" />
             </span>
-            <p className="eyebrow">即将到来</p>
-            <h3>Talk&amp;Talk App</h3>
+            <p className="eyebrow">官网说明面</p>
+            <h3>品牌、规则与公示</h3>
             <p>
-              独立 App 正在准备中。上线后将在官网与官方渠道同步公布下载方式，请勿轻信非官方链接。
+              官网用于说明产品边界、公开信息和服务路径，不承接预约、支付、聊天或售后。
             </p>
-            <span className="bubble-channel-badge">Coming soon</span>
+            <Link href="/about" className="bubble-text-link">
+              查看公开信息 <ArrowRight size={16} aria-hidden="true" />
+            </Link>
           </article>
           <article className="bubble-channel-card">
             <span className="bubble-channel-icon">
@@ -353,14 +353,13 @@ export default function MarketingHomeScreen() {
             <p className="eyebrow">开始一段有分寸的连接</p>
             <h2>先认识规则，再进入小程序。</h2>
             <p>
-              网页帮助你理解产品与边界；真实服务请使用微信小程序。App 上线后会在此更新。
+              网页帮助你理解产品与边界；当前真实服务请使用微信小程序内的文字互动入口。
             </p>
           </div>
           <MiniprogramCta
             variant="panel"
             secondaryHref="/how-it-works"
             secondaryLabel="了解服务路径"
-            showAppComingSoon
           />
         </div>
       </Reveal>

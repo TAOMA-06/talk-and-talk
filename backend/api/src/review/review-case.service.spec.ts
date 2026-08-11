@@ -41,6 +41,7 @@ describe("ReviewCaseService", () => {
     recordManualConfirmedViolation: jest.fn()
   };
   const mediaAssets = {
+    isChatMediaPlaybackEnabled: jest.fn(() => true),
     toAttachmentDto: jest.fn(async (asset: any) => asset)
   };
   const notifications = {
@@ -53,6 +54,7 @@ describe("ReviewCaseService", () => {
 
   beforeEach(() => {
     jest.resetAllMocks();
+    mediaAssets.isChatMediaPlaybackEnabled.mockReturnValue(true);
     chatRestrictions.recordManualConfirmedViolation.mockResolvedValue({ escalated: false, confirmations: 1 });
     mediaAssets.toAttachmentDto.mockImplementation(async (asset: any) => asset);
     prisma.moderationCase.count.mockResolvedValue(0);
@@ -175,6 +177,74 @@ describe("ReviewCaseService", () => {
         skip: 40,
         take: 20
       }));
+    });
+
+    it("redacts every stored legacy chat-case artifact in text-only mode while preserving plaintext conversation review", async () => {
+      const createdAt = new Date("2026-08-08T08:00:00.000Z");
+      const legacyMediaCase = {
+        id: "case-media-legacy",
+        title: "MEDIA_OCR_SECRET title",
+        category: "实时风控",
+        riskLevel: "high",
+        status: "humanReview",
+        source: "chat",
+        content: "MEDIA_OCR_SECRET content",
+        targetId: "conversation-1",
+        messageId: "message-media-legacy",
+        conversationId: "conversation-1",
+        subjectUserId: "user-1",
+        reporterUserId: null,
+        assignedToUserId: null,
+        priority: "high",
+        dueAt: createdAt,
+        policyVersion: "chat-v2",
+        provider: "local",
+        providerVersion: "1",
+        aiScore: 0.9,
+        aiReason: "MEDIA_OCR_SECRET reason",
+        decision: "review",
+        matchedRules: ["violence"],
+        usedAI: true,
+        resolvedAt: null,
+        appealDeadlineAt: null,
+        appealPolicyVersion: null,
+        createdAt
+      };
+      mediaAssets.isChatMediaPlaybackEnabled.mockReturnValue(false);
+      prisma.moderationCase.count.mockResolvedValue(1);
+      prisma.moderationCase.findMany.mockResolvedValue([legacyMediaCase]);
+
+      const overview = await service.overview();
+      const list = await service.listCases({ page: 1, pageSize: 20 });
+      prisma.moderationCase.findUnique.mockResolvedValue({
+        ...legacyMediaCase,
+        evidences: [{
+          id: "evidence-media-legacy",
+          type: "raw_text",
+          payload: { text: "MEDIA_OCR_SECRET raw evidence" },
+          createdAt
+        }],
+        actionLogs: [],
+        appeals: [],
+        restrictions: []
+      });
+      const detail = await service.getCase(legacyMediaCase.id);
+      const projection = (service as any).toCaseDto(legacyMediaCase);
+
+      for (const response of [overview, list, detail, projection]) {
+        expect(JSON.stringify(response)).not.toContain("MEDIA_OCR_SECRET");
+      }
+      expect(overview.queue[0]).toMatchObject({
+        title: "聊天审核案件",
+        content: "历史媒体审核证据已在文本首发版本中隐藏。"
+      });
+      expect(list.cases[0]).toMatchObject({ aiReason: null });
+      expect(detail.case.evidences).toEqual([{
+        id: "evidence-media-legacy",
+        type: "raw_text",
+        payload: { redacted: true },
+        createdAt: createdAt.toISOString()
+      }]);
     });
   });
 
@@ -959,6 +1029,25 @@ describe("ReviewCaseService", () => {
       visibility: "participants",
       attachments: [],
       createdAt: new Date(`2026-07-01T00:00:${String(second).padStart(2, "0")}.000Z`)
+    });
+
+    it("keeps review text but redacts historical media, OCR, and analysis on text-only", async () => {
+      mediaAssets.isChatMediaPlaybackEnabled.mockReturnValue(false);
+      const result = await (service as any).toEvidenceMessageDto({
+        ...message("msg-1", 1, "仍保留文字"),
+        attachments: [{
+          id: "asset-1",
+          status: "approved",
+          extractedText: "历史 OCR 内容",
+          analysis: { label: "history" }
+        }]
+      }, "c1");
+
+      expect(result).toEqual(expect.objectContaining({
+        content: "仍保留文字",
+        attachments: []
+      }));
+      expect(mediaAssets.toAttachmentDto).not.toHaveBeenCalled();
     });
 
     it("returns an explicit empty page when no conversation can be resolved", async () => {

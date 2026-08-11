@@ -518,6 +518,24 @@ export class PaymentsService implements OnModuleInit {
     });
   }
 
+  /**
+   * The customer route intentionally receives a smaller projection than staff
+   * refund workflows. Provider identifiers, reconciliation cadence, and
+   * provider timestamps stay inside the finance surface even when a customer
+   * initiated the refund.
+   */
+  async requestCustomerRefund(userId: string, orderId: string, reason: string) {
+    const result = await this.requestRefund(userId, orderId, reason);
+    return {
+      refund: this.customerRefundDto(result.refund),
+      // requestRefund returns the declared OrderDto on every branch. Do not
+      // re-project it here: the DTO carries ISO strings, whereas toDto expects
+      // a Prisma record and would turn a safe response into a runtime error.
+      order: result.order,
+      created: result.created
+    };
+  }
+
   async requestRefund(
     userId: string,
     orderId: string,
@@ -1070,7 +1088,7 @@ export class PaymentsService implements OnModuleInit {
       );
     }
     const current: any = await this.prisma.refundTransaction.findUnique({ where: { id: refund.id }, include: { order: true } } as any);
-    return { refund: this.refundDto(current), order: this.ordersService.toDto(current.order) };
+    return { refund: this.customerRefundDto(current), order: this.ordersService.toDto(current.order) };
   }
 
   async syncRefundForAdmin(actorId: string, refundId: string) {
@@ -2430,6 +2448,20 @@ export class PaymentsService implements OnModuleInit {
       reviewDueAt: refund.reviewDueAt?.toISOString?.() ?? null,
       resolutionDueAt: refund.resolutionDueAt?.toISOString?.() ?? null,
       createdAt: refund.createdAt.toISOString(), updatedAt: refund.updatedAt.toISOString()
+    };
+  }
+
+  private customerRefundDto(refund: any) {
+    return {
+      id: refund.id,
+      outRefundNo: refund.outRefundNo,
+      amountCents: refund.amountCents,
+      status: refund.status,
+      reason: refund.reason ?? null,
+      reviewNote: refund.reviewNote ?? null,
+      failureReason: refund.failureReason ?? null,
+      reviewDueAt: refund.reviewDueAt ?? null,
+      resolutionDueAt: refund.resolutionDueAt ?? null
     };
   }
 

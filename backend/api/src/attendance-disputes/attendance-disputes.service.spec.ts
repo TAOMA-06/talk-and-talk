@@ -67,6 +67,7 @@ function createHarness(configValues: Record<string, unknown> = {}) {
   };
   const config: any = {
     get: jest.fn((key: string, fallback?: unknown) => ({
+      COMMERCIAL_SURFACE: "full",
       TRTC_ENABLED: true,
       TRTC_SDK_APP_ID: 1400000001,
       TRTC_CALLBACK_SIGNING_KEY: callbackKey,
@@ -83,6 +84,7 @@ function createHarness(configValues: Record<string, unknown> = {}) {
   const caseEvidence: any = {
     attachmentInclude: jest.fn().mockReturnValue({ evidenceAttachments: { include: { mediaAsset: true } } }),
     attachmentDtos: jest.fn().mockReturnValue([]),
+    assertAttachmentsAllowed: jest.fn(),
     bindAttendanceStatement: jest.fn().mockResolvedValue([])
   };
   return {
@@ -98,6 +100,80 @@ function createHarness(configValues: Record<string, unknown> = {}) {
 }
 
 describe("AttendanceDisputesService", () => {
+  it("does not expose a provider refund identifier in a participant attendance case", async () => {
+    const { service, prisma } = createHarness();
+    const now = new Date("2026-08-10T00:00:00.000Z");
+    prisma.attendanceDispute.findUnique.mockResolvedValue({
+      id: "case-participant-refund",
+      orderId: "order-1",
+      openedByUserId: customerId,
+      openedByRole: "customer",
+      counterpartyUserId: companionId,
+      issue: "companionAbsent",
+      status: "final",
+      policyVersionSnapshot: "fulfillment-test-v1",
+      timezoneSnapshot: "Asia/Shanghai",
+      evidenceDueAt: now,
+      counterpartyResponseDueAt: now,
+      appealDeadlineAt: null,
+      appealResponseDueAt: null,
+      decision: "fullRefund",
+      decisionReason: "已确认退款。",
+      decidedAt: now,
+      appealedAt: null,
+      appealedByUserId: null,
+      finalDecision: "fullRefund",
+      finalReason: "已确认退款。",
+      finalizedAt: now,
+      assignedToUserId: "staff-1",
+      decidedByUserId: "staff-1",
+      appealAssignedToUserId: null,
+      appealReviewedByUserId: null,
+      refundTransaction: {
+        id: "refund-private",
+        status: "success",
+        amountCents: 9900,
+        providerRefundId: "wx-provider-private",
+        updatedAt: now
+      },
+      statements: [],
+      createdAt: now,
+      updatedAt: now,
+      order: {
+        id: "order-1",
+        status: "refunded",
+        scheduledAt: now,
+        durationMinutes: 30,
+        serviceOfferingTitleSnapshot: "文字陪伴",
+        voiceSession: null,
+        companion: { ownerUserId: companionId }
+      }
+    });
+
+    const result: any = await service.getForParticipant(customerId, "case-participant-refund");
+    const staffResult: any = await service.getForStaff(
+      { id: "staff-1", role: "admin" } as any,
+      "case-participant-refund"
+    );
+
+    expect(result.refund).toEqual({
+      id: "refund-private",
+      status: "success",
+      amountCents: 9900,
+      successConfirmedAt: now.toISOString()
+    });
+    expect(result.refund).not.toHaveProperty("providerRefundId");
+    expect(result).not.toHaveProperty("staff");
+    expect(staffResult.refund).toEqual(result.refund);
+    expect(staffResult.refund).not.toHaveProperty("providerRefundId");
+    expect(staffResult.staff).toEqual({
+      assignedToUserId: "staff-1",
+      decidedByUserId: "staff-1",
+      appealAssignedToUserId: null,
+      appealReviewedByUserId: null
+    });
+  });
+
   it("returns 404 for a support identity outside both canonical assignment scopes", async () => {
     const { service, prisma } = createHarness();
     prisma.attendanceDispute.findUnique.mockResolvedValue({
@@ -160,6 +236,101 @@ describe("AttendanceDisputesService", () => {
     const enabled = createHarness().service;
     await expect(enabled.ingestTrtcCallback(rawBody, "bad", "1400000001"))
       .rejects.toMatchObject({ code: "TRTC_CALLBACK_SIGNATURE_INVALID" });
+  });
+
+  it("blocks TRTC callbacks and client attendance writes for a text-only commercial surface", async () => {
+    const { service, prisma } = createHarness({ COMMERCIAL_SURFACE: "text_only" });
+    const rawBody = callbackBody();
+    const sign = createHmac("sha256", callbackKey).update(rawBody).digest("base64");
+
+    await expect(service.ingestTrtcCallback(rawBody, sign, "1400000001"))
+      .rejects.toMatchObject({ code: "COMMERCIAL_SURFACE_TEXT_ONLY", status: 503 });
+    await expect(service.reportClientEvent(customerId, "order-1", {
+      eventType: "heartbeat",
+      clientEventId: "text-only-blocked",
+      claimedAt: new Date().toISOString()
+    })).rejects.toMatchObject({ code: "COMMERCIAL_SURFACE_TEXT_ONLY", status: 503 });
+
+    expect(prisma.voiceSession.findUnique).not.toHaveBeenCalled();
+    expect(prisma.order.findFirst).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.voiceAttendanceEvent.create).not.toHaveBeenCalled();
+  });
+
+  it("keeps bilateral case text while redacting historical TRTC facts and attachments on a text-only surface", async () => {
+    const { service, prisma, caseEvidence } = createHarness({ COMMERCIAL_SURFACE: "text_only" });
+    const now = new Date("2026-08-10T00:00:00.000Z");
+    const dispute = {
+      id: "case-text-only-history",
+      orderId: "order-1",
+      openedByUserId: customerId,
+      openedByRole: "customer",
+      counterpartyUserId: companionId,
+      issue: "companionAbsent",
+      status: "review",
+      policyVersionSnapshot: "fulfillment-test-v1",
+      timezoneSnapshot: "Asia/Shanghai",
+      evidenceDueAt: now,
+      counterpartyResponseDueAt: now,
+      appealDeadlineAt: null,
+      appealResponseDueAt: null,
+      decision: null,
+      decisionReason: null,
+      decidedAt: null,
+      appealedAt: null,
+      appealedByUserId: null,
+      finalDecision: null,
+      finalReason: null,
+      finalizedAt: null,
+      assignedToUserId: "staff-1",
+      decidedByUserId: "staff-1",
+      appealAssignedToUserId: null,
+      appealReviewedByUserId: null,
+      refundTransaction: null,
+      statements: [{
+        id: "statement-history",
+        submittedByUserId: customerId,
+        kind: "evidence",
+        statement: "我在约定时间已进入文字服务页面并等待。",
+        evidenceAttachments: [{ id: "legacy-media-attachment" }],
+        createdAt: now
+      }],
+      createdAt: now,
+      updatedAt: now,
+      order: {
+        id: "order-1",
+        status: "completed",
+        scheduledAt: now,
+        durationMinutes: 30,
+        serviceOfferingTitleSnapshot: "文字陪伴",
+        voiceSession: { id: "voice-history" },
+        companion: { ownerUserId: companionId }
+      }
+    };
+    prisma.attendanceDispute.findUnique.mockResolvedValue(dispute);
+
+    const customerResult: any = await service.getForParticipant(customerId, "case-text-only-history");
+    const companionResult: any = await service.getForParticipant(companionId, "case-text-only-history");
+    const staffResult: any = await service.getForStaff(
+      { id: "staff-1", role: "admin" } as any,
+      "case-text-only-history"
+    );
+
+    for (const result of [customerResult, companionResult, staffResult]) {
+      expect(result.attendanceSummary).toEqual(expect.objectContaining({
+        providerEvidenceAvailable: false,
+        providerRoomEvents: 0,
+        auxiliaryClientEvents: 0,
+        customer: expect.objectContaining({ trustedProviderEvents: 0, firstJoinedAt: null }),
+        companion: expect.objectContaining({ trustedProviderEvents: 0, firstJoinedAt: null })
+      }));
+      expect(result.statements).toEqual([expect.objectContaining({
+        statement: "我在约定时间已进入文字服务页面并等待。",
+        evidenceAttachments: []
+      })]);
+    }
+    expect(caseEvidence.attachmentDtos).toHaveBeenCalledWith(dispute.statements[0]);
+    expect(prisma.voiceAttendanceEvent.groupBy).not.toHaveBeenCalled();
   });
 
   it("serializes and bounds auxiliary client events without breaking idempotent retries", async () => {
@@ -317,6 +488,21 @@ describe("AttendanceDisputesService", () => {
     });
     expect(prisma.attendanceDispute.findUnique).not.toHaveBeenCalled();
     expect(prisma.voiceAttendanceEvent.groupBy).toHaveBeenCalledTimes(1);
+
+    const textOnly = createHarness({ COMMERCIAL_SURFACE: "text_only" });
+    textOnly.prisma.attendanceDispute.findMany.mockResolvedValue([
+      record("case-text-only", "voice-history", customerId)
+    ]);
+    textOnly.prisma.attendanceDispute.count.mockResolvedValue(1);
+
+    const textOnlyResult: any = await textOnly.service.listMine(customerId, { page: 1, pageSize: 20 });
+
+    expect(textOnlyResult.items[0].attendanceSummary).toMatchObject({
+      providerEvidenceAvailable: false,
+      providerRoomEvents: 0,
+      auxiliaryClientEvents: 0
+    });
+    expect(textOnly.prisma.voiceAttendanceEvent.groupBy).not.toHaveBeenCalled();
   });
 
   it("creates an independent structured case and freezes settlement under the canonical order lock", async () => {
@@ -614,6 +800,29 @@ describe("AttendanceDisputesService", () => {
     await expect(service.submitStatement(companionId, "case-1", { statement: "我会在答辩窗口开放后提交事实说明。" }))
       .rejects.toMatchObject({ code: "ATTENDANCE_RESPONSE_NOT_OPEN" });
     expect(tx.attendanceDispute.update).not.toHaveBeenCalled();
+  });
+
+  it("rejects evidence-bearing statements and appeals before either transaction can mutate a case", async () => {
+    const { service, prisma, caseEvidence, audit, notifications } = createHarness();
+    const unavailable = Object.assign(new Error("case evidence disabled"), {
+      code: "MEDIA_FEATURE_DISABLED",
+      status: 503
+    });
+    caseEvidence.assertAttachmentsAllowed.mockImplementation(() => {
+      throw unavailable;
+    });
+    const dto = {
+      statement: "我需要补充可核对的文字事实。",
+      evidenceAssetIds: ["11111111-1111-4111-8111-111111111111"]
+    };
+
+    await expect(service.submitStatement(customerId, "case-1", dto)).rejects.toBe(unavailable);
+    await expect(service.appeal(customerId, "case-1", dto)).rejects.toBe(unavailable);
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(caseEvidence.bindAttendanceStatement).not.toHaveBeenCalled();
+    expect(audit.record).not.toHaveBeenCalled();
+    expect(notifications.createTransactional).not.toHaveBeenCalled();
   });
 
   it("publishes the wait, manual review, no-recording and client-evidence limits", () => {

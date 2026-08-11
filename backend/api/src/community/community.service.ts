@@ -270,7 +270,9 @@ export class CommunityService {
     return {
       id: item.id, authorId: item.authorId, authorName: name, authorInitials: name.slice(0, 2),
       companionId: item.kind === "malePromotion" ? item.author.companionProfile?.id ?? null : null,
-      kind: item.kind, topic: item.topic, content: item.content, coverImageUrl: item.coverImageUrl,
+      // The current surface is text-only. Preserve the nullable key for old
+      // clients while making historical rows fail closed on every read path.
+      kind: item.kind, topic: item.topic, content: item.content, coverImageUrl: null,
       likeCount: item._count?.likes ?? item.likes?.length ?? 0,
       isLiked: userId ? (item.likes ?? []).some((like: any) => like.userId === userId) : false,
       moderationStatus: item.status, createdAt: item.createdAt.toISOString()

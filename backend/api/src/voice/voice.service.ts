@@ -251,7 +251,7 @@ export class VoiceService {
       throw new AppException(
         "COMMERCIAL_SURFACE_TEXT_ONLY",
         "Real-time voice is disabled for the current commercial surface",
-        HttpStatus.UNPROCESSABLE_ENTITY
+        HttpStatus.SERVICE_UNAVAILABLE
       );
     }
     const enabled = this.config.get<boolean>("TRTC_ENABLED", false);

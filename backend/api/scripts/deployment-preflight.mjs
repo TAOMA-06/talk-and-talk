@@ -479,6 +479,14 @@ export function validateDeploymentConfig(env) {
   if (!["text_only", "text-only", "full"].includes(commercialSurface)) {
     errors.push("COMMERCIAL_SURFACE must be text_only or full");
   }
+  const firstReleaseCandidate = env.APP_ENV === "staging" || env.APP_ENV === "production";
+  if (firstReleaseCandidate && env.COMMERCIAL_SURFACE !== "text_only") {
+    errors.push("First-release staging/production requires COMMERCIAL_SURFACE=text_only");
+  }
+  const personalizationFlag = (env.RECOMMENDATION_PERSONALIZATION_ENABLED || "").trim().toLowerCase();
+  if (firstReleaseCandidate && !["", "false"].includes(personalizationFlag)) {
+    errors.push("First-release staging/production requires RECOMMENDATION_PERSONALIZATION_ENABLED to be unset or false pending PERSONALIZATION-R01");
+  }
   if ((commercialSurface === "text_only" || commercialSurface === "text-only") && env.TRTC_ENABLED === "true") {
     errors.push("COMMERCIAL_SURFACE=text_only forbids TRTC_ENABLED=true");
   }

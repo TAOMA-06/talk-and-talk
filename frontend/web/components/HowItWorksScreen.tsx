@@ -58,7 +58,7 @@ const faqs = [
   },
   {
     question: "网页和微信小程序分别承担什么？",
-    answer: "网页用于了解产品、浏览公开资料和体验产品路径；服务入口与履约以微信小程序实际配置和页面状态为准。",
+    answer: "网页用于了解产品、规则、公示和服务路径；真实服务与履约以微信小程序内的文字互动页面状态为准。",
   },
 ];
 
@@ -74,12 +74,11 @@ export default function HowItWorksScreen() {
             服务入口与履约以微信小程序页面状态为准。
           </p>
           <div className="marketing-detail-actions">
-            <Link href="/demo" className="button button-primary button-large">
-              进入网页产品演示 <ArrowRight size={18} aria-hidden="true" />
-            </Link>
-            <Link href="/safety" className="button button-secondary button-large">
-              查看安全与支持
-            </Link>
+            <MiniprogramCta
+              variant="inline"
+              secondaryHref="/safety"
+              secondaryLabel="查看安全与支持"
+            />
           </div>
         </div>
         <aside className="how-hero-map" aria-label="可信陪伴链结构示意">
@@ -157,7 +156,7 @@ export default function HowItWorksScreen() {
           <h2>先看清楚，再选择怎么开始。</h2>
           <p>网页可以帮助你认识产品；服务入口以微信小程序页面状态为准。</p>
         </div>
-        <MiniprogramCta variant="panel" secondaryHref="/demo" secondaryLabel="进入网页产品演示" />
+        <MiniprogramCta variant="panel" secondaryHref="/safety" secondaryLabel="查看安全与支持" />
       </Reveal>
     </div>
   );

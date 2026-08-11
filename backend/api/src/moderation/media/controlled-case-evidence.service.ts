@@ -33,6 +33,7 @@ export class ControlledCaseEvidenceService {
   ) {}
 
   async reserveForSupport(user: AuthenticatedUser, ticketId: string, input: ReserveInput) {
+    this.mediaAssets.assertCaseEvidenceMediaEnabled();
     const ticket: any = await this.prisma.supportTicket.findUnique({
       where: { id: ticketId },
       include: { order: { include: { companion: { select: { ownerUserId: true } } } } }
@@ -61,6 +62,7 @@ export class ControlledCaseEvidenceService {
   }
 
   async reserveForAttendance(userId: string, disputeId: string, input: ReserveInput) {
+    this.mediaAssets.assertCaseEvidenceMediaEnabled();
     const dispute: any = await this.prisma.attendanceDispute.findUnique({ where: { id: disputeId } } as any);
     if (!dispute || (dispute.openedByUserId !== userId && dispute.counterpartyUserId !== userId)) {
       throw new AppException("ATTENDANCE_CASE_NOT_FOUND", "Attendance case not found", HttpStatus.NOT_FOUND);
@@ -75,6 +77,7 @@ export class ControlledCaseEvidenceService {
   }
 
   async reserveForCompanionIncident(userId: string, input: ReserveInput) {
+    this.mediaAssets.assertCaseEvidenceMediaEnabled();
     const companion: any = await this.prisma.companionProfile.findFirst({
       where: { ownerUserId: userId },
       select: { id: true }
@@ -91,12 +94,14 @@ export class ControlledCaseEvidenceService {
   }
 
   async complete(userId: string, assetId: string) {
+    this.mediaAssets.assertCaseEvidenceMediaEnabled();
     const result = await this.mediaAssets.completeControlled(assetId, userId);
     if (result.asset.status === "scanning") this.worker.enqueue(assetId);
     return result;
   }
 
   status(userId: string, assetId: string) {
+    this.mediaAssets.assertCaseEvidenceMediaEnabled();
     return this.mediaAssets.controlledStatus(assetId, userId);
   }
 
@@ -111,6 +116,15 @@ export class ControlledCaseEvidenceService {
       userId: input.userId,
       target: { purpose: "orderSupportFact", orderSupportFactId: input.orderSupportFactId }
     });
+  }
+
+  /**
+   * Lets business-record entry points reject non-empty evidence references
+   * before they begin a transaction or create their parent record. Empty
+   * arrays remain valid for text-only support and dispute flows.
+   */
+  assertAttachmentsAllowed(assetIds?: readonly string[]) {
+    if (assetIds?.length) this.mediaAssets.assertCaseEvidenceMediaEnabled();
   }
 
   bindAttendanceStatement(
@@ -155,12 +169,14 @@ export class ControlledCaseEvidenceService {
   }
 
   attachmentDtos(record: any) {
+    if (!this.mediaAssets.isCaseEvidenceMediaEnabled()) return [];
     return (record?.evidenceAttachments ?? [])
       .filter((item: any) => item.mediaAsset?.status === "approved")
       .map((item: any) => this.mediaAssets.controlledAttachmentDto(item));
   }
 
   async createReadUrl(user: AuthenticatedUser, attachmentId: string) {
+    this.mediaAssets.assertCaseEvidenceMediaEnabled();
     const attachment: any = await this.prisma.controlledCaseEvidenceAttachment.findUnique({
       where: { id: attachmentId },
       include: {
@@ -200,6 +216,7 @@ export class ControlledCaseEvidenceService {
   ) {
     const assetIds = [...new Set(input.assetIds ?? [])];
     if (!assetIds.length) return [];
+    this.assertAttachmentsAllowed(assetIds);
     if (assetIds.length > MAX_ATTACHMENTS_PER_RECORD) {
       throw new AppException(
         "CASE_EVIDENCE_ATTACHMENT_LIMIT_REACHED",

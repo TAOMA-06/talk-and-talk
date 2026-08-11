@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 import pg from "pg";
+import { assertIsolatedPostgresPreflightEnvironment, POSTGRES_PREFLIGHT_SUITE } from "./isolated-postgres-preflight-environment.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const apiRoot = join(here, "..");
@@ -62,6 +63,9 @@ const integrationUrl = String(
     ?? process.env.TEST_DATABASE_URL
     ?? ""
 ).trim();
+const postgresPreflight = process.env.E2E_RUNNER_SUITE === POSTGRES_PREFLIGHT_SUITE
+  ? assertIsolatedPostgresPreflightEnvironment()
+  : null;
 
 function providerDigest(key, provider, providerId) {
   return createHmac("sha256", key)
@@ -73,11 +77,8 @@ async function expectPgCode(promise, code) {
   await assert.rejects(promise, (error) => error?.code === code);
 }
 
-test("real PostgreSQL closes login/deletion races and keeps tombstone lookups indexed at scale", {
-  skip: integrationUrl
-    ? false
-    : "set ACCOUNT_DELETION_AUTH_TOMBSTONE_TEST_DATABASE_URL to a disposable PostgreSQL database"
-}, async (t) => {
+if (postgresPreflight) test("real PostgreSQL closes login/deletion races and keeps tombstone lookups indexed at scale", async (t) => {
+  await postgresPreflight;
   const schema = `auth_tombstone_${randomBytes(8).toString("hex")}`;
   const admin = new pg.Client({ connectionString: integrationUrl });
   const deletion = new pg.Client({ connectionString: integrationUrl });

@@ -5,6 +5,7 @@ import { ConfigService } from "@nestjs/config";
 
 import { AuditService } from "../common/audit/audit.service";
 import { AppException } from "../common/errors/app.exception";
+import { isFirstReleaseCapabilityEnabled } from "../config/first-release-capability-matrix";
 import { PrismaService } from "../database/prisma.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { ControlledCaseEvidenceService } from "../moderation/media/controlled-case-evidence.service";
@@ -191,6 +192,7 @@ export class CompanionLifecycleService {
 
   async overview(userId: string) {
     const companion = await this.ownCompanion(userId);
+    const voiceIntroEnabled = this.isVoiceIntroEnabled();
     const [commercialProfile, training, quality, actions, incidents, withdrawals, operationalSummary] = await Promise.all([
       this.commercialProfileForCompanion(companion.id),
       this.trainingForCompanion(companion.id),
@@ -213,8 +215,10 @@ export class CompanionLifecycleService {
         serviceBoundaries: companion.serviceBoundaries ?? [],
         isPublished: companion.isPublished,
         voiceIntro: {
-          assetReference: companion.voiceIntroAssetRef ?? null,
-          durationSeconds: companion.voiceIntroDurationSeconds ?? null,
+          // Preserve a truthful review state for the owner, but never return a
+          // historical storage reference or playback metadata on text-only.
+          assetReference: voiceIntroEnabled ? companion.voiceIntroAssetRef ?? null : null,
+          durationSeconds: voiceIntroEnabled ? companion.voiceIntroDurationSeconds ?? null : null,
           status: companion.voiceIntroStatus
         }
       },
@@ -431,6 +435,9 @@ export class CompanionLifecycleService {
   }
 
   async createIncident(userId: string, input: CreateCompanionIncidentDto) {
+    // Do this before even resolving the owner profile: a text-only release
+    // cannot create an incident row or audit event for a media-bearing request.
+    this.caseEvidence.assertAttachmentsAllowed(input.evidenceAssetIds);
     const companion = await this.ownCompanion(userId);
     const incident = await this.prisma.$transaction(async (tx) => {
       const db = tx as any;
@@ -762,6 +769,7 @@ export class CompanionLifecycleService {
   }
 
   async createVoiceIntroReadUrl(actorId: string, companionId: string) {
+    this.assertVoiceIntroEnabled();
     const companion = await this.prisma.companionProfile.findUnique({
       where: { id: companionId },
       select: {
@@ -827,6 +835,7 @@ export class CompanionLifecycleService {
   }
 
   async reviewVoiceIntro(actorId: string, companionId: string, input: ReviewCompanionVoiceIntroDto) {
+    this.assertVoiceIntroEnabled();
     if (input.status === "approved") {
       this.voiceEvidenceViewer();
     }
@@ -875,6 +884,20 @@ export class CompanionLifecycleService {
       status: result.voiceIntroStatus,
       durationSeconds: result.voiceIntroDurationSeconds
     };
+  }
+
+  private isVoiceIntroEnabled() {
+    return isFirstReleaseCapabilityEnabled("voiceIntro", this.config);
+  }
+
+  private assertVoiceIntroEnabled() {
+    if (!this.isVoiceIntroEnabled()) {
+      throw new AppException(
+        "VOICE_INTRO_UNAVAILABLE",
+        "Voice introductions are disabled for this release surface",
+        HttpStatus.SERVICE_UNAVAILABLE
+      );
+    }
   }
 
   private voiceEvidenceViewer() {
@@ -949,6 +972,7 @@ export class CompanionLifecycleService {
   }
 
   async adminVoiceIntros(status = "pendingReview", page = 1, pageSize = 50) {
+    this.assertVoiceIntroEnabled();
     const safePage = Math.max(1, Math.floor(page));
     const safePageSize = Math.min(100, Math.max(1, Math.floor(pageSize)));
     const where = { voiceIntroStatus: status };

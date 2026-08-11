@@ -24,16 +24,19 @@
       </picker>
       <input class="field" value="{{incidentOrderId}}" bindinput="setIncidentOrderId" placeholder="关联订单 UUID（可选）" />
       <textarea class="textarea" value="{{incidentSummary}}" bindinput="setIncidentSummary" maxlength="1000" placeholder="描述发生时间、事实和影响，不要写第三方证件、联系方式或健康隐私" />
-      <view class="evidence-toolbar">
-        <button class="secondary-button" size="mini" disabled="{{incidentEvidenceUploading || incidentEvidenceDrafts.length >= 3}}" bindtap="addIncidentEvidenceImage">添加图片</button>
-        <button class="secondary-button" size="mini" disabled="{{incidentEvidenceUploading || incidentEvidenceDrafts.length >= 3}}" bindtap="addIncidentEvidenceAudio">添加音频</button>
-        <button wx:if="{{incidentEvidenceDrafts.length}}" class="secondary-button" size="mini" disabled="{{incidentEvidenceUploading}}" bindtap="refreshIncidentEvidence">刷新审核</button>
-      </view>
-      <view wx:for="{{incidentEvidenceDrafts}}" wx:key="assetId" class="evidence-draft">
-        <text>{{item.kind === 'image' ? '图片' : '音频'}} · {{item.statusText}}</text>
-        <button size="mini" data-id="{{item.assetId}}" bindtap="removeIncidentEvidence">移除</button>
-      </view>
-      <view class="hint">最多 3 个文件。文件直传受控存储并审核，事件只绑定审核通过的附件；创建事件不会自动判责、退款或冻结账号。</view>
+      <view wx:if="{{textOnly}}" class="hint">当前首发版本只接收文字事件说明；图片和音频证据暂未开放。</view>
+      <block wx:if="{{!textOnly}}">
+        <view class="evidence-toolbar">
+          <button class="secondary-button" size="mini" disabled="{{incidentEvidenceUploading || incidentEvidenceDrafts.length >= 3}}" bindtap="addIncidentEvidenceImage">添加图片</button>
+          <button class="secondary-button" size="mini" disabled="{{incidentEvidenceUploading || incidentEvidenceDrafts.length >= 3}}" bindtap="addIncidentEvidenceAudio">添加音频</button>
+          <button wx:if="{{incidentEvidenceDrafts.length}}" class="secondary-button" size="mini" disabled="{{incidentEvidenceUploading}}" bindtap="refreshIncidentEvidence">刷新审核</button>
+        </view>
+        <view wx:for="{{incidentEvidenceDrafts}}" wx:key="assetId" class="evidence-draft">
+          <text>{{item.kind === 'image' ? '图片' : '音频'}} · {{item.statusText}}</text>
+          <button size="mini" data-id="{{item.assetId}}" bindtap="removeIncidentEvidence">移除</button>
+        </view>
+        <view class="hint">最多 3 个文件。文件直传受控存储并审核，事件只绑定审核通过的附件；创建事件不会自动判责、退款或冻结账号。</view>
+      </block>
       <button class="primary-button" loading="{{saving}}" disabled="{{saving}}" bindtap="createIncident">创建待处理事件</button>
     </view>
 
@@ -42,7 +45,7 @@
       <view class="card-head"><view class="card-title">{{incident.categoryText}}</view><view class="status-chip">{{incident.statusText}}</view></view>
       <view class="card-meta">{{incident.createdText}}<text wx:if="{{incident.orderId}}"> · 订单 {{incident.orderId}}</text></view>
       <view class="card-body">{{incident.summary}}</view>
-      <view wx:if="{{incident.evidenceAttachments.length}}" class="evidence-list">
+      <view wx:if="{{!textOnly && incident.evidenceAttachments.length}}" class="evidence-list">
         <button wx:for="{{incident.evidenceAttachments}}" wx:for-item="attachment" wx:key="id" class="secondary-button" size="mini" data-id="{{attachment.id}}" bindtap="openBoundEvidence">{{attachment.kind === 'image' ? '查看图片证据' : '播放音频证据'}}</button>
       </view>
       <view wx:if="{{incident.resolution}}" class="resolution">处理结论：{{incident.resolution}}</view>
@@ -87,15 +90,18 @@
       <view class="modal-title">补充订单事实</view>
       <view class="modal-copy">只描述和该订单直接相关的事实；不要提交身份、联系方式、证件或健康资料。</view>
       <textarea class="textarea" value="{{factStatement}}" bindinput="setFactStatement" maxlength="1000" placeholder="至少5个字" />
-      <view class="evidence-toolbar">
-        <button class="secondary-button" size="mini" disabled="{{factEvidenceUploading || factEvidenceDrafts.length >= 3}}" bindtap="addFactEvidenceImage">添加图片</button>
-        <button class="secondary-button" size="mini" disabled="{{factEvidenceUploading || factEvidenceDrafts.length >= 3}}" bindtap="addFactEvidenceAudio">添加音频</button>
-        <button wx:if="{{factEvidenceDrafts.length}}" class="secondary-button" size="mini" disabled="{{factEvidenceUploading}}" bindtap="refreshFactEvidence">刷新审核</button>
-      </view>
-      <view wx:for="{{factEvidenceDrafts}}" wx:key="assetId" class="evidence-draft">
-        <text>{{item.kind === 'image' ? '图片' : '音频'}} · {{item.statusText}}</text>
-        <button size="mini" data-id="{{item.assetId}}" bindtap="removeFactEvidence">移除</button>
-      </view>
+      <view wx:if="{{textOnly}}" class="hint">当前首发版本只接收文字订单事实；图片和音频证据暂未开放。</view>
+      <block wx:if="{{!textOnly}}">
+        <view class="evidence-toolbar">
+          <button class="secondary-button" size="mini" disabled="{{factEvidenceUploading || factEvidenceDrafts.length >= 3}}" bindtap="addFactEvidenceImage">添加图片</button>
+          <button class="secondary-button" size="mini" disabled="{{factEvidenceUploading || factEvidenceDrafts.length >= 3}}" bindtap="addFactEvidenceAudio">添加音频</button>
+          <button wx:if="{{factEvidenceDrafts.length}}" class="secondary-button" size="mini" disabled="{{factEvidenceUploading}}" bindtap="refreshFactEvidence">刷新审核</button>
+        </view>
+        <view wx:for="{{factEvidenceDrafts}}" wx:key="assetId" class="evidence-draft">
+          <text>{{item.kind === 'image' ? '图片' : '音频'}} · {{item.statusText}}</text>
+          <button size="mini" data-id="{{item.assetId}}" bindtap="removeFactEvidence">移除</button>
+        </view>
+      </block>
       <button class="primary-button" loading="{{savingFact}}" disabled="{{savingFact}}" bindtap="addFact">保存为请求方陈述</button>
       <button class="secondary-button" disabled="{{savingFact}}" bindtap="closeFact">取消</button>
     </view>

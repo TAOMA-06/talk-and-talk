@@ -15,6 +15,7 @@ import {
   WeChatPayProvider
 } from "../src/payments/wechat/wechat-pay.provider";
 import { AccountDeletionExecutionWorker } from "../src/users/account-deletion-execution.worker";
+import { REVIEW_TOKEN_AUDIENCE, REVIEW_TOKEN_KIND, ReviewStaffRole } from "../src/review/review-auth.types";
 import { grantCurrentLegalConsent } from "./legal-consent-fixture";
 import { issueSessionBoundAccessToken } from "./session-token-fixture";
 
@@ -31,6 +32,8 @@ describe("Admin Moderation (e2e)", () => {
     process.env.CORS_ORIGINS = "http://localhost:3000";
     process.env.JWT_ACCESS_SECRET = "e2e-access-secret";
     process.env.JWT_REFRESH_SECRET = "e2e-refresh-secret";
+    process.env.REVIEW_JWT_ACCESS_SECRET = "e2e-review-access-secret";
+    process.env.REVIEW_JWT_REFRESH_SECRET = "e2e-review-refresh-secret";
     process.env.SMS_PROVIDER = "mock";
     process.env.RATE_LIMIT_PER_MINUTE = "1000";
     process.env.ACCOUNT_DELETION_RETENTION_POLICY_APPROVED = "true";
@@ -67,6 +70,8 @@ describe("Admin Moderation (e2e)", () => {
   async function cleanup() {
     if (!prisma) return;
     await prisma.notification.deleteMany();
+    await prisma.reviewSession.deleteMany();
+    await prisma.reviewAuditLog.deleteMany();
     await clearDisposableE2eTombstones();
     await prisma.accountDeletionRequest.deleteMany();
     await prisma.refundTransaction.deleteMany();
@@ -94,6 +99,7 @@ describe("Admin Moderation (e2e)", () => {
     await prisma.legalConsentReceipt.deleteMany().catch(() => undefined);
     await prisma.userProfile.deleteMany();
     await prisma.user.deleteMany();
+    await prisma.reviewStaff.deleteMany();
   }
 
   async function clearDisposableE2eTombstones() {
@@ -124,7 +130,11 @@ describe("Admin Moderation (e2e)", () => {
             displayName: role === "user" ? "普通用户" : role,
             phone: role === "user" ? "+8613800138000" : `+8613800${role === "admin" ? "000001" : "000002"}`,
             age: 22,
-            gender: "female"
+            gender: "female",
+            // Public interaction is intentionally identity-gated in the
+            // first release. Test fixtures that exercise a real chat/report
+            // route must model the verified state explicitly.
+            isVerified: role === "user"
           }
         }
       }
@@ -133,6 +143,24 @@ describe("Admin Moderation (e2e)", () => {
 
     const token = await issueSessionBoundAccessToken(prisma, jwt, user);
     return { user, token };
+  }
+
+  async function createReviewStaff(role: ReviewStaffRole = "reviewer") {
+    const reviewer = await prisma.reviewStaff.create({
+      data: {
+        username: `${role}.admin-moderation-e2e`,
+        displayName: role === "lead" ? "审核负责人" : "独立审核员",
+        role,
+        status: "active",
+        passwordHash: "e2e-direct-review-token-only",
+        totpSecretCiphertext: "e2e-direct-review-token-only"
+      }
+    });
+    const token = jwt.sign(
+      { sub: reviewer.id, role: reviewer.role, kind: REVIEW_TOKEN_KIND },
+      { secret: process.env.REVIEW_JWT_ACCESS_SECRET, audience: REVIEW_TOKEN_AUDIENCE }
+    );
+    return { reviewer, token };
   }
 
   async function createOpenCase() {
@@ -687,12 +715,12 @@ describe("Admin Moderation (e2e)", () => {
     expect((await runDeletionToCompletion(requestId)).status).toBe("completed");
   });
 
-  it.skip("allows moderator to list cases, resolve, and update overview stats (moved to independent /review department; commercial admin routes return 404/410)", async () => {
-    const { token } = await createUser("moderator");
+  it("lets independent review staff list cases, resolve, and update overview stats", async () => {
+    const { token } = await createReviewStaff("reviewer");
     const openCase = await createOpenCase();
 
     const before = await request(app.getHttpServer())
-      .get("/api/v1/admin/moderation/overview")
+      .get("/api/v1/review/overview")
       .set("Authorization", `Bearer ${token}`)
       .expect(200);
 
@@ -700,7 +728,7 @@ describe("Admin Moderation (e2e)", () => {
     expect(before.body.data.overview.resolved).toBe(0);
 
     const detail = await request(app.getHttpServer())
-      .get(`/api/v1/admin/moderation/cases/${openCase.id}`)
+      .get(`/api/v1/review/cases/${openCase.id}`)
       .set("Authorization", `Bearer ${token}`)
       .expect(200);
 
@@ -708,7 +736,7 @@ describe("Admin Moderation (e2e)", () => {
     expect(detail.body.data.case.status).toBe("pending");
 
     const resolved = await request(app.getHttpServer())
-      .post(`/api/v1/admin/moderation/cases/${openCase.id}/actions`)
+      .post(`/api/v1/review/cases/${openCase.id}/actions`)
       .set("Authorization", `Bearer ${token}`)
       .send({ action: "confirmViolation", note: "确认私联违规" })
       .expect(201);
@@ -721,14 +749,14 @@ describe("Admin Moderation (e2e)", () => {
     const logs = await prisma.moderationActionLog.findMany({ where: { caseId: openCase.id } });
     expect(logs.some((item) => item.action === "confirmViolation")).toBe(true);
 
-    const audits = await prisma.auditLog.findMany({
+    const audits = await prisma.reviewAuditLog.findMany({
       where: { resourceType: "moderation_case", resourceId: openCase.id }
     });
-    expect(audits.some((item) => item.action === "confirmViolation")).toBe(true);
+    expect(audits.some((item) => item.action === "review.case.confirmViolation")).toBe(true);
   });
 
-  it.skip("supports dismiss and escalate actions (moved to independent /review department; commercial admin routes return 404/410)", async () => {
-    const { token } = await createUser("admin");
+  it("lets independent review staff dismiss and escalate cases", async () => {
+    const { token } = await createReviewStaff("reviewer");
     const dismissCase = await createOpenCase();
     const escalateCase = await prisma.moderationCase.create({
       data: {
@@ -748,22 +776,22 @@ describe("Admin Moderation (e2e)", () => {
     });
 
     const dismissed = await request(app.getHttpServer())
-      .post(`/api/v1/admin/moderation/cases/${dismissCase.id}/actions`)
+      .post(`/api/v1/review/cases/${dismissCase.id}/actions`)
       .set("Authorization", `Bearer ${token}`)
       .send({ action: "dismiss", note: "误报" })
       .expect(201);
     expect(dismissed.body.data.case.status).toBe("dismissed");
 
     const escalated = await request(app.getHttpServer())
-      .post(`/api/v1/admin/moderation/cases/${escalateCase.id}/actions`)
+      .post(`/api/v1/review/cases/${escalateCase.id}/actions`)
       .set("Authorization", `Bearer ${token}`)
       .send({ action: "escalate" })
       .expect(201);
     expect(escalated.body.data.case.status).toBe("humanReview");
   });
 
-  it.skip("filters cases by status and keyword (moved to independent /review department; commercial admin routes return 404/410)", async () => {
-    const { token } = await createUser("moderator");
+  it("lets independent review staff filter cases by status and keyword", async () => {
+    const { token } = await createReviewStaff("reviewer");
     await createOpenCase();
     await prisma.moderationCase.create({
       data: {
@@ -783,7 +811,7 @@ describe("Admin Moderation (e2e)", () => {
     });
 
     const filtered = await request(app.getHttpServer())
-      .get("/api/v1/admin/moderation/cases")
+      .get("/api/v1/review/cases")
       .query({ status: "pending", keyword: "微信" })
       .set("Authorization", `Bearer ${token}`)
       .expect(200);
@@ -792,11 +820,12 @@ describe("Admin Moderation (e2e)", () => {
     expect(filtered.body.data.cases[0].content).toContain("微信");
   });
 
-  it.skip("creates and exports labels (moved to independent /review department; commercial admin routes return 404/410)", async () => {
-    const { token } = await createUser("moderator");
+  it("lets review staff create labels and a review lead export them", async () => {
+    const { token } = await createReviewStaff("reviewer");
+    const { token: leadToken } = await createReviewStaff("lead");
 
     const created = await request(app.getHttpServer())
-      .post("/api/v1/admin/moderation/labels")
+      .post("/api/v1/review/labels")
       .set("Authorization", `Bearer ${token}`)
       .send({
         text: "代理兼职赚钱，加我了解",
@@ -810,19 +839,20 @@ describe("Admin Moderation (e2e)", () => {
     expect(created.body.data.count).toBe(1);
 
     const exported = await request(app.getHttpServer())
-      .get("/api/v1/admin/moderation/labels/export")
-      .set("Authorization", `Bearer ${token}`)
+      .get("/api/v1/review/labels/export")
+      .set("Authorization", `Bearer ${leadToken}`)
       .expect(200);
 
-    expect(exported.body.data.schemaVersion).toBe(1);
-    expect(exported.body.data.count).toBe(1);
+    expect(exported.body.data.schemaVersion).toBe(2);
+    expect(exported.body.data.pageCount).toBe(1);
     expect(exported.body.data.samples[0].text).toContain("代理兼职");
   });
 
-  it.skip("allows users to submit reports while keeping case list staff-only (moved to independent /review department; commercial admin routes return 404/410)", async () => {
+  it("allows users to submit reports while keeping the independent review queue staff-only", async () => {
     const { token: userToken } = await createUser("user");
-    const { token: modToken } = await createUser("moderator");
+    const { token: moderatorToken } = await createUser("moderator");
     const { token: adminToken } = await createUser("admin");
+    const { token: reviewToken } = await createReviewStaff("reviewer");
 
     const report = await request(app.getHttpServer())
       .post("/api/v1/moderation/reports")
@@ -845,9 +875,9 @@ describe("Admin Moderation (e2e)", () => {
       .expect(403);
 
     const staffList = await request(app.getHttpServer())
-      .get("/api/v1/admin/moderation/cases")
+      .get("/api/v1/review/cases")
       .query({ source: "report" })
-      .set("Authorization", `Bearer ${modToken}`)
+      .set("Authorization", `Bearer ${reviewToken}`)
       .expect(200);
 
     expect(staffList.body.data.cases.length).toBeGreaterThanOrEqual(1);
@@ -860,9 +890,10 @@ describe("Admin Moderation (e2e)", () => {
 
     await request(app.getHttpServer())
       .post("/api/v1/moderation/check")
-      .set("Authorization", `Bearer ${modToken}`)
+      .set("Authorization", `Bearer ${moderatorToken}`)
       .send({ text: "测试内容", source: "chat" })
-      .expect(201);
+      .expect(410)
+      .expect(({ body }) => expect(body.error.code).toBe("REVIEW_DEPARTMENT_MOVED"));
 
     await request(app.getHttpServer())
       .get("/api/v1/payments/refunds/review-queue")
@@ -871,7 +902,7 @@ describe("Admin Moderation (e2e)", () => {
 
     await request(app.getHttpServer())
       .get("/api/v1/payments/refunds/review-queue")
-      .set("Authorization", `Bearer ${modToken}`)
+      .set("Authorization", `Bearer ${moderatorToken}`)
       .expect(403);
 
     await request(app.getHttpServer())
@@ -880,9 +911,9 @@ describe("Admin Moderation (e2e)", () => {
       .expect(200);
   });
 
-  it.skip("returns conversation evidence when message is linked (moved to independent /review department; commercial admin routes return 404/410)", async () => {
+  it("returns linked conversation evidence only through the independent review department", async () => {
     const { user, token: userToken } = await createUser("user");
-    const { token: modToken } = await createUser("moderator");
+    const { token: reviewToken } = await createReviewStaff("reviewer");
     const companion = await prisma.companionProfile.findUniqueOrThrow({ where: { id: "c1" } });
     const conversation = await prisma.conversation.create({
       data: { externalId: "c1", userId: user.id, companionId: "c1" }
@@ -922,8 +953,8 @@ describe("Admin Moderation (e2e)", () => {
     expect(openCases.length).toBe(1);
 
     const evidence = await request(app.getHttpServer())
-      .get(`/api/v1/admin/moderation/cases/${openCases[0].id}/conversation`)
-      .set("Authorization", `Bearer ${modToken}`)
+      .get(`/api/v1/review/cases/${openCases[0].id}/conversation`)
+      .set("Authorization", `Bearer ${reviewToken}`)
       .expect(200);
 
     expect(evidence.body.data.caseId).toBe(openCases[0].id);

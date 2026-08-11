@@ -1,5 +1,9 @@
-name: API
+name: API metadata hygiene (untrusted)
 
+# This repository-owned workflow is deliberately not a candidate test gate.
+# It never installs or executes candidate code. Candidate build, test, audit,
+# OCI, database, Redis, or E2E work belongs to the separately protected
+# external control plane described in g1-candidate-control-plane.yml.
 on:
   push:
     branches: [main]
@@ -15,82 +19,43 @@ on:
       - "shared/contracts/**"
       - ".github/workflows/api.yml"
 
-defaults:
-  run:
-    working-directory: backend/api
+permissions:
+  contents: read
+
+env:
+  BASH_ENV: /dev/null
+  DYLD_FORCE_FLAT_NAMESPACE: ""
+  DYLD_INSERT_LIBRARIES: ""
+  DYLD_LIBRARY_PATH: ""
+  DYLD_ROOT_PATH: ""
+  ENV: /dev/null
+  GIT_CONFIG_GLOBAL: /dev/null
+  GIT_CONFIG_NOSYSTEM: "1"
+  LD_AUDIT: ""
+  LD_LIBRARY_PATH: ""
+  LD_PRELOAD: ""
+  NODE_OPTIONS: ""
+  NODE_PATH: ""
 
 jobs:
-  test:
+  metadata:
+    name: Verify repository metadata without executing candidate code
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_DB: talk_and_talk
-          POSTGRES_USER: talk
-          POSTGRES_PASSWORD: talk
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U talk -d talk_and_talk"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 10
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 10
-
-    env:
-      NODE_ENV: test
-      APP_ENV: development
-      DATABASE_URL: postgres://talk:talk@localhost:5432/talk_and_talk
-      REDIS_URL: redis://localhost:6379/15
-      JWT_ACCESS_SECRET: ci-access-secret
-      JWT_REFRESH_SECRET: ci-refresh-secret
-      SMS_PROVIDER: mock
-      CORS_ORIGINS: http://localhost:3000
-
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: backend/api/package-lock.json
-      - name: Install
-        run: npm ci
-      - name: Build
-        run: npm run build
-      - name: Verify production artifacts
-        run: npm run verify:prod-artifacts
-      - name: Audit production dependencies
-        run: npm audit --omit=dev --audit-level=high
-      - name: Unit tests
-        run: npm test
-      - name: Deployment preflight tests
-        run: npm run test:preflight
-      - name: Migrate
-        run: npx prisma migrate deploy
-      - name: E2E tests
-        run: npm run test:e2e
-        env:
-          E2E_REDIS_FLUSH_ALLOWED: "1"
-      - name: Build production image
-        working-directory: .
-        run: docker build -t talk-and-talk-api:ci backend/api
-      - name: Validate production Compose
-        working-directory: .
-        env:
-          DEPLOY_ENV_FILE: ../backend/api/.env.production.example
-          POSTGRES_PASSWORD: ci-postgres-password
-          REDIS_PASSWORD: ci-redis-password
-          WECHAT_PAY_PRIVATE_KEY_HOST_PATH: ./secrets/mock-private-key.txt
-        run: docker compose -f infra/docker-compose.prod.yml config --quiet
+          fetch-depth: 1
+          lfs: false
+          persist-credentials: false
+          submodules: false
+      - name: Seal command files and verify checked-out metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH=/usr/bin:/bin
+          export GITHUB_ENV=/dev/null GITHUB_OUTPUT=/dev/null GITHUB_PATH=/dev/null GITHUB_STEP_SUMMARY=/dev/null
+          readonly PATH GITHUB_ENV GITHUB_OUTPUT GITHUB_PATH GITHUB_STEP_SUMMARY
+          /usr/bin/git -c core.hooksPath=/dev/null -c core.fsmonitor=false rev-parse HEAD | /usr/bin/grep -Fx "$GITHUB_SHA"
+          test -z "$(/usr/bin/git -c core.hooksPath=/dev/null -c core.fsmonitor=false status --porcelain --untracked-files=all)"
+          /usr/bin/git -c core.hooksPath=/dev/null -c core.fsmonitor=false diff --check --no-ext-diff

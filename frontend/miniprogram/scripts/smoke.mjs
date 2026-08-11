@@ -64,6 +64,65 @@ assert.match(
   /voiceIntroEnabled:\s*clientVoiceIntroEnabled\(\)/,
   "companion onboarding must bind voiceIntroEnabled from clientVoiceIntroEnabled"
 );
+assert.match(
+  readFileSync(join(root, "pages/companion/services/index.wxml"), "utf8"),
+  /wx:if="\{\{item\.isActive\s*\|\|\s*item\.deliveryMode\s*===\s*'text'\s*\|\|\s*voiceDeliveryModeAvailable\}\}"[\s\S]*?bindtap="toggleOfferingActive"/,
+  "inactive legacy voice offerings must not render an activation control while voice SKUs are unavailable"
+);
+const orderDetailTemplate = readFileSync(join(root, "pages/order/detail.wxml"), "utf8");
+const orderDetailSource = readFileSync(join(root, "pages/order/detail.ts"), "utf8");
+const ordersTemplate = readFileSync(join(root, "pages/orders/index.wxml"), "utf8");
+const ordersSource = readFileSync(join(root, "pages/orders/index.ts"), "utf8");
+assert.match(
+  orderDetailTemplate,
+  /view\.canConfirmServiceOrder\s*&&\s*!view\.isTextOnlyHistoricalVoiceOrder[\s\S]*?确认接单[\s\S]*?view\.canStartService\s*&&\s*!view\.isTextOnlyHistoricalVoiceOrder[\s\S]*?开始服务/,
+  "text-only historical voice orders must not render confirm or start actions in order detail"
+);
+assert.match(
+  orderDetailTemplate,
+  /\(order\.status === 'pending' \|\| order\.status === 'paid'\)\s*&&\s*!view\.isTextOnlyHistoricalVoiceOrder[\s\S]*?改期协商/,
+  "text-only historical voice orders must not render the detail-page reschedule entry"
+);
+assert.match(
+  orderDetailSource,
+  /async confirmServiceOrder\(\)\s*\{[\s\S]*?isTextOnlyHistoricalVoiceOrder\(this\.data\.order\)[\s\S]*?return;/,
+  "order detail must block historical-voice confirmation before its API action"
+);
+assert.match(
+  orderDetailSource,
+  /async startService\(\)\s*\{[\s\S]*?isTextOnlyHistoricalVoiceOrder\(this\.data\.order\)[\s\S]*?return;/,
+  "order detail must block historical-voice start before its API action"
+);
+assert.match(
+  ordersTemplate,
+  /wx:if="\{\{item\.canAcceptReschedule\}\}"[\s\S]*?data-action="accept">接受改期[\s\S]*?data-action="reject">保持原预约/,
+  "historical voice orders must hide acceptance while preserving the rejection action"
+);
+assert.match(
+  ordersTemplate,
+  /item\.canInitiateReschedule\s*&&\s*!item\.pendingReschedule\s*&&\s*!item\.isTextOnlyHistoricalVoiceOrder[\s\S]*?item\.status === 'pending' && !item\.companionConfirmedAt && !item\.isTextOnlyHistoricalVoiceOrder[\s\S]*?确认预约/,
+  "text-only historical voice orders must hide list confirmation and proposal entry actions"
+);
+assert.match(
+  ordersTemplate,
+  /item\.status === 'paid' && item\.canStartService && !item\.isTextOnlyHistoricalVoiceOrder[\s\S]*?bindtap="startService"[\s\S]*?开始服务/,
+  "text-only historical voice orders must not render the list start action"
+);
+assert.match(
+  ordersSource,
+  /async startService\(event: any\)\s*\{[\s\S]*?isTextOnlyHistoricalVoiceOrder\(context\.order\)[\s\S]*?return;/,
+  "order list must block historical-voice start before its API action"
+);
+assert.match(
+  ordersSource,
+  /async submitReschedule\(event: any\)\s*\{[\s\S]*?isTextOnlyHistoricalVoiceOrder\(order\)[\s\S]*?return;/,
+  "order list must block historical-voice reschedule creation before its API action"
+);
+assert.match(
+  ordersSource,
+  /async respondReschedule\(event: any\)\s*\{[\s\S]*?accepting && isTextOnlyHistoricalVoiceOrder\(context\.order\)[\s\S]*?return;/,
+  "order list must block historical-voice acceptance before its API action"
+);
 
 assert.match(
   readFileSync(join(root, "sitemap.json"), "utf8"),
@@ -76,9 +135,31 @@ assert.match(
   "commercial release must default to text-only client scope"
 );
 assert.match(
+  readFileSync(join(root, "utils/config.ts"), "utf8"),
+  /function\s+isExplicitDevelopmentEnvironment\s*\([\s\S]*?envVersion\s*===\s*"develop"[\s\S]*?if\s*\(!isExplicitDevelopmentEnvironment\(\)\)\s*return\s*true/,
+  "trial, release, and unknown builds must not let a global override reopen dormant media or voice"
+);
+assert.match(
   readFileSync(join(root, "pages/chat/index.wxml"), "utf8"),
-  /wx:if="\{\{mediaEnabled\}\}"[\s\S]*图片[\s\S]*wx:if="\{\{mediaEnabled\}\}"[\s\S]*语音/,
-  "chat attachment entry points must remain gated behind mediaEnabled"
+  /wx:if="\{\{mediaEnabled\s*&&\s*!textOnly\}\}"[\s\S]*图片[\s\S]*wx:if="\{\{mediaEnabled\s*&&\s*!textOnly\}\}"[\s\S]*语音/,
+  "chat attachment entry points must remain gated behind mediaEnabled and text-only scope"
+);
+for (const relativePath of [
+  "pages/chat/index.wxml",
+  "pages/support/detail.wxml",
+  "pages/order/dispute.wxml",
+  "pages/companion/safety/index.wxml"
+]) {
+  assert.match(
+    readFileSync(join(root, relativePath), "utf8"),
+    /textOnly/,
+    `${relativePath} must have an explicit text-only presentation boundary`
+  );
+}
+assert.match(
+  readFileSync(join(root, "utils/controlled-evidence.ts"), "utf8"),
+  /assertControlledEvidenceEnabled\(\)/,
+  "controlled-evidence uploads and polling must fail closed before any file or network operation"
 );
 const adultEligibilityTemplate = readFileSync(join(root, "pages/account/adult-eligibility.wxml"), "utf8");
 assert.match(adultEligibilityTemplate, /不接收证件照片/);
@@ -233,7 +314,10 @@ const subscriptionGrants = [];
 const phoneCalls = [];
 let crisisIntervention = null;
 let cloudRunCall = null;
-let environmentVersion = "release";
+// The smoke covers dormant paths in develop. Experience and release paths are
+// asserted below and cannot be reopened by the override.
+let environmentVersion = "develop";
+let accountInfoThrows = false;
 let currentUserRole = "companion";
 const recommendationEvents = [];
 const excludedRecommendationCompanionIds = new Set();
@@ -588,13 +672,13 @@ const companionEarnings = [
     id: "earning-available-1", orderId: order.id, grossCents: 6900, platformFeeCents: 1100,
     payableCents: 5800, status: "available",
     availableAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-    holdReason: null, paidAt: null, settlementRecipientMasked: "微信支付（尾号 1234）"
+    hold: null, paidAt: null, settlementRecipientMasked: "微信支付（尾号 1234）"
   },
   {
     id: "earning-held-1", orderId: serviceOrder.id, grossCents: 4900, platformFeeCents: 1000,
     payableCents: 3900, status: "held",
     availableAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-    holdReason: "unresolved_support_ticket", paidAt: null, settlementRecipientMasked: "微信支付（尾号 1234）"
+    hold: { category: "serviceReview", status: "underReview", nextAction: "openServiceCase" }, paidAt: null, settlementRecipientMasked: "微信支付（尾号 1234）"
   }
 ];
 const lifecycleQuality = {
@@ -744,6 +828,7 @@ function messagePage(cursor) {
   return {
     messages: page,
     pagination: {
+      limit: 50,
       nextCursor: available.length > 50 ? page[0]?.id ?? null : null,
       hasMore: available.length > 50
     }
@@ -1910,7 +1995,7 @@ function responseFor(path, method, data, query = new URLSearchParams()) {
     };
   }
   if (path === `/conversations/${companion.id}/messages` && method === "GET") {
-    if (conversationBlockedByYou) return { messages: [], pagination: { nextCursor: null, hasMore: false } };
+    if (conversationBlockedByYou) return { messages: [], pagination: { limit: 50, nextCursor: null, hasMore: false } };
     return messagePage(query.get("cursor"));
   }
   if (path === `/conversations/${companion.id}/messages` && method === "POST") {
@@ -2316,7 +2401,10 @@ globalThis.wx = {
   getStorageSync: (key) => storage.get(key),
   setStorageSync: (key, value) => storage.set(key, value),
   removeStorageSync: (key) => storage.delete(key),
-  getAccountInfoSync: () => ({ miniProgram: { envVersion: environmentVersion } }),
+  getAccountInfoSync: () => {
+    if (accountInfoThrows) throw new Error("account info unavailable");
+    return { miniProgram: { envVersion: environmentVersion } };
+  },
   cloud: {
     init: () => undefined,
     callContainer: ({ path, method = "GET", data = {}, header, config, success, fail }) => {
@@ -3647,6 +3735,7 @@ serviceManager.toggleFormTopic({ currentTarget: { dataset: { id: "t2" } } });
 await serviceManager.saveEditor();
 const createdManagedOffering = managedServiceOfferings.find((item) => item.title === "60 分钟深度倾听");
 assert.ok(createdManagedOffering, "a companion should be able to create a service draft");
+assert.equal(createdManagedOffering.deliveryMode, "voice", "the explicit develop override must preserve dormant voice SKU creation");
 assert.equal(createdManagedOffering.priceCents, 6990);
 assert.equal(createdManagedOffering.isActive, false, "new service should stay a draft until explicitly published");
 assert.ok(calls.some((call) => call.path === "/companions/me/service-offerings" && call.method === "POST"));
@@ -3665,7 +3754,8 @@ await serviceManager.saveEditor();
 assert.equal(managedServiceOfferings.find((item) => item.id === createdManagedOffering.id).title, "60 分钟语音倾听");
 
 await serviceManager.toggleOfferingActive({ currentTarget: { dataset: { id: createdManagedOffering.id } } });
-assert.equal(managedServiceOfferings.find((item) => item.id === createdManagedOffering.id).isActive, true);
+assert.equal(managedServiceOfferings.find((item) => item.id === createdManagedOffering.id).isActive, true,
+  "the explicit develop override must preserve dormant voice SKU activation");
 await serviceManager.moveOffering({ currentTarget: { dataset: { id: createdManagedOffering.id, direction: "-1" } } });
 assert.equal(serviceManager.data.offerings[1].id, createdManagedOffering.id, "owner ordering should be reflected after reload");
 
@@ -4592,6 +4682,14 @@ assert.equal(profile.data.hasCompanionProfile, true);
 profile.openCompanionWorkbench();
 assert.ok(navigations.includes("/pages/companion/workbench/index"));
 assert.equal(profile.data.recommendationPreferences.personalizationEnabled, false);
+const recommendationWritesBeforeClosedOptIn = calls.filter((call) =>
+  call.path === "/recommendations/me/preferences" && call.method === "PATCH"
+).length;
+await profile.setPersonalization({ detail: { value: true } });
+assert.equal(profile.data.recommendationPreferences.personalizationEnabled, false, "closed personalization must stay false in client state");
+assert.equal(calls.filter((call) =>
+  call.path === "/recommendations/me/preferences" && call.method === "PATCH"
+).length, recommendationWritesBeforeClosedOptIn, "a stale UI event must not submit a true personalization request");
 profile.toggleRecommendationTopic({ currentTarget: { dataset: { id: "t2" } } });
 await profile.saveRecommendations();
 assert.ok(recommendationPreference.topicIds.includes("t2"));
@@ -4673,6 +4771,9 @@ const companionEarningsPage = await loadPage("companion/earnings/index");
 await companionEarningsPage.load();
 assert.equal(companionEarningsPage.data.availableTotalText, "¥58.00");
 assert.equal(companionEarningsPage.data.commercialStatus, "verified");
+const heldEarningCopy = companionEarningsPage.data.earnings.find((item) => item.id === "earning-held-1")?.holdText || "";
+assert.equal(heldEarningCopy, "服务事实复核中 · 可在案件中心查看或补充已有事项");
+assert.doesNotMatch(heldEarningCopy, /unresolved|support|provider|refund|reconciliation|settlement/i, "companion hold copy must never echo internal hold facts");
 companionEarningsPage.data.earnings[0].selected = true;
 companionEarningsPage.updateSelectedTotal();
 assert.deepEqual(companionEarningsPage.data.selectedIds, ["earning-available-1"]);
@@ -4695,6 +4796,195 @@ await companionSafetyPage.addFact();
 assert.equal(activeOrderTicket.orderFacts.length, orderFactsBeforeCompanionFollowUp + 1);
 assert.equal(companionSafetyPage.data.factTicketId, "", "a saved order fact must close the safety modal even while saving is true");
 
+const historicalVoiceOrderOriginal = structuredClone(serviceOrder);
+const historicalVoiceTimelineOriginal = structuredClone(serviceOrderTimeline.items);
+const historicalVoiceRequestOriginal = serviceRescheduleRequest;
+const historicalVoiceEnvironmentOriginal = environmentVersion;
+environmentVersion = "release";
+serviceOrder.status = "pending";
+serviceOrder.scheduledAt = new Date(Date.now() + 60 * 60_000).toISOString();
+serviceOrder.durationMinutes = 30;
+serviceOrder.serviceStartedAt = null;
+serviceOrder.companionConfirmedAt = null;
+serviceOrder.paymentReservationExpiresAt = null;
+serviceOrder.completedAt = null;
+serviceOrder.cancelledAt = null;
+serviceOrder.serviceOfferingSnapshot = {
+  ...serviceOrder.serviceOfferingSnapshot,
+  id: "service-voice-historical",
+  code: "voice-historical",
+  title: "历史语音陪伴",
+  deliveryMode: "voice",
+  durationMinutes: 30
+};
+serviceRescheduleRequest = {
+  id: "service-reschedule-text-only",
+  requestedByRole: "customer",
+  originalScheduledAt: serviceOrder.scheduledAt,
+  requestedScheduledAt: new Date(Date.parse(serviceOrder.scheduledAt) + 24 * 60 * 60_000).toISOString(),
+  requestedAvailabilitySnapshot: { availabilityWindowId: "window-text-only", startsAt: null, endsAt: null, capacity: 1 },
+  status: "pending",
+  expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
+  respondedAt: null
+};
+serviceOrderTimeline.items = [
+  { id: "service-order-text-only-created", type: "orderCreated", actorRole: "customer", occurredAt: serviceOrder.createdAt, rescheduleRequest: null },
+  { id: serviceRescheduleRequest.id, type: "rescheduleRequested", actorRole: "customer", occurredAt: new Date().toISOString(), rescheduleRequest: serviceRescheduleRequest }
+];
+const releaseVoiceDetail = {
+  ...companionDetail,
+  data: structuredClone(companionDetail.data),
+  setData(patch) { Object.assign(this.data, patch); }
+};
+releaseVoiceDetail.onLoad({ id: serviceOrder.id });
+await releaseVoiceDetail.load();
+assert.equal(releaseVoiceDetail.data.view.isTextOnlyHistoricalVoiceOrder, true,
+  "release must identify a retained voice order as text-only historical state");
+assert.equal(releaseVoiceDetail.data.view.canConfirmServiceOrder, false,
+  "release detail must hide confirmation for a historical voice order");
+assert.equal(releaseVoiceDetail.data.view.canRejectServiceOrder, true,
+  "release detail must keep the companion's rejection path for a historical voice order");
+assert.equal(releaseVoiceDetail.data.timelineState, "available",
+  "release detail must preserve historical voice-order reads");
+const historicalVoiceWrites = () => calls.filter((call) => call.method === "POST" && [
+  `/orders/service/${serviceOrder.id}/confirm`,
+  `/orders/service/${serviceOrder.id}/start`,
+  `/orders/service/${serviceOrder.id}/complete`,
+  `/orders/${serviceOrder.id}/reschedule-requests`,
+  `/orders/${serviceOrder.id}/reschedule-requests/${serviceRescheduleRequest?.id}/accept`,
+  `/orders/${serviceOrder.id}/reschedule-requests/${serviceRescheduleRequest?.id}/reject`
+].includes(call.path)).length;
+modalConfirm = true;
+const detailWritesBeforeConfirmation = historicalVoiceWrites();
+const detailModalsBeforeConfirmation = modalInvocations.length;
+await releaseVoiceDetail.confirmServiceOrder();
+assert.equal(historicalVoiceWrites(), detailWritesBeforeConfirmation,
+  "release detail must block historical voice confirmation before any write");
+assert.equal(modalInvocations.length, detailModalsBeforeConfirmation,
+  "release detail must block historical voice confirmation before opening a confirmation dialog");
+
+serviceOrder.status = "paid";
+serviceOrder.companionConfirmedAt = new Date().toISOString();
+serviceOrder.scheduledAt = new Date(Date.now() + 5 * 60_000).toISOString();
+await releaseVoiceDetail.load();
+assert.equal(releaseVoiceDetail.data.view.canStartService, false,
+  "release detail must hide start for a paid historical voice order");
+const detailWritesBeforeStart = historicalVoiceWrites();
+await releaseVoiceDetail.startService();
+assert.equal(historicalVoiceWrites(), detailWritesBeforeStart,
+  "release detail must block historical voice start before any write");
+
+serviceOrder.status = "inService";
+serviceOrder.scheduledAt = new Date(Date.now() - 40 * 60_000).toISOString();
+serviceOrder.serviceStartedAt = serviceOrder.scheduledAt;
+await releaseVoiceDetail.load();
+assert.equal(releaseVoiceDetail.data.view.canCompleteService, true,
+  "text-only handling must not change an already in-service order's completion semantics");
+const detailWritesBeforeCompletion = historicalVoiceWrites();
+await releaseVoiceDetail.completeService();
+assert.equal(historicalVoiceWrites(), detailWritesBeforeCompletion + 1,
+  "text-only handling must preserve completion for an already in-service historical voice order");
+assert.equal(serviceOrder.status, "completed");
+
+serviceOrder.status = "pending";
+serviceOrder.scheduledAt = new Date(Date.now() + 60 * 60_000).toISOString();
+serviceOrder.serviceStartedAt = null;
+serviceOrder.companionConfirmedAt = null;
+serviceOrder.paymentReservationExpiresAt = null;
+serviceOrder.completedAt = null;
+serviceRescheduleRequest = {
+  ...serviceRescheduleRequest,
+  status: "pending",
+  originalScheduledAt: serviceOrder.scheduledAt,
+  requestedScheduledAt: new Date(Date.parse(serviceOrder.scheduledAt) + 24 * 60 * 60_000).toISOString(),
+  respondedAt: null
+};
+serviceOrderTimeline.items = [
+  { id: "service-order-text-only-reopened", type: "orderCreated", actorRole: "customer", occurredAt: serviceOrder.createdAt, rescheduleRequest: null },
+  { id: serviceRescheduleRequest.id, type: "rescheduleRequested", actorRole: "customer", occurredAt: new Date().toISOString(), rescheduleRequest: serviceRescheduleRequest }
+];
+const releaseVoiceOrders = {
+  ...orders,
+  data: structuredClone(orders.data),
+  setData(patch) { Object.assign(this.data, patch); }
+};
+await releaseVoiceOrders.load();
+assert.equal(releaseVoiceOrders.data.serviceOrders[0].isTextOnlyHistoricalVoiceOrder, true);
+assert.equal(releaseVoiceOrders.data.serviceOrders[0].canInitiateReschedule, false,
+  "release order list must hide historical voice proposal entry");
+const historicalVoiceTimelineReadsBefore = calls.filter((call) =>
+  call.path === `/orders/${serviceOrder.id}/timeline` && call.method === "GET"
+).length;
+await releaseVoiceOrders.toggleTimeline({ currentTarget: { dataset: { id: serviceOrder.id } } });
+assert.equal(calls.filter((call) =>
+  call.path === `/orders/${serviceOrder.id}/timeline` && call.method === "GET"
+).length, historicalVoiceTimelineReadsBefore + 1,
+"release order list must preserve timeline reads for a historical voice order");
+assert.equal(releaseVoiceOrders.data.serviceOrders[0].canRespondToReschedule, true,
+  "release order list must preserve the pending proposal's rejection route");
+assert.equal(releaseVoiceOrders.data.serviceOrders[0].canAcceptReschedule, false,
+  "release order list must hide acceptance for a historical voice proposal");
+const listWritesBeforeConfirmation = historicalVoiceWrites();
+const listModalsBeforeConfirmation = modalInvocations.length;
+await releaseVoiceOrders.confirmServiceOrder({ currentTarget: { dataset: { id: serviceOrder.id } } });
+assert.equal(historicalVoiceWrites(), listWritesBeforeConfirmation,
+  "release order list must block historical voice confirmation before any write");
+assert.equal(modalInvocations.length, listModalsBeforeConfirmation,
+  "release order list must block historical voice confirmation before opening a dialog");
+const historicalVoiceCandidateStart = Math.ceil((Date.now() + 2 * 60 * 60_000) / (30 * 60_000)) * (30 * 60_000);
+const historicalVoiceCandidate = {
+  id: "historical-voice-slot",
+  availabilityWindowId: "window-historical-voice",
+  startsAt: new Date(historicalVoiceCandidateStart).toISOString(),
+  endsAt: new Date(historicalVoiceCandidateStart + 30 * 60_000).toISOString(),
+  capacity: 1,
+  reservedCount: 0,
+  availableCapacity: 1,
+  dateKey: "2030-01-01",
+  dateLabel: "1月1日 周二",
+  timeLabel: "10:00",
+  endTimeLabel: "10:30"
+};
+releaseVoiceOrders.patchOrder(serviceOrder.id, {
+  rescheduleOpen: true,
+  rescheduleState: "structured",
+  selectedRescheduleCandidate: historicalVoiceCandidate,
+  selectedRescheduleCandidateId: historicalVoiceCandidate.id,
+  rescheduleDateGroups: [{ key: historicalVoiceCandidate.dateKey, label: historicalVoiceCandidate.dateLabel, items: [historicalVoiceCandidate] }],
+  rescheduleSubmitEnabled: true
+});
+const listWritesBeforeProposal = historicalVoiceWrites();
+await releaseVoiceOrders.submitReschedule({ currentTarget: { dataset: { id: serviceOrder.id } } });
+assert.equal(historicalVoiceWrites(), listWritesBeforeProposal,
+  "release order list must block historical voice proposal creation before any write");
+const listWritesBeforeAcceptance = historicalVoiceWrites();
+const listModalsBeforeAcceptance = modalInvocations.length;
+await releaseVoiceOrders.respondReschedule({ currentTarget: { dataset: { id: serviceOrder.id, action: "accept" } } });
+assert.equal(historicalVoiceWrites(), listWritesBeforeAcceptance,
+  "release order list must block historical voice proposal acceptance before any write");
+assert.equal(modalInvocations.length, listModalsBeforeAcceptance,
+  "release order list must block historical voice acceptance before opening a dialog");
+const listWritesBeforeRejection = historicalVoiceWrites();
+await releaseVoiceOrders.respondReschedule({ currentTarget: { dataset: { id: serviceOrder.id, action: "reject" } } });
+assert.equal(historicalVoiceWrites(), listWritesBeforeRejection + 1,
+  "release order list must preserve historical voice proposal rejection and closure");
+assert.equal(serviceRescheduleRequest.status, "rejected");
+serviceOrder.status = "paid";
+serviceOrder.companionConfirmedAt = new Date().toISOString();
+serviceOrder.scheduledAt = new Date(Date.now() + 5 * 60_000).toISOString();
+await releaseVoiceOrders.load();
+assert.equal(releaseVoiceOrders.data.serviceOrders[0].canStartService, false,
+  "release order list must hide start for a paid historical voice order");
+const listWritesBeforeStart = historicalVoiceWrites();
+await releaseVoiceOrders.startService({ currentTarget: { dataset: { id: serviceOrder.id } } });
+assert.equal(historicalVoiceWrites(), listWritesBeforeStart,
+  "release order list must block historical voice start before any write");
+
+Object.assign(serviceOrder, historicalVoiceOrderOriginal);
+serviceOrderTimeline.items = historicalVoiceTimelineOriginal;
+serviceRescheduleRequest = historicalVoiceRequestOriginal;
+environmentVersion = historicalVoiceEnvironmentOriginal;
+
 modalConfirm = true;
 await profile.requestDeletion();
 assert.ok(calls.some((call) => call.path === "/me/deletion-request"));
@@ -4714,17 +5004,140 @@ assert.ok(navigations.includes("/pages/consent/index"));
 
 const apiModule = await import(`${pathToFileURL(join(output, "utils/api.js")).href}`);
 const configModule = await import(`${pathToFileURL(join(output, "utils/config.js")).href}`);
+const controlledEvidenceModule = await import(`${pathToFileURL(join(output, "utils/controlled-evidence.js")).href}`);
 assert.equal(configModule.isCommercialTextOnly(), false, "smoke enables the dormant voice/media capability path");
 delete globalThis.__TALK_AND_TALK_COMMERCIAL_TEXT_ONLY__;
-assert.equal(configModule.isCommercialTextOnly(), true, "shipping default must fail closed to text-only");
+assert.equal(configModule.isCommercialTextOnly(), true, "develop must still default to text-only without an explicit test override");
+globalThis.__TALK_AND_TALK_COMMERCIAL_TEXT_ONLY__ = false;
+environmentVersion = "trial";
+assert.equal(configModule.isCommercialTextOnly(), true, "trial must fail closed even when a global override requests media");
+assert.equal(configModule.backendConfig().baseUrl, "https://api-staging.talkandtalk.app/api/v1");
+environmentVersion = "unknown";
+assert.equal(configModule.isCommercialTextOnly(), true, "an unrecognized Mini Program environment must fail closed even when an override requests media");
+accountInfoThrows = true;
+assert.equal(configModule.isCommercialTextOnly(), true, "missing Mini Program environment information must fail closed even when an override requests media");
+accountInfoThrows = false;
+environmentVersion = "release";
+assert.equal(configModule.isCommercialTextOnly(), true, "release must fail closed even when a global override requests media");
 assert.equal(configModule.clientChatMediaEnabled(true), false, "text-only scope must hide chat attachments even if the server flag is true");
 assert.equal(configModule.clientRealtimeVoiceEnabled(), false, "text-only scope must hide realtime voice entry points");
 assert.equal(configModule.clientVoiceIntroEnabled(), false, "text-only scope must hide voice intro entry points");
 assert.equal(configModule.clientVoiceSkuEnabled(), false, "text-only scope must hide voice SKU activation");
-globalThis.__TALK_AND_TALK_COMMERCIAL_TEXT_ONLY__ = false;
 assert.equal(configModule.backendConfig().baseUrl, "https://api.talkandtalk.app/api/v1");
-environmentVersion = "trial";
-assert.equal(configModule.backendConfig().baseUrl, "https://api-staging.talkandtalk.app/api/v1");
+const releaseServiceManager = {
+  ...serviceManager,
+  data: structuredClone(serviceManager.data),
+  setData(patch) { Object.assign(this.data, patch); }
+};
+releaseServiceManager.setData({ voiceDeliveryModeAvailable: configModule.clientVoiceSkuEnabled() });
+assert.equal(releaseServiceManager.data.voiceDeliveryModeAvailable, false,
+  "a release service manager must not expose dormant voice SKU activation");
+const legacyVoiceOffering = releaseServiceManager.data.offerings.find((item) => item.id === "owned-service-voice");
+assert.equal(legacyVoiceOffering?.isActive, false, "the smoke fixture must retain an inactive historical voice offering");
+const voiceActivationCallsBefore = calls.filter((call) =>
+  call.path === "/companions/me/service-offerings/owned-service-voice" && call.method === "PATCH"
+).length;
+const voiceActivationModalsBefore = modalInvocations.length;
+await releaseServiceManager.toggleOfferingActive({ currentTarget: { dataset: { id: "owned-service-voice" } } });
+assert.equal(managedServiceOfferings.find((item) => item.id === "owned-service-voice")?.isActive, false,
+  "release text-only must retain a historical voice offering as inactive");
+assert.equal(calls.filter((call) =>
+  call.path === "/companions/me/service-offerings/owned-service-voice" && call.method === "PATCH"
+).length, voiceActivationCallsBefore,
+"release text-only must not send a historical voice activation request");
+assert.equal(modalInvocations.length, voiceActivationModalsBefore,
+  "release text-only must reject historical voice activation before confirmation");
+assert.match(toasts.at(-1).title, /历史语音服务不能上架/);
+assert.equal(controlledEvidenceModule.controlledEvidenceEnabled(), false, "release must disable controlled evidence helpers");
+assert.deepEqual(
+  controlledEvidenceModule.approvedControlledEvidenceIds([{ assetId: "asset-1", status: "approved" }]),
+  [],
+  "release must not bind stale controlled-evidence ids to a text statement"
+);
+assert.equal(
+  await controlledEvidenceModule.chooseEvidenceImage(),
+  null,
+  "release must not open the image chooser for controlled evidence"
+);
+await assert.rejects(
+  () => controlledEvidenceModule.uploadControlledEvidence(
+    { kind: "image", path: "/not-used-in-text-only", mimeType: "image/jpeg" },
+    async () => { throw new Error("must not reserve evidence in text-only release"); }
+  ),
+  /仅支持文字陈述/,
+  "release must reject controlled-evidence uploads before local-file or network operations"
+);
+await assert.rejects(
+  () => controlledEvidenceModule.pollControlledEvidence({
+    assetId: "asset-1",
+    kind: "image",
+    status: "approved",
+    mimeType: "image/jpeg",
+    sizeBytes: 1,
+    durationMs: null,
+    statusText: "可随陈述提交"
+  }),
+  /仅支持文字陈述/,
+  "release must reject controlled-evidence polling before any evidence-status read"
+);
+const releaseEvidenceCallsBefore = calls.length;
+const releaseChat = {
+  ...chat,
+  data: structuredClone(chat.data),
+  setData(patch) { Object.assign(this.data, patch); }
+};
+releaseChat.conversationId = companion.id;
+releaseChat.setData({ mediaEnabled: true, textOnly: configModule.isCommercialTextOnly() });
+assert.equal(releaseChat.data.textOnly, true, "release chat state must render in text-only mode");
+releaseChat.chooseImage();
+await releaseChat.toggleRecord();
+await releaseChat.sendMedia({ kind: "image", path: "/not-used-in-text-only", mimeType: "image/jpeg" });
+releaseChat.previewImage({ currentTarget: { dataset: { url: "https://media.talkandtalk.test/blocked.jpg" } } });
+releaseChat.playAudio({ currentTarget: { dataset: { url: "https://media.talkandtalk.test/blocked.mp3" } } });
+releaseChat.handleSendResult({
+  message: {
+    id: "release-media-message",
+    conversationId: companion.id,
+    content: "历史文字",
+    senderId: companion.id,
+    type: "image",
+    timestamp: new Date().toISOString(),
+    attachments: [{ id: "asset-1", kind: "image", status: "approved", mimeType: "image/jpeg", sizeBytes: 1, url: "https://media.talkandtalk.test/blocked.jpg" }]
+  },
+  safetyMessage: null,
+  moderation: { deliveryStatus: "published", appealEligible: false, caseId: null }
+});
+assert.deepEqual(
+  releaseChat.data.messages.find((item) => item.id === "release-media-message")?.attachments,
+  [],
+  "release chat must remove historic media attachments before rendering"
+);
+const releaseSupportDetail = {
+  ...supportCaseDetail,
+  data: structuredClone(supportCaseDetail.data),
+  setData(patch) { Object.assign(this.data, patch); }
+};
+await releaseSupportDetail.addEvidenceImage();
+await releaseSupportDetail.openBoundEvidence({ currentTarget: { dataset: { id: "asset-1" } } });
+const releaseDispute = {
+  ...disputeDetail,
+  data: structuredClone(disputeDetail.data),
+  setData(patch) { Object.assign(this.data, patch); }
+};
+await releaseDispute.addEvidenceAudio();
+await releaseDispute.openBoundEvidence({ currentTarget: { dataset: { id: "asset-1" } } });
+const releaseCompanionSafety = {
+  ...companionSafetyPage,
+  data: structuredClone(companionSafetyPage.data),
+  setData(patch) { Object.assign(this.data, patch); }
+};
+await releaseCompanionSafety.addIncidentEvidenceImage();
+await releaseCompanionSafety.openBoundEvidence({ currentTarget: { dataset: { id: "asset-1" } } });
+assert.equal(
+  calls.length,
+  releaseEvidenceCallsBefore,
+  "release text-only handlers must not reserve, upload, poll, or read media/evidence through the backend"
+);
 assert.equal(typeof apiModule.installNetworkRecovery, "function", "weak-network recovery must be exportable for App.onLaunch");
 const cloudResponse = await apiModule.dispatchBackendRequest(
   { transport: "cloudRun", envId: "smoke-env", service: "talk-and-talk-api", apiPrefix: "/api/v1" },

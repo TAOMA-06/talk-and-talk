@@ -198,7 +198,11 @@ export type CompanionEarning = {
   payableCents: number;
   status: "pending" | "available" | "held" | "paid" | "void";
   availableAt: string;
-  holdReason: string | null;
+  hold: {
+    category: "afterSalesReview" | "serviceReview" | "eligibilityReview" | "paymentProcessing" | "accountReview";
+    status: "underReview" | "actionRequired" | "verificationPending";
+    nextAction: "waitForReview" | "openServiceCase" | "updateEligibility" | "contactSupport";
+  } | null;
   paidAt: string | null;
   settlementRecipientMasked: string | null;
 };

@@ -1190,7 +1190,7 @@ export const api = {
       typeof options.limit === "number" ? `limit=${encodeURIComponent(String(options.limit))}` : ""
     ].filter(Boolean).join("&");
     const suffix = query ? `?${query}` : "";
-    return request<{ messages: ChatMessage[]; pagination: { nextCursor?: string | null; hasMore: boolean } }>(
+    return request<{ messages: ChatMessage[]; pagination: { limit: number; nextCursor: string | null; hasMore: boolean } }>(
       `/conversations/${encodeURIComponent(id)}/messages${suffix}`
     );
   },

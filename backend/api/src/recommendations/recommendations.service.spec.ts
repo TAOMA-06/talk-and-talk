@@ -1,4 +1,7 @@
-import { MAX_BEHAVIOR_ORDER_FACTS, RecommendationsService } from "./recommendations.service";
+import {
+  RecommendationsService,
+  isRecommendationPersonalizationRankingAllowed
+} from "./recommendations.service";
 
 const companion = {
   id: "c1",
@@ -81,12 +84,12 @@ describe("RecommendationsService", () => {
     service = new RecommendationsService(prisma, companions);
   });
 
-  it("persists a ranked request snapshot and returns an opaque impression id", async () => {
+  it("persists a non-personalized ranked request despite a raw environment opt-in", async () => {
     process.env.RECOMMENDATION_PERSONALIZATION_ENABLED = "true";
     const request = {
       id: "request-1",
       algorithmVersion: "companion-ranking-v1",
-      personalized: true,
+      personalized: false,
       context: { themeId: "t1" },
       expiresAt: new Date(Date.now() + 60_000)
     };
@@ -149,15 +152,13 @@ describe("RecommendationsService", () => {
       })
     }));
     expect(prisma.recommendationRequest.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ userId: "u1", placement: "discoverHome", personalized: true })
+      data: expect.objectContaining({ userId: "u1", placement: "discoverHome", personalized: false })
     }));
     expect(prisma.recommendationImpression.createMany).toHaveBeenCalledWith(expect.objectContaining({
       data: [expect.objectContaining({ requestId: "request-1", companionId: "c1", position: 1 })]
     }));
-    expect(prisma.order.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-      take: MAX_BEHAVIOR_ORDER_FACTS
-    }));
+    expect(prisma.userRecommendationTag.findMany).not.toHaveBeenCalled();
+    expect(prisma.order.findMany).not.toHaveBeenCalled();
     expect(result.items[0]).toEqual(expect.objectContaining({
       id: "c1",
       impressionId: "00000000-0000-4000-8000-000000000001",
@@ -169,18 +170,15 @@ describe("RecommendationsService", () => {
     }));
   });
 
-  it("bounds recent order behavior facts to the newest stable one thousand records", async () => {
+  it("does not read behavioral tags or order history while governance is closed", async () => {
     prisma.userRecommendationPreference.findUnique.mockResolvedValue(null);
     prisma.userRecommendationTag.findMany.mockResolvedValue([]);
     prisma.order.findMany.mockResolvedValue([]);
 
     await service.getPreferences("u1");
 
-    expect(prisma.order.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({ userId: "u1", createdAt: { gte: expect.any(Date) } }),
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-      take: MAX_BEHAVIOR_ORDER_FACTS
-    }));
+    expect(prisma.userRecommendationTag.findMany).not.toHaveBeenCalled();
+    expect(prisma.order.findMany).not.toHaveBeenCalled();
   });
 
   it("aggregates large exposure volumes in the database without materializing impression rows", async () => {
@@ -230,6 +228,7 @@ describe("RecommendationsService", () => {
   });
 
   it("ignores stored personalization opt-in while ranking governance is closed", async () => {
+    process.env.RECOMMENDATION_PERSONALIZATION_ENABLED = "true";
     prisma.userRecommendationPreference.findUnique.mockResolvedValue({
       personalizationEnabled: true,
       topicIds: ["t1"],
@@ -253,6 +252,14 @@ describe("RecommendationsService", () => {
     await expect(service.listCompanions("u1", { pageSize: 10 })).resolves.toEqual(
       expect.objectContaining({ personalized: false })
     );
+    expect(prisma.userRecommendationTag.findMany).not.toHaveBeenCalled();
+    expect(prisma.order.findMany).not.toHaveBeenCalled();
+  });
+
+  it("does not treat a raw process environment flag as personalization authority", () => {
+    expect(isRecommendationPersonalizationRankingAllowed({
+      RECOMMENDATION_PERSONALIZATION_ENABLED: "true"
+    } as NodeJS.ProcessEnv)).toBe(false);
   });
 
   it("defaults personalization off when preference is missing and keeps create opt-in only", async () => {
@@ -285,7 +292,40 @@ describe("RecommendationsService", () => {
 
     expect(prisma.userRecommendationPreference.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
-        create: expect.objectContaining({ personalizationEnabled: false })
+        create: expect.objectContaining({ personalizationEnabled: false }),
+        update: expect.objectContaining({ personalizationEnabled: false })
+      })
+    );
+  });
+
+  it("rejects a new personalization opt-in before any preference write", async () => {
+    await expect(service.updatePreferences("u1", {
+      personalizationEnabled: true,
+      topicIds: ["t1"]
+    })).rejects.toMatchObject({
+      code: "RECOMMENDATION_PERSONALIZATION_CLOSED",
+      status: 409
+    });
+    expect(prisma.userRecommendationPreference.upsert).not.toHaveBeenCalled();
+  });
+
+  it("resets a historical true preference while saving ordinary manual filters", async () => {
+    prisma.userRecommendationPreference.findUnique.mockResolvedValue({
+      personalizationEnabled: true,
+      topicIds: ["t1"],
+      city: "上海",
+      maxPricePerHalfHour: null,
+      preferredTimeSlots: []
+    });
+    prisma.userRecommendationTag.findMany.mockResolvedValue([]);
+    prisma.order.findMany.mockResolvedValue([]);
+
+    await service.updatePreferences("u1", { city: "上海" });
+
+    expect(prisma.userRecommendationPreference.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ personalizationEnabled: false }),
+        update: expect.objectContaining({ personalizationEnabled: false, city: "上海" })
       })
     );
   });
@@ -537,7 +577,7 @@ describe("RecommendationsService", () => {
     }));
   });
 
-  it("records a first click once and builds behavioral topics without using message content", async () => {
+  it("records a first click without creating behavioral topics when a raw environment flag is true", async () => {
     process.env.RECOMMENDATION_PERSONALIZATION_ENABLED = "true";
     prisma.userRecommendationPreference.findUnique.mockResolvedValue({ personalizationEnabled: true });
     prisma.recommendationImpression.findMany.mockResolvedValue([{
@@ -557,9 +597,7 @@ describe("RecommendationsService", () => {
     expect(prisma.recommendationImpression.updateMany).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: "00000000-0000-4000-8000-000000000001", clickedAt: null }
     }));
-    expect(prisma.userRecommendationTag.upsert).toHaveBeenCalledWith(expect.objectContaining({
-      create: expect.objectContaining({ userId: "u1", topicId: "t1", weight: 1 })
-    }));
+    expect(prisma.userRecommendationTag.upsert).not.toHaveBeenCalled();
   });
 
   it("turns inferred-tag deletion into a durable disabled-topic marker", async () => {

@@ -1073,6 +1073,75 @@ describe("CompanionsService", () => {
     }));
   });
 
+  it("rejects reactivating a legacy voice offering while text-only, but still permits retiring it", async () => {
+    const textOnlyConfig = {
+      get: jest.fn((key: string, fallback?: unknown) => {
+        if (key === "COMMERCIAL_SURFACE") return "text_only";
+        if (key === "TRTC_ENABLED") return false;
+        return fallback;
+      })
+    } as any;
+    const textOnlyService = new CompanionsService(
+      prisma,
+      moderation,
+      moderationCases,
+      availabilityReminderCandidates,
+      availabilityScheduleRules,
+      textOnlyConfig
+    );
+    const legacyVoiceOffering = {
+      ...serviceOfferingRecord,
+      deliveryMode: "voice" as const,
+      isActive: false
+    };
+    prisma.companionProfile.findUnique.mockResolvedValue(eligibleOwnCompanion as any);
+    prisma.companionServiceOffering.findFirst.mockResolvedValue(legacyVoiceOffering as any);
+
+    await expect(textOnlyService.updateOwnServiceOffering("owner-1", "offer-1", { isActive: true }))
+      .rejects.toMatchObject({
+        code: "COMMERCIAL_SURFACE_TEXT_ONLY",
+        status: 422
+      });
+    expect(prisma.companionServiceOffering.update).not.toHaveBeenCalled();
+
+    prisma.companionServiceOffering.findFirst.mockResolvedValue({
+      ...legacyVoiceOffering,
+      isActive: true
+    } as any);
+    prisma.companionServiceOffering.update.mockResolvedValue({
+      ...legacyVoiceOffering,
+      isActive: false
+    } as any);
+
+    await expect(textOnlyService.updateOwnServiceOffering("owner-1", "offer-1", { isActive: false }))
+      .resolves.toEqual(expect.objectContaining({ deliveryMode: "voice", isActive: false }));
+    expect(prisma.companionServiceOffering.update).toHaveBeenLastCalledWith({
+      where: { id: "offer-1" },
+      data: { isActive: false }
+    });
+  });
+
+  it("keeps legacy voice reactivation available when voice booking is explicitly enabled", async () => {
+    const legacyVoiceOffering = {
+      ...serviceOfferingRecord,
+      deliveryMode: "voice" as const,
+      isActive: false
+    };
+    prisma.companionProfile.findUnique.mockResolvedValue(eligibleOwnCompanion as any);
+    prisma.companionServiceOffering.findFirst.mockResolvedValue(legacyVoiceOffering as any);
+    prisma.companionServiceOffering.update.mockResolvedValue({
+      ...legacyVoiceOffering,
+      isActive: true
+    } as any);
+
+    await expect(service.updateOwnServiceOffering("owner-1", "offer-1", { isActive: true }))
+      .resolves.toEqual(expect.objectContaining({ deliveryMode: "voice", isActive: true }));
+    expect(prisma.companionServiceOffering.update).toHaveBeenCalledWith({
+      where: { id: "offer-1" },
+      data: { isActive: true }
+    });
+  });
+
   it("does not reveal or update another companion's service offering", async () => {
     prisma.companionProfile.findUnique.mockResolvedValue(eligibleOwnCompanion as any);
     prisma.companionServiceOffering.findFirst.mockResolvedValue(null);

@@ -168,6 +168,11 @@ export type CommercialReadinessResult = {
   staleInServiceSampleTruncated: boolean;
 };
 const EARNING_STATUSES = ["pending", "available", "held", "paid", "void"] as const;
+export type CompanionEarningHoldProjection = {
+  category: "afterSalesReview" | "serviceReview" | "eligibilityReview" | "paymentProcessing" | "accountReview";
+  status: "underReview" | "actionRequired" | "verificationPending";
+  nextAction: "waitForReview" | "openServiceCase" | "updateEligibility" | "contactSupport";
+};
 const ACTIVE_REFUND_STATUSES = ["pendingReview", "pending", "processing", "failed"] as const;
 const STALE_IN_SERVICE_SAMPLE_LIMIT = 100;
 const ACCOUNT_DELETION_EXECUTION_BACKLOG_SLA_MS = 5 * 60_000;
@@ -176,6 +181,39 @@ const REQUIRED_COMPANION_TRAINING = [
   { moduleCode: "safety-escalation", moduleVersion: "2026.1" },
   { moduleCode: "privacy-refresh", moduleVersion: "2026.1" }
 ] as const;
+
+export function companionEarningHoldProjection(
+  holdReason: string | null | undefined
+): CompanionEarningHoldProjection | null {
+  if (!holdReason) return null;
+  if (["payout_execution_claimed", "payout_verification_pending"].includes(holdReason)) {
+    return { category: "paymentProcessing", status: "verificationPending", nextAction: "waitForReview" };
+  }
+  if ([
+    "payment_dispute_live",
+    "payment_dispute_transfer_outcome_unknown",
+    "payment_dispute_provider_outcome_unknown",
+    "refund_in_progress",
+    "refund_attention_required",
+    "refund_window_open",
+    "refund_policy_snapshot_missing"
+  ].includes(holdReason)) {
+    return { category: "afterSalesReview", status: "underReview", nextAction: "waitForReview" };
+  }
+  if (["attendance_dispute", "unresolved_support_ticket"].includes(holdReason)) {
+    return { category: "serviceReview", status: "underReview", nextAction: "openServiceCase" };
+  }
+  if ([
+    "commercial_profile_snapshot_missing",
+    "commercial_profile_not_verified",
+    "companion_adult_eligibility_not_current"
+  ].includes(holdReason)) {
+    return { category: "eligibilityReview", status: "actionRequired", nextAction: "updateEligibility" };
+  }
+  // `companion_recovery_due` and any future internal reason stay generic until
+  // a separately approved root-cause appeal policy exists. Never echo raw codes.
+  return { category: "accountReview", status: "underReview", nextAction: "contactSupport" };
+}
 
 @Injectable()
 export class CommercialService {
@@ -2219,7 +2257,9 @@ export class CommercialService {
       status: earning.status,
       availableAt: earning.availableAt.toISOString(),
       paidAt: earning.paidAt?.toISOString() ?? null,
-      holdReason: earning.holdReason ?? null,
+      ...(includeOperations
+        ? { holdReason: earning.holdReason ?? null }
+        : { hold: companionEarningHoldProjection(earning.holdReason) }),
       createdAt: earning.createdAt.toISOString(),
       updatedAt: earning.updatedAt.toISOString(),
       order: earning.order ? {

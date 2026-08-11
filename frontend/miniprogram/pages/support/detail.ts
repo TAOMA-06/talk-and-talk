@@ -5,12 +5,14 @@ import {
   approvedControlledEvidenceIds,
   chooseEvidenceAudio,
   chooseEvidenceImage,
+  controlledEvidenceEnabled,
   ControlledEvidenceDraft,
   loadControlledEvidenceDrafts,
   LocalEvidenceFile,
   refreshControlledEvidenceDrafts,
   saveControlledEvidenceDrafts,
-  uploadControlledEvidence
+  uploadControlledEvidence,
+  TEXT_ONLY_EVIDENCE_MESSAGE
 } from "../../utils/controlled-evidence";
 
 const SENSITIVE_CONTENT = /(?:\b\d{15}\b|\b\d{17}[\dXx]\b|1[3-9]\d{9}|身份证|护照|银行卡|病历|诊断|微信号|手机号)/;
@@ -43,6 +45,7 @@ Page({
     followUp: "",
     submitting: false,
     canAdd: false,
+    textOnly: !controlledEvidenceEnabled(),
     evidenceDrafts: [] as ControlledEvidenceDraft[],
     evidenceUploading: false
   },
@@ -77,13 +80,18 @@ Page({
         return;
       }
       const ticket = await api.supportTicket(this.itemId);
-      const storedDrafts = loadControlledEvidenceDrafts(this.evidenceStorageKey());
+      const evidenceEnabled = controlledEvidenceEnabled();
+      const storedDrafts = evidenceEnabled ? loadControlledEvidenceDrafts(this.evidenceStorageKey()) : [];
       const evidenceDrafts = storedDrafts.length
         ? await refreshControlledEvidenceDrafts(storedDrafts)
         : [];
       saveControlledEvidenceDrafts(this.evidenceStorageKey(), evidenceDrafts);
+      const displayTicket = evidenceEnabled ? ticket : {
+        ...ticket,
+        orderFacts: (ticket.orderFacts || []).map((fact) => ({ ...fact, evidenceAttachments: [] }))
+      };
       this.setData({
-        ticket,
+        ticket: displayTicket,
         safetyCase: null,
         statusText: SUPPORT_STATUS[ticket.status] || "状态更新中",
         createdText: formatShanghaiDateTime(ticket.updatedAt),
@@ -147,14 +155,26 @@ Page({
     }
   },
   async addEvidenceImage() {
+    if (!controlledEvidenceEnabled()) {
+      wx.showToast({ title: TEXT_ONLY_EVIDENCE_MESSAGE, icon: "none" });
+      return;
+    }
     const file = await chooseEvidenceImage();
     if (file) await this.uploadEvidence(file);
   },
   async addEvidenceAudio() {
+    if (!controlledEvidenceEnabled()) {
+      wx.showToast({ title: TEXT_ONLY_EVIDENCE_MESSAGE, icon: "none" });
+      return;
+    }
     const file = await chooseEvidenceAudio();
     if (file) await this.uploadEvidence(file);
   },
   async uploadEvidence(file: LocalEvidenceFile) {
+    if (!controlledEvidenceEnabled()) {
+      wx.showToast({ title: TEXT_ONLY_EVIDENCE_MESSAGE, icon: "none" });
+      return;
+    }
     if (this.data.kind !== "support" || this.data.evidenceUploading || this.data.evidenceDrafts.length >= 3) return;
     this.setData({ evidenceUploading: true });
     try {
@@ -180,17 +200,30 @@ Page({
     }
   },
   async refreshEvidence() {
+    if (!controlledEvidenceEnabled()) {
+      this.setData({ evidenceDrafts: [] });
+      wx.showToast({ title: TEXT_ONLY_EVIDENCE_MESSAGE, icon: "none" });
+      return;
+    }
     const evidenceDrafts = await refreshControlledEvidenceDrafts(this.data.evidenceDrafts);
     saveControlledEvidenceDrafts(this.evidenceStorageKey(), evidenceDrafts);
     this.setData({ evidenceDrafts });
   },
   removeEvidence(event: any) {
+    if (!controlledEvidenceEnabled()) {
+      this.setData({ evidenceDrafts: [] });
+      return;
+    }
     const assetId = String(event.currentTarget.dataset.id || "");
     const evidenceDrafts = this.data.evidenceDrafts.filter((item) => item.assetId !== assetId);
     saveControlledEvidenceDrafts(this.evidenceStorageKey(), evidenceDrafts);
     this.setData({ evidenceDrafts });
   },
   async openBoundEvidence(event: any) {
+    if (!controlledEvidenceEnabled()) {
+      wx.showToast({ title: TEXT_ONLY_EVIDENCE_MESSAGE, icon: "none" });
+      return;
+    }
     try {
       const result = await api.caseEvidenceReadUrl(String(event.currentTarget.dataset.id || ""));
       if (result.kind === "image") {

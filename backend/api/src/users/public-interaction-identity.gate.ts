@@ -5,9 +5,10 @@ import { AppException } from "../common/errors/app.exception";
 /**
  * Shared hard gate for public community posts and real-time messaging.
  *
- * MP-D08: use the existing server identity signal (`profile.isVerified`) without
- * selecting a new KYC vendor or collection fields. Adult-eligibility remains a
- * separate commercial gate and must not be treated as public-interaction identity.
+ * IDENTITY-R01/R02: the legacy `profile.isVerified` boolean has no independently
+ * retrievable authority binding. Until a real identity authority and lifecycle are
+ * approved, it must not unlock public posting or real-time messaging. This does not
+ * introduce a KYC vendor, collection field, or substitute adult eligibility.
  */
 export const PUBLIC_INTERACTION_IDENTITY_REQUIRED = "PUBLIC_INTERACTION_IDENTITY_REQUIRED";
 /** Mini Program recovery entry for identity hard-gate refusals (not a raw API path). */
@@ -29,9 +30,8 @@ export function resolvePublicInteractionIdentityStatus(
   if (input.accountStatus != null && input.accountStatus !== "active") {
     return "accountUnavailable";
   }
-  if (input.profile?.isVerified === true) {
-    return "verified";
-  }
+  // Existing true values are deliberately ignored: the repository cannot prove
+  // that every legacy row is bound to a current, revocable approval record.
   return "notVerified";
 }
 
@@ -58,7 +58,7 @@ export function assertPublicInteractionIdentity(
   if (verificationStatus === "verified") return;
   throw new AppException(
     PUBLIC_INTERACTION_IDENTITY_REQUIRED,
-    "A verified identity is required before public community posts or real-time messaging",
+    "Public posting and real-time messaging stay unavailable until identity verification has an approved authority",
     HttpStatus.FORBIDDEN,
     publicInteractionIdentityDetails(verificationStatus)
   );

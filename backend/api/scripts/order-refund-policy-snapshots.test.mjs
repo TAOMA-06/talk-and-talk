@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 import pg from "pg";
+import { assertIsolatedPostgresPreflightEnvironment, POSTGRES_PREFLIGHT_SUITE } from "./isolated-postgres-preflight-environment.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const apiRoot = join(here, "..");
@@ -57,12 +58,12 @@ test("refund policy snapshot migration and decision paths stay fail closed", asy
 });
 
 const integrationUrl = String(process.env.REFUND_POLICY_MIGRATION_TEST_DATABASE_URL ?? "").trim();
+const postgresPreflight = process.env.E2E_RUNNER_SUITE === POSTGRES_PREFLIGHT_SUITE
+  ? assertIsolatedPostgresPreflightEnvironment()
+  : null;
 
-test("real PostgreSQL deterministically backfills and enforces immutable refund snapshots", {
-  skip: integrationUrl
-    ? false
-    : "set REFUND_POLICY_MIGRATION_TEST_DATABASE_URL to a disposable PostgreSQL database"
-}, async (t) => {
+if (postgresPreflight) test("real PostgreSQL deterministically backfills and enforces immutable refund snapshots", async (t) => {
+  await postgresPreflight;
   const schemaName = `refund_policy_${randomBytes(8).toString("hex")}`;
   const client = new pg.Client({ connectionString: integrationUrl });
   await client.connect();

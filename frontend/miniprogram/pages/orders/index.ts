@@ -64,6 +64,7 @@ type DisplayOrder = Order & {
   canOpenOrderConversation: boolean;
   orderConversationActionText: string;
   isRealtimeVoiceService: boolean;
+  isTextOnlyHistoricalVoiceOrder: boolean;
   canOpenRealtimeVoice: boolean;
   canStartService: boolean;
   startServiceNotice: string;
@@ -119,6 +120,7 @@ type DisplayOrder = Order & {
   pendingRescheduleRequestedText: string;
   pendingRescheduleDeadlineText: string;
   canRespondToReschedule: boolean;
+  canAcceptReschedule: boolean;
   rescheduleResponseAction: "" | "accept" | "reject";
   rescheduleResponseError: string;
 };
@@ -336,6 +338,14 @@ function isRealtimeVoiceService(order: Order): boolean {
   return order.serviceOfferingSnapshot?.deliveryMode === "voice";
 }
 
+function isTextOnlyHistoricalVoiceOrder(order: Order | null | undefined): boolean {
+  return order?.serviceOfferingSnapshot?.deliveryMode === "voice" && !clientRealtimeVoiceEnabled();
+}
+
+function showTextOnlyHistoricalVoiceOrderNotice() {
+  wx.showToast({ title: "文字首发暂不能继续历史语音订单", icon: "none" });
+}
+
 function timestamp(value?: string | null): number | null {
   const parsed = value ? Date.parse(value) : Number.NaN;
   return Number.isFinite(parsed) ? parsed : null;
@@ -497,11 +507,12 @@ function fulfillmentDisplayPatch(order: Order, viewerRole: OrderViewerRole): Pic
   "hasFulfillmentGuidance" | "fulfillmentTitle" | "fulfillmentDetail" | "fulfillmentCountdownLabel" |
   "fulfillmentCountdownText" | "fulfillmentTone" | "canOpenOrderConversation" |
   "orderConversationActionText" | "canStartService" | "startServiceNotice" |
-  "isRealtimeVoiceService" | "canOpenRealtimeVoice"
+  "isRealtimeVoiceService" | "isTextOnlyHistoricalVoiceOrder" | "canOpenRealtimeVoice"
 > {
   const guidance = fulfillmentGuidance(order, viewerRole);
   const activeRefund = hasActiveRefund(order);
   const realTimeVoice = clientRealtimeVoiceEnabled() && isRealtimeVoiceService(order);
+  const textOnlyHistoricalVoiceOrder = isTextOnlyHistoricalVoiceOrder(order);
   return {
     hasFulfillmentGuidance: guidance.show && !activeRefund,
     fulfillmentTitle: guidance.title,
@@ -512,11 +523,12 @@ function fulfillmentDisplayPatch(order: Order, viewerRole: OrderViewerRole): Pic
     canOpenOrderConversation: guidance.canOpenConversation,
     orderConversationActionText: viewerRole === "customer" ? "进入订单会话" : "进入与客户的订单会话",
     isRealtimeVoiceService: realTimeVoice,
+    isTextOnlyHistoricalVoiceOrder: textOnlyHistoricalVoiceOrder,
     // Keep the visible entry aligned with the server's credential rule. The
     // server remains authoritative, but showing an entry after the paid window
     // has elapsed would create a guaranteed failed attempt for both parties.
     canOpenRealtimeVoice: realTimeVoice && order.status === "inService" && guidance.tone === "active" && !activeRefund,
-    canStartService: guidance.canStartService && !activeRefund,
+    canStartService: guidance.canStartService && !activeRefund && !textOnlyHistoricalVoiceOrder,
     startServiceNotice: activeRefund && order.status === "paid"
       ? "退款处理中，暂不能开始服务。"
       : guidance.startServiceNotice
@@ -687,6 +699,7 @@ function canInitiateReschedule(order: Order): boolean {
   return Number.isFinite(scheduledAt)
     && scheduledAt > Date.now() + 15 * 60_000
     && !hasActiveRefund(order)
+    && !isTextOnlyHistoricalVoiceOrder(order)
     && (unconfirmedPending || order.status === "paid");
 }
 
@@ -707,7 +720,11 @@ function pendingRescheduleText(request: OrderRescheduleRequest, viewerRole: Orde
   return `${requester}提议改为 ${formatDateTime(request.requestedScheduledAt)}，等待${recipient}在 ${formatDateTime(request.expiresAt)} 前回应。`;
 }
 
-function pendingReschedulePatch(request: OrderRescheduleRequest, viewerRole: OrderViewerRole): Partial<DisplayOrder> {
+function pendingReschedulePatch(
+  order: Order,
+  request: OrderRescheduleRequest,
+  viewerRole: OrderViewerRole
+): Partial<DisplayOrder> {
   return {
     canInitiateReschedule: false,
     pendingReschedule: request,
@@ -716,6 +733,7 @@ function pendingReschedulePatch(request: OrderRescheduleRequest, viewerRole: Ord
     pendingRescheduleRequestedText: formatDateTime(request.requestedScheduledAt),
     pendingRescheduleDeadlineText: formatDateTime(request.expiresAt),
     canRespondToReschedule: request.requestedByRole !== viewerRole,
+    canAcceptReschedule: request.requestedByRole !== viewerRole && !isTextOnlyHistoricalVoiceOrder(order),
     rescheduleResponseAction: "",
     rescheduleResponseError: ""
   };
@@ -1034,6 +1052,7 @@ function displayOrder(order: Order, viewerRole: OrderViewerRole): DisplayOrder {
     pendingRescheduleRequestedText: "",
     pendingRescheduleDeadlineText: "",
     canRespondToReschedule: false,
+    canAcceptReschedule: false,
     rescheduleResponseAction: "",
     rescheduleResponseError: ""
   };
@@ -1445,13 +1464,14 @@ Page({
       this.patchOrder(id, {
         timelineState: "loaded",
         timelineItems: mergeTimeline(order, timeline.items || [], viewerRole),
-        ...(pending ? pendingReschedulePatch(pending, viewerRole) : {
+        ...(pending ? pendingReschedulePatch(order, pending, viewerRole) : {
           pendingReschedule: null,
           pendingRescheduleText: "",
           pendingRescheduleOriginalText: "",
           pendingRescheduleRequestedText: "",
           pendingRescheduleDeadlineText: "",
           canRespondToReschedule: false,
+          canAcceptReschedule: false,
           rescheduleResponseAction: "",
           rescheduleResponseError: "",
           canInitiateReschedule: canInitiateReschedule(order)
@@ -1517,7 +1537,7 @@ Page({
       if (pending) {
         this.patchOrder(id, {
           rescheduleState: "pending",
-          ...pendingReschedulePatch(pending, viewerRole),
+          ...pendingReschedulePatch(order, pending, viewerRole),
           rescheduleMessage: "已有改期协商等待回应。"
         });
         return;
@@ -1617,6 +1637,10 @@ Page({
     const context = this.orderContext(id);
     if (!context) return;
     const { order, viewerRole } = context;
+    if (isTextOnlyHistoricalVoiceOrder(order)) {
+      showTextOnlyHistoricalVoiceOrderNotice();
+      return;
+    }
     let requestedScheduledAt: Date;
     let availabilityWindowId: string | undefined;
     if (order.rescheduleState === "structured") {
@@ -1652,7 +1676,7 @@ Page({
         rescheduleMessage: "改期提议已发送，原预约保持不变，等待对方确认。",
         rescheduleSubmitEnabled: false,
         rescheduleSubmitText: "改期提议已提交",
-        ...pendingReschedulePatch(request, viewerRole),
+        ...pendingReschedulePatch(order, request, viewerRole),
         timelineOpen: false,
         timelineState: "idle",
         timelineToggleText: "查看订单进度",
@@ -1684,6 +1708,10 @@ Page({
     const request = context?.order.pendingReschedule;
     if (!context || !request || !context.order.canRespondToReschedule) return;
     const accepting = action === "accept";
+    if (accepting && isTextOnlyHistoricalVoiceOrder(context.order)) {
+      showTextOnlyHistoricalVoiceOrderNotice();
+      return;
+    }
     const confirmation = await new Promise<any>((resolve) => wx.showModal({
       title: accepting ? "确认接受改期" : "确认拒绝改期",
       content: accepting
@@ -1975,6 +2003,10 @@ Page({
       wx.showToast({ title: "仅陪伴者可开始服务", icon: "none" });
       return;
     }
+    if (isTextOnlyHistoricalVoiceOrder(context.order)) {
+      showTextOnlyHistoricalVoiceOrderNotice();
+      return;
+    }
     try {
       const started = await api.startService(id);
       await this.load();
@@ -1995,6 +2027,10 @@ Page({
     const context = this.orderContext(id);
     if (!context || context.viewerRole !== "companion") {
       wx.showToast({ title: "订单信息已变化，请刷新后重试", icon: "none" });
+      return;
+    }
+    if (isTextOnlyHistoricalVoiceOrder(context.order)) {
+      showTextOnlyHistoricalVoiceOrderNotice();
       return;
     }
     const realTimeVoice = clientRealtimeVoiceEnabled() && isRealtimeVoiceService(context.order);

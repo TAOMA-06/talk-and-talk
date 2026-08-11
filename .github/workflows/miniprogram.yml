@@ -1,49 +1,59 @@
-name: Mini Program CI
+name: Mini Program metadata hygiene (untrusted)
 
+# This repository-owned workflow is deliberately limited to fixed Git metadata
+# checks. It does not install or execute Mini Program or API candidate code, and
+# cannot be used as AppID, device, candidate-CI, or release evidence.
 on:
   push:
     paths:
       - "frontend/miniprogram/**"
-      - "backend/api/src/**"
-      - "backend/api/prisma/**"
-      - "backend/api/public/legal/**"
-      - "backend/api/package.json"
-      - "backend/api/package-lock.json"
+      - "backend/api/**"
       - "shared/contracts/**"
       - ".github/workflows/miniprogram.yml"
   pull_request:
     paths:
       - "frontend/miniprogram/**"
-      - "backend/api/src/**"
-      - "backend/api/prisma/**"
-      - "backend/api/public/legal/**"
-      - "backend/api/package.json"
-      - "backend/api/package-lock.json"
+      - "backend/api/**"
       - "shared/contracts/**"
       - ".github/workflows/miniprogram.yml"
 
+permissions:
+  contents: read
+
+env:
+  BASH_ENV: /dev/null
+  DYLD_FORCE_FLAT_NAMESPACE: ""
+  DYLD_INSERT_LIBRARIES: ""
+  DYLD_LIBRARY_PATH: ""
+  DYLD_ROOT_PATH: ""
+  ENV: /dev/null
+  GIT_CONFIG_GLOBAL: /dev/null
+  GIT_CONFIG_NOSYSTEM: "1"
+  LD_AUDIT: ""
+  LD_LIBRARY_PATH: ""
+  LD_PRELOAD: ""
+  NODE_OPTIONS: ""
+  NODE_PATH: ""
+
 jobs:
-  validate:
+  metadata:
+    name: Verify Mini Program metadata without executing candidate code
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: backend/api/package-lock.json
-      - name: Install shared TypeScript toolchain
-        working-directory: backend/api
-        run: npm ci
-      - name: Validate Mini Program manifest and pages
-        env:
-          MINIPROGRAM_RELEASE: "1"
-          WECHAT_MINIPROGRAM_APP_ID: ${{ vars.WECHAT_MINIPROGRAM_APP_ID }}
-        run: node frontend/miniprogram/scripts/validate.mjs
-      - name: Verify shared profile and legal-consent contracts
-        working-directory: backend/api
-        run: npm test -- --runTestsByPath src/users/dto/update-me.dto.spec.ts src/users/dto/legal-consent.dto.spec.ts
-      - name: Type-check Mini Program
-        run: backend/api/node_modules/.bin/tsc -p frontend/miniprogram/tsconfig.json --noEmit
-      - name: Run Mini Program page/runtime smoke
-        run: node frontend/miniprogram/scripts/smoke.mjs
+          fetch-depth: 1
+          lfs: false
+          persist-credentials: false
+          submodules: false
+      - name: Seal command files and verify checked-out metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH=/usr/bin:/bin
+          export GITHUB_ENV=/dev/null GITHUB_OUTPUT=/dev/null GITHUB_PATH=/dev/null GITHUB_STEP_SUMMARY=/dev/null
+          readonly PATH GITHUB_ENV GITHUB_OUTPUT GITHUB_PATH GITHUB_STEP_SUMMARY
+          /usr/bin/git -c core.hooksPath=/dev/null -c core.fsmonitor=false rev-parse HEAD | /usr/bin/grep -Fx "$GITHUB_SHA"
+          test -z "$(/usr/bin/git -c core.hooksPath=/dev/null -c core.fsmonitor=false status --porcelain --untracked-files=all)"
+          /usr/bin/git -c core.hooksPath=/dev/null -c core.fsmonitor=false diff --check --no-ext-diff

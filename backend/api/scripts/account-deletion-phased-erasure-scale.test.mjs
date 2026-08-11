@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 import pg from "pg";
+import { assertIsolatedPostgresPreflightEnvironment, POSTGRES_PREFLIGHT_SUITE } from "./isolated-postgres-preflight-environment.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const apiRoot = join(here, "..");
@@ -62,6 +63,9 @@ const integrationUrl = String(
     ?? process.env.DATABASE_URL
     ?? ""
 ).trim();
+const postgresPreflight = process.env.E2E_RUNNER_SUITE === POSTGRES_PREFLIGHT_SUITE
+  ? assertIsolatedPostgresPreflightEnvironment()
+  : null;
 
 const claimSql = `
   WITH candidates AS MATERIALIZED (
@@ -114,11 +118,8 @@ const boundedDeleteSql = `
   SELECT COUNT(*)::integer AS count, MAX(cursor) AS cursor FROM deleted
 `;
 
-test("real PostgreSQL keeps high-volume erasure and two-replica claims bounded", {
-  skip: integrationUrl
-    ? false
-    : "set ACCOUNT_DELETION_TEST_DATABASE_URL, TEST_DATABASE_URL, or DATABASE_URL to a disposable PostgreSQL database"
-}, async (t) => {
+if (postgresPreflight) test("real PostgreSQL keeps high-volume erasure and two-replica claims bounded", async (t) => {
+  await postgresPreflight;
   const schema = `account_deletion_scale_${randomBytes(8).toString("hex")}`;
   const admin = new pg.Client({ connectionString: integrationUrl });
   const replicaA = new pg.Client({ connectionString: integrationUrl });

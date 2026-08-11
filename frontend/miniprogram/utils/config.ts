@@ -42,6 +42,20 @@ export function miniProgramEnvironment(): MiniProgramEnvironment {
   return "develop";
 }
 
+/**
+ * `miniProgramEnvironment()` deliberately falls back to develop for transport
+ * configuration in older tools. Capability safety has a stricter rule: only a
+ * positively identified Developer Tools build may exercise dormant media/voice
+ * code. Unknown, missing, or failed environment discovery is text-only.
+ */
+function isExplicitDevelopmentEnvironment(): boolean {
+  try {
+    return wx.getAccountInfoSync?.().miniProgram?.envVersion === "develop";
+  } catch {
+    return false;
+  }
+}
+
 export function backendConfig(): BackendConfig {
   const environment = miniProgramEnvironment();
   if (!USE_CLOUD_RUN[environment]) {
@@ -72,12 +86,17 @@ export const LEGAL_CONSENT_VERSION = "2.2-2026-08-01";
  * First commercial release stays text-only. Chat media uploads and TRTC voice
  * stay in the codebase for later activation, but default UX must not surface
  * those entry points until MEDIA/TRTC production evidence is archived.
- * Smoke may set `globalThis.__TALK_AND_TALK_COMMERCIAL_TEXT_ONLY__ = false`
- * to exercise the dormant capability path without shipping it.
+ * A test-only override may exercise dormant capability code in `develop`, but
+ * cannot reopen it in an experience build or a released Mini Program.
  */
 const COMMERCIAL_TEXT_ONLY_DEFAULT = true;
 
 export function isCommercialTextOnly(): boolean {
+  // `trial` is an externally consumable experience build and `release` is the
+  // production build. They must fail closed even when developer tooling or a
+  // stale global override tries to opt them into dormant media/voice code.
+  if (!isExplicitDevelopmentEnvironment()) return true;
+
   const override = (globalThis as { __TALK_AND_TALK_COMMERCIAL_TEXT_ONLY__?: boolean })
     .__TALK_AND_TALK_COMMERCIAL_TEXT_ONLY__;
   if (typeof override === "boolean") return override;

@@ -154,15 +154,18 @@ npm run db:seed
 ```bash
 cd backend/api
 npm test                 # unit（src/**/*.spec.ts）
-npm run test:preflight   # 部署配置检查器单元测试
-npm run test:e2e         # HTTP 集成级 e2e（需 Postgres + Redis）
-npm run test:integration # 同 test:e2e 别名
+npm run test:preflight:static # 零跳过的本地部署配置/静态 preflight
+# test:preflight 的 PostgreSQL 部分与 test:e2e/test:integration 只可由获授权、密封的 disposable runner 执行
 ./scripts/acceptance-smoke.sh http://127.0.0.1:3000
 cd ../..
 backend/api/node_modules/.bin/tsc -p frontend/miniprogram/tsconfig.json --noEmit
 node frontend/miniprogram/scripts/validate.mjs
 node frontend/miniprogram/scripts/smoke.mjs
 ```
+
+`acceptance-smoke.sh` 仅支持 development/mock SMS/mock payment/local seed；不能作为
+staging、真实微信、支付或 provider 的上线证据。外部动作必须按
+[部署与回滚控制参考](./docs/deploy-rollback.md) 与 G2 执行包逐项授权。
 
 iOS：
 
@@ -178,25 +181,15 @@ xcodebuild test \
 
 ## 部署（Staging / Production）
 
-填写环境文件后先运行不会输出密钥值的部署预检：
+当前首发的 staging/production 部署、环境文件、数据库迁移、备份/恢复、DNS、
+微信和支付动作都不是本 README 授权的操作。必须先有对应的逐项 Evidence ID、
+冻结候选 SHA/不可变制品和保管证明、目标范围、有效期、执行人、结果收据与独立
+复核。禁止从工作树或浮动 tag 使用 `--build` 重建制品。
 
-```bash
-cd backend/api
-npm run preflight:deployment -- .env.production
-```
-
-```bash
-# Production
-cp backend/api/.env.production.example backend/api/.env.production
-# 填写密钥、数据库/Redis 密码，并把微信商户私钥放到配置的 host path 后：
-docker compose -f infra/docker-compose.prod.yml --env-file backend/api/.env.production up -d --build
-
-# Staging
-cp backend/api/.env.staging.example backend/api/.env.staging
-# DEPLOY_ENV_FILE 路径相对 infra/（compose 文件所在目录）
-DEPLOY_ENV_FILE=../backend/api/.env.staging \
-  docker compose -f infra/docker-compose.prod.yml --env-file backend/api/.env.staging up -d --build
-```
+部署预检可在获授权的受控环境中读取环境文件，但只应记录 vault/version 引用、
+命令、时间、退出码和脱敏结果，绝不归档变量或密钥。详细边界见
+[部署与回滚控制参考](./docs/deploy-rollback.md) 和
+[G2 执行包](./docs/cto-self-audit/runs/2026-08-08-g1-remediation/g2-execution-package.md)。
 
 - Nginx TLS 示例：`infra/nginx/talk-and-talk.conf.example`，证书目录 `infra/nginx/certs/`
 - 回滚： [docs/deploy-rollback.md](./docs/deploy-rollback.md)
@@ -204,11 +197,10 @@ DEPLOY_ENV_FILE=../backend/api/.env.staging \
 
 ## 备份
 
-```bash
-DATABASE_URL=postgres://... ./backend/api/scripts/db-backup.sh
-```
-
-建议 cron 每日执行，发布前再跑一次。恢复步骤见 deploy-rollback 文档。
+备份、恢复和保留期是外部数据操作，必须由独立授权记录绑定目标库、数据边界、
+加密/保管位置、执行人、有效期、校验和和恢复复核。不得把数据库 URL 写入 shell
+历史、Git、日志或文档。恢复步骤与回滚边界见
+[deploy-rollback](./docs/deploy-rollback.md)。
 
 ## 微信支付
 

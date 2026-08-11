@@ -482,9 +482,24 @@ describe("validateEnvironment", () => {
       MEDIA_FEATURE_ENABLED: "true",
       MEDIA_PROVIDER: "mock"
     }))
-      .toThrow("MEDIA_FEATURE_ENABLED");
+      .toThrow("First-release staging/production requires COMMERCIAL_SURFACE=text_only");
     expect(() => validateEnvironment({ MEDIA_PROVIDER: "unknown" }))
       .toThrow("MEDIA_PROVIDER");
+  });
+
+  it("hard-locks staging and production candidates to text-only and non-personalized ranking", () => {
+    expect(() => validateEnvironment({
+      ...productionEnv,
+      COMMERCIAL_SURFACE: "full"
+    })).toThrow("First-release staging/production requires COMMERCIAL_SURFACE=text_only");
+    expect(() => validateEnvironment({
+      ...productionEnv,
+      RECOMMENDATION_PERSONALIZATION_ENABLED: "true"
+    })).toThrow("First-release staging/production forbids RECOMMENDATION_PERSONALIZATION_ENABLED=true");
+    expect(validateEnvironment({
+      COMMERCIAL_SURFACE: "full",
+      RECOMMENDATION_PERSONALIZATION_ENABLED: "true"
+    }).COMMERCIAL_SURFACE).toBe("full");
   });
 
   it("requires a restricted, server-side TRTC signing configuration before enabling real-time voice", () => {

@@ -510,6 +510,14 @@ export class PaymentDisputesService {
   }
 
   async reply(actor: AuthenticatedUser, id: string, dto: ReplyPaymentDisputeDto) {
+    const responseImages = (dto as ReplyPaymentDisputeDto & { responseImages?: unknown }).responseImages;
+    if (responseImages !== undefined) {
+      throw new AppException(
+        "PAYMENT_DISPUTE_MEDIA_DISABLED",
+        "Payment-dispute media is disabled for the text-only first release; submit a text reply or escalate through support",
+        HttpStatus.SERVICE_UNAVAILABLE
+      );
+    }
     const reservation = await this.prisma.$transaction(async (tx) => {
       const db = tx as any;
       await db.$queryRaw`SELECT "id" FROM "PaymentDispute" WHERE "id" = ${id} FOR UPDATE`;
@@ -553,14 +561,6 @@ export class PaymentDisputesService {
           actorId: actor.id,
           clientRequestId: dto.clientRequestId,
           content: dto.content.trim(),
-          attachments: dto.responseImages?.length ? {
-            create: dto.responseImages.map((providerMediaId) => ({
-              disputeId: id,
-              source: "merchant",
-              mediaType: "OPERATION_IMAGE",
-              providerMediaId
-            }))
-          } : undefined
         }
       });
       await this.audit.record({
@@ -569,7 +569,7 @@ export class PaymentDisputesService {
         action: "payment_dispute.reply_submitting",
         resourceType: "paymentDispute",
         resourceId: id,
-        metadata: { replyId: reply.id, clientRequestId: dto.clientRequestId, attachmentCount: dto.responseImages?.length ?? 0 }
+        metadata: { replyId: reply.id, clientRequestId: dto.clientRequestId, attachmentCount: 0 }
       }, db);
       return { dispute, reply, duplicate: false };
     });
@@ -578,8 +578,7 @@ export class PaymentDisputesService {
     try {
       const result = await this.wechat.replyComplaint({
         complaintId: reservation.dispute.providerDisputeId,
-        responseContent: dto.content.trim(),
-        responseImages: dto.responseImages
+        responseContent: dto.content.trim()
       });
       await this.prisma.$transaction(async (tx) => {
         const db = tx as any;

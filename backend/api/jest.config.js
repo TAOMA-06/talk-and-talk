@@ -2,6 +2,10 @@ module.exports = {
   moduleFileExtensions: ["js", "json", "ts"],
   rootDir: ".",
   testRegex: ".*\\.spec\\.ts$",
+  // Destructive HTTP specs are a separate target. They load test/setup-e2e.ts,
+  // which refuses an unsafe database/Redis environment before any cleanup.
+  // Never let the ordinary unit-test command discover them without that setup.
+  testPathIgnorePatterns: ["/test/.*\\.e2e-spec\\.ts$"],
   transform: {
     "^.+\\.(t|j)s$": "ts-jest"
   },

@@ -2,6 +2,31 @@ import { PaymentDisputesService } from "./payment-disputes.service";
 import { TEST_MOCK_WECHAT_NOTIFY_SECRET, MockWeChatPayProvider } from "./wechat/mock-wechat-pay.provider";
 
 describe("PaymentDisputesService", () => {
+  it("rejects payment-dispute media before transaction, storage, audit, or provider forwarding", async () => {
+    const prisma: any = { $transaction: jest.fn() };
+    const audit: any = { record: jest.fn() };
+    const provider = new MockWeChatPayProvider();
+    const reply = jest.spyOn(provider, "replyComplaint");
+    const service = new PaymentDisputesService(prisma, audit, provider);
+
+    await expect(service.reply(
+      { id: "support-1", role: "support" } as any,
+      "dispute-1",
+      {
+        clientRequestId: "00000000-0000-4000-8000-000000000001",
+        content: "已收到，请继续通过文字说明。",
+        responseImages: ["provider-media-1"]
+      } as any
+    )).rejects.toMatchObject({
+      code: "PAYMENT_DISPUTE_MEDIA_DISABLED",
+      status: 503
+    });
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(audit.record).not.toHaveBeenCalled();
+    expect(reply).not.toHaveBeenCalled();
+  });
+
   it("paginates participant-owned disputes and keeps direct lookups on the same sanitized scope", async () => {
     const now = new Date("2026-08-01T08:00:00.000Z");
     const row = {

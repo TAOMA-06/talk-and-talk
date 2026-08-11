@@ -5,7 +5,23 @@ import {
   readLocalFile,
   uploadAuthorizedMedia
 } from "./api";
+import { isCommercialTextOnly } from "./config";
 import { sha256Hex } from "./sha256";
+
+/**
+ * Text-only is a release boundary, not a presentation preference. Keep this
+ * message shared so every evidence entry point tells the user what remains
+ * available instead of silently failing.
+ */
+export const TEXT_ONLY_EVIDENCE_MESSAGE = "当前首发版本仅支持文字陈述，暂不支持上传或查看图片、音频证据";
+
+export function controlledEvidenceEnabled(): boolean {
+  return !isCommercialTextOnly();
+}
+
+function assertControlledEvidenceEnabled() {
+  if (!controlledEvidenceEnabled()) throw new Error(TEXT_ONLY_EVIDENCE_MESSAGE);
+}
 
 export type ControlledEvidenceDraft = {
   assetId: string;
@@ -61,6 +77,7 @@ export function controlledEvidenceDraft(
 }
 
 export function loadControlledEvidenceDrafts(storageKey: string): ControlledEvidenceDraft[] {
+  if (!controlledEvidenceEnabled()) return [];
   const value = wx.getStorageSync(storageKey);
   if (!Array.isArray(value)) return [];
   return value
@@ -69,6 +86,7 @@ export function loadControlledEvidenceDrafts(storageKey: string): ControlledEvid
 }
 
 export function saveControlledEvidenceDrafts(storageKey: string, drafts: ControlledEvidenceDraft[]) {
+  if (!controlledEvidenceEnabled()) return;
   if (!drafts.length) {
     wx.removeStorageSync(storageKey);
     return;
@@ -79,6 +97,7 @@ export function saveControlledEvidenceDrafts(storageKey: string, drafts: Control
 export async function refreshControlledEvidenceDrafts(
   drafts: ControlledEvidenceDraft[]
 ): Promise<ControlledEvidenceDraft[]> {
+  if (!controlledEvidenceEnabled()) return [];
   const refreshed = await Promise.all(drafts.map(async (draft) => {
     try {
       const result = await api.caseEvidenceUploadStatus(draft.assetId);
@@ -91,10 +110,15 @@ export async function refreshControlledEvidenceDrafts(
 }
 
 export function approvedControlledEvidenceIds(drafts: ControlledEvidenceDraft[]): string[] {
+  if (!controlledEvidenceEnabled()) return [];
   return drafts.filter((item) => item.status === "approved").map((item) => item.assetId);
 }
 
 export function chooseEvidenceImage(): Promise<LocalEvidenceFile | null> {
+  if (!controlledEvidenceEnabled()) {
+    wx.showToast({ title: TEXT_ONLY_EVIDENCE_MESSAGE, icon: "none" });
+    return Promise.resolve(null);
+  }
   return new Promise((resolve) => {
     wx.chooseMedia({
       count: 1,
@@ -114,6 +138,10 @@ export function chooseEvidenceImage(): Promise<LocalEvidenceFile | null> {
 }
 
 export function chooseEvidenceAudio(): Promise<LocalEvidenceFile | null> {
+  if (!controlledEvidenceEnabled()) {
+    wx.showToast({ title: TEXT_ONLY_EVIDENCE_MESSAGE, icon: "none" });
+    return Promise.resolve(null);
+  }
   return new Promise((resolve) => {
     if (!wx.chooseMessageFile) {
       wx.showToast({ title: "当前微信版本不支持选择音频文件", icon: "none" });
@@ -150,6 +178,7 @@ export async function uploadControlledEvidence(
   reserve: ReserveEvidence,
   onUpdate?: (draft: ControlledEvidenceDraft) => void
 ): Promise<ControlledEvidenceDraft> {
+  assertControlledEvidenceEnabled();
   const bytes = await readLocalFile(file.path);
   const reservation = await reserve({
     kind: file.kind,
@@ -178,6 +207,7 @@ export async function pollControlledEvidence(
   onUpdate?: (draft: ControlledEvidenceDraft) => void,
   attempts = 20
 ): Promise<ControlledEvidenceDraft> {
+  assertControlledEvidenceEnabled();
   let draft = initial;
   for (let attempt = 0; attempt < attempts && ["reserved", "uploaded", "scanning"].includes(draft.status); attempt += 1) {
     await delay(750);

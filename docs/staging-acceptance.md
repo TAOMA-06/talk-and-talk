@@ -1,56 +1,60 @@
-# Staging 联调验收
+# Staging 联调验收（受控参考，当前不可执行）
 
-从**空数据库**开始，验证 TestFlight 前关键路径。
+> 当前状态：`G1 NO-GO`、`G2-ready NO-GO`、`G2 BLOCKED`。本文件是未来
+> staging 验收的场景目录，不授权复制配置、创建数据、启动容器、迁移、seed、调用
+> 微信、支付或上传小程序。不得从旧版本复用 `docker compose up --build`、
+> `prisma` 写操作、`acceptance-smoke.sh` 或本地 source 启动作为 staging 配方。
 
-## 准备
+## 每项外部动作的必填记录
 
-从仓库根目录：
+每一项 staging 配置、部署、迁移、fixture/seed、支付/退款、微信回调、真机预览、
+数据清理或烟测都需要独立的非秘密授权记录。一个 G1、E2E、SBOM 或迁移批准不会
+自动覆盖任何其他动作。
 
-```bash
-cp backend/api/.env.staging.example backend/api/.env.staging
-# 配置 DATABASE_URL / JWT / WECHAT_PAY_*（沙箱）
+| 字段 | 必填内容 |
+|---|---|
+| Evidence ID | 仅用于当前动作、可在审批系统核验的非秘密授权 ID。 |
+| 目标与范围 | staging 环境/资源 ID、数据边界、账号/设备别名、是否会调用微信/支付/消息 provider。 |
+| 冻结输入 | 候选 SHA/source-tree、不可变 API/Web/OCI digest、制品保管证明；禁止分支、浮动 tag、`--build` 或当前工作树。 |
+| 有效期与人员 | 签发/到期时间、执行人、独立复核人，以及禁止自审/绕过的控制。 |
+| 预期结果与停止条件 | 所需场景、数据清理/保留策略、text-only 与路由断言、失败时停止条件。 |
+| 结果与复核 | 脱敏收据/校验和、清理结果、独立复核结论；不得归档凭据、连接串、OpenID、支付签名或聊天内容。 |
 
-# DEPLOY_ENV_FILE 路径相对 infra/（compose 文件所在目录）
-DEPLOY_ENV_FILE=../backend/api/.env.staging \
-  docker compose -f infra/docker-compose.prod.yml --env-file backend/api/.env.staging up -d --build
-```
+缺失、过期、目标不匹配、没有不可变制品保管或未填结果/复核，均为 `BLOCKED`。
+未来具体执行机制只能写入这份已批准记录和
+[G2 执行包](./cto-self-audit/runs/2026-08-08-g1-remediation/g2-execution-package.md)，不能由本仓库文档代替。
 
-`DEPLOY_ENV_FILE` 控制 API 容器加载的配置文件（默认 production 使用 `../backend/api/.env.production`，路径相对 `infra/`）。
+## 场景目录（未来获授权后）
 
-Seed 陪伴者 owner 登录手机号依次为 `13800000101`–`13800000105`。Web 审核部门需另按 [`review-department.md`](./review-department.md) 初始化独立密码和 TOTP 凭据。
+下表描述空的、一次性 disposable staging 数据边界中需要验证的结果；它不提供命令、
+测试账号、seed 口令、环境变量或部署配方。任何需要 fixture 的场景都必须由对应授权
+记录指定来源、保留期和清理证据。独立审核部门凭据按
+[review-department.md](./review-department.md) 的受控流程创建，不写入仓库。
 
-或本地（需 Postgres + Redis）：
-
-```bash
-cd backend/api
-npm run prisma:migrate
-npm run db:seed
-npm run start:dev
-```
-
-## 验收清单
-
-| # | 步骤 | 期望 |
+| # | 未来获授权场景 | 期望 |
 |---|------|------|
-| 1 | `prisma:migrate` + `seed` | 5 个有可登录 owner 的陪伴者；admin `13800000001`、moderator `13800000002` |
+| 1 | 不可变候选的迁移与受控 fixture 建立 | 仅产生授权记录中定义的陪伴者/员工/客户别名；migration/fixture receipt 和清理证据可复核 |
 | 2 | `POST /api/v1/auth/sms/send-code` + `phone/login` | 返回 access/refresh token |
 | 3 | `GET /api/v1/companions` | 返回 seed 陪伴者列表 |
-| 4 | `POST /api/v1/orders` → 陪伴者 `POST /orders/service/:id/confirm` → `prepay` | 确认前禁止支付；staging 返回 `payment.mock=true` |
-| 5 | 小程序支付模拟 **或** `POST /payments/wechat/mock-notify` | 订单 `paid`，会话激活 |
+| 4 | 创建订单 → 陪伴者确认 → 预下单 | 确认前禁止支付；只使用授权记录明确的 mock/sandbox/真实 provider 边界 |
+| 5 | 授权的支付结果回执演练 | 订单状态仅由权威/明确允许的回执改变，会话按预期激活 |
 | 6 | `POST /conversations/c1/messages` 正常文案 | `decision=allow`，有 `companionReply` |
 | 7 | 发送「加微信私下聊」等违规文案 | `decision=block`，`safetyMessage`，创建 ModerationCase |
 | 8 | Web `http://<host>/review/` 使用独立 reviewer 密码 + TOTP 登录处置 | `confirmViolation` / `dismiss` 写入 ReviewActionLog、AuditLog 与 ReviewAuditLog |
 | 9 | `GET /api/v1/health`；带 Bearer token 请求 `/api/v1/metrics` | health 仅含依赖状态；受保护 metrics 含请求/AI/微信计数 |
 
-## 自动化冒烟
+## 自动化冒烟边界
 
-```bash
-./backend/api/scripts/acceptance-smoke.sh http://127.0.0.1:3000
-```
+`backend/api/scripts/acceptance-smoke.sh` 仅用于 development/mock SMS/mock
+payment/local seed 的工程检查；它不是 staging、真实微信、真实支付或 provider
+证据，也不得作为 staging/production 放行命令。未来 staging 验收使用已批准记录
+中绑定的不可变候选、受控运行方法和脱敏结果，而不是本节的脚本。
 
 ## 商用闭环验收（必须留证）
 
-以下场景不能只看接口返回；每项保存请求 ID、后台截图、数据库/微信商户侧引用和两名执行人。涉及真实支付时只在隔离 staging 或批准的小额生产验收中执行。
+以下场景不能只看接口返回；只有相应独立授权记录已获批准时才可执行。每项保存
+Evidence ID、请求 ID、后台截图、数据库/微信商户侧引用、清理结果和两名执行人；
+涉及真实支付时还必须明确金额上限、商户范围和停止条件。
 
 | # | 场景 | 必须证明的结果 |
 | --- | --- | --- |
@@ -67,7 +71,9 @@ npm run start:dev
 
 ## 微信小程序验收
 
-前置：在小程序后台将 staging API 配置为 request 合法域名；配置有效 HTTPS 证书、ICP备案域名、测试小程序 AppID，并在 `.env.staging` 填写 `WECHAT_MINIPROGRAM_APP_ID` / `WECHAT_MINIPROGRAM_APP_SECRET`。若验证真实支付，商户号必须已绑定该小程序 AppID 并获 JSAPI 权限。
+前置仅能由获授权的环境记录完成：小程序 request 合法域名、HTTPS/备案、测试
+AppID、微信凭据引用及真实支付商户绑定均不得写入 Git 或由本文件直接配置。若验证
+真实支付，授权记录还必须限定商户/AppID、金额、账户别名、回滚/清理与结果复核。
 
 | # | 场景 | 期望 |
 |---|------|------|

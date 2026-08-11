@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 import pg from "pg";
+import { assertIsolatedPostgresPreflightEnvironment, POSTGRES_PREFLIGHT_SUITE } from "./isolated-postgres-preflight-environment.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const apiRoot = join(here, "..");
@@ -31,12 +32,12 @@ test("finance terminal migration encodes immutable evidence and concurrency cont
 });
 
 const integrationUrl = String(process.env.FINANCE_MIGRATION_TEST_DATABASE_URL ?? "").trim();
+const postgresPreflight = process.env.E2E_RUNNER_SUITE === POSTGRES_PREFLIGHT_SUITE
+  ? assertIsolatedPostgresPreflightEnvironment()
+  : null;
 
-test("real PostgreSQL serializes finance approvals and append races", {
-  skip: integrationUrl
-    ? false
-    : "set FINANCE_MIGRATION_TEST_DATABASE_URL to a disposable PostgreSQL database"
-}, async (t) => {
+if (postgresPreflight) test("real PostgreSQL serializes finance approvals and append races", async (t) => {
+  await postgresPreflight;
   const schema = `finance_audit_${randomBytes(8).toString("hex")}`;
   const admin = new pg.Client({ connectionString: integrationUrl });
   const reviewerA = new pg.Client({ connectionString: integrationUrl });

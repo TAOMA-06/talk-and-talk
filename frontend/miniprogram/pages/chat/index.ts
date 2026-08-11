@@ -1,5 +1,5 @@
 import { api, ApiError, ensureSession, readLocalFile, uploadAuthorizedMedia } from "../../utils/api";
-import { clientChatMediaEnabled } from "../../utils/config";
+import { clientChatMediaEnabled, isCommercialTextOnly } from "../../utils/config";
 import { openCrisisResources } from "../../utils/crisis-gate";
 import { ChatMessage } from "../../utils/models";
 import { ensurePrivacyAuthorization } from "../../utils/privacy";
@@ -34,7 +34,11 @@ function compareMessages(left: ChatMessage, right: ChatMessage): number {
 function mergeMessages(...groups: ChatMessage[][]): ChatMessage[] {
   const byId = new Map<string, ChatMessage>();
   for (const group of groups) {
-    for (const message of group) byId.set(message.id, message);
+    for (const message of group) {
+      // Historic media must not leak back into a text-only release just because
+      // an older server record still contains an attachment reference.
+      byId.set(message.id, isCommercialTextOnly() ? { ...message, attachments: [] } : message);
+    }
   }
   return [...byId.values()].sort(compareMessages);
 }
@@ -76,6 +80,7 @@ Page({
     sending: false,
     mediaUploading: false,
     mediaEnabled: false,
+    textOnly: isCommercialTextOnly(),
     messageNotificationsMuted: false,
     messageNotificationUpdating: false,
     conversationBlockedByYou: false,
@@ -112,7 +117,7 @@ Page({
       return;
     }
     this.setData({ hasConversation: true });
-    this.ensureRecorder();
+    if (!isCommercialTextOnly()) this.ensureRecorder();
     void this.load();
   },
   onShow() {
@@ -343,7 +348,7 @@ Page({
     });
     switch (result.moderation.deliveryStatus) {
       case "queued":
-        wx.showToast({ title: "媒体审核中，仅自己可见", icon: "none" });
+        wx.showToast({ title: "内容审核中，仅自己可见", icon: "none" });
         break;
       case "pendingReview":
         wx.showToast({ title: "消息审核中，暂未送达", icon: "none" });
@@ -393,6 +398,10 @@ Page({
     finally { this.setData({ sending: false }); }
   },
   chooseImage() {
+    if (isCommercialTextOnly()) {
+      wx.showToast({ title: "当前首发版本仅支持文字消息", icon: "none" });
+      return;
+    }
     if (!this.data.messageInteractionAvailable) return;
     if (!this.data.mediaEnabled) {
       wx.showToast({ title: "当前环境未启用媒体消息", icon: "none" });
@@ -414,6 +423,7 @@ Page({
     });
   },
   ensureRecorder() {
+    if (isCommercialTextOnly()) return null;
     if (this.recorder || !wx.getRecorderManager) return this.recorder;
     const recorder = wx.getRecorderManager();
     recorder.onStop((result: any) => {
@@ -434,6 +444,10 @@ Page({
     return recorder;
   },
   async toggleRecord() {
+    if (isCommercialTextOnly()) {
+      wx.showToast({ title: "当前首发版本仅支持文字消息", icon: "none" });
+      return;
+    }
     if (!this.data.messageInteractionAvailable) return;
     if (!this.data.mediaEnabled) {
       wx.showToast({ title: "当前环境未启用媒体消息", icon: "none" });
@@ -458,6 +472,10 @@ Page({
     }
   },
   async sendMedia(input: MediaInput) {
+    if (isCommercialTextOnly()) {
+      wx.showToast({ title: "当前首发版本仅支持文字消息", icon: "none" });
+      return;
+    }
     if (this.data.mediaUploading || this.data.sending || this.data.restrictionEndsAt || !this.data.messageInteractionAvailable) return;
     this.setData({ mediaUploading: true });
     try {
@@ -480,10 +498,18 @@ Page({
     }
   },
   previewImage(event: any) {
+    if (isCommercialTextOnly()) {
+      wx.showToast({ title: "当前首发版本不展示图片或语音消息", icon: "none" });
+      return;
+    }
     const url = event.currentTarget.dataset.url;
     if (typeof url === "string" && url) wx.previewImage({ current: url, urls: [url] });
   },
   playAudio(event: any) {
+    if (isCommercialTextOnly()) {
+      wx.showToast({ title: "当前首发版本不展示图片或语音消息", icon: "none" });
+      return;
+    }
     const url = event.currentTarget.dataset.url;
     if (typeof url !== "string" || !url) return;
     this.audioPlayer?.destroy?.();

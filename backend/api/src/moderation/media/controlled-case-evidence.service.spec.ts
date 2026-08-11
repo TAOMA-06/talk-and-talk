@@ -10,6 +10,8 @@ describe("ControlledCaseEvidenceService", () => {
     controlledCaseEvidenceAttachment: { findUnique: jest.fn() }
   };
   const mediaAssets: any = {
+    assertCaseEvidenceMediaEnabled: jest.fn(),
+    isCaseEvidenceMediaEnabled: jest.fn(() => true),
     reserveControlled: jest.fn(),
     completeControlled: jest.fn(),
     controlledStatus: jest.fn(),
@@ -21,7 +23,49 @@ describe("ControlledCaseEvidenceService", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mediaAssets.assertCaseEvidenceMediaEnabled.mockImplementation(() => undefined);
+    mediaAssets.isCaseEvidenceMediaEnabled.mockReturnValue(true);
     service = new ControlledCaseEvidenceService(prisma, mediaAssets, worker);
+  });
+
+  it("rejects controlled evidence before target lookup, binding, worker, or read-url access on text-only", async () => {
+    mediaAssets.assertCaseEvidenceMediaEnabled.mockImplementation(() => {
+      throw Object.assign(new Error("media disabled"), { code: "MEDIA_FEATURE_DISABLED", status: 503 });
+    });
+    mediaAssets.isCaseEvidenceMediaEnabled.mockReturnValue(false);
+    const db = {
+      $queryRaw: jest.fn(),
+      mediaAsset: { findMany: jest.fn() },
+      controlledCaseEvidenceAttachment: { create: jest.fn() }
+    };
+
+    await expect(service.reserveForSupport(
+      { id: "customer-1", role: "user" } as any,
+      "ticket-1",
+      { kind: "image", mimeType: "image/jpeg", sizeBytes: 10, sha256: "a".repeat(64) }
+    )).rejects.toMatchObject({ code: "MEDIA_FEATURE_DISABLED", status: 503 });
+    await expect(service.complete("customer-1", assetId))
+      .rejects.toMatchObject({ code: "MEDIA_FEATURE_DISABLED", status: 503 });
+    expect(() => service.status("customer-1", assetId)).toThrow("media disabled");
+    await expect(service.createReadUrl({ id: "customer-1", role: "user" } as any, "binding-1"))
+      .rejects.toMatchObject({ code: "MEDIA_FEATURE_DISABLED", status: 503 });
+    await expect(service.bindSupportFact(db, {
+      assetIds: [assetId],
+      userId: "customer-1",
+      supportTicketId: "ticket-1",
+      orderSupportFactId: "fact-1"
+    })).rejects.toMatchObject({ code: "MEDIA_FEATURE_DISABLED", status: 503 });
+    expect(service.attachmentDtos({ evidenceAttachments: [{ id: "binding-1", mediaAsset: { status: "approved" } }] }))
+      .toEqual([]);
+
+    expect(prisma.supportTicket.findUnique).not.toHaveBeenCalled();
+    expect(mediaAssets.completeControlled).not.toHaveBeenCalled();
+    expect(mediaAssets.controlledStatus).not.toHaveBeenCalled();
+    expect(mediaAssets.approvedReadUrl).not.toHaveBeenCalled();
+    expect(worker.enqueue).not.toHaveBeenCalled();
+    expect(db.$queryRaw).not.toHaveBeenCalled();
+    expect(db.mediaAsset.findMany).not.toHaveBeenCalled();
+    expect(mediaAssets.controlledAttachmentDto).not.toHaveBeenCalled();
   });
 
   it("reserves support evidence only for the requester who remains an order participant", async () => {

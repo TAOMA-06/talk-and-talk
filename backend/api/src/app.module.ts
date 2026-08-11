@@ -34,6 +34,10 @@ import { UsersModule } from "./users/users.module";
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      // Isolated E2E invokes Nest with a sealed child environment. Do not let a
+      // developer's backend/api/.env reintroduce provider credentials or
+      // worker switches after the E2E guard has checked them.
+      ignoreEnvFile: process.env.NODE_ENV === "test",
       load: [configuration],
       validate: validateEnvironment
     }),

@@ -23,6 +23,7 @@ type PaymentDisputeState = "loading" | "available" | "none" | "error";
 type OrderViewerRole = "customer" | "companion";
 type OrderView = {
   viewerRole: OrderViewerRole;
+  isTextOnlyHistoricalVoiceOrder: boolean;
   viewerRoleText: string;
   participantLabel: string;
   participantName: string;
@@ -67,6 +68,14 @@ type OrderView = {
 };
 
 const SERVICE_EARLY_START_MS = 15 * 60_000;
+
+function isTextOnlyHistoricalVoiceOrder(order: Order | null | undefined): boolean {
+  return order?.serviceOfferingSnapshot?.deliveryMode === "voice" && !clientRealtimeVoiceEnabled();
+}
+
+function showTextOnlyHistoricalVoiceOrderNotice() {
+  wx.showToast({ title: "文字首发暂不能继续历史语音订单", icon: "none" });
+}
 
 const ATTENDANCE_STATUS_LABELS: Record<string, string> = {
   evidenceCollection: "补充事实",
@@ -117,6 +126,7 @@ function participantStatusExplanation(order: Order, viewerRole: OrderViewerRole)
 
 function viewForOrder(order: Order, now = Date.now()): OrderView {
   const viewerRole: OrderViewerRole = order.viewerRole === "companion" ? "companion" : "customer";
+  const textOnlyHistoricalVoiceOrder = isTextOnlyHistoricalVoiceOrder(order);
   const scheduledAt = Date.parse(order.scheduledAt || "");
   const serviceStartedAt = Date.parse(order.serviceStartedAt || "");
   const serviceEndAt = Number.isFinite(scheduledAt)
@@ -140,6 +150,7 @@ function viewForOrder(order: Order, now = Date.now()): OrderView {
     && refundRequestWindowHours <= 720;
   return {
     viewerRole,
+    isTextOnlyHistoricalVoiceOrder: textOnlyHistoricalVoiceOrder,
     viewerRoleText: viewerRole === "customer" ? "客户" : "陪伴者",
     participantLabel: viewerRole === "customer" ? "陪伴者" : "客户",
     participantName: viewerRole === "customer"
@@ -178,13 +189,16 @@ function viewForOrder(order: Order, now = Date.now()): OrderView {
       && !order.fulfillmentBlockedByRefund
       && !ownGuidelinesConfirmed,
     guidelinesActionText: viewerRole === "customer" ? "确认服务前约定" : "确认服务范围与边界",
-    canConfirmServiceOrder: viewerRole === "companion" && order.status === "pending" && !order.companionConfirmedAt,
+    canConfirmServiceOrder: viewerRole === "companion" && order.status === "pending"
+      && !order.companionConfirmedAt && !textOnlyHistoricalVoiceOrder,
     canRejectServiceOrder: viewerRole === "companion" && order.status === "pending" && !order.companionConfirmedAt,
     canStartService: viewerRole === "companion" && order.status === "paid"
-      && !order.fulfillmentBlockedByRefund && inStartWindow,
+      && !order.fulfillmentBlockedByRefund && inStartWindow && !textOnlyHistoricalVoiceOrder,
     canCompleteService: viewerRole === "companion" && order.status === "inService"
       && Number.isFinite(serviceEndAt) && now >= serviceEndAt,
     serviceActionNotice: viewerRole !== "companion" ? ""
+      : textOnlyHistoricalVoiceOrder && ["pending", "paid"].includes(order.status)
+        ? "当前首发仅支持文字服务；历史语音订单不能继续确认或开始服务。仍可查看订单、拒绝预约或联系平台客服。"
       : order.fulfillmentBlockedByRefund && ["paid", "inService"].includes(order.status)
         ? "售后或退款处理中，当前履约操作已暂停。"
         : order.status === "paid" && Number.isFinite(scheduledAt) && now < scheduledAt - SERVICE_EARLY_START_MS
@@ -510,6 +524,10 @@ Page({
     }
   },
   async confirmServiceOrder() {
+    if (isTextOnlyHistoricalVoiceOrder(this.data.order)) {
+      showTextOnlyHistoricalVoiceOrderNotice();
+      return;
+    }
     if (!this.data.view?.canConfirmServiceOrder) return;
     const confirmation = await new Promise<any>((resolve) => wx.showModal({
       title: "确认接单",
@@ -534,6 +552,10 @@ Page({
     await this.runServiceAction("reject", () => api.rejectServiceOrder(this.orderId), "预约已拒绝");
   },
   async startService() {
+    if (isTextOnlyHistoricalVoiceOrder(this.data.order)) {
+      showTextOnlyHistoricalVoiceOrderNotice();
+      return;
+    }
     if (!this.data.view?.canStartService) return;
     await this.runServiceAction("start", () => api.startService(this.orderId), "服务已开始");
   },

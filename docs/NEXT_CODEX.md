@@ -4,37 +4,22 @@
 
 当前工作区已完成聊天审核 v2 及全应用核心可靠性补强；先阅读 `git diff`，不要覆盖未提交改动。历史 iOS 工程仍不在本轮范围，正式范围是 NestJS、Web 运营后台与微信小程序。
 
-## 上线前必须完成
+## 当前执行边界
 
-1. 在 staging 按顺序部署并验证以下迁移：
+本文件的旧迁移/上线清单不可执行，尤其不得把其中的 staging、`test:preflight`、
+`test:e2e`、支付开关或历史媒体流程当作当前发布指令。当前首发必须遵循
+[`docs/cto-self-audit/runs/2026-08-08-g1-remediation`](./cto-self-audit/runs/2026-08-08-g1-remediation/)
+中的冻结候选、零跳过、不可变制品、逐项授权和 G2 场景卡：
 
-   ```text
-   20260719070000_chat_moderation_v2
-   20260719100000_core_reliability_fixes
-   ```
+- 本地只可执行 `npm run test:preflight:static` 等无外部副作用门禁；
+  PostgreSQL preflight 和 E2E 仅由获授权的密封 disposable runner 创建目标。
+- 真实微信、支付/退款、TRTC、provider-media、staging/production 迁移与部署均需
+  对应 Evidence ID、目标范围、有效期、执行者、收据和独立复核；当前不得推断授权。
+- 当前 first-release 为 text-only，不能根据本历史快照打开媒体/TRTC 或支付相关
+  provider 开关。
 
-   后一迁移增加媒体审核租约、聊天案件去重索引与预约支付保留截止时间。
-
-2. 运行完整验证：
-
-   ```bash
-   cd backend/api
-   npm run prisma:generate
-   npm test
-   npm run test:preflight
-   npm run verify:prod-artifacts
-
-   cd ../../frontend/miniprogram
-   ../../backend/api/node_modules/.bin/tsc -p tsconfig.json --noEmit
-   node scripts/validate.mjs
-   node scripts/smoke.mjs
-   ```
-
-3. 在专用、可销毁的 PostgreSQL + Redis 环境运行 `npm run test:e2e`。该套件会清理测试 Redis，不能指向共享或生产实例。
-
-4. 配置并监控 `PAYMENT_RECONCILIATION_ENABLED=true`、60 秒间隔与告警。重点演练：预约保留超时释放、服务结束后未开始的自动退款、失败退款的受控重试、账号注销资金结算。
-
-5. 每次编辑 `backend/api/public/review/` 后，保持审核网页仅加载同源外部脚本（不引入内联脚本或用户登录接口）；`npm run verify:prod-artifacts` 必须通过，不能手工跳过。
+历史迁移名称仅供差异审计；任何新接手者先读当前 `git diff`、候选证据模板、G2
+执行包和部署/回滚控制参考，再决定是否有获授权的下一步。
 
 ## 仍需外部环境完成的工作
 

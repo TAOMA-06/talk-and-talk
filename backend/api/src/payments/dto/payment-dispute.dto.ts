@@ -1,12 +1,9 @@
 import {
-  ArrayMaxSize,
-  IsArray,
   IsIn,
   IsInt,
   IsOptional,
   IsString,
   IsUUID,
-  Matches,
   Max,
   MaxLength,
   Min,
@@ -64,12 +61,6 @@ export class ReplyPaymentDisputeDto {
   @MaxLength(200)
   content!: string;
 
-  @IsOptional()
-  @IsArray()
-  @ArrayMaxSize(4)
-  @IsString({ each: true })
-  @Matches(/^[A-Za-z0-9._-]{1,256}$/, { each: true })
-  responseImages?: string[];
 }
 
 export class CompletePaymentDisputeDto {

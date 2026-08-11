@@ -39,7 +39,7 @@ export default function AboutScreen() {
         <article>
           <span><Smartphone size={22} /></span>
           <h3>发行面清晰</h3>
-          <p>用户服务入口以微信小程序页面状态为准；本站用于官方说明与网页体验。</p>
+          <p>用户服务入口以微信小程序内的文字互动页面状态为准；本站用于官方说明、规则与公示。</p>
         </article>
       </Reveal>
 

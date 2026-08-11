@@ -413,6 +413,20 @@ describe("Orders and payments (e2e)", () => {
 
     expect(results.map((result) => result.status)).toEqual([201, 201]);
     expect(results[0].body.data.refund.outRefundNo).toBe(results[1].body.data.refund.outRefundNo);
+    for (const result of results) {
+      expect(result.body.data.order).toMatchObject({ id: order.body.data.id });
+      for (const privateOrderField of [
+        "userId",
+        "settlementRecipientRefSnapshot",
+        "taxProfileRefSnapshot",
+        "identityEvidenceRefSnapshot",
+        "serviceAgreementEvidenceRefSnapshot",
+        "refundPolicyVersionSnapshot",
+        "clientRequestId"
+      ]) {
+        expect(result.body.data.order).not.toHaveProperty(privateOrderField);
+      }
+    }
     expect(createRefund).toHaveBeenCalledTimes(1);
     const refunds = await prisma.refundTransaction.findMany({
       where: { orderId: order.body.data.id }
@@ -537,6 +551,130 @@ describe("Orders and payments (e2e)", () => {
     expect(refund.failureReason).toBeNull();
     expect(persistedOrder.status).toBe("refunded");
     provider.mockRestore();
+  });
+
+  it("returns non-probing not-found results for every non-owner service write without side effects", async () => {
+    const customer = await createUser("+8613800138030");
+    const companionOwner = await createUser("+8613800138031", "companion");
+    const otherCompanionOwner = await createUser("+8613800138032", "companion");
+    const thirdParty = await createUser("+8613800138033");
+    const staff = await createUser("+8613800138034", "support");
+    await prisma.companionProfile.update({ where: { id: "c1" }, data: { ownerUserId: companionOwner.user.id } });
+    await prisma.companionProfile.update({ where: { id: "c2" }, data: { ownerUserId: otherCompanionOwner.user.id } });
+
+    const createOrder = async (hoursFromNow: number) => request(app.getHttpServer())
+      .post("/api/v1/orders")
+      .set("Authorization", `Bearer ${customer.token}`)
+      .send({
+        companionId: "c1",
+        themeId: "t1",
+        durationMinutes: 30,
+        scheduledAt: new Date(Date.now() + hoursFromNow * 60 * 60_000).toISOString()
+      })
+      .expect(201);
+
+    const pending = await createOrder(2);
+    const paid = await createOrder(3);
+    const inService = await createOrder(4);
+    const settledAt = new Date(Date.now() - 2 * 60 * 60_000);
+    await prisma.order.update({
+      where: { id: paid.body.data.id },
+      data: {
+        status: "paid",
+        companionConfirmedAt: new Date(),
+        paidAt: new Date(),
+        paymentReservationExpiresAt: null
+      }
+    });
+    await prisma.order.update({
+      where: { id: inService.body.data.id },
+      data: {
+        status: "inService",
+        scheduledAt: settledAt,
+        companionConfirmedAt: new Date(settledAt.getTime() - 60_000),
+        paidAt: new Date(settledAt.getTime() - 60_000),
+        serviceStartedAt: settledAt,
+        paymentReservationExpiresAt: null
+      }
+    });
+
+    const orderIds = [pending.body.data.id, paid.body.data.id, inService.body.data.id] as string[];
+    const stateSnapshot = async () => {
+      const orders = await prisma.order.findMany({
+        where: { id: { in: orderIds } },
+        select: {
+          id: true,
+          status: true,
+          companionConfirmedAt: true,
+          companionResponseDeadlineAt: true,
+          paymentReservationExpiresAt: true,
+          paidAt: true,
+          serviceStartedAt: true,
+          completedAt: true,
+          cancelledAt: true,
+          refundRequestDeadlineAt: true
+        },
+        orderBy: { id: "asc" }
+      });
+      return {
+        orders: orders.map((order) => ({
+          ...order,
+          companionConfirmedAt: order.companionConfirmedAt?.toISOString() ?? null,
+          companionResponseDeadlineAt: order.companionResponseDeadlineAt?.toISOString() ?? null,
+          paymentReservationExpiresAt: order.paymentReservationExpiresAt?.toISOString() ?? null,
+          paidAt: order.paidAt?.toISOString() ?? null,
+          serviceStartedAt: order.serviceStartedAt?.toISOString() ?? null,
+          completedAt: order.completedAt?.toISOString() ?? null,
+          cancelledAt: order.cancelledAt?.toISOString() ?? null,
+          refundRequestDeadlineAt: order.refundRequestDeadlineAt?.toISOString() ?? null
+        })),
+        timelineCount: await prisma.orderTimelineEvent.count({ where: { orderId: { in: orderIds } } }),
+        auditCount: await prisma.auditLog.count({
+          where: { resourceType: "order", resourceId: { in: orderIds } }
+        }),
+        notificationCount: await prisma.notification.count(),
+        notificationDeliveryCount: await prisma.notificationDelivery.count(),
+        paymentCount: await prisma.paymentTransaction.count({ where: { orderId: { in: orderIds } } }),
+        refundCount: await prisma.refundTransaction.count({ where: { orderId: { in: orderIds } } }),
+        earningCount: await prisma.companionEarning.count({ where: { orderId: { in: orderIds } } }),
+        companion: await prisma.companionProfile.findUniqueOrThrow({
+          where: { id: "c1" },
+          select: { responseTime: true, completedOrders: true }
+        })
+      };
+    };
+    const before = await stateSnapshot();
+
+    const writes = [
+      { path: `/api/v1/orders/service/${pending.body.data.id}/confirm`, description: "confirm" },
+      { path: `/api/v1/orders/service/${pending.body.data.id}/reject`, description: "reject" },
+      { path: `/api/v1/orders/service/${paid.body.data.id}/start`, description: "start" },
+      { path: `/api/v1/orders/service/${inService.body.data.id}/complete`, description: "complete" }
+    ];
+    for (const actor of [customer, otherCompanionOwner, thirdParty, staff]) {
+      for (const write of writes) {
+        const response = await request(app.getHttpServer())
+          .post(write.path)
+          .set("Authorization", `Bearer ${actor.token}`)
+          .expect(404);
+        expect(response.body.error.code).toBe("ORDER_NOT_FOUND");
+      }
+    }
+
+    const hiddenExisting = await request(app.getHttpServer())
+      .post(`/api/v1/orders/service/${pending.body.data.id}/confirm`)
+      .set("Authorization", `Bearer ${thirdParty.token}`)
+      .expect(404);
+    const missing = await request(app.getHttpServer())
+      .post("/api/v1/orders/service/not-an-order/confirm")
+      .set("Authorization", `Bearer ${thirdParty.token}`)
+      .expect(404);
+    expect(missing.body.error).toEqual(expect.objectContaining({
+      code: hiddenExisting.body.error.code,
+      message: hiddenExisting.body.error.message
+    }));
+
+    await expect(stateSnapshot()).resolves.toEqual(before);
   });
 
   it("rejects starting a paid future service outside the allowed window", async () => {

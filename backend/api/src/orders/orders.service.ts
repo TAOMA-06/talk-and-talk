@@ -1461,6 +1461,7 @@ export class OrdersService {
         throw new AppException("ORDER_NOT_FOUND", "Order not found", HttpStatus.NOT_FOUND);
       }
 
+      this.assertVoiceOrderFeatureEnabled(order);
       const now = new Date();
       this.assertRescheduleEligible(order, now);
       const requestedScheduledAt = this.parseRescheduleRequestedAt(dto.requestedScheduledAt, now);
@@ -1680,6 +1681,7 @@ export class OrdersService {
         );
       }
 
+      this.assertVoiceOrderFeatureEnabled(order);
       const now = new Date();
       if (
         request.expiresAt.getTime() <= now.getTime() ||
@@ -1757,7 +1759,7 @@ export class OrdersService {
         }, now);
       }
 
-      const responderRole = order.userId === userId ? "customer" : "companion";
+      const responderRole: "customer" | "companion" = order.userId === userId ? "customer" : "companion";
       const updatedOrder = await db.order.update({
         where: { id: orderId },
         data: {
@@ -1814,9 +1816,12 @@ export class OrdersService {
           requestedAvailabilityWindowId: availabilityWindow?.id ?? null
         }
       });
-      return { accepted, order: updatedOrder };
+      return { accepted, order: updatedOrder, viewerRole: responderRole };
     }, { maxWait: 5_000, timeout: 10_000 });
-    return { rescheduleRequest: this.toRescheduleRequestDto(result.accepted), order: this.toDto(result.order) };
+    return {
+      rescheduleRequest: this.toRescheduleRequestDto(result.accepted),
+      order: this.toParticipantDto(result.order, result.viewerRole)
+    };
   }
 
   async rejectReschedule(userId: string, orderId: string, requestId: string) {
@@ -2264,13 +2269,6 @@ export class OrdersService {
         label: serviceIntentLabel(order.serviceIntentSnapshot),
         policyVersion: order.serviceIntentPolicyVersionSnapshot ?? "legacy"
       } : null,
-      commercialAssurances: {
-        adultEligibilityVerdict: order.adultEligibilityVerdictSnapshot ?? null,
-        adultEligibilityVerifiedAt:
-          order.adultEligibilityVerifiedAtSnapshot?.toISOString() ?? null,
-        adultEligibilityValidUntil:
-          order.adultEligibilityValidUntilSnapshot?.toISOString() ?? null
-      },
       customer: order.user ? {
         id: order.userId,
         name: order.user.profile?.displayName ?? "用户",
@@ -2305,9 +2303,6 @@ export class OrdersService {
       companionResponseDeadlineAt: order.companionResponseDeadlineAt?.toISOString() ?? null,
       paymentReservationExpiresAt: order.paymentReservationExpiresAt?.toISOString() ?? null,
       serviceStartedAt: order.serviceStartedAt?.toISOString() ?? null,
-      platformFeeBps: order.platformFeeBps ?? 0,
-      platformFeeCents: order.platformFeeCents ?? 0,
-      companionPayableCents: order.companionPayableCents ?? order.amountCents,
       paidAt: order.paidAt?.toISOString() ?? null,
       cancelledAt: order.cancelledAt?.toISOString() ?? null,
       completedAt: order.completedAt?.toISOString() ?? null,

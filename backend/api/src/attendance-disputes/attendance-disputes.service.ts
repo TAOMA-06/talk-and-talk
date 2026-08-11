@@ -15,6 +15,7 @@ import {
   ATTENDANCE_WAIT_MINUTES
 } from "../common/fulfillment-policy";
 import { CommercialService } from "../commercial/commercial.service";
+import { isFirstReleaseCapabilityEnabled } from "../config/first-release-capability-matrix";
 import { PrismaService } from "../database/prisma.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { ControlledCaseEvidenceService } from "../moderation/media/controlled-case-evidence.service";
@@ -460,6 +461,9 @@ export class AttendanceDisputesService {
   }
 
   async submitStatement(userId: string, disputeId: string, dto: SubmitAttendanceStatementDto) {
+    // Reject media evidence before the transaction creates a statement. Empty
+    // evidence lists remain valid for text-only case statements.
+    this.caseEvidence.assertAttachmentsAllowed(dto.evidenceAssetIds);
     await this.prisma.$transaction(async (tx) => {
       const db = tx as any;
       await db.$queryRaw`SELECT "id" FROM "AttendanceDispute" WHERE "id" = ${disputeId} FOR UPDATE`;
@@ -558,6 +562,9 @@ export class AttendanceDisputesService {
   }
 
   async appeal(userId: string, disputeId: string, dto: SubmitAttendanceStatementDto) {
+    // An appeal can remain a pure-text appeal in the first release, but may not
+    // start a transaction when it carries historical media references.
+    this.caseEvidence.assertAttachmentsAllowed(dto.evidenceAssetIds);
     await this.prisma.$transaction(async (tx) => {
       const db = tx as any;
       await db.$queryRaw`SELECT "id" FROM "AttendanceDispute" WHERE "id" = ${disputeId} FOR UPDATE`;
@@ -1008,6 +1015,13 @@ export class AttendanceDisputesService {
   }
 
   private trtcCallbackRuntime() {
+    if (!isFirstReleaseCapabilityEnabled("trtcUserSig", this.config)) {
+      throw new AppException(
+        "COMMERCIAL_SURFACE_TEXT_ONLY",
+        "Real-time voice is disabled for the current commercial surface",
+        HttpStatus.SERVICE_UNAVAILABLE
+      );
+    }
     if (this.config.get<boolean>("TRTC_ENABLED", false) !== true) {
       throw new AppException("TRTC_CALLBACK_DISABLED", "TRTC callback intake is disabled", HttpStatus.SERVICE_UNAVAILABLE);
     }
@@ -1089,6 +1103,12 @@ export class AttendanceDisputesService {
   }
 
   private async attendanceSummary(dispute: any) {
+    // Historical real-time attendance facts are part of the disabled voice
+    // surface. Keep a text-only dispute readable for its written statements,
+    // but never query or project those facts back to a participant or staff.
+    if (!isFirstReleaseCapabilityEnabled("trtcUserSig", this.config)) {
+      return this.emptyAttendanceSummary();
+    }
     const sessionId = dispute.order?.voiceSession?.id;
     if (!sessionId) return this.emptyAttendanceSummary();
     const groups: any[] = await this.prisma.voiceAttendanceEvent.groupBy({
@@ -1103,6 +1123,10 @@ export class AttendanceDisputesService {
 
   private async attendanceSummaries(disputes: any[]) {
     const summaries = new Map<string, AttendanceSummary>();
+    if (!isFirstReleaseCapabilityEnabled("trtcUserSig", this.config)) {
+      for (const dispute of disputes) summaries.set(dispute.id, this.emptyAttendanceSummary());
+      return summaries;
+    }
     const sessionIds = [...new Set(disputes
       .map((dispute) => dispute.order?.voiceSession?.id)
       .filter((id): id is string => Boolean(id)))];
@@ -1260,7 +1284,6 @@ export class AttendanceDisputesService {
         id: dispute.refundTransaction.id,
         status: dispute.refundTransaction.status,
         amountCents: dispute.refundTransaction.amountCents,
-        providerRefundId: dispute.refundTransaction.providerRefundId ?? null,
         successConfirmedAt: dispute.refundTransaction.status === "success"
           ? dispute.refundTransaction.updatedAt.toISOString()
           : null

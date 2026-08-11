@@ -1,8 +1,13 @@
-import { IsOptional, IsString, MaxLength } from "class-validator";
+import { Transform } from "class-transformer";
+import { IsString, MaxLength, MinLength } from "class-validator";
+
+import { IsSafeOperationalText } from "../../common/validation/sensitive-free-text";
 
 export class CreateRefundDto {
-  @IsOptional()
+  @Transform(({ value }) => typeof value === "string" ? value.trim() : value)
   @IsString()
+  @IsSafeOperationalText()
+  @MinLength(2)
   @MaxLength(200)
-  reason?: string;
+  reason!: string;
 }

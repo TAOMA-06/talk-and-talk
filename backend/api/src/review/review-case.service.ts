@@ -26,6 +26,8 @@ const MESSAGE_EVIDENCE_REQUIRED_ACTIONS = new Set<ReviewCaseAction>([
   "restrict7d",
   "upholdAppeal"
 ]);
+const TEXT_ONLY_REDACTED_CASE_TITLE = "聊天审核案件";
+const TEXT_ONLY_REDACTED_CASE_CONTENT = "历史媒体审核证据已在文本首发版本中隐藏。";
 
 export type ReviewDecisionActor = {
   id: string;
@@ -127,6 +129,7 @@ export class ReviewCaseService {
     if (!item) {
       throw new AppException("NOT_FOUND", `Moderation case ${id} was not found`, HttpStatus.NOT_FOUND);
     }
+    const redactLegacyChatEvidence = this.shouldRedactLegacyChatEvidence(item);
 
     return {
       case: {
@@ -134,7 +137,12 @@ export class ReviewCaseService {
         evidences: (item.evidences ?? []).map((ev: any) => ({
           id: ev.id,
           type: ev.type,
-          payload: ev.payload,
+          // Legacy chat cases did not persist whether an artifact was derived
+          // from an attachment. A stored title/content/raw-text field can
+          // therefore contain OCR or a transcription. While text-only is
+          // active, project every chat-case evidence payload as redacted rather
+          // than guessing which historic rows are safe to expose.
+          payload: redactLegacyChatEvidence ? { redacted: true } : ev.payload,
           createdAt: ev.createdAt.toISOString()
         })),
         actionLog: (item.actionLogs ?? []).map((log: any) => this.toActionLogDto(log)),
@@ -1061,6 +1069,16 @@ export class ReviewCaseService {
   }
 
   private async toEvidenceMessageDto(message: any, externalConversationId: string) {
+    // Review keeps the text and moderation chain available, but a text-only
+    // release must not turn historical chat assets into staff-readable media,
+    // OCR, or analysis through this separate evidence surface.
+    const attachments = this.mediaAssets.isChatMediaPlaybackEnabled()
+      ? await Promise.all((message.attachments ?? []).map(async (asset: any) => ({
+          ...(await this.mediaAssets.toAttachmentDto(asset)),
+          extractedText: asset.extractedText ?? null,
+          analysis: asset.analysis ?? null
+        })))
+      : [];
     return {
       id: message.id,
       conversationId: externalConversationId,
@@ -1070,11 +1088,7 @@ export class ReviewCaseService {
       type: message.type,
       moderationStatus: message.moderationStatus,
       visibility: message.visibility,
-      attachments: await Promise.all((message.attachments ?? []).map(async (asset: any) => ({
-        ...(await this.mediaAssets.toAttachmentDto(asset)),
-        extractedText: asset.extractedText ?? null,
-        analysis: asset.analysis ?? null
-      }))),
+      attachments,
       timestamp: message.createdAt.toISOString()
     };
   }
@@ -1120,15 +1134,16 @@ export class ReviewCaseService {
   }
 
   private toCaseSummary(item: any) {
+    const redactLegacyChatEvidence = this.shouldRedactLegacyChatEvidence(item);
     return {
       id: item.id,
-      title: item.title,
+      title: redactLegacyChatEvidence ? TEXT_ONLY_REDACTED_CASE_TITLE : item.title,
       category: item.category,
       riskLevel: item.riskLevel,
       status: item.status,
       source: item.source,
       decision: item.decision,
-      content: item.content,
+      content: redactLegacyChatEvidence ? TEXT_ONLY_REDACTED_CASE_CONTENT : item.content,
       aiScore: item.aiScore,
       priority: item.priority ?? "normal",
       dueAt: item.dueAt ? item.dueAt.toISOString() : null,
@@ -1137,14 +1152,15 @@ export class ReviewCaseService {
   }
 
   private toCaseDto(item: any) {
+    const redactLegacyChatEvidence = this.shouldRedactLegacyChatEvidence(item);
     return {
       id: item.id,
-      title: item.title,
+      title: redactLegacyChatEvidence ? TEXT_ONLY_REDACTED_CASE_TITLE : item.title,
       category: item.category,
       riskLevel: item.riskLevel,
       status: item.status,
       source: item.source,
-      content: item.content,
+      content: redactLegacyChatEvidence ? TEXT_ONLY_REDACTED_CASE_CONTENT : item.content,
       targetId: item.targetId ?? null,
       messageId: item.messageId ?? null,
       conversationId: item.conversationId ?? null,
@@ -1157,7 +1173,7 @@ export class ReviewCaseService {
       provider: item.provider ?? null,
       providerVersion: item.providerVersion ?? null,
       aiScore: item.aiScore,
-      aiReason: item.aiReason,
+      aiReason: redactLegacyChatEvidence ? null : item.aiReason,
       decision: item.decision,
       matchedRules: item.matchedRules ?? [],
       usedAI: item.usedAI,
@@ -1166,6 +1182,16 @@ export class ReviewCaseService {
       appealPolicyVersion: item.appealPolicyVersion ?? null,
       createdAt: item.createdAt.toISOString()
     };
+  }
+
+  private shouldRedactLegacyChatEvidence(item: any): boolean {
+    // ModerationCase has no immutable "content came from media" marker. The
+    // historic media worker concatenated extracted attachment text into every
+    // source=chat case artifact, so redact that whole stored projection when
+    // playback is disabled. Reviewers can still inspect the retained plaintext
+    // conversation through conversationEvidence(), whose attachment projection
+    // is separately empty in text-only mode.
+    return item?.source === "chat" && !this.mediaAssets.isChatMediaPlaybackEnabled();
   }
 
   private toActionLogDto(log: any) {

@@ -75,12 +75,11 @@ export default function SafetyScreen() {
             服务中的举报与售后入口以微信小程序对应页面为准。
           </p>
           <div className="marketing-detail-actions">
-            <Link href="/demo" className="button button-primary button-large">
-              查看网页产品演示 <ArrowRight size={18} aria-hidden="true" />
-            </Link>
-            <Link href="/how-it-works" className="button button-secondary button-large">
-              了解服务路径
-            </Link>
+            <MiniprogramCta
+              variant="inline"
+              secondaryHref="/how-it-works"
+              secondaryLabel="了解服务路径"
+            />
           </div>
         </div>
         <aside className="site-safety-aside" aria-label="先保护自己">

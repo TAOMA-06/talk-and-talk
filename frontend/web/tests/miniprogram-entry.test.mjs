@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   miniprogramCtaCopy,
   resolveMiniprogramEntry,
+  resolveMiniprogramQr,
 } from "../lib/miniprogram-entry.ts";
 
 test("missing config yields honest search fallback", () => {
@@ -39,12 +40,56 @@ test("non-allowlisted QR host falls back", () => {
   assert.equal(resolution.reason, "qr_host_not_allowlisted");
 });
 
+test("a valid QR remains separately resolvable when a configured deep link is rejected", () => {
+  const entry = resolveMiniprogramEntry({
+    path: "https://evil.example/mp",
+    qrUrl: "https://cdn.talkandtalk.app/qr/mini.png",
+  });
+  const qr = resolveMiniprogramQr({ qrUrl: "https://cdn.talkandtalk.app/qr/mini.png" });
+  assert.deepEqual(entry, {
+    kind: "fallback",
+    searchName: "Talk&Talk",
+    reason: "entry_host_not_allowlisted",
+  });
+  assert.deepEqual(qr, { kind: "qr", href: "https://cdn.talkandtalk.app/qr/mini.png" });
+});
+
+test("QR resolver rejects raw hostile configuration values", () => {
+  for (const qrUrl of [
+    "javascript:alert(1)",
+    "https://evil.example/qr.png",
+    "https://user:pass@cdn.talkandtalk.app/qr.png",
+    "https://cdn.talkandtalk.app/qr.png#fragment",
+    "https://cdn.talkandtalk.app/qr.png?cache=1",
+  ]) {
+    assert.equal(resolveMiniprogramQr({ qrUrl }).kind, "fallback", qrUrl);
+  }
+});
+
 test("weixin scheme path is accepted (query tokens allowed)", () => {
   const resolution = resolveMiniprogramEntry({
     path: "weixin://dl/business/?t=demo",
     qrUrl: "",
   });
   assert.equal(resolution.kind, "path");
+});
+
+test("weixin deep links must target the official Mini Program entry only", () => {
+  for (const [path, reason] of [
+    ["weixin://evil.example/business/?t=demo", "entry_weixin_target_not_allowlisted"],
+    ["weixin://dl/other/?t=demo", "entry_weixin_target_not_allowlisted"],
+    ["weixin://dl/business/extra?t=demo", "entry_weixin_target_not_allowlisted"],
+    ["weixin://dl/business/?redirect=https%3A%2F%2Fevil.example", "entry_weixin_target_not_allowlisted"],
+    ["weixin://dl/business/?t=one&t=two", "entry_weixin_target_not_allowlisted"],
+    ["weixin://dl/business/?t=", "entry_weixin_target_not_allowlisted"],
+    ["weixin://dl:8443/business/?t=demo", "entry_url_injection"],
+    ["weixin://user:pass@dl/business/?t=demo", "entry_url_injection"],
+    ["weixin://dl/business/?t=demo#fragment", "entry_url_injection"],
+  ]) {
+    const resolution = resolveMiniprogramEntry({ path, qrUrl: "" });
+    assert.equal(resolution.kind, "fallback", path);
+    assert.equal(resolution.reason, reason, path);
+  }
 });
 
 test("allowlisted https entry path is accepted without injection", () => {
@@ -79,6 +124,10 @@ test("credentials, fragments, and https query strings are rejected", () => {
   );
   assert.equal(
     resolveMiniprogramEntry({ path: "https://talkandtalk.app/mp?x=1" }).kind,
+    "fallback",
+  );
+  assert.equal(
+    resolveMiniprogramEntry({ path: "https://talkandtalk.app:8443/mp" }).kind,
     "fallback",
   );
 });

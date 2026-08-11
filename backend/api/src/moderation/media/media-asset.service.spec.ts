@@ -70,6 +70,41 @@ describe("MediaAssetService retention and presentation", () => {
     expect(storage.createReadUrl).not.toHaveBeenCalled();
   });
 
+  it("fails closed for legacy chat and controlled evidence before database or storage access on text-only", async () => {
+    await expect(service.bindUploadedAssets({
+      assetIds: ["asset-1"],
+      uploaderId: "user-1",
+      conversationId: "conversation-1",
+      messageId: "message-1"
+    })).rejects.toMatchObject({ code: "MEDIA_FEATURE_DISABLED", status: 503 });
+    await expect(service.controlledStatus("asset-1", "user-1"))
+      .rejects.toMatchObject({ code: "MEDIA_FEATURE_DISABLED", status: 503 });
+    await expect(service.approvedReadUrl({
+      id: "asset-1",
+      status: "approved",
+      storageKey: "case-evidence/support/asset-1",
+      kind: "image",
+      mimeType: "image/jpeg",
+      sizeBytes: 1,
+      sha256: "a".repeat(64),
+      expiresAt: new Date(Date.now() + 60_000)
+    })).rejects.toMatchObject({ code: "MEDIA_FEATURE_DISABLED", status: 503 });
+    await expect(service.attachmentsForMessage("message-1")).resolves.toEqual([]);
+    await expect(service.toAttachmentDto({
+      id: "asset-1",
+      status: "approved",
+      storageKey: "chat/conversation-1/asset-1",
+      kind: "image",
+      mimeType: "image/jpeg",
+      sizeBytes: 1,
+      sha256: "a".repeat(64),
+      expiresAt: new Date(Date.now() + 60_000)
+    })).resolves.toEqual(expect.objectContaining({ url: null }));
+
+    expect(prisma.mediaAsset.findMany).not.toHaveBeenCalled();
+    expect(storage.createReadUrl).not.toHaveBeenCalled();
+  });
+
   it("marks media expired only after object storage confirms deletion", async () => {
     const now = new Date("2026-07-20T00:00:00.000Z");
     prisma.$queryRawUnsafe.mockResolvedValue([claimedAsset()]);

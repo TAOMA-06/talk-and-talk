@@ -35,10 +35,12 @@ const MAX_CANDIDATES = 200;
  * ranking for the first-release candidate.
  */
 export function isRecommendationPersonalizationRankingAllowed(
-  env: NodeJS.ProcessEnv = process.env
+  _env: NodeJS.ProcessEnv = process.env
 ): boolean {
-  const flag = (env.RECOMMENDATION_PERSONALIZATION_ENABLED || "").trim().toLowerCase();
-  return flag === "1" || flag === "true" || flag === "yes";
+  // R01 is the only authority that can define an auditable consent ledger and
+  // future re-enablement. A process environment flag is not that authority,
+  // so it must not restore behavioural/order ranking in the first release.
+  return false;
 }
 
 type CompanionCandidate = {
@@ -111,22 +113,27 @@ export class RecommendationsService {
   }
 
   async getPreferences(userId: string) {
+    const rankingAllowed = isRecommendationPersonalizationRankingAllowed();
     const [stored, tags, orders] = await Promise.all([
       this.prisma.userRecommendationPreference.findUnique({ where: { userId } }),
-      this.prisma.userRecommendationTag.findMany({
-        where: { userId, source: "behavioral" as any },
-        orderBy: [{ updatedAt: "desc" }]
-      } as any),
-      this.prisma.order.findMany({
-        where: {
-          userId,
-          createdAt: { gte: this.daysAgo(BEHAVIOR_LOOKBACK_DAYS) },
-          status: { in: ["pending", "paying", "paid", "inService", "completed"] }
-        },
-        select: { themeId: true, status: true, createdAt: true },
-        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-        take: MAX_BEHAVIOR_ORDER_FACTS
-      } as any)
+      rankingAllowed
+        ? this.prisma.userRecommendationTag.findMany({
+            where: { userId, source: "behavioral" as any },
+            orderBy: [{ updatedAt: "desc" }]
+          } as any)
+        : Promise.resolve([]),
+      rankingAllowed
+        ? this.prisma.order.findMany({
+            where: {
+              userId,
+              createdAt: { gte: this.daysAgo(BEHAVIOR_LOOKBACK_DAYS) },
+              status: { in: ["pending", "paying", "paid", "inService", "completed"] }
+            },
+            select: { themeId: true, status: true, createdAt: true },
+            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+            take: MAX_BEHAVIOR_ORDER_FACTS
+          } as any)
+        : Promise.resolve([])
     ]);
     const preference = this.asPreference(stored);
     const disabledTopics = new Set(tags.filter((tag: any) => tag.disabledAt).map((tag: any) => tag.topicId));
@@ -154,7 +161,6 @@ export class RecommendationsService {
         updatedAt: null
       }));
 
-    const rankingAllowed = isRecommendationPersonalizationRankingAllowed();
     return {
       ...preference,
       // Effective ranking flag: stored opt-in cannot enable ranking while P0-14 is closed.
@@ -165,6 +171,13 @@ export class RecommendationsService {
   }
 
   async updatePreferences(userId: string, dto: UpdateRecommendationPreferencesDto) {
+    if (dto.personalizationEnabled === true) {
+      throw new AppException(
+        "RECOMMENDATION_PERSONALIZATION_CLOSED",
+        "Personalized ranking is unavailable until a new recorded opt-in authority is approved",
+        HttpStatus.CONFLICT
+      );
+    }
     const normalizedTopics = dto.topicIds === undefined ? undefined : this.assertTopicIds(dto.topicIds);
     const preferredTimeSlots = dto.preferredTimeSlots === undefined
       ? undefined
@@ -175,15 +188,16 @@ export class RecommendationsService {
       where: { userId },
       create: {
         userId,
-        // MP-D07 / P0-14: personalization stays off unless the caller opts in.
-        personalizationEnabled: dto.personalizationEnabled ?? false,
+        // PERSONALIZATION-R01-A: neither a stale row nor a request payload may
+        // retain/recreate the historical opt-in without a new consent ledger.
+        personalizationEnabled: false,
         topicIds: normalizedTopics ?? [],
         city: city ?? null,
         maxPricePerHalfHour: maxPricePerHalfHour ?? null,
         preferredTimeSlots: preferredTimeSlots ?? []
       },
       update: {
-        ...(dto.personalizationEnabled !== undefined ? { personalizationEnabled: dto.personalizationEnabled } : {}),
+        personalizationEnabled: false,
         ...(normalizedTopics !== undefined ? { topicIds: normalizedTopics } : {}),
         ...(city !== undefined ? { city } : {}),
         ...(maxPricePerHalfHour !== undefined ? { maxPricePerHalfHour } : {}),

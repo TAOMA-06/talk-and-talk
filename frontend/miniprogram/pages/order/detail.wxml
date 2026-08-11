@@ -88,19 +88,19 @@
         <view class="replacement-copy">{{view.replacementDescription}}</view>
         <button class="replacement-action" bindtap="findReplacement">按原需求重新匹配</button>
       </view>
-      <button wx:if="{{view.canConfirmServiceOrder}}" class="primary-button action-button" loading="{{action === 'confirm'}}" disabled="{{action !== ''}}" bindtap="confirmServiceOrder">确认接单</button>
+      <button wx:if="{{view.canConfirmServiceOrder && !view.isTextOnlyHistoricalVoiceOrder}}" class="primary-button action-button" loading="{{action === 'confirm'}}" disabled="{{action !== ''}}" bindtap="confirmServiceOrder">确认接单</button>
       <button wx:if="{{view.canRejectServiceOrder}}" class="danger-button action-button" loading="{{action === 'reject'}}" disabled="{{action !== ''}}" bindtap="rejectServiceOrder">无法接单</button>
       <button wx:if="{{view.canPay}}" class="primary-button action-button" bindtap="openPayment">进入安全支付与结果页</button>
       <button wx:if="{{view.canConfirmGuidelines}}" class="secondary-button action-button" loading="{{action === 'guidelines'}}" disabled="{{action !== ''}}" bindtap="confirmGuidelines">{{view.guidelinesActionText}}</button>
       <button wx:if="{{view.canChat}}" class="secondary-button action-button" bindtap="openConversation">进入订单会话</button>
-      <button wx:if="{{view.canStartService}}" class="primary-button action-button" loading="{{action === 'start'}}" disabled="{{action !== ''}}" bindtap="startService">开始服务</button>
+      <button wx:if="{{view.canStartService && !view.isTextOnlyHistoricalVoiceOrder}}" class="primary-button action-button" loading="{{action === 'start'}}" disabled="{{action !== ''}}" bindtap="startService">开始服务</button>
       <button wx:if="{{view.canVoice}}" class="primary-button action-button" bindtap="openVoice">通话前检查并进入实时语音</button>
       <button wx:if="{{view.canCompleteService}}" class="primary-button action-button" loading="{{action === 'complete'}}" disabled="{{action !== ''}}" bindtap="completeService">完成服务</button>
       <view wx:if="{{view.serviceActionNotice}}" class="service-action-notice">{{view.serviceActionNotice}}</view>
       <button wx:if="{{view.canAftercare}}" class="primary-button action-button" bindtap="openAftercare">评价、反馈与售后</button>
       <view wx:if="{{!view.hasAttendanceDispute && view.attendanceDisputeNotice}}" class="service-action-notice">{{view.attendanceDisputeNotice}}</view>
       <button wx:if="{{view.canOpenAttendanceDispute && !view.hasAttendanceDispute}}" class="secondary-button action-button" bindtap="openAttendanceDispute" aria-label="提交迟到爽约技术故障争议">{{view.attendanceDisputeActionText}}</button>
-      <button wx:if="{{order.status === 'pending' || order.status === 'paid'}}" class="secondary-button action-button" bindtap="openOrdersForReschedule">改期协商</button>
+      <button wx:if="{{(order.status === 'pending' || order.status === 'paid') && !view.isTextOnlyHistoricalVoiceOrder}}" class="secondary-button action-button" bindtap="openOrdersForReschedule">改期协商</button>
       <button wx:if="{{view.canCancel}}" class="danger-button action-button" loading="{{action === 'cancel'}}" bindtap="cancelOrder">取消订单</button>
       <button class="secondary-button action-button" bindtap="openSupport">订单需要平台协助</button>
       <button class="safety-button action-button" bindtap="openSafetyReport">安全举报与案件进度</button>

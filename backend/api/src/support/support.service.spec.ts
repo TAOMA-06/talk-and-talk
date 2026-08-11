@@ -13,12 +13,14 @@ describe("SupportService", () => {
   const caseEvidence = {
     attachmentInclude: jest.fn().mockReturnValue({ evidenceAttachments: { include: { mediaAsset: true } } }),
     attachmentDtos: jest.fn().mockReturnValue([]),
+    assertAttachmentsAllowed: jest.fn(),
     bindSupportFact: jest.fn().mockResolvedValue([])
   } as any;
   let service: SupportService;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    caseEvidence.assertAttachmentsAllowed.mockReturnValue(undefined);
     service = new SupportService(prisma, config, commercial, audit, notifications, caseEvidence);
   });
 
@@ -271,6 +273,30 @@ describe("SupportService", () => {
     )).rejects.toMatchObject({ code: "SUPPORT_ORDER_FACT_SENSITIVE_CONTENT" });
 
     expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects media evidence before an order fact transaction can create any business record", async () => {
+    const unavailable = Object.assign(new Error("media disabled"), {
+      code: "MEDIA_FEATURE_DISABLED",
+      status: 503
+    });
+    caseEvidence.assertAttachmentsAllowed.mockImplementation(() => {
+      throw unavailable;
+    });
+
+    await expect(service.addOrderFact(
+      { id: "customer-1" } as any,
+      "ticket-1",
+      {
+        statement: "我需要补充一段可核对的履约事实。",
+        evidenceAssetIds: ["11111111-1111-4111-8111-111111111111"]
+      }
+    )).rejects.toBe(unavailable);
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(caseEvidence.bindSupportFact).not.toHaveBeenCalled();
+    expect(audit.record).not.toHaveBeenCalled();
+    expect(notifications.createTransactional).not.toHaveBeenCalled();
   });
 
   it("does not let another person probe or append to a requester's order support ticket", async () => {

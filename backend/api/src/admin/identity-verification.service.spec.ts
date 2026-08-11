@@ -64,61 +64,46 @@ describe("IdentityVerificationService", () => {
     audit.record.mockResolvedValue(undefined);
   });
 
-  it("submits a pending proposal without changing KYC or publication state", async () => {
+  it("rejects a new verification grant before reading or writing identity state", async () => {
     tx.user.findUnique.mockResolvedValue({
       id: "user-1",
       role: "user",
       profile: { isVerified: false },
       companionProfile: null
     });
-    tx.identityVerificationRequest.create.mockResolvedValue(record());
-
     await expect(service.submitRequest(actor, "user-1", {
       isVerified: true,
       reason: " 外部实名核验已完成 ",
       evidenceReference: "kyc:case-001"
-    })).resolves.toEqual(expect.objectContaining({
-      id: "verification-1",
-      status: "pending",
-      requestedIsVerified: true,
-      previousIsVerified: false
-    }));
+    })).rejects.toMatchObject({ code: "IDENTITY_VERIFICATION_GRANT_FROZEN" });
 
-    expect(tx.identityVerificationRequest.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({
-        userId: "user-1",
-        previousIsVerified: false,
-        requestedIsVerified: true,
-        submittedById: actor.id
-      })
-    }));
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(tx.identityVerificationRequest.create).not.toHaveBeenCalled();
     expect(tx.userProfile.upsert).not.toHaveBeenCalled();
     expect(tx.companionProfile.updateMany).not.toHaveBeenCalled();
-    expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({
-      action: "identity.verification_change_submitted"
-    }), tx);
+    expect(audit.record).not.toHaveBeenCalled();
   });
 
-  it("rejects duplicate pending requests before writing", async () => {
+  it("allows a revocation proposal while grants are frozen", async () => {
     tx.user.findUnique.mockResolvedValue({
       id: "user-1",
       role: "user",
-      profile: { isVerified: false },
+      profile: { isVerified: true },
       companionProfile: null
     });
-    tx.identityVerificationRequest.findFirst.mockResolvedValue({
-      id: "verification-existing",
-      requestedIsVerified: true
+    const revocation = record({
+      requestedIsVerified: false,
+      previousIsVerified: true,
+      evidenceReference: "kyc:revoke-002"
     });
+    tx.identityVerificationRequest.create.mockResolvedValue(revocation);
 
     await expect(service.submitRequest(actor, "user-1", {
-      isVerified: true,
-      reason: "重新提交核验申请",
-      evidenceReference: "kyc:case-002"
-    })).rejects.toMatchObject({
-      code: "IDENTITY_VERIFICATION_REQUEST_ALREADY_PENDING"
-    });
-    expect(tx.identityVerificationRequest.create).not.toHaveBeenCalled();
+      isVerified: false,
+      reason: "撤销旧身份状态",
+      evidenceReference: "kyc:revoke-002"
+    })).resolves.toEqual(expect.objectContaining({ requestedIsVerified: false }));
+    expect(tx.identityVerificationRequest.create).toHaveBeenCalled();
   });
 
   it("requires a different staff member for both approval and rejection", async () => {
@@ -133,44 +118,14 @@ describe("IdentityVerificationService", () => {
     expect(tx.identityVerificationRequest.update).not.toHaveBeenCalled();
   });
 
-  it("locks CompanionProfile before User and applies an approved verification", async () => {
+  it("rejects approval of a previously queued grant before mutating the subject", async () => {
     tx.identityVerificationRequest.findUnique.mockResolvedValue(record());
-    tx.user.findUnique.mockResolvedValue({
-      id: "user-1",
-      role: "user",
-      profile: { isVerified: false }
-    });
-    tx.identityVerificationRequest.update.mockResolvedValue(record({
-      status: "approved",
-      reviewedById: secondActor.id,
-      reviewedAt: now,
-      reviewReason: "第二人复核通过",
-      subject: {
-        id: "user-1",
-        role: "user",
-        accountStatus: "active",
-        profile: { displayName: "申请人", isVerified: true },
-        companionProfile: null
-      },
-      reviewedBy: { id: secondActor.id, profile: { displayName: "供给二" } }
-    }));
-
     await expect(service.approveRequest(secondActor, "verification-1", {
       reason: "第二人复核通过"
-    })).resolves.toEqual(expect.objectContaining({
-      status: "approved",
-      applied: true,
-      unpublishedCompanions: 0
-    }));
+    })).rejects.toMatchObject({ code: "IDENTITY_VERIFICATION_GRANT_FROZEN" });
 
-    const lockSql = tx.$queryRaw.mock.calls.map((call) => (call[0] as readonly string[]).join("?"));
-    expect(lockSql[1]).toContain('FROM "CompanionProfile"');
-    expect(lockSql[2]).toContain('FROM "User"');
-    expect(tx.userProfile.upsert).toHaveBeenCalledWith({
-      where: { userId: "user-1" },
-      create: { userId: "user-1", isVerified: true },
-      update: { isVerified: true }
-    });
+    expect(tx.user.findUnique).not.toHaveBeenCalled();
+    expect(tx.userProfile.upsert).not.toHaveBeenCalled();
     expect(tx.companionProfile.updateMany).not.toHaveBeenCalled();
   });
 
@@ -242,11 +197,15 @@ describe("IdentityVerificationService", () => {
   });
 
   it("fails closed if the subject state changed after submission", async () => {
-    tx.identityVerificationRequest.findUnique.mockResolvedValue(record());
+    tx.identityVerificationRequest.findUnique.mockResolvedValue(record({
+      requestedIsVerified: false,
+      previousIsVerified: true,
+      evidenceReference: "kyc:revoke-state-changed"
+    }));
     tx.user.findUnique.mockResolvedValue({
       id: "user-1",
       role: "user",
-      profile: { isVerified: true }
+      profile: { isVerified: false }
     });
 
     await expect(service.approveRequest(secondActor, "verification-1", {

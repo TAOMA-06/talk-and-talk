@@ -1,5 +1,9 @@
-name: iOS
+name: iOS metadata hygiene (untrusted)
 
+# This repository-owned workflow is deliberately limited to fixed Git metadata
+# checks. It does not select Xcode, install or execute iOS candidate code, or
+# create a release artifact. iOS build/test evidence belongs only to the
+# separately protected external control plane.
 on:
   push:
     branches: [main]
@@ -13,41 +17,43 @@ on:
       - "shared/contracts/**"
       - ".github/workflows/ios.yml"
 
+permissions:
+  contents: read
+
+env:
+  BASH_ENV: /dev/null
+  DYLD_FORCE_FLAT_NAMESPACE: ""
+  DYLD_INSERT_LIBRARIES: ""
+  DYLD_LIBRARY_PATH: ""
+  DYLD_ROOT_PATH: ""
+  ENV: /dev/null
+  GIT_CONFIG_GLOBAL: /dev/null
+  GIT_CONFIG_NOSYSTEM: "1"
+  LD_AUDIT: ""
+  LD_LIBRARY_PATH: ""
+  LD_PRELOAD: ""
+  NODE_OPTIONS: ""
+  NODE_PATH: ""
+
 jobs:
-  test:
-    runs-on: macos-15
-    timeout-minutes: 45
+  metadata:
+    name: Verify iOS metadata without executing candidate code
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode.app
-      - name: Unit tests
-        working-directory: frontend/ios
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 1
+          lfs: false
+          persist-credentials: false
+          submodules: false
+      - name: Seal command files and verify checked-out metadata
+        shell: bash
         run: |
           set -euo pipefail
-          xcodebuild test \
-            -project TalkAndTalk.xcodeproj \
-            -scheme TalkAndTalk \
-            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
-            -only-testing:TalkAndTalkTests \
-            CODE_SIGNING_ALLOWED=NO \
-            | xcpretty || xcodebuild test \
-            -project TalkAndTalk.xcodeproj \
-            -scheme TalkAndTalk \
-            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
-            -only-testing:TalkAndTalkTests \
-            CODE_SIGNING_ALLOWED=NO
-      - name: Build Release artifact
-        working-directory: frontend/ios
-        run: |
-          set -euo pipefail
-          xcodebuild build \
-            -project TalkAndTalk.xcodeproj \
-            -scheme TalkAndTalk \
-            -configuration Release \
-            -destination 'generic/platform=iOS Simulator' \
-            -derivedDataPath "$RUNNER_TEMP/TalkAndTalkDerivedData" \
-            CODE_SIGNING_ALLOWED=NO
-      - name: Reject Demo data in Release
-        working-directory: frontend/ios
-        run: Scripts/check_release_artifact.sh "$RUNNER_TEMP/TalkAndTalkDerivedData/Build/Products/Release-iphonesimulator/TalkAndTalk.app"
+          export PATH=/usr/bin:/bin
+          export GITHUB_ENV=/dev/null GITHUB_OUTPUT=/dev/null GITHUB_PATH=/dev/null GITHUB_STEP_SUMMARY=/dev/null
+          readonly PATH GITHUB_ENV GITHUB_OUTPUT GITHUB_PATH GITHUB_STEP_SUMMARY
+          /usr/bin/git -c core.hooksPath=/dev/null -c core.fsmonitor=false rev-parse HEAD | /usr/bin/grep -Fx "$GITHUB_SHA"
+          test -z "$(/usr/bin/git -c core.hooksPath=/dev/null -c core.fsmonitor=false status --porcelain --untracked-files=all)"
+          /usr/bin/git -c core.hooksPath=/dev/null -c core.fsmonitor=false diff --check --no-ext-diff

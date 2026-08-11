@@ -1,3 +1,5 @@
+> **历史归档 / 非当前状态（已被替代）：** 本文件记录的是基于 2026-08-07 脏基线 `main@9cf5e3849a9654ddfddb8046bf29a580533fa268` 的历史 G0 包，已被[当前 G1 修复运行状态](../2026-08-08-g1-remediation/state.md)替代（`G1 NO-GO`、`G2-ready NO-GO`、`G2 BLOCKED`）。不得将其用作当前候选、E2、G1、G2-ready、G2、CI、发布、授权或任何外部证据。
+
 # Talk&Talk 官网 + 微信小程序长期任务状态
 
 > Task ID：`2026-08-04-web-miniprogram-g0`。2026-08-07 Grok 续跑：MODEL-D06 按目标 OBJECTIVE 放弃；按指南默认冻结 MP-D05/D07/D08；完成 SHARED-01 / WEB-01 / Mini G1 blockers 实现与本地门禁；G2 仍 BLOCKED，无外部写操作。

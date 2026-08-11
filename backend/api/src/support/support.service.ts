@@ -270,6 +270,9 @@ export class SupportService {
         HttpStatus.BAD_REQUEST
       );
     }
+    // A text-only release must reject an evidence-bearing request before the
+    // fact row, audit record, or enclosing transaction can be created.
+    this.caseEvidence.assertAttachmentsAllowed(dto.evidenceAssetIds);
     const fact = await this.prisma.$transaction(async (tx) => {
       const db = tx as any;
       // Read only the opaque order pointer before acquiring the canonical

@@ -18,13 +18,18 @@
       <view class="profile-hub-item" bindtap="openNotificationCenter" aria-role="button" aria-label="打开通知中心" tabindex="0"><view class="profile-hub-title">通知中心</view><view class="profile-hub-copy">{{unreadNotificationState === 'available' ? unreadNotificationCount + ' 条未读' : '未读数待核对'}}</view></view>
       <view class="profile-hub-item" bindtap="openSupportCenter" aria-role="button" aria-label="打开案件中心：安全与客服进度" tabindex="0"><view class="profile-hub-title">案件中心</view><view class="profile-hub-copy">安全与客服进度</view></view>
     </view>
+    <view class="card" aria-live="polite">
+      <view class="title small">公开互动身份状态</view>
+      <view class="muted">首发阶段尚未启用可追溯的身份核验授权，因此公开发帖和即时消息保持关闭。订单读取、履约收尾和售后仍可使用；平台不会要求你在此上传证件、照片、人脸、手机号或自由文本身份材料。</view>
+      <button class="resource-retry" bindtap="openSupportCenter" aria-label="前往案件中心查看身份状态支持">前往案件中心</button>
+    </view>
     <view class="card resource-error-card" wx:if="{{recommendationSettingsState === 'error'}}" aria-live="polite">
       <view class="title small">个性化推荐设置暂不可用</view>
       <view class="muted">{{recommendationSettingsError}}</view>
       <button class="resource-retry" bindtap="load" aria-label="重新读取个性化推荐设置">重新读取推荐设置</button>
     </view>
     <view class="card" wx:elif="{{recommendationSettingsState === 'available' && recommendationPreferences}}">
-      <view class="recommendation-header"><view><view class="title small">个性化推荐</view><view class="muted">只使用你主动填写的偏好、卡片互动和订单主题，不读取聊天内容。</view></view><switch checked="{{recommendationPreferences.personalizationEnabled}}" color="#B94A68" bindchange="setPersonalization" aria-label="{{recommendationPreferences.personalizationEnabled ? '关闭' : '开启'}}个性化推荐" /></view>
+      <view class="recommendation-header"><view><view class="title small">个性化推荐</view><view class="muted">首发阶段未启用个性化排序；历史开关已按关闭处理。你仍可手动搜索和浏览当前可用服务。</view></view><switch checked="{{false}}" disabled color="#B94A68" bindchange="setPersonalization" aria-label="个性化推荐首发阶段未启用" /></view>
       <view wx:if="{{recommendationPreferences.personalizationEnabled}}">
         <view class="recommendation-label">感兴趣的主题</view>
         <view class="choices"><view wx:for="{{recommendationTopics}}" wx:key="id" class="choice {{item.selected ? 'selected' : ''}}" bindtap="toggleRecommendationTopic" data-id="{{item.id}}" aria-role="checkbox" aria-checked="{{item.selected}}" aria-label="推荐主题：{{item.name}}" tabindex="0">{{item.selected ? '✓ ' : ''}}{{item.name}}</view></view>

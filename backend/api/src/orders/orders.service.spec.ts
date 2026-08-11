@@ -932,9 +932,13 @@ describe("OrdersService", () => {
 
   it("returns a role-aware order detail to the assigned companion without customer-only refund or feedback text", async () => {
     const createdAt = new Date("2026-07-20T00:00:00.000Z");
-    prisma.order.findUnique.mockResolvedValue({
+    const participantOrder = {
       id: "o-participant", userId: "u-customer", companionId: "c1", themeId: "t1",
       durationMinutes: 30, amountCents: 3900, currency: "CNY", status: "paid",
+      platformFeeBps: 1000, platformFeeCents: 390, companionPayableCents: 3510,
+      adultEligibilityVerdictSnapshot: "adult",
+      adultEligibilityVerifiedAtSnapshot: createdAt,
+      adultEligibilityValidUntilSnapshot: new Date("2027-01-20T00:00:00.000Z"),
       scheduledAt: new Date("2026-07-21T01:00:00.000Z"),
       companionNameSnapshot: "林屿", companionRoleSnapshot: "倾听者",
       companionInitialsSnapshot: "LY", themeNameSnapshot: "情绪倾听",
@@ -956,7 +960,8 @@ describe("OrdersService", () => {
       attendanceDispute: {
         id: "attendance-1", issue: "technicalFailure", status: "counterpartyResponse", updatedAt: createdAt
       }
-    });
+    };
+    prisma.order.findUnique.mockResolvedValue(participantOrder);
 
     const result: any = await service.get("u-companion", "o-participant");
 
@@ -981,6 +986,20 @@ describe("OrdersService", () => {
       experienceFeedback: { id: "feedback-private", note: "customer private feedback" },
       attendanceDispute: { id: "attendance-1" }
     });
+
+    // The generic serializer is also returned by customer refund create/sync;
+    // participant list/detail add only role-safe fields on top of it.
+    const genericResult: any = service.toDto(participantOrder as any);
+    for (const dto of [genericResult, result, customerResult]) {
+      for (const field of [
+        "platformFeeBps",
+        "platformFeeCents",
+        "companionPayableCents",
+        "commercialAssurances"
+      ]) {
+        expect(dto).not.toHaveProperty(field);
+      }
+    }
   });
 
   it("publishes the authoritative attendance-case opening and closing window", () => {
@@ -1081,6 +1100,48 @@ describe("OrdersService", () => {
       "u-companion", "orderStatus", "有新的改期请求", expect.any(String), expect.objectContaining({ orderId: order.id })
     );
     expect(prisma.order.update).not.toHaveBeenCalled();
+  });
+
+  it("fails closed before a text-only historical voice order can create a reschedule proposal", async () => {
+    const audit = { record: jest.fn() } as any;
+    const textOnlyConfig = {
+      get: jest.fn((key: string, fallback?: unknown) => key === "COMMERCIAL_SURFACE" ? "text_only" : fallback)
+    } as any;
+    const guardedNotifications = { create: jest.fn() } as any;
+    const guardedService = new OrdersService(
+      prisma,
+      guardedNotifications,
+      wechat,
+      undefined,
+      textOnlyConfig,
+      audit
+    );
+    const order = {
+      id: "o-text-only-voice-reschedule",
+      userId: "u-customer",
+      companionId: "c1",
+      serviceOfferingDeliveryModeSnapshot: "voice",
+      status: "paid",
+      scheduledAt: new Date(Date.now() + 3 * 24 * 60 * 60_000),
+      durationMinutes: 30,
+      companion: { ownerUserId: "u-companion" },
+      refunds: []
+    };
+    prisma.order.findUnique.mockResolvedValue(order);
+
+    await expect(guardedService.requestReschedule("u-customer", order.id, {
+      requestedScheduledAt: new Date(Date.now() + 4 * 24 * 60 * 60_000).toISOString()
+    })).rejects.toMatchObject({
+      code: "COMMERCIAL_SURFACE_TEXT_ONLY",
+      status: HttpStatus.UNPROCESSABLE_ENTITY
+    });
+
+    expect(prisma.orderRescheduleRequest.create).not.toHaveBeenCalled();
+    expect(prisma.orderRescheduleRequest.update).not.toHaveBeenCalled();
+    expect(prisma.order.update).not.toHaveBeenCalled();
+    expect(prisma.orderTimelineEvent.create).not.toHaveBeenCalled();
+    expect(guardedNotifications.create).not.toHaveBeenCalled();
+    expect(audit.record).not.toHaveBeenCalled();
   });
 
   it("rejects a reschedule proposal beyond the companion adult-eligibility window", async () => {
@@ -1229,7 +1290,7 @@ describe("OrdersService", () => {
     expect(db.order.update).not.toHaveBeenCalled();
   });
 
-  it("lets the other participant accept a structured proposal and atomically replace the appointment snapshot", async () => {
+  it("returns the responder's role-aware projection when accepting a structured proposal", async () => {
     const requestedScheduledAt = new Date(
       Math.ceil((Date.now() + 3 * 24 * 60 * 60_000) / (30 * 60_000)) * (30 * 60_000)
     );
@@ -1269,6 +1330,22 @@ describe("OrdersService", () => {
       availabilityWindowStartsAtSnapshot: window.startsAt,
       availabilityWindowEndsAtSnapshot: window.endsAt,
       availabilityWindowCapacitySnapshot: window.capacity,
+      refunds: [{
+        id: "refund-rejected-private",
+        outRefundNo: "refund-private-reference",
+        amountCents: 6900,
+        status: "rejected",
+        reason: "customer private refund statement",
+        reviewNote: "staff private refund note",
+        failureReason: "customer private failure detail"
+      }],
+      experienceFeedback: {
+        id: "feedback-private",
+        rating: 3,
+        tags: ["private"],
+        note: "customer private experience feedback",
+        createdAt: new Date()
+      },
       updatedAt: new Date()
     };
     prisma.order.findUnique.mockResolvedValue(order);
@@ -1289,6 +1366,22 @@ describe("OrdersService", () => {
       endsAt: window.endsAt.toISOString(),
       capacity: window.capacity
     });
+    expect(result.order).toEqual(expect.objectContaining({
+      viewerRole: "companion",
+      fulfillmentBlockedByRefund: false,
+      refund: null,
+      experienceFeedback: null
+    }));
+    const companionResponse = JSON.stringify(result.order);
+    for (const privateValue of [
+      "refund-private-reference",
+      "customer private refund statement",
+      "staff private refund note",
+      "customer private failure detail",
+      "customer private experience feedback"
+    ]) {
+      expect(companionResponse).not.toContain(privateValue);
+    }
     const orderUpdate = prisma.order.update.mock.calls.at(-1)[0];
     expect(orderUpdate.data).toEqual(expect.objectContaining({
       scheduledAt: requestedScheduledAt,
@@ -1308,6 +1401,32 @@ describe("OrdersService", () => {
     expect(notifications.create).toHaveBeenCalledWith(
       "u-customer", "orderStatus", "改期请求已接受", expect.any(String), expect.objectContaining({ scheduledAt: requestedScheduledAt.toISOString() })
     );
+
+    const customerRequest = {
+      ...request,
+      id: "reschedule-accept-customer",
+      requestedByUserId: "u-companion",
+      requestedByRole: "companion"
+    };
+    prisma.orderRescheduleRequest.findUnique.mockResolvedValue(customerRequest);
+    prisma.orderRescheduleRequest.update.mockResolvedValue({
+      ...customerRequest,
+      status: "accepted",
+      respondedAt: new Date(),
+      respondedByUserId: "u-customer"
+    });
+
+    const customerResult = await service.acceptReschedule("u-customer", order.id, customerRequest.id);
+
+    expect(customerResult.order).toEqual(expect.objectContaining({
+      viewerRole: "customer",
+      refund: expect.objectContaining({
+        outRefundNo: "refund-private-reference",
+        reason: "customer private refund statement",
+        reviewNote: "staff private refund note"
+      }),
+      experienceFeedback: expect.objectContaining({ note: "customer private experience feedback" })
+    }));
   });
 
   it("rechecks companion adult eligibility when accepting a reschedule", async () => {
@@ -1348,6 +1467,57 @@ describe("OrdersService", () => {
       .rejects.toMatchObject({ code: "COMPANION_ADULT_ELIGIBILITY_VALIDITY_TOO_SHORT" });
     expect(prisma.order.update).not.toHaveBeenCalled();
     expect(prisma.orderRescheduleRequest.update).not.toHaveBeenCalled();
+  });
+
+  it("fails closed before a text-only historical voice order can expire or accept a reschedule proposal", async () => {
+    const audit = { record: jest.fn() } as any;
+    const textOnlyConfig = {
+      get: jest.fn((key: string, fallback?: unknown) => key === "COMMERCIAL_SURFACE" ? "text_only" : fallback)
+    } as any;
+    const guardedNotifications = { create: jest.fn() } as any;
+    const guardedService = new OrdersService(
+      prisma,
+      guardedNotifications,
+      wechat,
+      undefined,
+      textOnlyConfig,
+      audit
+    );
+    const originalScheduledAt = new Date(Date.now() + 3 * 24 * 60 * 60_000);
+    const order = {
+      id: "o-text-only-voice-accept",
+      userId: "u-customer",
+      companionId: "c1",
+      serviceOfferingDeliveryModeSnapshot: "voice",
+      status: "paid",
+      scheduledAt: originalScheduledAt,
+      durationMinutes: 30,
+      companion: { ownerUserId: "u-companion" },
+      refunds: []
+    };
+    const request = {
+      id: "reschedule-text-only-voice",
+      orderId: order.id,
+      requestedByUserId: "u-customer",
+      requestedByRole: "customer",
+      originalScheduledAt,
+      requestedScheduledAt: new Date(originalScheduledAt.getTime() + 24 * 60 * 60_000),
+      status: "pending",
+      expiresAt: new Date(Date.now() - 1_000)
+    };
+    prisma.order.findUnique.mockResolvedValue(order);
+    prisma.orderRescheduleRequest.findUnique.mockResolvedValue(request);
+
+    await expect(guardedService.acceptReschedule("u-companion", order.id, request.id)).rejects.toMatchObject({
+      code: "COMMERCIAL_SURFACE_TEXT_ONLY",
+      status: HttpStatus.UNPROCESSABLE_ENTITY
+    });
+
+    expect(prisma.order.update).not.toHaveBeenCalled();
+    expect(prisma.orderRescheduleRequest.update).not.toHaveBeenCalled();
+    expect(prisma.orderTimelineEvent.create).not.toHaveBeenCalled();
+    expect(guardedNotifications.create).not.toHaveBeenCalled();
+    expect(audit.record).not.toHaveBeenCalled();
   });
 
   it("does not let the requester accept their own reschedule proposal", async () => {
@@ -1574,6 +1744,59 @@ describe("OrdersService", () => {
       status: HttpStatus.CONFLICT
     });
     expect(prisma.order.update).not.toHaveBeenCalled();
+  });
+
+  it.each(["start", "confirm", "reject", "complete"])("rejects a non-owner before %s can mutate an order", async (action) => {
+    const transactionalNotifications = {
+      create: jest.fn(),
+      createTransactional: jest.fn()
+    } as any;
+    const audit = { record: jest.fn() } as any;
+    const voiceRoomControl = { terminateForOrder: jest.fn() } as any;
+    const companionEarning = { upsert: jest.fn() } as any;
+    const guardedPrisma = { ...prisma, companionEarning } as any;
+    const guardedService = new OrdersService(
+      guardedPrisma,
+      transactionalNotifications,
+      wechat,
+      undefined,
+      undefined,
+      audit,
+      undefined,
+      undefined,
+      voiceRoomControl
+    );
+    const db = {
+      ...guardedPrisma,
+      $queryRaw: jest.fn().mockResolvedValue([])
+    } as any;
+    guardedPrisma.$transaction.mockImplementation(async (fn: any) => fn(db));
+    guardedPrisma.order.findUnique.mockResolvedValue({
+      id: "o-owner-bound",
+      companionId: "c1",
+      companion: { ownerUserId: "actual-companion-owner" }
+    });
+    const invoke = {
+      start: () => guardedService.startService("third-party", "o-owner-bound"),
+      confirm: () => guardedService.confirmOrder("third-party", "o-owner-bound"),
+      reject: () => guardedService.rejectOrder("third-party", "o-owner-bound"),
+      complete: () => guardedService.completeService("third-party", "o-owner-bound")
+    }[action];
+
+    await expect(invoke!()).rejects.toMatchObject({
+      code: "ORDER_NOT_FOUND",
+      status: HttpStatus.NOT_FOUND
+    });
+
+    expect(guardedPrisma.order.update).not.toHaveBeenCalled();
+    expect(guardedPrisma.orderTimelineEvent.create).not.toHaveBeenCalled();
+    expect(guardedPrisma.orderRescheduleRequest.update).not.toHaveBeenCalled();
+    expect(guardedPrisma.companionProfile.update).not.toHaveBeenCalled();
+    expect(companionEarning.upsert).not.toHaveBeenCalled();
+    expect(transactionalNotifications.create).not.toHaveBeenCalled();
+    expect(transactionalNotifications.createTransactional).not.toHaveBeenCalled();
+    expect(audit.record).not.toHaveBeenCalled();
+    expect(voiceRoomControl.terminateForOrder).not.toHaveBeenCalled();
   });
 
   it("rechecks companion adult eligibility through the actual service end before start", async () => {
