@@ -23,6 +23,19 @@ import {
 } from "../../utils/models";
 import { formatCny, formatShanghaiDateTime, orderServiceName } from "../../utils/order-display";
 import { currentLegalConsent, openLegalDocument, withdrawLegalConsent } from "../../utils/privacy";
+import {
+  approvedControlledEvidenceIds,
+  chooseEvidenceAudio,
+  chooseEvidenceImage,
+  controlledEvidenceEnabled,
+  ControlledEvidenceDraft,
+  loadControlledEvidenceDrafts,
+  LocalEvidenceFile,
+  refreshControlledEvidenceDrafts,
+  saveControlledEvidenceDrafts,
+  TEXT_ONLY_EVIDENCE_MESSAGE,
+  uploadControlledEvidence
+} from "../../utils/controlled-evidence";
 
 type LoadState = "loading" | "available" | "empty" | "error";
 
@@ -277,6 +290,9 @@ Page({
     focusAccountAppealId: "",
     accountAppealActionId: "",
     accountAppealStatement: "",
+    accountAppealEvidenceDrafts: [] as ControlledEvidenceDraft[],
+    accountAppealEvidenceUploading: false,
+    accountAppealTextOnly: !controlledEvidenceEnabled(),
     accountAppealSubmitting: false,
     sessions: [] as SessionView[],
     sessionState: "loading" as LoadState,
@@ -619,16 +635,31 @@ Page({
     this.setData({ focusAccountActionId: "", focusAccountAppealId: "", accountActionsPage: 1 });
     void this.loadAccountActions();
   },
-  openAccountAppeal(event: any) {
+  async openAccountAppeal(event: any) {
     if (this.data.accountAppealSubmitting) return;
     const id = String(event.currentTarget.dataset.id || "");
     const action = this.data.accountActions.find((item) => item.id === id);
     if (!action?.canAppeal || action.appeal || action.revokedAt) return;
-    this.setData({ accountAppealActionId: id, accountAppealStatement: "" });
+    const transport = this.accountAppealEvidenceTransport(id);
+    const drafts = controlledEvidenceEnabled()
+      ? await refreshControlledEvidenceDrafts(
+          loadControlledEvidenceDrafts(this.accountAppealEvidenceStorageKey(id)),
+          transport
+        )
+      : [];
+    this.setData({
+      accountAppealActionId: id,
+      accountAppealStatement: "",
+      accountAppealEvidenceDrafts: drafts
+    });
   },
   closeAccountAppeal() {
     if (this.data.accountAppealSubmitting) return;
-    this.setData({ accountAppealActionId: "", accountAppealStatement: "" });
+    this.setData({
+      accountAppealActionId: "",
+      accountAppealStatement: "",
+      accountAppealEvidenceDrafts: []
+    });
   },
   setAccountAppealStatement(event: any) {
     this.setData({
@@ -644,6 +675,10 @@ Page({
       wx.showToast({ title: "请填写 10–1000 字申诉说明", icon: "none" });
       return;
     }
+    if (this.data.accountAppealEvidenceDrafts.some((item) => item.status !== "approved")) {
+      wx.showToast({ title: "请等待证据审核，或移除未通过文件", icon: "none" });
+      return;
+    }
     const confirmation = await new Promise<any>((resolve) => wx.showModal({
       title: "提交账号处置申诉",
       content: `你正在就“${action.kindText}”提交正式复核。提交成功不代表原处置已撤销，结果以独立复核结论为准。`,
@@ -654,8 +689,17 @@ Page({
     if (!confirmation.confirm) return;
     this.setData({ accountAppealSubmitting: true });
     try {
-      await api.createAccountActionAppeal(actionId, statement);
-      this.setData({ accountAppealActionId: "", accountAppealStatement: "" });
+      await api.createAccountActionAppeal(
+        actionId,
+        statement,
+        approvedControlledEvidenceIds(this.data.accountAppealEvidenceDrafts)
+      );
+      saveControlledEvidenceDrafts(this.accountAppealEvidenceStorageKey(actionId), []);
+      this.setData({
+        accountAppealActionId: "",
+        accountAppealStatement: "",
+        accountAppealEvidenceDrafts: []
+      });
       wx.showToast({ title: "申诉已提交", icon: "success" });
       await this.loadAccountActions();
     } catch (error) {
@@ -663,6 +707,97 @@ Page({
     } finally {
       this.setData({ accountAppealSubmitting: false });
     }
+  },
+  async addAccountAppealEvidenceImage() {
+    const file = await chooseEvidenceImage();
+    if (file) await this.uploadAccountAppealEvidence(file);
+  },
+  async addAccountAppealEvidenceAudio() {
+    const file = await chooseEvidenceAudio();
+    if (file) await this.uploadAccountAppealEvidence(file);
+  },
+  async uploadAccountAppealEvidence(file: LocalEvidenceFile) {
+    const actionId = this.data.accountAppealActionId;
+    if (
+      !actionId
+      || this.data.accountAppealEvidenceUploading
+      || this.data.accountAppealEvidenceDrafts.length >= 3
+    ) return;
+    this.setData({ accountAppealEvidenceUploading: true });
+    try {
+      let pendingId = "";
+      const storageKey = this.accountAppealEvidenceStorageKey(actionId);
+      const draft = await uploadControlledEvidence(
+        file,
+        (input) => api.reserveAccountActionAppealEvidenceUpload(actionId, input),
+        (next) => {
+          pendingId ||= next.assetId;
+          const drafts = this.data.accountAppealEvidenceDrafts
+            .filter((item) => item.assetId !== pendingId);
+          drafts.push(next);
+          saveControlledEvidenceDrafts(storageKey, drafts);
+          this.setData({ accountAppealEvidenceDrafts: drafts });
+        },
+        this.accountAppealEvidenceTransport(actionId)
+      );
+      if (draft.status !== "approved") {
+        wx.showToast({ title: draft.statusText, icon: "none" });
+      }
+    } catch (error) {
+      wx.showToast({ title: (error as Error).message || "证据上传失败", icon: "none" });
+    } finally {
+      this.setData({ accountAppealEvidenceUploading: false });
+    }
+  },
+  async refreshAccountAppealEvidence() {
+    const actionId = this.data.accountAppealActionId;
+    if (!actionId || !controlledEvidenceEnabled()) return;
+    const drafts = await refreshControlledEvidenceDrafts(
+      this.data.accountAppealEvidenceDrafts,
+      this.accountAppealEvidenceTransport(actionId)
+    );
+    saveControlledEvidenceDrafts(this.accountAppealEvidenceStorageKey(actionId), drafts);
+    this.setData({ accountAppealEvidenceDrafts: drafts });
+  },
+  removeAccountAppealEvidence(event: any) {
+    const assetId = String(event.currentTarget.dataset.id || "");
+    const drafts = this.data.accountAppealEvidenceDrafts
+      .filter((item) => item.assetId !== assetId);
+    saveControlledEvidenceDrafts(
+      this.accountAppealEvidenceStorageKey(this.data.accountAppealActionId),
+      drafts
+    );
+    this.setData({ accountAppealEvidenceDrafts: drafts });
+  },
+  async openAccountAppealEvidence(event: any) {
+    if (!controlledEvidenceEnabled()) {
+      wx.showToast({ title: TEXT_ONLY_EVIDENCE_MESSAGE, icon: "none" });
+      return;
+    }
+    const actionId = String(event.currentTarget.dataset.actionId || "");
+    const attachmentId = String(event.currentTarget.dataset.id || "");
+    try {
+      const result = await api.accountActionAppealEvidenceReadUrl(actionId, attachmentId);
+      if (result.kind === "image") {
+        wx.previewImage({ current: result.url, urls: [result.url] });
+      } else {
+        const audio = wx.createInnerAudioContext();
+        audio.src = result.url;
+        audio.onError(() => wx.showToast({ title: "音频暂时无法播放", icon: "none" }));
+        audio.play();
+      }
+    } catch (error) {
+      wx.showToast({ title: (error as Error).message || "证据暂时无法查看", icon: "none" });
+    }
+  },
+  accountAppealEvidenceTransport(actionId: string) {
+    return {
+      complete: (assetId: string) => api.completeAccountActionAppealEvidenceUpload(actionId, assetId),
+      status: (assetId: string) => api.accountActionAppealEvidenceUploadStatus(actionId, assetId)
+    };
+  },
+  accountAppealEvidenceStorageKey(actionId: string) {
+    return `talkandtalk.caseEvidence.userAccountAppeal.${actionId}`;
   },
   async loadSessions(pageOrEvent: number | unknown = 1, append = false) {
     const page = typeof pageOrEvent === "number" ? pageOrEvent : 1;

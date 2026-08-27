@@ -429,5 +429,16 @@ if (postgresPreflight) test("real PostgreSQL capacity SQL and ten replicas stay 
     `EXPLAIN (FORMAT JSON) ${preparationClaimSql}`,
     [claimAt, "plan-token", leaseExpiresAt]
   );
-  assert.match(JSON.stringify(claimPlan.rows[0]["QUERY PLAN"]), /AvailabilityReminderCandidate_preparation_due/);
+  const candidateIndexes = await admin.query(`
+    SELECT indexname FROM pg_indexes
+    WHERE schemaname = $1 AND tablename = 'AvailabilityReminderCandidate'
+  `, [schema]);
+  assert.ok(
+    candidateIndexes.rows.some((row) => row.indexname === "AvailabilityReminderCandidate_preparation_due"),
+    "the due-candidate lookup index must exist even when PostgreSQL legitimately chooses another plan"
+  );
+  const serializedClaimPlan = JSON.stringify(claimPlan.rows[0]["QUERY PLAN"]);
+  assert.match(serializedClaimPlan, /"Node Type":"Limit"/);
+  assert.match(serializedClaimPlan, /"Plan Rows":1/);
+  assert.match(serializedClaimPlan, /"Node Type":"LockRows"/);
 });

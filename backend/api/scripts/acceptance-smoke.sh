@@ -13,6 +13,8 @@
 # The Mini Program payment channel requires a real, server-verified WeChat
 # openid.  This script therefore exercises the same server-side order/payment
 # lifecycle through the mock App channel, without fabricating WeChat identity.
+# While IDENTITY-R01/R02 freezes every grant, the script proves the exact 403
+# and stops before any order/payment write instead of bypassing the product gate.
 
 set -euo pipefail
 umask 077
@@ -100,6 +102,7 @@ api_request() {
   local path="$3"
   local token="${4:-}"
   local body="${5:-}"
+  local allowed_error_code="${6:-}"
   local output="$TMP_DIR/$name.json"
   local status_file="$TMP_DIR/$name.status"
   local status
@@ -118,6 +121,18 @@ api_request() {
   fi
   printf '%s' "$status" > "$status_file"
   if [[ ! "$status" =~ ^2[0-9][0-9]$ ]]; then
+    if [[ -n "$allowed_error_code" ]] && python3 - "$output" "$allowed_error_code" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as source:
+    payload = json.load(source)
+raise SystemExit(0 if payload.get("error", {}).get("code") == sys.argv[2] else 1)
+PY
+    then
+      printf '%s\n' "$output"
+      return 0
+    fi
     printf 'Request failed: %s %s (HTTP %s)\n' "$method" "$path" "$status" >&2
     python3 - "$output" <<'PY' >&2 || true
 import json
@@ -490,7 +505,12 @@ OWNER_ID="$AUTH_USER_ID"
 record_legal_consent owner "$OWNER_TOKEN" "$OWNER_ID"
 
 say 'Customer creates a future service order'
-ORDER_JSON="$(api_request order-create POST '/orders' "$CUSTOMER_TOKEN" "$(make_order_body "$(near_future_schedule)")")"
+ORDER_JSON="$(api_request order-create POST '/orders' "$CUSTOMER_TOKEN" "$(make_order_body "$(near_future_schedule)")" 'PUBLIC_INTERACTION_IDENTITY_REQUIRED')"
+if [[ "$(<"$TMP_DIR/order-create.status")" == "403" ]]; then
+  say 'PASS: approved identity authority is absent; order and payment writes failed closed before creation'
+  say 'Downstream mock transaction coverage remains in isolated tests behind an explicitly labelled test adapter; this run is not commercial acceptance'
+  exit 0
+fi
 ORDER_ID="$(json_data "$ORDER_JSON" 'id')"
 
 say 'Companion owner confirms the service order'

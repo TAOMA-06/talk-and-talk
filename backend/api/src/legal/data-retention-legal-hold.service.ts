@@ -141,6 +141,7 @@ type LockedRetentionRecord = {
   expiryLeaseToken: string | null;
   expiryLeaseExpiresAt: Date | null;
   expiryErasedRecordCount: number;
+  mediaDeletionClaimedAt: Date | null;
   processingRestrictedAt: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -323,6 +324,7 @@ export class DataRetentionLegalHoldService {
           return this.mutationResponse(existing, null, actor.id, policy, false);
         }
         this.assertRecordCanReceiveHold(record);
+        await this.assertRetentionMediaPreservable(db, record);
         this.assertReasonAllowed(policy, dto.reasonCode, "placement", record.category);
 
         const activeHold = await db.accountDataRetentionLegalHold.findFirst({
@@ -596,6 +598,7 @@ export class DataRetentionLegalHoldService {
         let wakeRetentionWorker = false;
         if (decision === "approved" && action.action === "placement") {
           this.assertRecordCanReceiveHold(record);
+          await this.assertRetentionMediaPreservable(db, record);
           const active = await db.accountDataRetentionLegalHold.findFirst({
             where: { retentionRecordId: record.id, releasedAt: null },
             select: { id: true }
@@ -886,6 +889,55 @@ export class DataRetentionLegalHoldService {
     }
   }
 
+  private async assertRetentionMediaPreservable(db: any, record: LockedRetentionRecord) {
+    if (record.mediaDeletionClaimedAt) {
+      throw new AppException(
+        "DATA_RETENTION_LEGAL_HOLD_MEDIA_DELETE_ALREADY_STARTED",
+        "A media deletion was already claimed; preservation can no longer be guaranteed",
+        HttpStatus.CONFLICT,
+        { retentionRecordId: record.id }
+      );
+    }
+    const purposes = record.category === "support_disputes_safety"
+      ? [
+          "chatMessage",
+          "orderSupportFact",
+          "attendanceDisputeStatement",
+          "companionIncidentReport"
+        ]
+      : record.category === "consent_rights_account_governance"
+        ? ["userAccountAppeal", "companionAccountAppeal"]
+        : [];
+    const destructive = await db.mediaAsset.findFirst({
+      where: {
+        OR: [
+          { retentionExpiryRecordId: record.id },
+          ...(purposes.length > 0 ? [{
+            retentionExpiryRecordId: null,
+            uploaderId: record.userId,
+            purpose: { in: purposes }
+          }] : [])
+        ],
+        AND: [{
+          OR: [
+            { storageDeleteLeaseToken: { not: null } },
+            { storageDeleteOutcomeUnknownAt: { not: null } },
+            { storageDeletedAt: { not: null } }
+          ]
+        }]
+      },
+      select: { id: true }
+    });
+    if (destructive) {
+      throw new AppException(
+        "DATA_RETENTION_LEGAL_HOLD_MEDIA_DELETE_ALREADY_STARTED",
+        "A media deletion is already in flight or has an unknown provider outcome; preservation can no longer be guaranteed",
+        HttpStatus.CONFLICT,
+        { retentionRecordId: record.id }
+      );
+    }
+  }
+
   private loadPolicy(): LegalHoldPolicy {
     return evaluateDataRetentionLegalHoldPolicy(this.config);
   }
@@ -1159,6 +1211,21 @@ export class DataRetentionLegalHoldService {
 
   private rethrowMutationError(error: unknown, operation: string): never {
     if (error instanceof AppException) throw error;
+    if (
+      error
+      && typeof error === "object"
+      && (
+        String((error as { code?: unknown }).code ?? "") === "55000"
+        || String((error as { message?: unknown }).message ?? "")
+          .match(/retention media deletion (?:is already in flight or outcome unknown|was already claimed)/)
+      )
+    ) {
+      throw new AppException(
+        "DATA_RETENTION_LEGAL_HOLD_MEDIA_DELETE_ALREADY_STARTED",
+        "A media deletion is already in flight or has an unknown provider outcome; preservation can no longer be guaranteed",
+        HttpStatus.CONFLICT
+      );
+    }
     if (
       error
       && typeof error === "object"

@@ -368,9 +368,32 @@ export type VoiceRoomAccess = {
   participant: { name: string; initials: string };
 };
 
+/** Exact minimal order projection returned only by customer refund actions.
+ * It intentionally excludes participant identity, policy/idempotency fields,
+ * settlement evidence, commercial assurance, and the broader Order surface. */
+export type CustomerRefundOrder = {
+  id: string;
+  companionId: string;
+  themeId: string;
+  durationMinutes: number;
+  amountCents: number;
+  amountYuan: number;
+  currency: string;
+  status: "pending" | "paying" | "paid" | "inService" | "completed" | "cancelled" | "refunded";
+  scheduledAt: string;
+  companionSnapshot: { name: string; role: string; initials: string };
+  themeNameSnapshot: string;
+  conversationId: string | null;
+  paidAt: string | null;
+  cancelledAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type RefundRequestResult = {
   refund: OrderRefund;
-  order: Order;
+  order: CustomerRefundOrder;
   created: boolean;
 };
 
@@ -604,6 +627,7 @@ export type UserAccountAppeal = {
   id: string;
   status: "pending" | "upheld" | "overturned" | "dismissed" | string;
   statement: string;
+  evidenceAttachments: MediaAttachment[];
   reviewDueAt: string;
   overdue: boolean;
   resolution: string | null;

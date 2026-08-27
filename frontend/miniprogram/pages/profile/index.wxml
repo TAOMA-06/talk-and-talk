@@ -20,7 +20,7 @@
     </view>
     <view class="card" aria-live="polite">
       <view class="title small">公开互动身份状态</view>
-      <view class="muted">首发阶段尚未启用可追溯的身份核验授权，因此公开发帖和即时消息保持关闭。订单读取、履约收尾和售后仍可使用；平台不会要求你在此上传证件、照片、人脸、手机号或自由文本身份材料。</view>
+      <view class="muted">首发阶段尚未启用可追溯的身份核验授权，因此新预约、支付、公开发帖和即时消息保持关闭。已有订单读取、履约收尾和售后仍可使用；平台不会要求你在此上传证件、照片、人脸、手机号或自由文本身份材料。</view>
       <button class="resource-retry" bindtap="openSupportCenter" aria-label="前往案件中心查看身份状态支持">前往案件中心</button>
     </view>
     <view class="card resource-error-card" wx:if="{{recommendationSettingsState === 'error'}}" aria-live="polite">

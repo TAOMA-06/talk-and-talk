@@ -8,12 +8,15 @@ import test from "node:test";
 import pg from "pg";
 import ts from "typescript";
 
+import { assertIsolatedPostgresPreflightEnvironment } from "./isolated-postgres-preflight-environment.mjs";
+
 const here = dirname(fileURLToPath(import.meta.url));
 const apiRoot = join(here, "..");
 const migrationsRoot = join(apiRoot, "prisma", "migrations");
 const schemaMigrationName = "20260801007200_retention_graph_schema";
 const guardsMigrationName = "20260801007300_retention_graph_guards";
 const auditPolicyMigrationName = "20260801007600_audit_subject_policy_registry";
+const auditPolicyV3MigrationName = "20260825050000_audit_subject_policy_registry_v3";
 
 function modelBlock(schema, name) {
   const start = schema.indexOf(`model ${name} {`);
@@ -42,6 +45,23 @@ function sqlControlledAuditRules(source) {
   return [...registry.matchAll(/\('([^']+)', '([^']+)', '(user|companion)'\)/g)]
     .map((match) => `${match[1]}|${match[2]}|${match[3]}`)
     .sort();
+}
+
+function postV2AuditPolicyExtensions(source) {
+  return [...source.matchAll(
+    /AUDIT_SUBJECT_POLICY_EXTENSION\|([^|\s]+)\|([^|\s]+)\|(user|companion)/g
+  )].map((match) => `${match[1]}|${match[2]}|${match[3]}`).sort();
+}
+
+async function postV2AuditPolicyMigrationSource() {
+  const entries = await readdir(migrationsRoot, { withFileTypes: true });
+  const names = entries
+    .filter((entry) => entry.isDirectory() && entry.name > auditPolicyMigrationName)
+    .map((entry) => entry.name)
+    .sort();
+  return (await Promise.all(names.map((name) =>
+    readFile(join(migrationsRoot, name, "migration.sql"), "utf8")
+  ))).join("\n");
 }
 
 async function productionTypescriptSources(directory, relative = "") {
@@ -257,6 +277,7 @@ test("retention graph schema and guards remain bounded and database-authoritativ
     schemaMigration,
     guardsMigration,
     auditPolicyMigration,
+    postV2AuditPolicyMigrations,
     reviews,
     media,
     audit,
@@ -270,6 +291,7 @@ test("retention graph schema and guards remain bounded and database-authoritativ
     readFile(join(migrationsRoot, schemaMigrationName, "migration.sql"), "utf8"),
     readFile(join(migrationsRoot, guardsMigrationName, "migration.sql"), "utf8"),
     readFile(join(migrationsRoot, auditPolicyMigrationName, "migration.sql"), "utf8"),
+    postV2AuditPolicyMigrationSource(),
     readFile(join(apiRoot, "src", "reviews", "reviews.service.ts"), "utf8"),
     readFile(join(apiRoot, "src", "moderation", "media", "media-asset.service.ts"), "utf8"),
     readFile(join(apiRoot, "src", "common", "audit", "audit-subject-reference.ts"), "utf8"),
@@ -326,7 +348,7 @@ test("retention graph schema and guards remain bounded and database-authoritativ
   assert.doesNotMatch(seedProfileUpdate, /\b(?:rating|ratingSum|reviewCount)\s*:/);
   assert.doesNotMatch(seed, /(?:rating|reviewCount): companion\.(?:rating|reviewCount)/);
 
-  assert.match(media, /FOR UPDATE SKIP LOCKED/);
+  assert.match(media, /FOR UPDATE(?: OF asset)? SKIP LOCKED/);
   const deleteCall = media.indexOf("this.storage.delete");
   const claimSqlEnd = media.indexOf("private async processStorageDeleteClaim");
   assert.ok(deleteCall > claimSqlEnd, "object storage delete must happen after the claim statement");
@@ -356,6 +378,9 @@ test("retention graph schema and guards remain bounded and database-authoritativ
   assert.match(audit, /NON_USER_AUDIT_ACTORS = new Set\(\["system"\]\)/);
   assert.match(auditPolicyMigration, /controlled-v2/);
   assert.match(auditPolicyMigration, /backfill_audit_subject_references_v2/);
+  assert.match(postV2AuditPolicyMigrations, /controlled-v3/);
+  assert.match(postV2AuditPolicyMigrations, /backfill_audit_subject_references_v3/);
+  assert.match(postV2AuditPolicyMigrations, /backfill_audit_subject_references_v2/);
   assert.match(auditPolicyMigration, /LIMIT bounded_batch_size/);
   assert.match(auditPolicyMigration, /LEAST\(GREATEST\(COALESCE\(batch_size, 250\), 1\), 250\)/);
   assert.match(auditPolicyMigration, /\(log\."createdAt", log\."id"\) >/);
@@ -367,7 +392,13 @@ test("retention graph schema and guards remain bounded and database-authoritativ
     "refund.requested', 'requestedForUserId', 'user",
     "commercial.companion_withdrawal_requested', 'companionId', 'companion"
   ]) assert.match(auditPolicyMigration, new RegExp(exactRule.replaceAll(".", "\\.")));
-  assert.deepEqual(sqlControlledAuditRules(auditPolicyMigration), typescriptControlledAuditRules(audit));
+  assert.deepEqual(
+    [...new Set([
+      ...sqlControlledAuditRules(auditPolicyMigration),
+      ...postV2AuditPolicyExtensions(postV2AuditPolicyMigrations)
+    ])].sort(),
+    typescriptControlledAuditRules(audit)
+  );
   const policies = typescriptAuditActionPolicies(audit);
   const dynamicHelpers = typescriptDynamicAuditHelpers(audit);
   const sourceFiles = await productionTypescriptSources(join(apiRoot, "src"));
@@ -387,6 +418,7 @@ test("retention graph schema and guards remain bounded and database-authoritativ
   }
   const productionAuditCalls = sourceFiles.flatMap((file) => scanProductionAuditCalls(file.path, file.source));
   const controlledAuditRules = new Set(typescriptControlledAuditRules(audit));
+  const missingControlledAuditRules = [];
   const observedActions = new Set();
   const observedDynamicHelpers = new Set();
   for (const caller of productionAuditCalls) {
@@ -413,8 +445,11 @@ test("retention graph schema and guards remain bounded and database-authoritativ
           `system operational audit action cannot declare subjectUserIds: ${action} in ${caller.path}:${caller.line}`);
       }
       for (const rule of caller.identityRules) {
-        assert.ok(controlledAuditRules.has(`${action}|${rule.key}|${rule.identifierKind}`),
-          `top-level audit identity metadata is not registered: ${action}.${rule.key} in ${caller.path}:${caller.line}`);
+        if (!controlledAuditRules.has(`${action}|${rule.key}|${rule.identifierKind}`)) {
+          missingControlledAuditRules.push(
+            `${action}.${rule.key} (${rule.identifierKind}) in ${caller.path}:${caller.line}`
+          );
+        }
       }
     }
     assert.deepEqual(caller.nestedIdentityKeys, [],
@@ -429,6 +464,11 @@ test("retention graph schema and guards remain bounded and database-authoritativ
         `direct User identity must not be stored as audit resourceId in ${caller.path}:${caller.line}`);
     }
   }
+  assert.deepEqual(
+    missingControlledAuditRules,
+    [],
+    `top-level audit identity metadata is not registered:\n${missingControlledAuditRules.join("\n")}`
+  );
   assert.deepEqual([...observedDynamicHelpers].sort(), [...dynamicHelpers.keys()].sort(),
     "dynamic audit helper allowlist must exactly match production helper calls");
   assert.deepEqual([...observedActions].sort(), [...policies.keys()].sort(),
@@ -454,11 +494,16 @@ test("retention graph schema and guards remain bounded and database-authoritativ
   }
 });
 
-const integrationUrl = String(process.env.RETENTION_GRAPH_TEST_DATABASE_URL ?? "").trim();
+const integrationUrl = String(
+  process.env.RETENTION_GRAPH_TEST_DATABASE_URL
+    ?? process.env.TEST_DATABASE_URL
+    ?? ""
+).trim();
 
 test("real PostgreSQL enforces rating deltas, controlled audit backfill and detach guards", {
   skip: integrationUrl ? false : "set RETENTION_GRAPH_TEST_DATABASE_URL to a disposable PostgreSQL database"
 }, async (t) => {
+  await assertIsolatedPostgresPreflightEnvironment();
   const namespace = `retention_graph_${randomBytes(8).toString("hex")}`;
   const client = new pg.Client({ connectionString: integrationUrl });
   await client.connect();
@@ -472,12 +517,13 @@ test("real PostgreSQL enforces rating deltas, controlled audit backfill and deta
   await client.query("SET statement_timeout TO '10s'");
 
   const migrationDirectories = (await readdir(migrationsRoot, { withFileTypes: true }))
-    .filter((entry) => entry.isDirectory() && entry.name <= auditPolicyMigrationName)
+    .filter((entry) => entry.isDirectory() && entry.name <= auditPolicyV3MigrationName)
     .map((entry) => entry.name)
     .sort();
   assert.ok(migrationDirectories.includes(schemaMigrationName));
   assert.ok(migrationDirectories.includes(guardsMigrationName));
   assert.ok(migrationDirectories.includes(auditPolicyMigrationName));
+  assert.ok(migrationDirectories.includes(auditPolicyV3MigrationName));
   for (const directory of migrationDirectories) {
     const sql = await readFile(join(migrationsRoot, directory, "migration.sql"), "utf8");
     await client.query(sql);
@@ -728,10 +774,16 @@ test("real PostgreSQL enforces rating deltas, controlled audit backfill and deta
       ('audit-2', 'system', 'commercial.companion_withdrawal_requested', 'withdrawal', '{"companionId":"companion-1"}', NOW()),
       ('audit-3', 'system', 'unregistered.action', 'other', '{"nested":{"userId":"customer-2"}}', NOW())
   `);
-  for (let attempt = 0; attempt < 10; attempt += 1) {
-    const batch = await client.query(`SELECT * FROM "backfill_audit_subject_references_v2"(1)`);
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const batch = await client.query(`SELECT * FROM "backfill_audit_subject_references_v3"(1)`);
     if (batch.rows[0]?.completed) break;
   }
+  const v3State = await client.query(`
+    SELECT "completedAt" IS NOT NULL AS completed
+    FROM "AuditSubjectReferenceBackfillState"
+    WHERE "version" = 'controlled-v3'
+  `);
+  assert.equal(v3State.rows[0]?.completed, true);
   const references = await client.query(`
     SELECT "auditLogId", "subjectUserId", "relationKind"
     FROM "AuditSubjectReference"

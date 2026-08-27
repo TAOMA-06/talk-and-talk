@@ -105,6 +105,39 @@ describe("Companions and me (e2e)", () => {
     return { user, token };
   }
 
+  async function seedPreviouslyApprovedIdentityVerification(
+    userId: string,
+    submittedById: string,
+    reviewedById: string
+  ) {
+    if (submittedById === reviewedById) {
+      throw new Error("Identity verification fixture requires an independent reviewer");
+    }
+    const reviewedAt = new Date();
+    const submittedAt = new Date(reviewedAt.getTime() - 60_000);
+    await prisma.$transaction([
+      prisma.identityVerificationRequest.create({
+        data: {
+          userId,
+          requestedIsVerified: true,
+          previousIsVerified: false,
+          status: "approved",
+          reason: "pre-existing identity review fixture",
+          evidenceReference: `kyc://test/pre-existing/${userId}`,
+          submittedById,
+          submittedAt,
+          reviewedById,
+          reviewedAt,
+          reviewReason: "independent identity review fixture"
+        }
+      }),
+      prisma.userProfile.update({
+        where: { userId },
+        data: { isVerified: true }
+      })
+    ]);
+  }
+
   it("returns seeded c1/c2/c3 from the public companion list", async () => {
     const response = await request(app.getHttpServer())
       .get("/api/v1/companions")
@@ -305,9 +338,14 @@ describe("Companions and me (e2e)", () => {
       where: { companionId: "c2", isActive: true }
     });
     expect(otherOffering).not.toBeNull();
+    // This assertion owns the cross-companion resource boundary, not consumer
+    // session longevity (covered by auth E2E). Bind it to a fresh persisted
+    // session so a prior request's transient auth cleanup cannot turn the
+    // expected non-probing 404 into an unrelated 401.
+    const foreignBoundaryToken = await issueSessionBoundAccessToken(prisma, jwt, owner!);
     const foreignResponse = await request(app.getHttpServer())
       .patch(`/api/v1/companions/me/service-offerings/${otherOffering!.id}`)
-      .set("Authorization", `Bearer ${token}`)
+      .set("Authorization", `Bearer ${foreignBoundaryToken}`)
       .send({ isActive: false })
       .expect(404);
     expect(foreignResponse.body.error.code).toBe("SERVICE_OFFERING_NOT_FOUND");
@@ -398,29 +436,14 @@ describe("Companions and me (e2e)", () => {
   });
 
   it("allows admins to create, edit, publish and unpublish companions", async () => {
-    const { token } = await createUser("admin");
-    const { token: reviewerToken } = await createUser("admin");
+    const { user: submitter, token } = await createUser("admin");
+    const { user: reviewer, token: reviewerToken } = await createUser("admin");
     const { user: owner, token: ownerToken } = await createUser("user");
 
-    // Dual-control KYC: one staff submits, a different staff approves.
-    const proposal = await request(app.getHttpServer())
-      .patch(`/api/v1/admin/users/${owner.id}/verification`)
-      .set("Authorization", `Bearer ${token}`)
-      .send({
-        isVerified: true,
-        reason: "test identity review",
-        evidenceReference: "kyc://test/c-admin-owner"
-      })
-      .expect(200);
-    await request(app.getHttpServer())
-      .post(`/api/v1/admin/identity-verification-requests/${proposal.body.data.id}/approve`)
-      .set("Authorization", `Bearer ${reviewerToken}`)
-      .send({ reason: "independent identity review" })
-      .expect((res) => {
-        if (![200, 201].includes(res.status)) {
-          throw new Error(`identity approve unexpected status ${res.status}`);
-        }
-      });
+    // New identity grants are intentionally frozen in the first release. This
+    // companion-lifecycle spec starts from a previously approved dual-control
+    // identity record; the identity service unit suite owns the frozen grant.
+    await seedPreviouslyApprovedIdentityVerification(owner.id, submitter.id, reviewer.id);
 
     await request(app.getHttpServer())
       .post("/api/v1/admin/companions")

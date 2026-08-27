@@ -11,7 +11,7 @@
 | Decision | Confirmed boundary |
 |---|---|
 | `IDENTITY-R01` | `R01-C`: freeze every new true grant until an approved identity authority and revocation lifecycle exist. Existing `isVerified=true` rows cannot be proven from the repository and are treated as unverified for public interaction at read time. |
-| `IDENTITY-R02` | `R02-A`: public posting and instant messaging remain fail-closed; reading, orders, fulfillment closure, after-sales, and support remain available. Recovery owner is support, route `/pages/profile/index`, with no new identity fields or uploads. |
+| `IDENTITY-R02` | `R02-A`（2026-08-25 交叉审查收紧）：public posting、instant messaging、新订单和预支付均 fail-closed；已有订单读取、履约收尾、售后、支持与数据权利保持可用。Recovery owner 是 support，路由 `/pages/profile/index`，不新增身份字段或上传。 |
 | `PERSONALIZATION-R01` | `A`: reset historical true values to false in a new forward-only migration; reject new true requests with 409; preserve manual catalogue/current-request discovery. |
 | `EARNINGS-R01` | `A`: companion-visible hold data is limited to typed `category`, `status`, and `nextAction`; no raw hold code or customer/support/provider/reconciliation/settlement facts. `companion_recovery_due` remains support review only. |
 | `PAYMENT-DISPUTE-MEDIA-R01` | `B`: disable response-image storage and provider forwarding before mutation. Preserve text reply and support escalation. Product/operations authorization reference: `USER-AUTH-ALL-20260811`; escalation owner: support. |

@@ -28,9 +28,11 @@ function createDatabase() {
     paymentDispute: createDelegate(),
     attendanceDispute: createDelegate(),
     userAccountAppeal: createDelegate(),
+    companionAccountAppeal: createDelegate(),
     dataRightsRequest: createDelegate(),
     invoiceRequest: createDelegate(),
     companionWithdrawalRequest: createDelegate(),
+    companionIncidentReport: createDelegate(),
     refreshToken: createDelegate(),
     notification: createDelegate(),
     $queryRaw: jest.fn()
@@ -194,9 +196,13 @@ describe("StaffOffboardingService", () => {
     db.userAccountAppeal.updateMany
       .mockResolvedValueOnce({ count: 12_007 })
       .mockResolvedValueOnce({ count: 12_008 });
-    db.dataRightsRequest.updateMany.mockResolvedValue({ count: 12_009 });
-    db.invoiceRequest.updateMany.mockResolvedValue({ count: 12_010 });
-    db.companionWithdrawalRequest.updateMany.mockResolvedValue({ count: 12_011 });
+    db.companionAccountAppeal.updateMany
+      .mockResolvedValueOnce({ count: 12_009 })
+      .mockResolvedValueOnce({ count: 12_010 });
+    db.dataRightsRequest.updateMany.mockResolvedValue({ count: 12_011 });
+    db.invoiceRequest.updateMany.mockResolvedValue({ count: 12_012 });
+    db.companionWithdrawalRequest.updateMany.mockResolvedValue({ count: 12_013 });
+    db.companionIncidentReport.updateMany.mockResolvedValue({ count: 12_014 });
 
     const result = await (service as any).handoffAssignments(
       db,
@@ -213,12 +219,16 @@ describe("StaffOffboardingService", () => {
       attendanceAppealsUnassignedForIndependence: 12_005,
       userAccountAppealsReassigned: 12_008,
       userAccountAppealsUnassignedForIndependence: 12_007,
-      dataRightsRequests: 12_009,
-      invoiceRequests: 12_010,
-      companionWithdrawals: 12_011
+      companionAccountAppealsReassigned: 12_010,
+      companionAccountAppealsUnassignedForIndependence: 12_009,
+      dataRightsRequests: 12_011,
+      invoiceRequests: 12_012,
+      companionWithdrawals: 12_013,
+      companionIncidents: 12_014
     });
     expect(db.attendanceDispute.findMany).not.toHaveBeenCalled();
     expect(db.userAccountAppeal.findMany).not.toHaveBeenCalled();
+    expect(db.companionAccountAppeal.findMany).not.toHaveBeenCalled();
     expect(db.attendanceDispute.updateMany).toHaveBeenNthCalledWith(2, {
       where: {
         appealAssignedToUserId: TARGET_ID,

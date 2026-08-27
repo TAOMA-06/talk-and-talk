@@ -1,5 +1,7 @@
 # Talk&Talk G1 remediation — task state
 
+> **历史快照：** 本状态已由 [2026-08-26 商用闭环状态](../2026-08-26-commercial-closure/state.md)取代。下面的 SHA、测试数字和 active phase 只描述 2026-08-08 至 08-11 的执行，不得用于当前候选或发布判断。
+
 > Task ID: `2026-08-08-g1-remediation`
 > Phase: `All earlier local slices through G1-FOLLOWUP-12 are complete and independently reviewed at static/local scope. Under USER-AUTH-ALL-20260811, G1-FOLLOWUP-13 confirms and implements the four remaining product-authority groups with fail-closed first-release choices and has completed owner validation. The first local preparation commit 83a9ec6aa4e67c65997baa4ae4fa786a00654560 is superseded after two clean detached captures exposed nondeterministic Vinext security nonces/runtime cache in the raw Web tree. G1-FOLLOWUP-14 is active to make that comparison explicit and fail closed without weakening runtime secrets; a replacement commit and two fresh captures are required. QA-02E-A remains superseded: ordinary repository workflows are metadata-only, and real candidate build/test/runtime evidence belongs only to an independently protected external control plane. F13/F14 have no independent candidate reviewer in this task, and Docker/runtime, custody, browser/device, provider, staging and production evidence remain pending.`
 > Scope: local implementation and evidence only; no deployment, upload, external-account write, or shared database/Redis action has been performed in this recovery task.

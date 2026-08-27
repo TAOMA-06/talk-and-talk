@@ -8,7 +8,8 @@ describe("ConversationsService.ensureConversation", () => {
       count: jest.fn()
     },
     companionProfile: {
-      findFirst: jest.fn()
+      findFirst: jest.fn(),
+      findUnique: jest.fn()
     },
     order: {
       findMany: jest.fn()
@@ -71,6 +72,7 @@ describe("ConversationsService.ensureConversation", () => {
     prisma.$queryRaw.mockResolvedValue([{ available: false }]);
     prisma.$transaction.mockImplementation(async (fn: any) => fn(prisma));
     prisma.companionCustomerFutureBoundary.findUnique.mockResolvedValue(null);
+    prisma.companionProfile.findUnique.mockResolvedValue({ ownerUserId: "companion-owner" });
     prisma.recommendationRequest.updateMany.mockResolvedValue({ count: 0 });
     service = new ConversationsService(
       prisma,
@@ -198,6 +200,29 @@ describe("ConversationsService.ensureConversation", () => {
     expect(audit.record).toHaveBeenLastCalledWith(expect.objectContaining({
       action: "conversation.future_booking_restored"
     }), prisma);
+  });
+
+  it("rechecks companion ownership after the profile lock before changing a private future boundary", async () => {
+    prisma.conversation.findFirst.mockResolvedValue({
+      id: "conv-1",
+      externalId: "c1",
+      userId: "customer-1",
+      companionId: "c1",
+      companion: { id: "c1", ownerUserId: "former-owner", name: "林屿" },
+      user: { id: "customer-1", profile: { nickname: "顾客" } }
+    });
+    prisma.companionProfile.findUnique.mockResolvedValue({ ownerUserId: "new-owner" });
+
+    await expect(service.setFutureBookingBoundary("former-owner", "conv-1", { declined: true }))
+      .rejects.toMatchObject({ code: "FUTURE_BOOKING_BOUNDARY_COMPANION_ONLY" });
+
+    expect(prisma.companionProfile.findUnique).toHaveBeenCalledWith({
+      where: { id: "c1" },
+      select: { ownerUserId: true }
+    });
+    expect(prisma.companionCustomerFutureBoundary.create).not.toHaveBeenCalled();
+    expect(prisma.recommendationRequest.updateMany).not.toHaveBeenCalled();
+    expect(audit.record).not.toHaveBeenCalled();
   });
 
   it("rejects free messaging to a published companion", async () => {

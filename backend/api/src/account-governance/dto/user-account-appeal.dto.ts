@@ -1,5 +1,8 @@
 import { Type } from "class-transformer";
 import {
+  ArrayMaxSize,
+  ArrayUnique,
+  IsArray,
   IsIn,
   IsInt,
   IsOptional,
@@ -30,6 +33,13 @@ export class CreateUserAccountAppealDto {
   @MinLength(10)
   @MaxLength(1000)
   statement!: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(3)
+  @ArrayUnique()
+  @IsUUID("4", { each: true })
+  evidenceAssetIds?: string[];
 }
 
 export class ListUserAccountAppealsDto {

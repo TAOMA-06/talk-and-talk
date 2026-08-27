@@ -20,9 +20,16 @@ describe("AccountGovernanceController", () => {
     listMy: jest.fn(),
     createAppeal: jest.fn()
   };
+  const caseEvidence = {
+    reserveForUserAccountAppeal: jest.fn(),
+    completeUserAccountAppeal: jest.fn(),
+    statusUserAccountAppeal: jest.fn(),
+    createUserAccountAppealReadUrl: jest.fn()
+  };
   const controller = new AccountGovernanceController(
     governance as unknown as AccountGovernanceService,
-    accountActions as any
+    accountActions as any,
+    caseEvidence as any
   );
   const user = { id: "user-1", role: "user", sessionId: "session-1" };
 
@@ -49,6 +56,10 @@ describe("AccountGovernanceController", () => {
     expect(Reflect.getMetadata(SKIP_LEGAL_CONSENT_KEY, prototype.addDataRightsFollowUp)).toBe(true);
     expect(Reflect.getMetadata(SKIP_LEGAL_CONSENT_KEY, prototype.accountActionHistory)).toBe(true);
     expect(Reflect.getMetadata(SKIP_LEGAL_CONSENT_KEY, prototype.createAccountActionAppeal)).toBe(true);
+    expect(Reflect.getMetadata(SKIP_LEGAL_CONSENT_KEY, prototype.reserveAccountActionAppealEvidence)).toBe(true);
+    expect(Reflect.getMetadata(SKIP_LEGAL_CONSENT_KEY, prototype.completeAccountActionAppealEvidence)).toBe(true);
+    expect(Reflect.getMetadata(SKIP_LEGAL_CONSENT_KEY, prototype.accountActionAppealEvidenceStatus)).toBe(true);
+    expect(Reflect.getMetadata(SKIP_LEGAL_CONSENT_KEY, prototype.accountActionAppealEvidenceReadUrl)).toBe(true);
     expect(Reflect.getMetadata(SKIP_LEGAL_CONSENT_KEY, prototype.invoices)).toBeUndefined();
     expect(Reflect.getMetadata(SKIP_LEGAL_CONSENT_KEY, prototype.createInvoice)).toBeUndefined();
     expect(Reflect.getMetadata(SKIP_LEGAL_CONSENT_KEY, prototype.cancelInvoice)).toBe(true);
@@ -63,6 +74,28 @@ describe("AccountGovernanceController", () => {
       "user-1",
       "rights-1",
       { statement: "补充最近一年的订单范围" }
+    );
+  });
+
+  it("keeps legal-recovery appeal uploads scoped to the authenticated action owner", () => {
+    const upload = {
+      kind: "image" as const,
+      mimeType: "image/jpeg",
+      sizeBytes: 9,
+      sha256: "a".repeat(64)
+    };
+    controller.reserveAccountActionAppealEvidence(user, "action-1", upload);
+    controller.completeAccountActionAppealEvidence(user, "action-1", "asset-1");
+    controller.accountActionAppealEvidenceStatus(user, "action-1", "asset-1");
+    controller.accountActionAppealEvidenceReadUrl(user, "action-1", "attachment-1");
+
+    expect(caseEvidence.reserveForUserAccountAppeal).toHaveBeenCalledWith("user-1", "action-1", upload);
+    expect(caseEvidence.completeUserAccountAppeal).toHaveBeenCalledWith("user-1", "action-1", "asset-1");
+    expect(caseEvidence.statusUserAccountAppeal).toHaveBeenCalledWith("user-1", "action-1", "asset-1");
+    expect(caseEvidence.createUserAccountAppealReadUrl).toHaveBeenCalledWith(
+      user,
+      "action-1",
+      "attachment-1"
     );
   });
 

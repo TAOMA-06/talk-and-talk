@@ -35,6 +35,7 @@ test("mutation, order and recommendation paths close the privacy and race bounda
   const companionLock = conversations.indexOf('SELECT "id" FROM "CompanionProfile"');
   const customerLock = conversations.indexOf('SELECT "id" FROM "User"');
   assert.ok(companionLock >= 0 && customerLock > companionLock);
+  assert.match(conversations, /companionProfile\.findUnique[\s\S]*ownerUserId[\s\S]*!== userId/);
   assert.match(conversations, /FUTURE_BOOKING_BOUNDARY_COMPANION_ONLY/);
   assert.match(conversations, /recommendationRequest\.updateMany/);
   assert.match(conversations, /conversation\.future_booking_declined/);
@@ -43,6 +44,10 @@ test("mutation, order and recommendation paths close the privacy and race bounda
 
   assert.match(orders, /companionCustomerFutureBoundary\.findUnique/);
   assert.match(orders, /ORDER_COMPANION_UNAVAILABLE/);
+  assert.ok(
+    (orders.match(/ORDER_COMPANION_UNAVAILABLE/g) ?? []).length >= 2,
+    "private boundary and ordinary companion unavailability must share one public code"
+  );
   assert.doesNotMatch(orders, /ORDER_COMPANION_UNAVAILABLE[\s\S]{0,240}(boundaryId|reasonCode)/);
 
   assert.ok((recommendations.match(/privateUnavailableCompanionIds\(/g) ?? []).length >= 4);

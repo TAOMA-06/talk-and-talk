@@ -1,6 +1,7 @@
 .chat-page { padding-bottom: 164rpx; }
 .notice, .restriction-notice, .appeal-notice, .safety-exit { margin-bottom: 20rpx; padding: 16rpx; border-radius: 14rpx; font-size: 24rpx; line-height: 1.5; }
 .notice { background: #fce8ed; color: #9b3d58; }
+.identity-unavailable-notice { margin-bottom: 20rpx; padding: 16rpx; border: 1rpx solid #dfd3c5; border-radius: 14rpx; background: #fffaf1; color: #70583c; font-size: 23rpx; line-height: 1.55; }
 .message-notification-setting { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; margin-bottom: 20rpx; padding: 16rpx; border: 1rpx solid #e7dfe1; border-radius: 14rpx; background: #fff; }
 .message-notification-copy { min-width: 0; flex: 1; }
 .message-notification-title { color: #5f454d; font-size: 25rpx; font-weight: 700; }

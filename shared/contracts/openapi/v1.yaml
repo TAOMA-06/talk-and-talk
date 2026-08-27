@@ -794,6 +794,11 @@ paths:
                   type: string
                   minLength: 10
                   maxLength: 1000
+                evidenceAssetIds:
+                  type: array
+                  maxItems: 3
+                  uniqueItems: true
+                  items: { type: string, format: uuid }
       responses:
         "201":
           description: Appeal accepted for independent review
@@ -810,6 +815,95 @@ paths:
           $ref: "#/components/responses/Error"
         "409":
           $ref: "#/components/responses/Error"
+  /me/account-actions/{id}/appeal-evidence-uploads:
+    post:
+      tags: [users, safety]
+      summary: Reserve controlled evidence for an owned account-action appeal
+      description: Available through the restricted legal-recovery channel. The action must still be owned, active, unappealed, and inside its appeal window.
+      operationId: reserveMyAccountActionAppealEvidence
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ControlledCaseEvidenceUploadInput" }
+      responses:
+        "201":
+          description: Action-scoped short-lived upload instruction
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ControlledCaseEvidenceUploadReservationEnvelope" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+        "503": { $ref: "#/components/responses/Error" }
+  /me/account-actions/{id}/appeal-evidence-uploads/{assetId}/complete:
+    post:
+      tags: [users, safety]
+      summary: Verify and enqueue one owned account-appeal evidence upload
+      operationId: completeMyAccountActionAppealEvidence
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - name: assetId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "201":
+          description: Upload verified and moderation queued, or existing terminal state on retry
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ControlledCaseEvidenceStatusEnvelope" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+        "503": { $ref: "#/components/responses/Error" }
+  /me/account-actions/{id}/appeal-evidence-uploads/{assetId}:
+    get:
+      tags: [users, safety]
+      summary: Poll one owned account-appeal evidence upload
+      operationId: getMyAccountActionAppealEvidenceStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - name: assetId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Action-scoped moderation state without a storage URL
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ControlledCaseEvidenceStatusEnvelope" }
+        "404": { $ref: "#/components/responses/Error" }
+        "503": { $ref: "#/components/responses/Error" }
+  /me/account-actions/{id}/appeal-evidence-attachments/{attachmentId}/read-url:
+    get:
+      tags: [users, safety]
+      summary: Read one approved attachment from the caller's own account appeal
+      operationId: createMyAccountActionAppealEvidenceReadUrl
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - name: attachmentId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Short-lived owner-authorized read URL
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ControlledCaseEvidenceReadUrlEnvelope" }
+        "404": { $ref: "#/components/responses/Error" }
+        "410": { $ref: "#/components/responses/Error" }
+        "503": { $ref: "#/components/responses/Error" }
   /me/sessions:
     get:
       tags: [users, auth]
@@ -2519,8 +2613,18 @@ paths:
                     properties:
                       data:
                         $ref: "#/components/schemas/OrderDto"
+        "403":
+          description: >-
+            The shared public-interaction identity authority gate is closed
+            (`PUBLIC_INTERACTION_IDENTITY_REQUIRED`). Because text messaging is
+            the only first-release delivery channel, no order, timeline event,
+            notification, recommendation attribution, or payment intent is created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
         "409":
-          description: Per-user or companion intake limit reached, an availability candidate/window is no longer valid or full, or an idempotency key was reused with different data
+          description: Per-user or companion intake limit reached; the companion is generically unavailable (without revealing a private future-booking choice); an availability candidate/window is no longer valid or full; or an idempotency key was reused with different data
           content:
             application/json:
               schema:
@@ -2978,6 +3082,15 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuccessEnvelope"
+        "403":
+          description: >-
+            The customer cannot use the only first-release delivery channel
+            because the shared identity authority gate is closed. No provider
+            prepay call, payment row, or order-state mutation occurs.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
   /community/reports/mine:
     get:
       tags: [community]
@@ -3973,7 +4086,9 @@ paths:
       description: >-
         Returns 404 for unauthorized viewers. Support facts are visible only to their requester and the assigned support/admin
         boundary; attendance attachments to both case participants and assigned support/admin; companion incidents to the owner
-        and supply/admin. Blocked, pending, failed, expired and unbound assets never receive a URL.
+        and supply/admin. Ordinary account-appeal attachments are visible only to the appellant or currently assigned independent
+        admin reviewer; companion-appeal attachments only to the owner or an independent supply/admin reviewer. Blocked, pending,
+        failed, expired and unbound assets never receive a URL.
       operationId: createControlledCaseEvidenceReadUrl
       security:
         - bearerAuth: []
@@ -4727,6 +4842,10 @@ paths:
         - name: active
           in: query
           schema: { type: string, enum: ["true", "false"] }
+        - name: reactivationStatus
+          in: query
+          description: Filter the bounded supply queue by natural-expiry reactivation state.
+          schema: { type: string, enum: [notRequired, required, completed] }
         - name: page
           in: query
           schema: { type: integer, minimum: 1, default: 1 }
@@ -4740,11 +4859,78 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PaginatedItemsEnvelope"
+  /commercial/companion/actions/{id}/appeal-evidence-uploads:
+    post:
+      tags: [commercial, companions]
+      summary: Reserve controlled evidence for an owned companion action appeal
+      description: The action must still belong to the authenticated companion owner, remain active and unappealed, and be inside its immutable appeal window.
+      operationId: reserveMyCompanionActionAppealEvidence
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ControlledCaseEvidenceUploadInput" }
+      responses:
+        "201":
+          description: Action-scoped short-lived upload instruction
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ControlledCaseEvidenceUploadReservationEnvelope" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+        "503": { $ref: "#/components/responses/Error" }
+  /commercial/companion/actions/{id}/appeal-evidence-uploads/{assetId}/complete:
+    post:
+      tags: [commercial, companions]
+      summary: Verify and enqueue one owned companion-appeal evidence upload
+      operationId: completeMyCompanionActionAppealEvidence
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - name: assetId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "201":
+          description: Upload verified and moderation queued, or existing terminal state on retry
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ControlledCaseEvidenceStatusEnvelope" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+        "503": { $ref: "#/components/responses/Error" }
+  /commercial/companion/actions/{id}/appeal-evidence-uploads/{assetId}:
+    get:
+      tags: [commercial, companions]
+      summary: Poll one owned companion-appeal evidence upload
+      operationId: getMyCompanionActionAppealEvidenceStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - name: assetId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Action-scoped moderation state without a storage URL
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ControlledCaseEvidenceStatusEnvelope" }
+        "404": { $ref: "#/components/responses/Error" }
+        "503": { $ref: "#/components/responses/Error" }
   /commercial/companion/actions/{id}/appeals:
     post:
       tags: [commercial, companions]
       summary: Appeal one action affecting the authenticated companion owner
-      description: Accepted once only, before the action's immutable appealDeadlineAt. Creation snapshots the platform review SLA into reviewDueAt.
+      description: Accepted once only, before the action's immutable appealDeadlineAt. Optional evidenceAssetIds must be up to three approved, unexpired, unused action-scoped uploads owned by the appellant; arbitrary external references are rejected.
       operationId: appealMyCompanionAccountAction
       security:
         - bearerAuth: []
@@ -4995,11 +5181,35 @@ paths:
           $ref: "#/components/responses/Error"
         "409":
           $ref: "#/components/responses/Error"
+  /admin/commercial/companion-lifecycle/actions/{id}/reactivation:
+    post:
+      tags: [admin, commercial, companions]
+      summary: Complete independent reactivation review for an expired temporary suspension
+      description: The original suspension creator cannot perform this review. Current owner, identity, adult eligibility, commercial evidence, training, deletion state, and other active restrictions are rechecked under locks. A causally linked suspension may return to verified, but the companion remains unpublished, offline, and busy until a separate explicit publication decision.
+      operationId: adminCompleteExpiredCompanionSuspensionReactivation
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CompanionReactivationCompletion" }
+      responses:
+        "201":
+          description: Reactivation review completed without restoring public visibility
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SuccessEnvelope" }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
   /admin/commercial/companion-lifecycle/appeals:
     get:
       tags: [admin, commercial, companions]
       summary: List companion action appeals
-      description: Appeals are stably ordered by reviewDueAt, createdAt, and id, expose an overdue flag, and return exact bounded pagination metadata.
+      description: Admin may route the global queue; supply receives only appeals currently assigned to that operator. Attachment metadata is returned only to the current independent assignee.
       operationId: adminListCompanionAppeals
       security:
         - bearerAuth: []
@@ -5007,6 +5217,9 @@ paths:
         - name: appealStatus
           in: query
           schema: { type: string, enum: [pending, upheld, overturned, dismissed] }
+        - name: reactivationStatus
+          in: query
+          schema: { type: string, enum: [notRequired, required, completed] }
         - name: page
           in: query
           schema: { type: integer, minimum: 1, default: 1 }
@@ -5018,6 +5231,63 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CompanionAppealQueueEnvelope"
+  /admin/commercial/companion-lifecycle/appeals/claimable:
+    get:
+      tags: [admin, commercial, companions]
+      summary: List minimal unassigned companion-appeal summaries for supply claim
+      operationId: adminListClaimableCompanionAppeals
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - $ref: "#/components/parameters/PageSizeQuery"
+      responses:
+        "200":
+          description: Oldest-due summaries without companion, action, statement, resolution, or attachment identifiers
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CompanionAppealClaimableListEnvelope" }
+  /admin/commercial/companion-lifecycle/appeals/{id}/claims:
+    post:
+      tags: [admin, commercial, companions]
+      summary: Atomically claim an unassigned companion appeal as supply
+      operationId: adminClaimCompanionAppeal
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200": { description: Appeal claimed, content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /admin/commercial/companion-lifecycle/appeals/{id}/assignments:
+    post:
+      tags: [admin, commercial, companions]
+      summary: Assign or hand off a pending companion appeal as admin
+      operationId: adminAssignCompanionAppeal
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [assignedToUserId]
+              properties:
+                assignedToUserId: { type: string, format: uuid }
+      responses:
+        "200": { description: Appeal assignment updated, content: { application/json: { schema: { $ref: "#/components/schemas/SuccessEnvelope" } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
   /admin/commercial/companion-lifecycle/appeals/{id}/resolution:
     post:
       tags: [admin, commercial, companions]
@@ -5036,6 +5306,35 @@ paths:
       responses:
         "201":
           description: Appeal resolution recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+        "400":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+  /admin/commercial/companion-lifecycle/appeals/{id}/reactivation:
+    post:
+      tags: [admin, commercial, companions]
+      summary: Complete an independent operational reactivation review after an overturned restriction
+      description: Requires an overturned service restriction or suspension whose original action was revoked. The operator must differ from both the original action creator and the appeal reviewer. Current owner, identity, adult-eligibility, commercial-profile, training, and other active restriction facts are rechecked under locks. Success never republishes the companion; publication remains a separate explicit action.
+      operationId: adminCompleteCompanionReactivation
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompanionReactivationCompletion"
+      responses:
+        "201":
+          description: Reactivation review completed while public listing remains disabled
           content:
             application/json:
               schema:
@@ -5165,7 +5464,8 @@ paths:
   /admin/commercial/companion-lifecycle/incidents:
     get:
       tags: [admin, commercial, companions]
-      summary: List private companion fulfillment and safety incidents
+      summary: List authorized private companion fulfillment and safety incidents
+      description: Administrators receive the bounded global queue. Supply staff receive only incidents currently assigned to them, including controlled attachment metadata.
       operationId: adminListCompanionIncidents
       security:
         - bearerAuth: []
@@ -5183,11 +5483,103 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CompanionIncidentListEnvelope"
+                $ref: "#/components/schemas/CompanionIncidentAdminListEnvelope"
+        "403": { $ref: "#/components/responses/Error" }
+  /admin/commercial/companion-lifecycle/incidents/claimable:
+    get:
+      tags: [admin, commercial, companions]
+      summary: List minimal unassigned incident summaries for supply claim
+      description: Supply-only. Returns no companion, category, narrative, order id, attachment id, or evidence metadata before a successful claim.
+      operationId: adminListClaimableCompanionIncidents
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: incidentStatus
+          in: query
+          schema: { type: string, enum: [open, inReview] }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - $ref: "#/components/parameters/PageSizeQuery"
+      responses:
+        "200":
+          description: Stable oldest-first claimable summaries
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CompanionIncidentClaimableListEnvelope" }
+        "403": { $ref: "#/components/responses/Error" }
+  /admin/commercial/companion-lifecycle/incidents/{id}:
+    get:
+      tags: [admin, commercial, companions]
+      summary: Read one authorized companion incident
+      description: Administrators may read any incident. Supply staff receive 404 unless they are the current assignee.
+      operationId: adminGetCompanionIncident
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Full incident projection within the current assignment boundary
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CompanionIncidentEnvelope" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /admin/commercial/companion-lifecycle/incidents/{id}/claims:
+    post:
+      tags: [admin, commercial, companions]
+      summary: Atomically claim one unassigned companion incident
+      description: Supply-only compare-and-set claim. Competing callers receive conflict and no incident narrative or attachment metadata.
+      operationId: adminClaimCompanionIncident
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      responses:
+        "200":
+          description: Claimed full incident projection
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CompanionIncidentEnvelope" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /admin/commercial/companion-lifecycle/incidents/{id}/assignments:
+    post:
+      tags: [admin, commercial, companions]
+      summary: Assign one unresolved companion incident
+      description: Admin-only. The assignee must have an active supply StaffCredential; offboarding may transfer unresolved assignments to the active administrator selected for the wider commercial handoff.
+      operationId: adminAssignCompanionIncident
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [assignedToUserId]
+              properties:
+                assignedToUserId: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Assigned full incident projection
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CompanionIncidentEnvelope" }
+        "400": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
   /admin/commercial/companion-lifecycle/incidents/{id}/status:
     post:
       tags: [admin, commercial, companions]
-      summary: Advance a companion incident and record a controlled resolution
+      summary: Advance an authorized companion incident and record a controlled resolution
+      description: Administrators may update any unresolved incident. Supply staff must remain its current active assignee.
       operationId: adminUpdateCompanionIncident
       security:
         - bearerAuth: []
@@ -9352,7 +9744,7 @@ components:
     CommercialStaffAssignmentCounts:
       type: object
       additionalProperties: false
-      required: [supportTickets, refunds, paymentDisputes, attendanceReviews, attendanceAppeals, userAccountAppeals, dataRightsRequests, invoiceRequests, companionWithdrawals]
+      required: [supportTickets, refunds, paymentDisputes, attendanceReviews, attendanceAppeals, userAccountAppeals, companionAccountAppeals, dataRightsRequests, invoiceRequests, companionWithdrawals, companionIncidents]
       properties:
         supportTickets: { type: integer, minimum: 0 }
         refunds: { type: integer, minimum: 0 }
@@ -9360,9 +9752,11 @@ components:
         attendanceReviews: { type: integer, minimum: 0 }
         attendanceAppeals: { type: integer, minimum: 0 }
         userAccountAppeals: { type: integer, minimum: 0 }
+        companionAccountAppeals: { type: integer, minimum: 0 }
         dataRightsRequests: { type: integer, minimum: 0 }
         invoiceRequests: { type: integer, minimum: 0 }
         companionWithdrawals: { type: integer, minimum: 0 }
+        companionIncidents: { type: integer, minimum: 0 }
     CommercialStaffIdentityBoundary:
       type: object
       additionalProperties: false
@@ -9467,7 +9861,7 @@ components:
     CommercialStaffHandoffResult:
       type: object
       additionalProperties: false
-      required: [supportTickets, refunds, paymentDisputes, attendanceReviews, attendanceAppealsReassigned, attendanceAppealsUnassignedForIndependence, userAccountAppealsReassigned, userAccountAppealsUnassignedForIndependence, dataRightsRequests, invoiceRequests, companionWithdrawals]
+      required: [supportTickets, refunds, paymentDisputes, attendanceReviews, attendanceAppealsReassigned, attendanceAppealsUnassignedForIndependence, userAccountAppealsReassigned, userAccountAppealsUnassignedForIndependence, companionAccountAppealsReassigned, companionAccountAppealsUnassignedForIndependence, dataRightsRequests, invoiceRequests, companionWithdrawals, companionIncidents]
       properties:
         supportTickets: { type: integer, minimum: 0 }
         refunds: { type: integer, minimum: 0 }
@@ -9477,9 +9871,12 @@ components:
         attendanceAppealsUnassignedForIndependence: { type: integer, minimum: 0 }
         userAccountAppealsReassigned: { type: integer, minimum: 0 }
         userAccountAppealsUnassignedForIndependence: { type: integer, minimum: 0 }
+        companionAccountAppealsReassigned: { type: integer, minimum: 0 }
+        companionAccountAppealsUnassignedForIndependence: { type: integer, minimum: 0 }
         dataRightsRequests: { type: integer, minimum: 0 }
         invoiceRequests: { type: integer, minimum: 0 }
         companionWithdrawals: { type: integer, minimum: 0 }
+        companionIncidents: { type: integer, minimum: 0 }
     CommercialStaffSuspensionEnvelope:
       allOf:
         - $ref: "#/components/schemas/SuccessEnvelope"
@@ -9686,6 +10083,7 @@ components:
         - orderIntakeDisabled
         - payoutClaimsDisabled
         - paymentDisputeIntakeDisabled
+        - publicInteractionIdentityAuthorityUnavailable
         - refundPolicyUnapproved
         - refundPolicySnapshotGaps
         - wechatDailyBillReconciliationDisabled
@@ -9712,6 +10110,7 @@ components:
         - retainedExpiryFailures
         - overdueUserAccountAppeals
         - overdueCompanionAccountAppeals
+        - expiredCompanionSuspensionReactivationPending
         - overduePaymentDisputes
         - paymentDisputeSyncFailures
         - notificationDeliveryDisabledWithPending
@@ -9753,6 +10152,11 @@ components:
         orderIntakeDisabled: { type: integer, minimum: 0 }
         payoutClaimsDisabled: { type: integer, minimum: 0 }
         paymentDisputeIntakeDisabled: { type: integer, minimum: 0 }
+        publicInteractionIdentityAuthorityUnavailable:
+          type: integer
+          minimum: 0
+          maximum: 1
+          description: One in commercial mode until a current, revocable authority-backed identity grant model exists. While one, new orders and prepay fail before writes; legacy profile booleans cannot clear it.
         refundPolicyUnapproved: { type: integer, minimum: 0, maximum: 1, description: One when commercial mode lacks an approved controlled refund-policy version and non-secret approval reference. }
         refundPolicySnapshotGaps: { type: integer, minimum: 0, description: Orders with a missing, out-of-range, or completion-deadline-inconsistent immutable refund-policy snapshot. Any value above zero blocks commercial readiness. }
         wechatDailyBillReconciliationDisabled: { type: integer, minimum: 0, maximum: 1 }
@@ -9808,6 +10212,10 @@ components:
           type: integer
           minimum: 0
           description: Pending companion account-action appeals whose immutable review deadline has passed.
+        expiredCompanionSuspensionReactivationPending:
+          type: integer
+          minimum: 0
+          description: Expired temporary suspension actions whose durable reactivation review has not materialized or completed. Public listing remains disabled until this count is zero.
         overduePaymentDisputes: { type: integer, minimum: 0 }
         paymentDisputeSyncFailures: { type: integer, minimum: 0 }
         notificationDeliveryDisabledWithPending: { type: integer, minimum: 0, description: Pending deliveries that cannot drain because the delivery worker is disabled. }
@@ -10296,10 +10704,11 @@ components:
       additionalProperties: false
       required: [id, userId, companionId, serviceOfferingId, serviceOfferingSnapshot, availabilityWindowId, availabilitySnapshot, themeId, durationMinutes, amountCents, amountYuan, currency, status, scheduledAt, companionSnapshot, themeNameSnapshot, serviceIntent, customer, refund, experienceFeedback, attendanceDispute, conversationId, companionConfirmedAt, companionResponseDeadlineAt, paymentReservationExpiresAt, serviceStartedAt, paidAt, cancelledAt, completedAt, customerConfirmedAt, customerServiceGuidelinesConfirmedAt, companionServiceGuidelinesConfirmedAt, refundRequestDeadlineAt, refundPolicyVersionSnapshot, refundRequestWindowHoursSnapshot, createdAt, updatedAt]
       description: >-
-        Safe generic order projection shared by customer order reads and customer
-        refund results. Participant-only viewer fields are optional. Settlement
+        Safe generic order projection shared by customer and companion order
+        reads. Participant-only viewer fields are optional. Settlement
         economics and commercial eligibility-assurance evidence are intentionally
         absent; authorized companion earnings use their dedicated commercial API.
+        Refund actions use the narrower CustomerRefundOrder projection.
       properties:
         id: { type: string }
         userId: { type: string }
@@ -10916,6 +11325,53 @@ components:
           properties:
             data:
               $ref: "#/components/schemas/WeChatPaymentReconciliationIssue"
+    CustomerRefundOrder:
+      type: object
+      additionalProperties: false
+      description: Minimal customer-owned order state returned by refund request and sync actions. It deliberately omits user identity, customer profile, policy snapshots, idempotency keys, settlement evidence, and commercial assurance fields.
+      required:
+        - id
+        - companionId
+        - themeId
+        - durationMinutes
+        - amountCents
+        - amountYuan
+        - currency
+        - status
+        - scheduledAt
+        - companionSnapshot
+        - themeNameSnapshot
+        - conversationId
+        - paidAt
+        - cancelledAt
+        - completedAt
+        - createdAt
+        - updatedAt
+      properties:
+        id: { type: string }
+        companionId: { type: string }
+        themeId: { type: string }
+        durationMinutes: { type: integer, minimum: 1 }
+        amountCents: { type: integer, minimum: 0 }
+        amountYuan: { type: integer, minimum: 0 }
+        currency: { type: string }
+        status: { type: string, enum: [pending, paying, paid, inService, completed, cancelled, refunded] }
+        scheduledAt: { type: string, format: date-time }
+        companionSnapshot:
+          type: object
+          additionalProperties: false
+          required: [name, role, initials]
+          properties:
+            name: { type: string }
+            role: { type: string }
+            initials: { type: string }
+        themeNameSnapshot: { type: string }
+        conversationId: { type: string, nullable: true }
+        paidAt: { type: string, format: date-time, nullable: true }
+        cancelledAt: { type: string, format: date-time, nullable: true }
+        completedAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
     CustomerRefund:
       type: object
       additionalProperties: false
@@ -10952,7 +11408,7 @@ components:
                 refund:
                   $ref: "#/components/schemas/CustomerRefund"
                 order:
-                  $ref: "#/components/schemas/OrderDto"
+                  $ref: "#/components/schemas/CustomerRefundOrder"
                 created: { type: boolean }
     RefundSyncEnvelope:
       allOf:
@@ -10967,7 +11423,7 @@ components:
                 refund:
                   $ref: "#/components/schemas/CustomerRefund"
                 order:
-                  $ref: "#/components/schemas/OrderDto"
+                  $ref: "#/components/schemas/CustomerRefundOrder"
     RefundReviewQueueItem:
       type: object
       additionalProperties: false
@@ -11675,6 +12131,7 @@ components:
         - id
         - status
         - statement
+        - evidenceAttachments
         - reviewDueAt
         - overdue
         - resolution
@@ -11685,6 +12142,10 @@ components:
         id: { type: string }
         status: { type: string, enum: [pending, upheld, overturned, dismissed] }
         statement: { type: string, minLength: 10, maxLength: 1000 }
+        evidenceAttachments:
+          type: array
+          maxItems: 3
+          items: { $ref: "#/components/schemas/ControlledCaseEvidenceAttachment" }
         reviewDueAt: { type: string, format: date-time }
         overdue:
           type: boolean
@@ -11771,13 +12232,17 @@ components:
     UserAccountAppealQueueItem:
       type: object
       additionalProperties: false
-      required: [id, actionId, userId, status, statement, reviewDueAt, overdue, resolution, resolvedAt, policyVersion, createdAt, assignedToUserId, assignedAt, independentReviewEligible, action]
+      required: [id, actionId, userId, status, statement, evidenceAttachments, reviewDueAt, overdue, resolution, resolvedAt, policyVersion, createdAt, assignedToUserId, assignedAt, independentReviewEligible, action]
       properties:
         id: { type: string, format: uuid }
         actionId: { type: string }
         userId: { type: string, format: uuid }
         status: { type: string, enum: [pending, upheld, overturned, dismissed] }
         statement: { type: string, minLength: 10, maxLength: 1000 }
+        evidenceAttachments:
+          type: array
+          maxItems: 3
+          items: { $ref: "#/components/schemas/ControlledCaseEvidenceAttachment" }
         reviewDueAt: { type: string, format: date-time }
         overdue: { type: boolean }
         resolution: { type: string, nullable: true, maxLength: 1000 }
@@ -12272,7 +12737,7 @@ components:
         id: { type: string, format: uuid }
         purpose:
           type: string
-          enum: [orderSupportFact, attendanceDisputeStatement, companionIncidentReport]
+          enum: [orderSupportFact, attendanceDisputeStatement, companionIncidentReport, userAccountAppeal, companionAccountAppeal]
         kind: { type: string, enum: [image, audio] }
         status:
           type: string
@@ -12860,16 +13325,14 @@ components:
           type: string
           minLength: 10
           maxLength: 1000
-        evidenceReferences:
+        evidenceAssetIds:
           type: array
-          maxItems: 8
+          maxItems: 3
           uniqueItems: true
-          description: Controlled external references only; no raw attachment content.
+          description: Approved, unexpired, unused action-scoped controlled uploads owned by the appellant.
           items:
             type: string
-            minLength: 6
-            maxLength: 160
-            pattern: "^[A-Za-z0-9][A-Za-z0-9._:/-]*$"
+            format: uuid
     CompanionIncidentSubmission:
       type: object
       additionalProperties: false
@@ -12910,6 +13373,16 @@ components:
         resolvedAt: { type: string, format: date-time, nullable: true }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+        assignedTo:
+          type: object
+          nullable: true
+          additionalProperties: false
+          required: [userId, displayName, role]
+          properties:
+            userId: { type: string, format: uuid }
+            displayName: { type: string, nullable: true }
+            role: { type: string, enum: [supply, admin] }
+        assignedAt: { type: string, format: date-time, nullable: true }
         companion:
           type: object
           nullable: true
@@ -12939,6 +13412,47 @@ components:
                   maxItems: 100
                   items: { $ref: "#/components/schemas/CompanionIncidentView" }
                 pagination: { $ref: "#/components/schemas/BoundedPagination" }
+    CompanionIncidentAdminListEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              type: object
+              additionalProperties: false
+              required: [items, pagination, scope]
+              properties:
+                items:
+                  type: array
+                  maxItems: 100
+                  items: { $ref: "#/components/schemas/CompanionIncidentView" }
+                pagination: { $ref: "#/components/schemas/BoundedPagination" }
+                scope: { type: string, enum: [all, assignedToMe] }
+    CompanionIncidentClaimableSummary:
+      type: object
+      additionalProperties: false
+      required: [id, status, submittedAt, hasOrder]
+      properties:
+        id: { type: string, format: uuid }
+        status: { type: string, enum: [open, inReview] }
+        submittedAt: { type: string, format: date-time }
+        hasOrder: { type: boolean }
+    CompanionIncidentClaimableListEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              type: object
+              additionalProperties: false
+              required: [items, pagination, scope]
+              properties:
+                items:
+                  type: array
+                  maxItems: 100
+                  items: { $ref: "#/components/schemas/CompanionIncidentClaimableSummary" }
+                pagination: { $ref: "#/components/schemas/BoundedPagination" }
+                scope: { type: string, enum: [claimableSummary] }
     CompanionEarningHold:
       type: object
       additionalProperties: false
@@ -13067,29 +13581,41 @@ components:
         - id
         - actionId
         - statement
-        - evidenceReferences
+        - evidenceAttachments
+        - legacyEvidenceReferenceCount
         - status
         - reviewDueAt
         - overdue
         - resolution
         - resolvedAt
+        - reactivation
         - createdAt
         - companion
         - action
+        - assignedToUserId
+        - assignedAt
+        - assignedTo
+        - assignedToActor
         - independentReviewEligible
+        - reactivationReviewEligible
       properties:
         id: { type: string, format: uuid }
         actionId: { type: string, format: uuid }
         statement: { type: string, minLength: 10, maxLength: 1000 }
-        evidenceReferences:
+        evidenceAttachments:
           type: array
-          maxItems: 8
-          items: { type: string }
+          maxItems: 3
+          items: { $ref: "#/components/schemas/ControlledCaseEvidenceAttachment" }
+        legacyEvidenceReferenceCount:
+          type: integer
+          minimum: 0
+          description: Count-only migration tombstone for pre-controlled arbitrary references; values are never returned.
         status: { type: string, enum: [pending, upheld, overturned, dismissed] }
         reviewDueAt: { type: string, format: date-time }
         overdue: { type: boolean }
         resolution: { type: string, nullable: true }
         resolvedAt: { type: string, format: date-time, nullable: true }
+        reactivation: { $ref: "#/components/schemas/CompanionReactivationState" }
         createdAt: { type: string, format: date-time }
         companion:
           type: object
@@ -13102,7 +13628,7 @@ components:
         action:
           type: object
           additionalProperties: false
-          required: [id, companionId, kind, reasonCode, message, startsAt, endsAt, appealDeadlineAt, appealWindowOpen, revokedAt, active, createdAt]
+          required: [id, companionId, kind, reasonCode, message, startsAt, endsAt, appealDeadlineAt, appealWindowOpen, revokedAt, active, reactivation, createdAt]
           properties:
             id: { type: string, format: uuid }
             companionId: { type: string }
@@ -13115,8 +13641,24 @@ components:
             appealWindowOpen: { type: boolean }
             revokedAt: { type: string, format: date-time, nullable: true }
             active: { type: boolean }
+            reactivation: { $ref: "#/components/schemas/CompanionReactivationState" }
             createdAt: { type: string, format: date-time }
         independentReviewEligible: { type: boolean }
+        assignedToUserId: { type: string, format: uuid, nullable: true }
+        assignedAt: { type: string, format: date-time, nullable: true }
+        assignedTo:
+          type: object
+          nullable: true
+          additionalProperties: false
+          required: [userId, role, displayName]
+          properties:
+            userId: { type: string, format: uuid }
+            role: { type: string, enum: [supply, admin] }
+            displayName: { type: string, nullable: true }
+        assignedToActor: { type: boolean }
+        reactivationReviewEligible:
+          type: boolean
+          description: True only for a required reactivation when the current operator is neither the original action creator nor the appeal reviewer.
     CompanionAppealQueueEnvelope:
       allOf:
         - $ref: "#/components/schemas/SuccessEnvelope"
@@ -13126,7 +13668,7 @@ components:
             data:
               type: object
               additionalProperties: false
-              required: [items, pagination]
+              required: [items, pagination, scope]
               properties:
                 items:
                   type: array
@@ -13135,12 +13677,66 @@ components:
                     $ref: "#/components/schemas/CompanionAppealQueueItem"
                 pagination:
                   $ref: "#/components/schemas/BoundedPagination"
+                scope: { type: string, enum: [all, assignedToMe] }
+    CompanionAppealClaimableSummary:
+      type: object
+      additionalProperties: false
+      required: [id, status, submittedAt, reviewDueAt, overdue]
+      properties:
+        id: { type: string, format: uuid }
+        status: { type: string, enum: [pending] }
+        submittedAt: { type: string, format: date-time }
+        reviewDueAt: { type: string, format: date-time }
+        overdue: { type: boolean }
+    CompanionAppealClaimableListEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          required: [data]
+          properties:
+            data:
+              type: object
+              additionalProperties: false
+              required: [items, pagination, scope]
+              properties:
+                items:
+                  type: array
+                  maxItems: 100
+                  items: { $ref: "#/components/schemas/CompanionAppealClaimableSummary" }
+                pagination: { $ref: "#/components/schemas/BoundedPagination" }
+                scope: { type: string, enum: [claimableSummary] }
     CompanionAppealResolution:
       type: object
       additionalProperties: false
       required: [status, resolution]
       properties:
         status: { type: string, enum: [upheld, overturned, dismissed] }
+        resolution:
+          type: string
+          minLength: 10
+          maxLength: 1000
+    CompanionReactivationState:
+      type: object
+      additionalProperties: false
+      required: [status, required, requiredAt, completedAt, resolution, publicationRestored, nextAction]
+      properties:
+        status: { type: string, enum: [notRequired, required, completed] }
+        required: { type: boolean }
+        requiredAt: { type: string, format: date-time, nullable: true }
+        completedAt: { type: string, format: date-time, nullable: true }
+        resolution: { type: string, nullable: true }
+        publicationRestored:
+          type: boolean
+          enum: [false]
+          description: Reactivation never guesses or restores the previous public-listing state.
+        nextAction:
+          type: string
+          enum: [none, awaitExpiryReactivationMaterialization, awaitIndependentOperationalReview, awaitExplicitPublicationDecision]
+    CompanionReactivationCompletion:
+      type: object
+      additionalProperties: false
+      required: [resolution]
+      properties:
         resolution:
           type: string
           minLength: 10

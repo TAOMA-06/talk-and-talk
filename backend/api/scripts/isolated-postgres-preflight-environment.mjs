@@ -22,6 +22,13 @@ export const POSTGRES_PREFLIGHT_DATABASE_KEYS = Object.freeze([
   "ACCOUNT_DELETION_TEST_DATABASE_URL",
   "ACCOUNT_DELETION_AUTH_TOMBSTONE_TEST_DATABASE_URL",
   "REFUND_POLICY_MIGRATION_TEST_DATABASE_URL",
+  "ACCOUNT_DATA_RETENTION_LEGAL_HOLD_TEST_DATABASE_URL",
+  "CONTROLLED_ACCOUNT_APPEAL_EVIDENCE_TEST_DATABASE_URL",
+  "RETENTION_EXPIRY_GRAPH_TEST_DATABASE_URL",
+  "RETENTION_MEDIA_LEGAL_HOLD_TEST_DATABASE_URL",
+  "RETENTION_GRAPH_TEST_DATABASE_URL",
+  "AUDIT_SUBJECT_POLICY_V3_TEST_DATABASE_URL",
+  "COMPANION_INCIDENT_ASSIGNMENT_TEST_DATABASE_URL",
   "TEST_DATABASE_URL"
 ]);
 
@@ -42,7 +49,7 @@ function canonicalUrl(value, key) {
 let verifiedEnvironment = null;
 
 /**
- * Returns a shared promise so all seven Node test modules verify the same
+ * Returns a shared promise so every PostgreSQL probe verifies the same
  * ownership record without racing one another or opening independent trust
  * paths. No test body may create a schema until this promise resolves.
  */

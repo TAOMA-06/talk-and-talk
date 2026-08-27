@@ -22,7 +22,7 @@ describe("ControlledCaseEvidenceWorker", () => {
     }
   };
   const mediaAssets: any = {
-    isFeatureEnabled: jest.fn().mockReturnValue(true),
+    isCaseEvidenceMediaEnabled: jest.fn().mockReturnValue(true),
     toReference: jest.fn((asset) => asset)
   };
   const analysis: any = {

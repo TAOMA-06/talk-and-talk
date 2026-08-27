@@ -125,6 +125,7 @@ test("server-renders the Talk&Talk official marketing home", async () => {
   assert.match(html, /先认识规则，再进入小程序/);
   assert.match(html, /hero-trust-strip/);
   assert.match(html, /文字互动/);
+  assert.match(html, /身份核验通道完成前不开放新预约、支付或聊天/);
   assert.doesNotMatch(html, /App 即将到来/);
   assert.match(html, /bubble-hero|icon-orbit|app-icon/);
   assert.match(html, /非医疗|非急救|年满 18/);

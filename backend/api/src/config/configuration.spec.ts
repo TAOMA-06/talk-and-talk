@@ -75,6 +75,9 @@ describe("validateEnvironment", () => {
     DATA_EXPORT_MAX_BYTES: String(50 * 1024 * 1024),
     COMPANION_APPEAL_SUBMISSION_DAYS: "30",
     COMPANION_APPEAL_RESPONSE_HOURS: "72",
+    COMPANION_ACTION_EXPIRY_ENABLED: "true",
+    COMPANION_ACTION_EXPIRY_INTERVAL_SECONDS: "60",
+    COMPANION_ACTION_EXPIRY_BATCH_SIZE: "50",
     NOTIFICATION_DELIVERY_ENABLED: "true",
     WECHAT_SUBSCRIBE_MESSAGES_ENABLED: "true",
     WECHAT_SUBSCRIBE_TEMPLATES_JSON: JSON.stringify(transactionalTemplateManifest.map(({ key, defaultPage }) => ({
@@ -201,6 +204,9 @@ describe("validateEnvironment", () => {
     expect(env.DATA_EXPORT_MAX_BYTES).toBe(50 * 1024 * 1024);
     expect(env.COMPANION_APPEAL_SUBMISSION_DAYS).toBe(30);
     expect(env.COMPANION_APPEAL_RESPONSE_HOURS).toBe(72);
+    expect(env.COMPANION_ACTION_EXPIRY_ENABLED).toBe(true);
+    expect(env.COMPANION_ACTION_EXPIRY_INTERVAL_SECONDS).toBe(60);
+    expect(env.COMPANION_ACTION_EXPIRY_BATCH_SIZE).toBe(50);
     expect(env.ORDER_INTAKE_ENABLED).toBe(true);
     expect(env.ORDER_MAX_OPEN_TOTAL).toBe(500);
     expect(env.ORDER_MAX_OPEN_PER_USER).toBe(3);
@@ -274,6 +280,23 @@ describe("validateEnvironment", () => {
     expect(() => validateEnvironment({
       COMPANION_APPEAL_RESPONSE_HOURS: "721"
     })).toThrow("COMPANION_APPEAL_RESPONSE_HOURS");
+  });
+
+  it("enables and bounds companion action expiry materialization", () => {
+    const configured = validateEnvironment({
+      COMPANION_ACTION_EXPIRY_ENABLED: "false",
+      COMPANION_ACTION_EXPIRY_INTERVAL_SECONDS: "15",
+      COMPANION_ACTION_EXPIRY_BATCH_SIZE: "100"
+    });
+    expect(configured.COMPANION_ACTION_EXPIRY_ENABLED).toBe(false);
+    expect(configured.COMPANION_ACTION_EXPIRY_INTERVAL_SECONDS).toBe(15);
+    expect(configured.COMPANION_ACTION_EXPIRY_BATCH_SIZE).toBe(100);
+    expect(() => validateEnvironment({
+      COMPANION_ACTION_EXPIRY_INTERVAL_SECONDS: "4"
+    })).toThrow("COMPANION_ACTION_EXPIRY_INTERVAL_SECONDS");
+    expect(() => validateEnvironment({
+      COMPANION_ACTION_EXPIRY_BATCH_SIZE: "201"
+    })).toThrow("COMPANION_ACTION_EXPIRY_BATCH_SIZE");
   });
 
   it("keeps availability-reminder preparation explicitly opt-in and bounds its internal work", () => {

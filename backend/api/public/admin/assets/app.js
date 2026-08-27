@@ -17,7 +17,7 @@
     mutationsEnabled: false,
     loading: false,
     action: null,
-    pages: { companions: 1, supportAssigned: 1, supportClaimable: 1, earnings: 1, recoveries: 1, training: 1, reviewDue: 1, accountActions: 1, incidents: 1, withdrawals: 1, voiceIntros: 1, orders: 1, refunds: 1, paymentReconciliationRuns: 1, paymentReconciliationIssues: 1, merchantBillImports: 1, cashLedgerClassifications: 1, paymentDisputes: 1, attendanceDisputes: 1, companionAppeals: 1, users: 1, accountAppeals: 1, deletions: 1, legalHolds: 1, dataRights: 1, dataRightsClaimable: 1, identityVerification: 1, customerAdultEligibility: 1, invoices: 1, staffCredentials: 1, audit: 1 },
+    pages: { companions: 1, supportAssigned: 1, supportClaimable: 1, earnings: 1, recoveries: 1, training: 1, reviewDue: 1, accountActions: 1, suspensionReactivations: 1, incidents: 1, incidentClaimable: 1, withdrawals: 1, voiceIntros: 1, orders: 1, refunds: 1, paymentReconciliationRuns: 1, paymentReconciliationIssues: 1, merchantBillImports: 1, cashLedgerClassifications: 1, paymentDisputes: 1, attendanceDisputes: 1, companionAppeals: 1, companionAppealClaimable: 1, users: 1, accountAppeals: 1, deletions: 1, legalHolds: 1, dataRights: 1, dataRightsClaimable: 1, identityVerification: 1, customerAdultEligibility: 1, invoices: 1, staffCredentials: 1, audit: 1 },
     records: {
       companion: new Map(),
       identityVerification: new Map(),
@@ -34,12 +34,15 @@
       earning: new Map(),
       recovery: new Map(),
       incident: new Map(),
+      incidentClaimable: new Map(),
       withdrawal: new Map(),
       companionAppeal: new Map(),
+      companionAppealClaimable: new Map(),
       voiceIntro: new Map(),
       training: new Map(),
       reviewDue: new Map(),
       accountAction: new Map(),
+      suspensionReactivation: new Map(),
       accountAppeal: new Map(),
       user: new Map(),
       staffCredential: new Map(),
@@ -116,6 +119,7 @@
     orderIntakeDisabled: "订单入口已关闭",
     payoutClaimsDisabled: "结算认领已关闭",
     paymentDisputeIntakeDisabled: "微信支付投诉接入已关闭",
+    publicInteractionIdentityAuthorityUnavailable: "可撤销的真实身份授权体系尚未接入，新预约与支付保持关闭",
     wechatDailyBillReconciliationDisabled: "微信日账单对账未完成配置",
     wechatDailyBillReconciliationIncomplete: "微信日账单覆盖不完整",
     wechatDailyBillOpenIssues: "微信日账单差异未结",
@@ -140,6 +144,7 @@
     accountDeletionAuthTombstoneUnknownKeys: "存在当前密钥环无法验证的登录标识保护摘要，新身份注册已关闭",
     overdueUserAccountAppeals: "普通用户账号申诉复核超时",
     overdueCompanionAccountAppeals: "陪伴者账号申诉复核超时",
+    expiredCompanionSuspensionReactivationPending: "临时暂停已到期但资格恢复复核尚未完成",
     failedNotifications: "用户通知失败",
     staleNotificationLeases: "通知任务租约过期",
     notificationDeliveryDisabledWithPending: "通知队列有待投递任务，但投递工作进程未启用",
@@ -1129,17 +1134,14 @@
           const profileSummary = profile
             ? `结算 ${escapeHtml(profile.settlementRecipientMasked || "—")} · 税务 ${escapeHtml(maskReference(profile.taxProfileRef))} · 协议 ${escapeHtml(profile.serviceAgreementVersion || "—")}`
             : "尚未提交商业档案";
+          const identityAction = ownerIsVerified
+            ? actionButton("提交撤销实名复核", "submitCompanionVerification", "companion", item.id, "warn")
+            : "";
           const actions = [
             actionButton(profile ? "更新档案" : "提交档案", "submitCommercialProfile", "companion", item.id),
             profile?.status === "pendingReview" ? actionButton("第二人核验", "verifyCommercialProfile", "companion", item.id, "primary") : "",
             profile && profile.status !== "suspended" ? actionButton("暂停商业资格", "suspendCommercialProfile", "companion", item.id, "danger") : "",
-            actionButton(
-              ownerIsVerified ? "提交撤销实名复核" : "提交实名核验复核",
-              "submitCompanionVerification",
-              "companion",
-              item.id,
-              ownerIsVerified ? "warn" : "primary"
-            ),
+            identityAction,
             item.isPublished
               ? actionButton("下架", "unpublishCompanion", "companion", item.id, "warn")
               : actionButton("发布", "publishCompanion", "companion", item.id, "primary"),
@@ -1147,7 +1149,7 @@
           ].join("");
           return `<article class="data-row ${profile?.status === "verified" ? "good" : profile?.status === "suspended" ? "urgent" : "attention"}">
             <div class="row-title"><div>${statusPill(commercialStatus)} ${item.isPublished ? statusPill("active") : ""}</div><h3>${escapeHtml(item.name || item.id)}</h3><p class="masked-id">${escapeHtml(maskId(item.id))} · owner ${escapeHtml(maskId(item.ownerUserId))}</p></div>
-            <div class="row-facts"><div><span>商业档案</span><strong title="${profileSummary}">${profileSummary}</strong></div><div><span>实名 / 陪伴资料</span><strong>${ownerIsVerified ? "用户已实名" : "用户未实名"} · ${item.isVerified ? "资料已核验" : "资料未核验"}</strong></div><div><span>最近更新</span><strong>${formatTime(profile?.updatedAt || item.updatedAt)}</strong></div></div>
+            <div class="row-facts"><div><span>商业档案</span><strong title="${profileSummary}">${profileSummary}</strong></div><div><span>实名 / 陪伴资料</span><strong>${ownerIsVerified ? "用户已实名" : "用户未实名 · 新授权 No-Go"} · ${item.isVerified ? "资料已核验" : "资料未核验"}</strong></div><div><span>最近更新</span><strong>${formatTime(profile?.updatedAt || item.updatedAt)}</strong></div></div>
             <div class="row-actions">${actions}</div>
           </article>`;
         }).join("");
@@ -1184,9 +1186,10 @@
     container.innerHTML = items.length ? items.map((item) => {
       const sameOperator = item.submittedBy?.id === state.user?.id;
       const direction = item.requestedIsVerified ? "核验实名" : "撤销实名";
+      const grantFrozen = item.requestedIsVerified === true;
       const actions = item.status === "pending" && !sameOperator
         ? [
-            actionButton("批准并应用", "approveIdentityVerification", "identityVerification", item.id, "primary"),
+            grantFrozen ? "" : actionButton("批准撤销并应用", "approveIdentityVerification", "identityVerification", item.id, "primary"),
             actionButton("拒绝请求", "rejectIdentityVerification", "identityVerification", item.id, "danger")
           ].join("")
         : "";
@@ -1194,7 +1197,9 @@
         ? `${item.subject.companion.name || maskId(item.subject.companion.id)} · ${item.subject.companion.isPublished ? "当前公开" : "当前下架"}`
         : "非陪伴者账号";
       const reviewFact = item.status === "pending"
-        ? (sameOperator ? "你是提交人，必须由另一名授权人员复核" : "等待第二人复核")
+        ? (grantFrozen
+            ? "No-Go：新实名授权冻结，不得批准；另一名授权人员只能拒绝该请求"
+            : sameOperator ? "你是提交人，必须由另一名授权人员复核撤销" : "等待第二人复核撤销")
         : `${item.reviewedBy?.displayName || maskId(item.reviewedBy?.id)} · ${item.reviewReason || "未填写复核结论"}`;
       return `<article class="compact-item ${item.status === "rejected" ? "urgent" : item.status === "approved" ? "good" : "attention"}"><div class="compact-item-head"><h3>${escapeHtml(item.subject?.displayName || maskId(item.userId))} · ${escapeHtml(direction)}</h3>${statusPill(item.status)}</div><p>${escapeHtml(item.reason)} · 证据 ${escapeHtml(maskReference(item.evidenceReference))}</p><div class="compact-meta"><span>状态 ${item.previousIsVerified ? "已核验" : "未核验"} → ${item.requestedIsVerified ? "已核验" : "未核验"}</span><span>当前 ${item.subject?.currentIsVerified ? "已核验" : "未核验"}</span><span>${escapeHtml(companion)}</span><span>提交 ${escapeHtml(item.submittedBy?.displayName || maskId(item.submittedBy?.id))} · ${escapeHtml(formatTime(item.submittedAt))}</span><span>${escapeHtml(reviewFact)}</span></div><div class="compact-actions">${actions}</div></article>`;
     }).join("") : '<div class="empty-state">当前筛选下没有实名变更复核请求。</div>';
@@ -1893,6 +1898,19 @@
     }
   }
 
+  async function openControlledCaseEvidence(attachmentId) {
+    try {
+      const result = await request(`/case-evidence/attachments/${encodeURIComponent(attachmentId)}/read-url`);
+      const url = safeNavigationUrl(result.url);
+      if (!url) throw new Error("服务端未返回可用的 HTTPS 受控证据地址");
+      const opened = window.open(url, "_blank", "noopener,noreferrer");
+      if (opened) opened.opener = null;
+    } catch (error) {
+      showToast(error.message || "受控证据暂时无法查看", true);
+      showTrace(error);
+    }
+  }
+
   async function loadSettlements(
     earningPage = state.pages.earnings,
     recoveryPage = state.pages.recoveries,
@@ -2004,9 +2022,13 @@
     }
     setContainerState(container, "loading", "正在读取陪伴者申诉队列…");
     pagination.innerHTML = "";
-    const status = document.querySelector("#companionAppealStatusFilter").value || "pending";
+    const selectedStatus = document.querySelector("#companionAppealStatusFilter").value || "pending";
+    const status = selectedStatus === "reactivationRequired" ? "overturned" : selectedStatus;
+    const reactivationFilter = selectedStatus === "reactivationRequired"
+      ? "&reactivationStatus=required"
+      : "";
     try {
-      const result = await request(`/admin/commercial/companion-lifecycle/appeals?page=${page}&pageSize=50&appealStatus=${encodeURIComponent(status)}`);
+      const result = await request(`/admin/commercial/companion-lifecycle/appeals?page=${page}&pageSize=50&appealStatus=${encodeURIComponent(status)}${reactivationFilter}`);
       const items = result.items || [];
       setRecords("companionAppeal", items);
       renderCompanionAppeals(container, items);
@@ -2014,6 +2036,61 @@
     } catch (error) {
       state.records.companionAppeal.clear();
       setContainerState(container, "error", `陪伴者申诉队列加载失败：${error.message}`);
+      showTrace(error);
+    }
+  }
+
+  async function loadClaimableCompanionAppeals(page = state.pages.companionAppealClaimable) {
+    const panel = document.querySelector("#companionAppealClaimablePanel");
+    const container = document.querySelector("#companionAppealClaimableList");
+    const pagination = document.querySelector("#companionAppealClaimablePagination");
+    const allowed = state.user?.role === "supply"
+      && (hasCapability("companion.lifecycle.supply.manage") || hasCapability("companion.lifecycle.manage"));
+    panel?.classList.toggle("hidden", !allowed);
+    if (!allowed) {
+      state.records.companionAppealClaimable.clear();
+      pagination.innerHTML = "";
+      return;
+    }
+    state.pages.companionAppealClaimable = page;
+    setContainerState(container, "loading", "正在读取匿名可认领申诉…");
+    pagination.innerHTML = "";
+    try {
+      const result = await request(`/admin/commercial/companion-lifecycle/appeals/claimable?page=${page}&pageSize=50`);
+      const items = result.items || [];
+      setRecords("companionAppealClaimable", items);
+      renderClaimableCompanionAppeals(container, items);
+      renderPagination(pagination, result.pagination, (next) => loadClaimableCompanionAppeals(next));
+    } catch (error) {
+      state.records.companionAppealClaimable.clear();
+      setContainerState(container, "error", `匿名申诉队列加载失败：${error.message}`);
+      showTrace(error);
+    }
+  }
+
+  async function loadClaimableIncidents(page = state.pages.incidentClaimable) {
+    const panel = document.querySelector("#incidentClaimablePanel");
+    const container = document.querySelector("#incidentClaimableList");
+    const pagination = document.querySelector("#incidentClaimablePagination");
+    const allowed = state.user?.role === "supply"
+      && (hasCapability("companion.lifecycle.supply.manage") || hasCapability("companion.lifecycle.manage"));
+    panel?.classList.toggle("hidden", !allowed);
+    if (!allowed) {
+      state.records.incidentClaimable.clear();
+      return;
+    }
+    state.pages.incidentClaimable = page;
+    setContainerState(container, "loading", "正在读取匿名可认领事件…");
+    pagination.innerHTML = "";
+    try {
+      const result = await request(`/admin/commercial/companion-lifecycle/incidents/claimable?page=${page}&pageSize=50`);
+      const items = result.items || [];
+      setRecords("incidentClaimable", items);
+      renderClaimableIncidents(container, items);
+      renderPagination(pagination, result.pagination, (next) => loadClaimableIncidents(next));
+    } catch (error) {
+      state.records.incidentClaimable.clear();
+      setContainerState(container, "error", `匿名事件队列加载失败：${error.message}`);
       showTrace(error);
     }
   }
@@ -2030,6 +2107,7 @@
       ["training", "training", "#trainingList", "#trainingPagination", `/admin/commercial/companion-lifecycle/training?page=${state.pages.training}&pageSize=50`, renderTraining, supplyCapability],
       ["reviewDue", "reviewDue", "#reviewDueList", "#reviewDuePagination", `/admin/commercial/companion-lifecycle/review-due?page=${state.pages.reviewDue}&pageSize=50`, renderReviewDue, supplyCapability],
       ["accountAction", "accountActions", "#accountActionList", "#accountActionPagination", `/admin/commercial/companion-lifecycle/actions?active=true&page=${state.pages.accountActions}&pageSize=50`, renderAccountActions, supplyCapability],
+      ["suspensionReactivation", "suspensionReactivations", "#suspensionReactivationList", "#suspensionReactivationPagination", `/admin/commercial/companion-lifecycle/actions?reactivationStatus=required&page=${state.pages.suspensionReactivations}&pageSize=50`, renderSuspensionReactivations, supplyCapability],
       ["incident", "incidents", "#incidentList", "#incidentPagination", `/admin/commercial/companion-lifecycle/incidents?page=${state.pages.incidents}&pageSize=50`, renderIncidents, supplyCapability],
       ["withdrawal", "withdrawals", "#withdrawalList", "#withdrawalPagination", `/admin/commercial/companion-lifecycle/withdrawals?page=${state.pages.withdrawals}&pageSize=50`, renderWithdrawals, withdrawalCapability],
       ["voiceIntro", "voiceIntros", "#voiceIntroList", "#voiceIntroPagination", `/admin/commercial/companion-lifecycle/voice-intros?page=${state.pages.voiceIntros}&pageSize=50`, renderVoiceIntros, supplyCapability]
@@ -2044,6 +2122,10 @@
       document.querySelector(paginationSelector).innerHTML = "";
     });
     const companionAppealsPromise = loadCompanionAppeals(state.pages.companionAppeals);
+    const claimableCompanionAppealsPromise = loadClaimableCompanionAppeals(
+      state.pages.companionAppealClaimable
+    );
+    const claimableIncidentsPromise = loadClaimableIncidents(state.pages.incidentClaimable);
     const results = await Promise.allSettled(allowedConfigs.map(([, , , , endpoint]) => request(endpoint)));
     results.forEach((result, index) => {
       const [kind, pageKey, selector, paginationSelector, , render] = allowedConfigs[index];
@@ -2066,6 +2148,8 @@
       }
     });
     await companionAppealsPromise;
+    await claimableCompanionAppealsPromise;
+    await claimableIncidentsPromise;
     const failed = results.find((result) => result.status === "rejected");
     if (failed) showTrace(failed.reason);
   }
@@ -2266,11 +2350,35 @@
     container.innerHTML = items.length ? items.map((item) => `<article class="compact-item attention"><div class="compact-item-head"><h3>${escapeHtml(item.companion?.name || maskId(item.companionId))} · ${escapeHtml(statusLabels[item.kind] || item.kind)}</h3>${statusPill(item.active ? "active" : "closed")}</div><p>${escapeHtml(item.message || item.reasonCode || "未填写对外说明")}</p><div class="compact-meta"><span>原因码 ${escapeHtml(item.reasonCode || "—")}</span><span>开始 ${escapeHtml(formatTime(item.startsAt))}</span><span>结束 ${escapeHtml(formatTime(item.endsAt))}</span><span>申诉截止 ${escapeHtml(formatTime(item.appealDeadlineAt))}</span><span>${escapeHtml(item.appeals?.length || 0)} 次申诉</span></div></article>`).join("") : '<div class="empty-state">当前没有生效中的账号处置。</div>';
   }
 
+  function renderSuspensionReactivations(container, items) {
+    container.innerHTML = items.length ? items.map((item) => {
+      const action = item.reactivationReviewEligible
+        ? actionButton("完成独立恢复复核", "completeExpiredSuspensionReactivation", "suspensionReactivation", item.id, "warn")
+        : '<button class="button small quiet" type="button" disabled title="原暂停创建人不得完成恢复复核">等待其他运营人员复核</button>';
+      return `<article class="compact-item attention"><div class="compact-item-head"><h3>${escapeHtml(item.companion?.name || maskId(item.companionId))} · 临时暂停到期</h3>${statusPill(item.reactivation?.status || "required")}</div><p>${escapeHtml(item.message || item.reasonCode || "未填写暂停说明")}</p><div class="compact-meta"><span>暂停到期 ${escapeHtml(formatTime(item.endsAt))}</span><span>恢复待办登记 ${escapeHtml(formatTime(item.reactivation?.requiredAt))}</span><span>原处置人 ${escapeHtml(maskId(item.createdById))}</span><span>公开恢复：否</span></div><div class="compact-actions">${action}</div></article>`;
+    }).join("") : '<div class="empty-state">当前没有临时暂停到期恢复待办。</div>';
+  }
+
   function renderIncidents(container, items) {
     container.innerHTML = items.length ? items.map((item) => {
-      const actions = ["resolved", "closed"].includes(item.status) ? "" : actionButton("更新事件", "resolveIncident", "incident", item.id, "primary");
-      return `<article class="compact-item"><div class="compact-item-head"><h3>${escapeHtml(item.companion?.name || maskId(item.companionId))} · ${escapeHtml(item.category)}</h3>${statusPill(item.status)}</div><p>${escapeHtml(item.summary)}</p><div class="compact-meta"><span>订单 ${escapeHtml(maskId(item.orderId))}</span><span>${escapeHtml(formatTime(item.createdAt))}</span><span>${escapeHtml(item.evidenceReferences?.length || 0)} 份证据</span></div><div class="compact-actions">${actions}</div></article>`;
+      const terminal = ["resolved", "closed"].includes(item.status);
+      const actions = [
+        terminal ? "" : actionButton("更新事件", "resolveIncident", "incident", item.id, "primary"),
+        state.user?.role === "admin" && !terminal
+          ? actionButton(item.assignedTo ? "重新分配" : "分配事件", "assignIncident", "incident", item.id, "quiet")
+          : ""
+      ].filter(Boolean).join("");
+      const assignment = item.assignedTo
+        ? `当前受理 ${item.assignedTo.displayName || maskId(item.assignedTo.userId)}`
+        : "尚未分配";
+      return `<article class="compact-item"><div class="compact-item-head"><h3>${escapeHtml(item.companion?.name || maskId(item.companionId))} · ${escapeHtml(item.category)}</h3>${statusPill(item.status)}</div><p>${escapeHtml(item.summary)}</p>${caseEvidenceButtons(item.evidenceAttachments)}<div class="compact-meta"><span>订单 ${escapeHtml(maskId(item.orderId))}</span><span>${escapeHtml(formatTime(item.createdAt))}</span><span>${escapeHtml(assignment)}</span><span>认领 ${escapeHtml(formatTime(item.assignedAt))}</span></div><div class="compact-actions">${actions}</div></article>`;
     }).join("") : '<div class="empty-state">当前没有陪伴者事件。</div>';
+  }
+
+  function renderClaimableIncidents(container, items) {
+    container.innerHTML = items.length ? items.map((item) =>
+      `<article class="compact-item"><div class="compact-item-head"><h3>匿名事件 ${escapeHtml(maskId(item.id))}</h3>${statusPill(item.status)}</div><div class="compact-meta"><span>提交 ${escapeHtml(formatTime(item.submittedAt))}</span><span>${item.hasOrder ? "关联订单：是" : "关联订单：否"}</span><span>正文与附件：认领后可见</span></div><div class="compact-actions">${actionButton("认领事件", "claimIncident", "incidentClaimable", item.id, "primary")}</div></article>`
+    ).join("") : '<div class="empty-state">当前没有可认领匿名事件。</div>';
   }
 
   function renderWithdrawals(container, items) {
@@ -2280,17 +2388,46 @@
     }).join("") : '<div class="empty-state">当前没有提现请求。</div>';
   }
 
+  function renderClaimableCompanionAppeals(container, items) {
+    container.innerHTML = items.length ? items.map((item) =>
+      `<article class="compact-item"><div class="compact-item-head"><h3>匿名申诉 ${escapeHtml(maskId(item.id))}</h3>${statusPill(item.overdue ? "overdue" : item.status)}</div><div class="compact-meta"><span>提交 ${escapeHtml(formatTime(item.submittedAt))}</span><span>复核期限 ${escapeHtml(formatTime(item.reviewDueAt))}</span><span>陪伴者、正文与附件：认领后可见</span></div><div class="compact-actions">${actionButton("认领申诉", "claimCompanionAppeal", "companionAppealClaimable", item.id, "primary")}</div></article>`
+    ).join("") : '<div class="empty-state">当前没有可认领的陪伴者申诉。</div>';
+  }
+
   function renderCompanionAppeals(container, items) {
     container.innerHTML = items.length ? items.map((item) => {
       const decision = item.status !== "pending"
         ? ""
-        : item.independentReviewEligible
+        : item.independentReviewEligible && item.assignedToActor
           ? actionButton("独立复核申诉", "resolveCompanionAppeal", "companionAppeal", item.id, "primary")
-          : '<button class="button small quiet" type="button" disabled title="你创建了原账号处置，必须由另一名授权人员独立复核">不可复核自己的处置</button>';
+          : item.independentReviewEligible
+            ? '<button class="button small quiet" type="button" disabled title="只有当前处理人可复核和读取附件">等待当前处理人复核</button>'
+            : '<button class="button small quiet" type="button" disabled title="你创建了原账号处置，必须由另一名授权人员独立复核">不可复核自己的处置</button>';
+      const assignmentAction = item.status === "pending"
+        && state.user?.role === "admin"
+        && item.independentReviewEligible
+        ? actionButton(item.assignedToUserId ? "重新分配申诉" : "分配申诉", "assignCompanionAppeal", "companionAppeal", item.id, "quiet")
+        : "";
       const independence = item.status === "pending" && !item.independentReviewEligible
         ? '<span class="error-state">你是原处置人，服务端已禁止同人复核</span>'
-        : '<span>原处置与申诉复核职责分离</span>';
-      return `<article class="compact-item ${item.overdue ? "attention" : ""}"><div class="compact-item-head"><h3>${escapeHtml(item.companion?.name || maskId(item.companionId))} · 申诉 ${escapeHtml(maskId(item.id))}</h3>${statusPill(item.overdue ? "overdue" : item.status)}</div><p>${escapeHtml(item.statement)}</p><div class="compact-meta"><span>${escapeHtml(item.evidenceReferences?.length || 0)} 份证据</span><span>提交 ${escapeHtml(formatTime(item.createdAt))}</span><span>处理时限 ${escapeHtml(formatTime(item.reviewDueAt))}</span>${independence}</div><div class="compact-actions">${decision}</div></article>`;
+        : `<span>${item.assignedToActor ? "已由当前账号受理" : item.assignedToUserId ? `当前受理 ${escapeHtml(item.assignedTo?.displayName || maskId(item.assignedToUserId))}` : "尚未分配"}</span>`;
+      const reactivation = item.reactivation || { status: "notRequired", publicationRestored: false };
+      const reactivationAction = reactivation.status === "required"
+        ? item.reactivationReviewEligible
+          ? actionButton("完成独立恢复复核", "completeCompanionReactivation", "companionAppeal", item.id, "warn")
+          : '<button class="button small quiet" type="button" disabled title="原处置人和申诉复核人均不得完成恢复复核">等待其他运营人员复核</button>'
+        : "";
+      const reactivationState = reactivation.status === "required"
+        ? '<p class="error-state"><strong>恢复状态：</strong>原处置已撤销；商业资格与公开上架仍未恢复，等待第三人复核。</p>'
+        : reactivation.status === "completed"
+          ? `<p><strong>恢复状态：</strong>资格复核已完成；未自动公开上架。${reactivation.resolution ? ` ${escapeHtml(reactivation.resolution)}` : ""}</p>`
+          : "";
+      const evidenceAttachments = item.evidenceAttachments || [];
+      const evidenceButtons = evidenceAttachments.map((attachment) => `<button class="button small quiet" type="button" data-case-evidence-id="${escapeHtml(attachment.id)}">查看${attachment.kind === "image" ? "图片" : "音频"}证据</button>`).join("");
+      const legacyEvidence = Number(item.legacyEvidenceReferenceCount || 0) > 0
+        ? `<span class="error-state">${escapeHtml(item.legacyEvidenceReferenceCount)} 条历史任意引用仅保留计数，不可查看或恢复</span>`
+        : "";
+      return `<article class="compact-item ${item.overdue ? "attention" : ""}"><div class="compact-item-head"><h3>${escapeHtml(item.companion?.name || maskId(item.companionId))} · 申诉 ${escapeHtml(maskId(item.id))}</h3>${statusPill(item.overdue ? "overdue" : item.status)}</div><p>${escapeHtml(item.statement)}</p>${reactivationState}<div class="compact-meta"><span>${escapeHtml(evidenceAttachments.length)} 份当前可读受控证据</span>${legacyEvidence}<span>提交 ${escapeHtml(formatTime(item.createdAt))}</span><span>处理时限 ${escapeHtml(formatTime(item.reviewDueAt))}</span>${independence}</div><div class="compact-actions">${evidenceButtons}${decision}${assignmentAction}${reactivationAction}</div></article>`;
     }).join("") : '<div class="empty-state">当前没有待处理陪伴者申诉。</div>';
   }
 
@@ -2351,13 +2488,23 @@
       const resolution = item.resolution
         ? `<p><strong>复核结论：</strong>${escapeHtml(item.resolution)}</p>`
         : "";
+      const appealEvidence = caseEvidenceButtons(item.evidenceAttachments);
       const evidenceChain = evidence.status === "available"
         ? `<p><strong>受控证据链：</strong>${escapeHtml(evidence.sourceType)} · 来源 ${escapeHtml(evidence.sourceReference)} · 证据 ${escapeHtml(evidence.evidenceReference)}</p><div class="compact-meta"><span class="masked-id">SHA-256 ${escapeHtml(evidence.evidenceDigest)}</span><span>仅显示引用与摘要，不显示原始敏感证据</span></div>`
         : evidence.status === "anonymized"
           ? `<p class="masked-id"><strong>受控证据链：</strong>已按留存政策匿名化 · ${escapeHtml(formatTime(evidence.anonymizedAt))}</p>`
           : '<p class="error-state"><strong>受控证据链：</strong>历史处置未形成新证据快照，不得伪造补录。</p>';
-      return `<article class="compact-item"><div class="compact-item-head"><h3>${escapeHtml(action.kind === "ban" ? "账号封禁申诉" : "账号限制申诉")} · 用户 ${escapeHtml(maskId(item.userId))}</h3>${statusPill(item.status)}</div><p><strong>处置理由：</strong>${escapeHtml(action.message || "未返回用户可见理由")}</p>${evidenceChain}<p><strong>用户申诉：</strong>${escapeHtml(item.statement || "未返回申诉说明")}</p>${resolution}<div class="compact-meta"><span>原因码 ${escapeHtml(action.reasonCode || "—")}</span><span>规则 ${escapeHtml(item.policyVersion || action.policyVersion || "—")}</span><span>提交 ${escapeHtml(formatTime(item.createdAt))}</span><span class="${item.overdue ? "error-state" : ""}">复核目标 ${escapeHtml(formatTime(item.reviewDueAt))}${item.overdue ? " · 已超期" : ""}</span></div><div class="compact-meta"><span>${escapeHtml(assignment)}</span><span>${escapeHtml(independence)}</span><span>原处置人 ${escapeHtml(maskId(action.createdById))}</span></div>${actions ? `<div class="compact-actions">${actions}</div>` : ""}</article>`;
+      return `<article class="compact-item"><div class="compact-item-head"><h3>${escapeHtml(action.kind === "ban" ? "账号封禁申诉" : "账号限制申诉")} · 用户 ${escapeHtml(maskId(item.userId))}</h3>${statusPill(item.status)}</div><p><strong>处置理由：</strong>${escapeHtml(action.message || "未返回用户可见理由")}</p>${evidenceChain}<p><strong>用户申诉：</strong>${escapeHtml(item.statement || "未返回申诉说明")}</p>${appealEvidence}${resolution}<div class="compact-meta"><span>原因码 ${escapeHtml(action.reasonCode || "—")}</span><span>规则 ${escapeHtml(item.policyVersion || action.policyVersion || "—")}</span><span>提交 ${escapeHtml(formatTime(item.createdAt))}</span><span class="${item.overdue ? "error-state" : ""}">复核目标 ${escapeHtml(formatTime(item.reviewDueAt))}${item.overdue ? " · 已超期" : ""}</span></div><div class="compact-meta"><span>${escapeHtml(assignment)}</span><span>${escapeHtml(independence)}</span><span>原处置人 ${escapeHtml(maskId(action.createdById))}</span></div>${actions ? `<div class="compact-actions">${actions}</div>` : ""}</article>`;
     }).join("") : '<div class="empty-state">当前筛选条件下没有账号申诉。</div>';
+  }
+
+  function caseEvidenceButtons(attachments) {
+    if (!Array.isArray(attachments) || attachments.length === 0) {
+      return '<p class="masked-id"><strong>受控附件：</strong>未向当前处理人开放或未提交。</p>';
+    }
+    return `<div class="compact-actions">${attachments.map((attachment) =>
+      `<button class="button small quiet" type="button" data-case-evidence-id="${escapeHtml(attachment.id)}">查看${attachment.kind === "audio" ? "音频" : "图片"}证据</button>`
+    ).join("")}</div>`;
   }
 
   async function loadAccountAppeals(page = state.pages.accountAppeals) {
@@ -2649,7 +2796,10 @@
       setRecords("user", items);
       userContainer.innerHTML = items.length ? items.map((item) => {
         const nextStatus = item.accountStatus === "active" ? "restricted" : "active";
-        return `<article class="compact-item"><div class="compact-item-head"><h3>${escapeHtml(item.displayName || "未设置名称")} · ${escapeHtml(item.phoneMasked || "无手机号")}</h3>${statusPill(item.accountStatus)}</div><p>${escapeHtml(item.role)} · ${item.isVerified ? "实名已核验" : "实名未核验"} · 安全分 ${escapeHtml(item.safetyScore ?? "—")}</p><div class="compact-meta"><span class="masked-id">${escapeHtml(maskId(item.id))}</span><span>${escapeHtml(item.counts?.orders || 0)} 个订单</span><span>${escapeHtml(item.counts?.supportTickets || 0)} 个工单</span></div><div class="compact-actions">${actionButton(nextStatus === "active" ? "恢复账号" : "限制账号", "updateAccountStatus", "user", item.id, nextStatus === "active" ? "primary" : "warn")}${actionButton(item.isVerified ? "提交撤销实名复核" : "提交实名核验复核", "updateUserVerification", "user", item.id, item.isVerified ? "warn" : "primary")}</div></article>`;
+        const identityAction = item.isVerified
+          ? actionButton("提交撤销实名复核", "updateUserVerification", "user", item.id, "warn")
+          : "";
+        return `<article class="compact-item"><div class="compact-item-head"><h3>${escapeHtml(item.displayName || "未设置名称")} · ${escapeHtml(item.phoneMasked || "无手机号")}</h3>${statusPill(item.accountStatus)}</div><p>${escapeHtml(item.role)} · ${item.isVerified ? "实名已核验" : "实名未核验 · 新授权 No-Go"} · 安全分 ${escapeHtml(item.safetyScore ?? "—")}</p><div class="compact-meta"><span class="masked-id">${escapeHtml(maskId(item.id))}</span><span>${escapeHtml(item.counts?.orders || 0)} 个订单</span><span>${escapeHtml(item.counts?.supportTickets || 0)} 个工单</span></div><div class="compact-actions">${actionButton(nextStatus === "active" ? "恢复账号" : "限制账号", "updateAccountStatus", "user", item.id, nextStatus === "active" ? "primary" : "warn")}${identityAction}</div></article>`;
       }).join("") : '<div class="empty-state">没有符合条件的账号。</div>';
       renderPagination(userPagination, results[0].value.pagination, (next) => loadAccounts(next, state.pages.deletions, state.pages.dataRights, state.pages.dataRightsClaimable));
     } else if (canManageAccounts) {
@@ -2903,9 +3053,11 @@
     attendanceReviews: "履约首审",
     attendanceAppeals: "履约申诉",
     userAccountAppeals: "账号申诉",
+    companionAccountAppeals: "陪伴者申诉",
     dataRightsRequests: "数据权利",
     invoiceRequests: "发票申请",
-    companionWithdrawals: "提现复核"
+    companionWithdrawals: "提现复核",
+    companionIncidents: "陪伴者事件"
   };
 
   async function loadStaffCredentials(page = state.pages.staffCredentials) {
@@ -3382,9 +3534,27 @@
         execute: (values, reason, operationId) => postJson(`/admin/commercial/recoveries/${encodeURIComponent(item.id)}/evidence`, { evidenceReference: values.evidenceReference }, reason, operationId)
       }),
       verifyRecovery: () => openAction(simplePostAction("第二人核验追偿", "核验人不能是证据提交人。成功后追偿台账进入已追回状态。", recordResource("recovery", item), `/admin/commercial/recoveries/${encodeURIComponent(item.id)}/verify`, "SECOND REVIEW")),
+      claimIncident: () => openAction(simplePostAction(
+        "认领匿名陪伴者事件",
+        "服务端以行锁执行唯一认领；成功前不会返回陪伴者、事件类别、正文、订单号或附件标识。",
+        recordResource("incident-claimable", item),
+        `/admin/commercial/companion-lifecycle/incidents/${encodeURIComponent(item.id)}/claims`,
+        "PRIVATE CASE OWNERSHIP"
+      )),
+      claimCompanionAppeal: () => openAction(simplePostAction(
+        "认领匿名陪伴者申诉",
+        "服务端以行锁执行唯一认领；成功前不会返回陪伴者、原处置、申诉正文或附件标识。",
+        recordResource("companion-appeal-claimable", item),
+        `/admin/commercial/companion-lifecycle/appeals/${encodeURIComponent(item.id)}/claims`,
+        "PRIVATE APPEAL OWNERSHIP"
+      )),
+      assignCompanionAppeal: () => void openAssignCompanionAppeal(item),
+      assignIncident: () => void openAssignIncident(item),
       resolveIncident: () => openResolveIncident(item),
       updateWithdrawal: () => openUpdateWithdrawal(item),
       resolveCompanionAppeal: () => openResolveCompanionAppeal(item),
+      completeCompanionReactivation: () => openCompleteCompanionReactivation(item),
+      completeExpiredSuspensionReactivation: () => openCompleteExpiredSuspensionReactivation(item),
       approveVoiceIntro: () => openVoiceIntro(item, "approved"),
       rejectVoiceIntro: () => openVoiceIntro(item, "rejected"),
       transitionDataRight: () => openDataRightTransition(item),
@@ -3723,6 +3893,80 @@
     });
   }
 
+  async function loadIncidentAssigneeOptions() {
+    const assignees = [];
+    let page = 1;
+    let totalPages = 1;
+    do {
+      const result = await request(`/admin/staff?status=active&role=supply&page=${page}&pageSize=100`);
+      for (const entry of result.items || []) {
+        assignees.push({
+          value: entry.userId,
+          label: `${entry.displayName || entry.username || maskId(entry.userId)} · supply`
+        });
+      }
+      totalPages = Math.max(1, Number(result.pagination?.totalPages || 1));
+      page += 1;
+    } while (page <= totalPages);
+    return assignees;
+  }
+
+  async function openAssignIncident(item) {
+    try {
+      const options = await loadIncidentAssigneeOptions();
+      if (!options.length) throw new Error("当前没有可接收事件的在岗供应运营");
+      openAction({
+        title: item.assignedTo ? "重新分配陪伴者事件" : "分配陪伴者事件",
+        description: "只有在岗 supply 可从后台接收；人员停权前系统会强制完成未结事件交接。",
+        resource: recordResource("incident", item),
+        risk: "PRIVATE CASE ASSIGNMENT",
+        fields: [{
+          name: "assignedToUserId",
+          label: "供应运营",
+          type: "select",
+          options
+        }],
+        execute: (values, reason, operationId) => postJson(
+          `/admin/commercial/companion-lifecycle/incidents/${encodeURIComponent(item.id)}/assignments`,
+          { assignedToUserId: values.assignedToUserId },
+          reason,
+          operationId
+        )
+      });
+    } catch (error) {
+      showToast(error.message || "事件受理人员目录暂时不可用", true);
+      showTrace(error);
+    }
+  }
+
+  async function openAssignCompanionAppeal(item) {
+    try {
+      const options = await loadIncidentAssigneeOptions();
+      if (!options.length) throw new Error("当前没有可接收申诉的在岗供应运营");
+      openAction({
+        title: item.assignedToUserId ? "重新分配陪伴者申诉" : "分配陪伴者申诉",
+        description: "附件与复核权限会立即转交给新的当前处理人；原处置人不能被指定为处理人。",
+        resource: recordResource("companionAppeal", item),
+        risk: "PRIVATE APPEAL ASSIGNMENT",
+        fields: [{
+          name: "assignedToUserId",
+          label: "供应运营",
+          type: "select",
+          options
+        }],
+        execute: (values, reason, operationId) => postJson(
+          `/admin/commercial/companion-lifecycle/appeals/${encodeURIComponent(item.id)}/assignments`,
+          { assignedToUserId: values.assignedToUserId },
+          reason,
+          operationId
+        )
+      });
+    } catch (error) {
+      showToast(error.message || "申诉受理人员目录暂时不可用", true);
+      showTrace(error);
+    }
+  }
+
   function openResolveIncident(item) {
     openAction({
       title: "更新陪伴者事件",
@@ -3777,7 +4021,7 @@
     }
     openAction({
       title: "独立复核陪伴者申诉",
-      description: "原处置人不能裁决本次申诉；推翻处置会撤销原账号动作，结论必须基于申诉证据并保留审计记录。",
+      description: "原处置人不能裁决本次申诉；推翻处置只撤销原账号动作，不会自动恢复商业资格或公开上架。限制/暂停类处置还须由另一名运营人员完成当前资格复核。",
       resource: recordResource("companionAppeal", item),
       risk: "SECOND REVIEW",
       fields: [
@@ -3785,6 +4029,58 @@
         { name: "resolution", label: "裁决说明", type: "textarea", minlength: 10, maxlength: 1000, wide: true }
       ],
       execute: (values, reason, operationId) => postJson(`/admin/commercial/companion-lifecycle/appeals/${encodeURIComponent(item.id)}/resolution`, values, reason, operationId)
+    });
+  }
+
+  function openCompleteCompanionReactivation(item) {
+    if (item.reactivation?.status !== "required") {
+      showToast("该申诉当前不需要恢复复核。", true);
+      return;
+    }
+    if (!item.reactivationReviewEligible) {
+      showToast("原处置人和申诉复核人都不能完成恢复复核，须由另一名运营人员处理。", true);
+      return;
+    }
+    openAction({
+      title: "完成陪伴者资格恢复复核",
+      description: "服务端会重新核对当前实名、成年、商业资料、培训和其它有效限制。通过只恢复合格的商业资格，始终保持下架；是否重新公开必须另走显式发布操作。",
+      resource: recordResource("companionAppeal", item),
+      risk: "INDEPENDENT REACTIVATION · NO AUTO-PUBLISH",
+      fields: [
+        { name: "resolution", label: "恢复复核结论", type: "textarea", minlength: 10, maxlength: 1000, wide: true }
+      ],
+      execute: (values, reason, operationId) => postJson(
+        `/admin/commercial/companion-lifecycle/appeals/${encodeURIComponent(item.id)}/reactivation`,
+        { resolution: values.resolution },
+        reason,
+        operationId
+      )
+    });
+  }
+
+  function openCompleteExpiredSuspensionReactivation(item) {
+    if (item.reactivation?.status !== "required") {
+      showToast("该临时暂停当前不需要恢复复核。", true);
+      return;
+    }
+    if (!item.reactivationReviewEligible) {
+      showToast("原暂停创建人不能完成恢复复核，须由另一名运营人员处理。", true);
+      return;
+    }
+    openAction({
+      title: "完成临时暂停到期恢复复核",
+      description: "服务端会重新核对当前实名、成年、商业资料、培训、注销和其它有效限制。通过只恢复可证明由本次暂停造成的商业状态，并始终保持下架、离线和忙碌；是否公开须另走发布操作。",
+      resource: recordResource("suspensionReactivation", item),
+      risk: "THIRD REVIEW · NO AUTO-PUBLISH",
+      fields: [
+        { name: "resolution", label: "恢复复核结论", type: "textarea", minlength: 10, maxlength: 1000, wide: true }
+      ],
+      execute: (values, reason, operationId) => postJson(
+        `/admin/commercial/companion-lifecycle/actions/${encodeURIComponent(item.id)}/reactivation`,
+        { resolution: values.resolution },
+        reason,
+        operationId
+      )
     });
   }
 
@@ -4076,17 +4372,18 @@
   }
 
   function openUpdateVerification(item) {
-    const next = !item.isVerified;
+    if (!item.isVerified) {
+      showToast("No-Go：真实、可撤销的身份授权通道尚未接入，不能提交新的实名授权。", true);
+      return;
+    }
     openAction({
-      title: next ? "提交实名核验复核" : "提交撤销实名复核",
-      description: next
-        ? "本操作只创建待复核请求，不会立即改变实名状态；另一名授权人员批准后才生效。"
-        : "本操作只提交撤销复核；批准后才撤销实名并按服务端规则下架相关公开资料。",
+      title: "提交撤销实名复核",
+      description: "本操作只提交撤销复核；批准后才撤销实名并按服务端规则下架相关公开资料。",
       resource: recordResource("user", item),
       risk: "IDENTITY STATUS",
-      fields: [{ name: "evidenceReference", label: next ? "实名核验证据引用" : "撤销实名依据引用", minlength: 6, maxlength: 160, pattern: "[A-Za-z0-9][A-Za-z0-9._:/-]*" }],
+      fields: [{ name: "evidenceReference", label: "撤销实名依据引用", minlength: 6, maxlength: 160, pattern: "[A-Za-z0-9][A-Za-z0-9._:/-]*" }],
       execute: (values, reason, operationId) => patchJson(`/admin/users/${encodeURIComponent(item.id)}/verification`, {
-        isVerified: next,
+        isVerified: false,
         reason,
         evidenceReference: values.evidenceReference
       }, reason, operationId)
@@ -4098,17 +4395,18 @@
       showToast("该陪伴者缺少归属用户标识，无法提交实名复核。", true);
       return;
     }
-    const next = !(item.owner?.isVerified === true);
+    if (item.owner?.isVerified !== true) {
+      showToast("No-Go：真实、可撤销的身份授权通道尚未接入，不能提交新的实名授权。", true);
+      return;
+    }
     openAction({
-      title: next ? "提交陪伴者实名核验复核" : "提交陪伴者撤销实名复核",
-      description: next
-        ? "本操作只创建待复核请求，不会立即改变实名状态；另一名授权人员批准后才生效。"
-        : "本操作只提交撤销复核；另一名授权人员批准后才撤销实名，相关已公开陪伴者可能被服务端强制下架。",
+      title: "提交陪伴者撤销实名复核",
+      description: "本操作只提交撤销复核；另一名授权人员批准后才撤销实名，相关已公开陪伴者可能被服务端强制下架。",
       resource: `user:${item.ownerUserId} · companion:${item.id}`,
       risk: "IDENTITY STATUS",
       fields: [{
         name: "evidenceReference",
-        label: next ? "实名核验证据引用" : "撤销实名依据引用",
+        label: "撤销实名依据引用",
         minlength: 6,
         maxlength: 160,
         pattern: "[A-Za-z0-9][A-Za-z0-9._:/-]*"
@@ -4116,7 +4414,7 @@
       execute: (values, reason, operationId) => patchJson(
         `/admin/users/${encodeURIComponent(item.ownerUserId)}/verification`,
         {
-          isVerified: next,
+          isVerified: false,
           reason,
           evidenceReference: values.evidenceReference
         },
@@ -4128,14 +4426,18 @@
 
   function openIdentityVerificationReview(item, decision) {
     const approve = decision === "approve";
+    if (approve && item.requestedIsVerified === true) {
+      showToast("No-Go：新实名授权冻结；只能拒绝该请求，不能批准并应用。", true);
+      return;
+    }
     openAction({
-      title: approve ? "批准并应用实名变更" : "拒绝实名变更请求",
+      title: approve ? "批准撤销实名" : "拒绝实名变更请求",
       description: approve
-        ? "必须由不同于提交人的授权人员执行。批准后服务端才会应用实名状态；撤销实名可能同时下架相关公开陪伴者。"
+        ? "必须由不同于提交人的授权人员执行。批准后服务端才会撤销实名状态，并可能同时下架相关公开陪伴者。"
         : "拒绝只关闭本次待复核请求，不会改变用户当前实名状态。后续如需变更，必须重新提交证据。",
       resource: recordResource("identity-verification-request", item),
       risk: approve ? "SECOND REVIEW · IDENTITY STATUS" : "SECOND REVIEW",
-      submitLabel: approve ? "确认批准并应用" : "确认拒绝",
+      submitLabel: approve ? "确认批准撤销" : "确认拒绝",
       variant: approve ? "danger" : "secondary",
       execute: (_values, reason, operationId) => postJson(
         `/admin/identity-verification-requests/${encodeURIComponent(item.id)}/${decision}`,
@@ -4284,6 +4586,11 @@
       const evidenceButton = event.target.closest("[data-payment-evidence-resource]");
       if (evidenceButton) {
         void loadPaymentDisputeEvidence(evidenceButton);
+        return;
+      }
+      const caseEvidenceButton = event.target.closest("[data-case-evidence-id]");
+      if (caseEvidenceButton) {
+        void openControlledCaseEvidence(caseEvidenceButton.dataset.caseEvidenceId);
         return;
       }
       const legalHoldHistoryButton = event.target.closest("[data-legal-hold-history]");

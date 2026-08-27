@@ -61,16 +61,24 @@ describe("consumer account-action and appeal DTOs", () => {
 
   it("bounds user statements and rejects obvious operational secrets", async () => {
     const valid = Object.assign(new CreateUserAccountAppealDto(), {
-      statement: "我认为该处置依据不完整，请重新核验全部事实。"
+      statement: "我认为该处置依据不完整，请重新核验全部事实。",
+      evidenceAssetIds: ["11111111-1111-4111-8111-111111111111"]
     });
     const sensitive = Object.assign(new CreateUserAccountAppealDto(), {
       statement: "请核验，银行卡 4111 1111 1111 1111 是我的凭据。"
+    });
+    const arbitraryReferences = Object.assign(new CreateUserAccountAppealDto(), {
+      statement: "我认为该处置依据不完整，请重新核验全部事实。",
+      evidenceAssetIds: ["https://external.invalid/evidence"]
     });
 
     await expect(validate(valid)).resolves.toEqual([]);
     expect((await validate(sensitive))[0]?.constraints).toEqual(expect.objectContaining({
       isSafeOperationalText: expect.any(String)
     }));
+    expect((await validate(arbitraryReferences)).some((error) =>
+      error.property === "evidenceAssetIds"
+    )).toBe(true);
   });
 
   it("allows only bounded queue filters, UUID assignments, and terminal decisions", async () => {

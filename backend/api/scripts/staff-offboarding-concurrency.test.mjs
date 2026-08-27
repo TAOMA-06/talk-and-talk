@@ -14,8 +14,9 @@ const migrationsRoot = join(apiRoot, "prisma", "migrations");
 const targetMigration = "20260731233000_staff_credential_offboarding";
 
 test("staff offboarding keeps set handoff and credential-lock concurrency guards", async () => {
-  const [service, migration] = await Promise.all([
+  const [service, lockOrder, migration] = await Promise.all([
     readFile(join(apiRoot, "src", "admin", "staff-offboarding.service.ts"), "utf8"),
+    readFile(join(apiRoot, "src", "admin", "staff-credential-lock-order.ts"), "utf8"),
     readFile(join(migrationsRoot, targetMigration, "migration.sql"), "utf8")
   ]);
   const handoff = service.slice(
@@ -27,8 +28,10 @@ test("staff offboarding keeps set handoff and credential-lock concurrency guards
   assert.doesNotMatch(handoff, /id:\s*\{\s*in:/);
   assert.match(handoff, /userAccountAppeal\.updateMany/);
   assert.match(handoff, /attendanceDispute\.updateMany/);
-  assert.match(service, /WHERE "userId" = \$\{targetUserId\} FOR UPDATE/);
-  assert.match(service, /WHERE "userId" = \$\{replacementUserId\} FOR UPDATE/);
+  assert.match(service, /lockStaffCredentialRowsInOrder\(db, \[[\s\S]*actorUserId,[\s\S]*targetUserId,[\s\S]*dto\.replacementUserId/);
+  assert.match(lockOrder, /new Set/);
+  assert.match(lockOrder, /\.sort\(\)/);
+  assert.match(lockOrder, /StaffCredential[\s\S]*FOR UPDATE/);
   assert.match(migration, /FOR KEY SHARE OF sc/);
   assert.match(migration, /commercial assignment requires an active StaffCredential/);
 });

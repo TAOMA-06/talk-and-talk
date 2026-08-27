@@ -36,7 +36,7 @@ const valueProps = [
   {
     code: "03",
     title: "服务入口真实可到达",
-    copy: "官网说明品牌、规则与路径；当前真实服务以微信小程序内的文字互动页面为准。",
+    copy: "官网说明品牌、规则与路径；服务开放状态以微信小程序与正式公告为准。",
   },
 ];
 
@@ -95,7 +95,7 @@ const trustPoints = [
   {
     Icon: Smartphone,
     title: "入口以小程序页面为准",
-    copy: "网页帮助你理解规则；真实服务范围与可用状态以小程序展示为准。",
+    copy: "网页帮助你理解规则；服务范围与开放状态以小程序页面和正式公告为准。",
   },
 ];
 
@@ -123,7 +123,7 @@ export default function MarketingHomeScreen() {
             <>
               <p className="hero-lead">
                 Talk&amp;Talk 面向需要情绪倾听、减压与陪伴的成年人。发现、预约与沟通在平台内完成；
-                官网说明规则与边界，真实服务请进入微信小程序，并以文字互动为限。
+                官网说明规则与边界。文字互动开放状态以微信小程序为准；身份核验通道完成前不开放新预约、支付或聊天。
               </p>
               <ul className="hero-trust-strip" aria-label="产品可信要点">
                 {trustSignals.map((item) => (
@@ -171,7 +171,7 @@ export default function MarketingHomeScreen() {
         <Reveal as="header" className="bubble-heading">
           <p className="eyebrow">适合这样开始</p>
           <h2 id="moments-title">不用先想清楚一切，也可以找到好好说话的空间。</h2>
-          <p>以下是常见需要。真实服务与可约状态，以微信小程序页面为准。</p>
+          <p>以下是常见需要。服务与可约状态以微信小程序页面和正式公告为准。</p>
         </Reveal>
         <RevealStagger className="home-moment-list" stagger={0.05}>
           {moments.map((moment, index) => (
@@ -196,7 +196,7 @@ export default function MarketingHomeScreen() {
           <header className="bubble-heading bubble-heading-light">
             <p className="eyebrow">如何开始</p>
             <h2 id="path-title">官网说明规则，小程序完成连接。</h2>
-            <p>官网不提供预约、支付、聊天或售后；当前服务入口以微信小程序内的文字互动页面为准。</p>
+            <p>官网不提供预约、支付、聊天或售后；服务开放状态以微信小程序页面和正式公告为准。</p>
           </header>
           <ol className="bubble-path-steps">
             {pathSteps.map((step) => (
@@ -224,7 +224,7 @@ export default function MarketingHomeScreen() {
           <p className="eyebrow">可信的表达方式</p>
           <h2 id="trust-title">我们用结构说明产品，不用虚构数字。</h2>
           <p>
-            官网不展示未核验的规模叙事。你可以在这里理解路径与边界，再进入微信小程序完成真实服务。
+            官网不展示未核验的规模叙事。你可以在这里理解路径与边界，再到微信小程序查看当前开放状态。
           </p>
         </Reveal>
         <RevealStagger className="home-trust-grid" stagger={0.05}>
@@ -270,10 +270,10 @@ export default function MarketingHomeScreen() {
                 aria-hidden="true"
               />
             </span>
-            <p className="eyebrow">当前主入口</p>
+            <p className="eyebrow">状态查询入口</p>
             <h3>微信小程序</h3>
             <p>
-              当前文字互动服务及其可用状态，以小程序实际页面展示为准。可在微信中搜索「Talk&amp;Talk」。
+              当前服务开放状态以小程序实际页面展示为准。身份核验通道完成前不开放新预约、支付或聊天；可在微信中搜索「Talk&amp;Talk」查看说明。
             </p>
             <MiniprogramCta
               variant="inline"
@@ -353,7 +353,7 @@ export default function MarketingHomeScreen() {
             <p className="eyebrow">开始一段有分寸的连接</p>
             <h2>先认识规则，再进入小程序。</h2>
             <p>
-              网页帮助你理解产品与边界；当前真实服务请使用微信小程序内的文字互动入口。
+              网页帮助你理解产品与边界；服务开放状态请以微信小程序页面和正式公告为准。
             </p>
           </div>
           <MiniprogramCta

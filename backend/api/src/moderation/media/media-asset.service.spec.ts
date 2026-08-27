@@ -121,11 +121,23 @@ describe("MediaAssetService retention and presentation", () => {
     });
 
     const claimSql = prisma.$queryRawUnsafe.mock.calls[0][0] as string;
-    expect(claimSql).toContain("FOR UPDATE SKIP LOCKED");
+    expect(claimSql).toContain('FROM "AccountDataRetentionRecord" AS record');
+    expect(claimSql).toContain("LEFT JOIN LATERAL");
+    expect(claimSql).toContain('record."userId" = asset."uploaderId"');
+    expect(claimSql).toContain('AS "effectiveRetentionRecordId"');
+    expect(claimSql).toMatch(/due_assets AS MATERIALIZED[\s\S]*ORDER BY asset\."expiresAt", asset\."id"[\s\S]*LIMIT \$2[\s\S]*due_bound_records/);
+    expect(claimSql).toContain('AS "effectiveRetentionEndsAt"');
+    expect(claimSql).toContain('locked_records."retentionEndsAt" <= CURRENT_TIMESTAMP');
+    expect(claimSql).toContain('"retentionExpiryRecordId" = COALESCE');
+    expect(claimSql).toContain("FOR UPDATE OF record");
+    expect(claimSql).toContain('FROM "AccountDataRetentionLegalHoldAction" AS action');
+    expect(claimSql).toContain('FROM "AccountDataRetentionLegalHold" AS hold');
+    expect(claimSql).toContain("FOR UPDATE OF asset SKIP LOCKED");
     expect(claimSql).toContain('"storageDeleteLeaseExpiresAt" <= CURRENT_TIMESTAMP');
     expect(prisma.$queryRawUnsafe.mock.calls[0].slice(1)).toEqual([now, 20, 120000]);
     const finalize = prisma.$executeRawUnsafe.mock.calls[0];
     expect(finalize[0]).toContain('"storageDeletedAt" = $1');
+    expect(finalize[0]).toContain('"storageDeleteOutcomeUnknownAt" = NULL');
     expect(finalize[0]).toContain('"storageDeleteLeaseToken" = $3');
     expect(finalize.slice(2)).toEqual(["asset-1", "lease-1"]);
     expect(storage.delete.mock.invocationCallOrder[0])
@@ -149,6 +161,7 @@ describe("MediaAssetService retention and presentation", () => {
 
     const failure = prisma.$executeRawUnsafe.mock.calls[0];
     expect(failure[0]).toContain('"storageDeleteNextAttemptAt" = $1');
+    expect(failure[0]).toContain('"storageDeleteOutcomeUnknownAt" = COALESCE');
     expect(failure[0]).not.toContain('"status" = \'expired\'');
     expect(failure[2]).toBe("media_storage_delete_failed");
     expect(failure.slice(3)).toEqual(["asset-1", "lease-1"]);
@@ -224,6 +237,8 @@ describe("MediaAssetService retention and presentation", () => {
       }));
       expect(prisma.$executeRawUnsafe.mock.calls[0][2]).toBe("media_storage_delete_timeout");
       expect(prisma.$executeRawUnsafe.mock.calls[0][0]).toContain('"storageDeleteLeaseToken" = NULL');
+      expect(prisma.$executeRawUnsafe.mock.calls[0][0])
+        .toContain('"storageDeleteOutcomeUnknownAt" = COALESCE');
     } finally {
       jest.useRealTimers();
     }

@@ -1,5 +1,8 @@
 import { api, ensureSession } from "../../utils/api";
-import { clientRealtimeVoiceEnabled } from "../../utils/config";
+import {
+  clientPublicInteractionIdentityGrantsAvailable,
+  clientRealtimeVoiceEnabled
+} from "../../utils/config";
 import { Order, OrderTimelineEvent } from "../../utils/models";
 import {
   canOpenConversation,
@@ -45,6 +48,7 @@ type OrderView = {
   refundPolicySnapshotValid: boolean;
   showRefundPolicyBeforePayment: boolean;
   canPay: boolean;
+  paymentUnavailableNotice: string;
   canCancel: boolean;
   canRefund: boolean;
   canChat: boolean;
@@ -148,6 +152,8 @@ function viewForOrder(order: Order, now = Date.now()): OrderView {
     && Number.isInteger(refundRequestWindowHours)
     && refundRequestWindowHours >= 1
     && refundRequestWindowHours <= 720;
+  const identityAvailable = clientPublicInteractionIdentityGrantsAvailable();
+  const otherwisePayable = viewerRole === "customer" && refundPolicySnapshotValid && canPayOrder(order);
   return {
     viewerRole,
     isTextOnlyHistoricalVoiceOrder: textOnlyHistoricalVoiceOrder,
@@ -174,7 +180,10 @@ function viewForOrder(order: Order, now = Date.now()): OrderView {
     refundPolicySnapshotValid,
     showRefundPolicyBeforePayment: viewerRole === "customer"
       && ["pending", "paying"].includes(order.status),
-    canPay: viewerRole === "customer" && refundPolicySnapshotValid && canPayOrder(order),
+    canPay: otherwisePayable && identityAvailable,
+    paymentUnavailableNotice: otherwisePayable && !identityAvailable
+      ? "身份核验授权通道尚未开放，当前不能支付；仍可取消订单或联系平台协助。"
+      : "",
     canCancel: viewerRole === "customer" && ["pending", "paying"].includes(order.status),
     canRefund: viewerRole === "customer" && canRequestRefund(order),
     canChat: canOpenConversation(order),
@@ -408,6 +417,10 @@ Page({
     await this.loadPaymentDispute();
   },
   openPayment() {
+    if (!clientPublicInteractionIdentityGrantsAvailable()) {
+      wx.showToast({ title: "身份核验授权通道尚未开放，当前不能支付", icon: "none" });
+      return;
+    }
     wx.navigateTo({ url: `/pages/order/payment?orderId=${encodeURIComponent(this.orderId)}` });
   },
   openRefundTerms() {

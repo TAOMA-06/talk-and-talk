@@ -5,6 +5,7 @@ import { NotificationsModule } from "../notifications/notifications.module";
 import { ModerationModule } from "../moderation/moderation.module";
 import { PaymentsModule } from "../payments/payments.module";
 import { CommercialController } from "./commercial.controller";
+import { CompanionActionExpiryWorker } from "./companion-action-expiry.worker";
 import { CompanionLifecycleAdminController } from "./companion-lifecycle-admin.controller";
 import { CompanionLifecycleController } from "./companion-lifecycle.controller";
 import { CompanionLifecycleService } from "./companion-lifecycle.service";
@@ -18,6 +19,7 @@ import { CommercialService } from "./commercial.service";
   providers: [
     CommercialService,
     CompanionLifecycleService,
+    CompanionActionExpiryWorker,
     CommercialFunnelService,
     CommercialSettlementWorker
   ],

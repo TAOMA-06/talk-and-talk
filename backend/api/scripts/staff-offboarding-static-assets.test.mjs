@@ -6,10 +6,11 @@ const root = new URL("../", import.meta.url);
 const read = (path) => readFile(new URL(path, root), "utf8");
 
 test("commercial StaffCredential offboarding is server-authoritative and ReviewStaff-independent", async () => {
-  const [schema, migration, service, controller, strategy, auth, bootstrap] = await Promise.all([
+  const [schema, migration, service, lockOrder, controller, strategy, auth, bootstrap] = await Promise.all([
     read("prisma/schema.prisma"),
     read("prisma/migrations/20260731233000_staff_credential_offboarding/migration.sql"),
     read("src/admin/staff-offboarding.service.ts"),
+    read("src/admin/staff-credential-lock-order.ts"),
     read("src/admin/admin-staff.controller.ts"),
     read("src/auth/strategies/jwt.strategy.ts"),
     read("src/auth/auth.service.ts"),
@@ -36,8 +37,10 @@ test("commercial StaffCredential offboarding is server-authoritative and ReviewS
   assert.match(service, /STAFF_HANDOFF_POSTCONDITION_FAILED/);
   assert.match(service, /admin\.staff_credential_suspended/);
   assert.match(service, /refreshToken\.updateMany/);
-  assert.match(service, /WHERE "userId" = \$\{targetUserId\} FOR UPDATE/);
-  assert.match(service, /WHERE "userId" = \$\{replacementUserId\} FOR UPDATE/);
+  assert.match(service, /lockStaffCredentialRowsInOrder\(db, \[[\s\S]*actorUserId,[\s\S]*targetUserId,[\s\S]*dto\.replacementUserId/);
+  assert.match(lockOrder, /new Set/);
+  assert.match(lockOrder, /\.sort\(\)/);
+  assert.match(lockOrder, /StaffCredential[\s\S]*FOR UPDATE/);
   const handoff = service.slice(
     service.indexOf("private async handoffAssignments"),
     service.indexOf("private emptyHandoffResult")

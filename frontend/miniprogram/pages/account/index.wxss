@@ -24,6 +24,10 @@
 .action-message { margin-top: 12rpx; padding: 14rpx; border-radius: 12rpx; background: #f8f3f4; color: #5f474f; font-size: 22rpx; line-height: 1.6; word-break: break-all; }
 .appeal-deadline { margin-top: 10rpx; color: #8d4d5d; font-size: 21rpx; font-weight: 700; }
 .appeal-result { margin-top: 12rpx; padding: 14rpx; border-radius: 12rpx; background: #f6f8f7; }
+.appeal-evidence-list, .evidence-toolbar { display: flex; flex-wrap: wrap; gap: 12rpx; margin-top: 12rpx; }
+.appeal-evidence-button, .evidence-toolbar .text-button { width: auto; margin: 0; padding: 0 14rpx; border: 1rpx solid #d8c5cb; border-radius: 10rpx; line-height: 58rpx; }
+.evidence-draft { display: flex; align-items: center; justify-content: space-between; gap: 12rpx; margin-top: 10rpx; padding: 12rpx 14rpx; border-radius: 10rpx; background: #fff; color: #6f575f; font-size: 21rpx; }
+.evidence-draft .text-button { flex: 0 0 auto; width: auto; margin: 0; }
 .overdue-text { color: #a13f53; font-weight: 700; }
 .current-session { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; margin-top: 20rpx; padding: 18rpx; border-radius: 14rpx; background: #f6f2f3; }
 .session-title { color: #543d44; font-size: 25rpx; font-weight: 700; }

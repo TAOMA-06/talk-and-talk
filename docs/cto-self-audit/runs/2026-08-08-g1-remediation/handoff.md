@@ -1,5 +1,7 @@
 # G1 remediation handoff
 
+> **历史交接：** 当前接手入口是 [2026-08-26 商用闭环交接](../2026-08-26-commercial-closure/handoff.md)。本文件保留旧任务的控制沿革，不再是当前执行指令。
+
 ## Current handoff state
 
 All earlier implementation slices through `G1-FOLLOWUP-12` have completed

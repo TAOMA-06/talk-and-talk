@@ -25,6 +25,7 @@ import { NotificationsService } from "../notifications/notifications.service";
 import { RecommendationsService } from "../recommendations/recommendations.service";
 import { VoiceRoomControlService } from "../voice/voice-room-control.service";
 import { assertCurrentCustomerAdultEligibility } from "../users/customer-adult-eligibility.service";
+import { assertPublicInteractionIdentity } from "../users/public-interaction-identity.gate";
 import {
   WECHAT_PAY_PROVIDER,
   WECHAT_PREPAY_TTL_MS,
@@ -275,6 +276,14 @@ export class OrdersService {
       // the same lock, not from a pre-transaction marketplace lookup.
       await db.$queryRaw`SELECT "id" FROM "CompanionProfile" WHERE "id" = ${dto.companionId} FOR UPDATE`;
       await db.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${userId} FOR UPDATE`;
+      const customer = await db.user.findUnique({
+        where: { id: userId },
+        select: {
+          accountStatus: true,
+          profile: { select: { isVerified: true } }
+        }
+      });
+      assertPublicInteractionIdentity(customer ?? { accountStatus: "unavailable" });
       const futureBoundary = await db.companionCustomerFutureBoundary.findUnique({
         where: {
           companionId_customerUserId: {
@@ -324,11 +333,26 @@ export class OrdersService {
           ownerUserId: { not: null },
           owner: { accountStatus: "active", profile: { isVerified: true } }
         },
-        include: { commercialProfile: true }
+        include: {
+          commercialProfile: true,
+          owner: {
+            select: {
+              accountStatus: true,
+              profile: { select: { isVerified: true } }
+            }
+          }
+        }
       });
       if (!companion) {
-        throw new AppException("COMPANION_NOT_FOUND", "Companion not found", HttpStatus.NOT_FOUND);
+        // Keep a private future-boundary choice indistinguishable from a profile
+        // that became unavailable between browse and checkout.
+        throw new AppException(
+          "ORDER_COMPANION_UNAVAILABLE",
+          "This companion is currently unavailable for a new order",
+          HttpStatus.CONFLICT
+        );
       }
+      assertPublicInteractionIdentity(companion.owner ?? { accountStatus: "unavailable" });
       await assertCurrentCompanionCommercialEligibility(
         db,
         companion.id,

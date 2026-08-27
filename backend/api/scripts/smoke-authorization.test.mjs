@@ -79,6 +79,9 @@ test("acceptance smoke is explicit-development and loopback-only before any conn
   assert.match(source, /unset ALL_PROXY all_proxy HTTP_PROXY http_proxy HTTPS_PROXY https_proxy NO_PROXY no_proxy/);
   assert.match(source, /local -a args=\(-q --noproxy '\*'/);
   assert.match(source, /"\$CURL_BIN" "\$\{args\[@\]\}"/);
+  assert.match(source, /PUBLIC_INTERACTION_IDENTITY_REQUIRED/);
+  assert.match(source, /order and payment writes failed closed before creation/);
+  assert.match(source, /this run is not commercial acceptance/);
 });
 
 function readSource(path) {

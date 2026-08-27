@@ -469,6 +469,10 @@ function isAllowedLegalRecoveryRequest(path: string, method: NonNullable<Request
   const pathname = path.split("?", 1)[0];
   if (pathname === "/me/account-actions" && method === "GET") return true;
   if (/^\/me\/account-actions\/[^/?]+\/appeals$/.test(pathname) && method === "POST") return true;
+  if (/^\/me\/account-actions\/[^/?]+\/appeal-evidence-uploads$/.test(pathname) && method === "POST") return true;
+  if (/^\/me\/account-actions\/[^/?]+\/appeal-evidence-uploads\/[^/?]+\/complete$/.test(pathname) && method === "POST") return true;
+  if (/^\/me\/account-actions\/[^/?]+\/appeal-evidence-uploads\/[^/?]+$/.test(pathname) && method === "GET") return true;
+  if (/^\/me\/account-actions\/[^/?]+\/appeal-evidence-attachments\/[^/?]+\/read-url$/.test(pathname) && method === "GET") return true;
   if (pathname === "/me/data-rights" && (method === "GET" || method === "POST")) return true;
   if (/^\/me\/data-rights\/[^/?]+\/follow-ups$/.test(pathname) && method === "POST") return true;
   if (pathname === "/me/deletion-request" && (method === "GET" || method === "POST")) return true;
@@ -747,10 +751,40 @@ export const api = {
       pagination: { page: number; pageSize: number; total: number; totalPages: number };
     }>(`/me/account-actions${query ? `?${query}` : ""}`);
   },
-  createAccountActionAppeal: (id: string, statement: string) => legalRecoveryRequest<UserAccountAppeal>(
+  createAccountActionAppeal: (id: string, statement: string, evidenceAssetIds: string[] = []) => legalRecoveryRequest<UserAccountAppeal>(
     `/me/account-actions/${encodeURIComponent(id)}/appeals`,
-    { method: "POST", data: { statement } }
+    {
+      method: "POST",
+      data: { statement, ...(evidenceAssetIds.length ? { evidenceAssetIds } : {}) }
+    }
   ),
+  reserveAccountActionAppealEvidenceUpload: (id: string, data: {
+    kind: "image" | "audio";
+    mimeType: string;
+    sizeBytes: number;
+    sha256: string;
+    durationMs?: number;
+  }) => legalRecoveryRequest<{
+    asset: ControlledEvidenceAsset;
+    upload: MediaUploadReservation["upload"];
+  }>(`/me/account-actions/${encodeURIComponent(id)}/appeal-evidence-uploads`, {
+    method: "POST",
+    data
+  }),
+  completeAccountActionAppealEvidenceUpload: (id: string, assetId: string) => legalRecoveryRequest<{
+    asset: ControlledEvidenceAsset;
+  }>(`/me/account-actions/${encodeURIComponent(id)}/appeal-evidence-uploads/${encodeURIComponent(assetId)}/complete`, {
+    method: "POST"
+  }),
+  accountActionAppealEvidenceUploadStatus: (id: string, assetId: string) => legalRecoveryRequest<{
+    asset: ControlledEvidenceAsset;
+  }>(`/me/account-actions/${encodeURIComponent(id)}/appeal-evidence-uploads/${encodeURIComponent(assetId)}`),
+  accountActionAppealEvidenceReadUrl: (id: string, attachmentId: string) => legalRecoveryRequest<{
+    attachmentId: string;
+    kind: "image" | "audio";
+    url: string;
+    assetExpiresAt: string;
+  }>(`/me/account-actions/${encodeURIComponent(id)}/appeal-evidence-attachments/${encodeURIComponent(attachmentId)}/read-url`),
   accountSessions: (options: { page?: number; pageSize?: number } = {}) => {
     const query = [
       options.page ? `page=${encodeURIComponent(String(options.page))}` : "",

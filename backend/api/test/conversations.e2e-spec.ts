@@ -10,6 +10,7 @@ import { HttpExceptionFilter } from "../src/common/errors/http-exception.filter"
 import { buildCorsOptions } from "../src/config/cors";
 import { PrismaService } from "../src/database/prisma.service";
 import { seedDatabase } from "../src/database/seed";
+import * as publicInteractionIdentity from "../src/users/public-interaction-identity.gate";
 import {
   grantCurrentCustomerAdultEligibility,
   grantCurrentLegalConsent
@@ -20,8 +21,14 @@ describe("Conversations (e2e)", () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let jwt: JwtService;
+  let identityGateSpy: jest.SpyInstance;
 
   beforeAll(async () => {
+    // Downstream chat state-machine integration behind a hypothetical approved
+    // identity adapter. The real first-release rejection is covered by the
+    // orders/payments E2E plus the shared gate and conversation unit suites.
+    identityGateSpy = jest.spyOn(publicInteractionIdentity, "assertPublicInteractionIdentity")
+      .mockImplementation(() => undefined);
     process.env.NODE_ENV = "test";
     process.env.API_PREFIX = "api/v1";
     process.env.CORS_ORIGINS = "http://localhost:3000";
@@ -56,6 +63,7 @@ describe("Conversations (e2e)", () => {
   afterAll(async () => {
     await cleanup();
     await app.close();
+    identityGateSpy.mockRestore();
   });
 
   async function cleanup() {

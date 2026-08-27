@@ -18,8 +18,13 @@ describe("Companion lifecycle controllers", () => {
     requestWithdrawal: jest.fn(),
     cancelWithdrawal: jest.fn(),
     createAccountAction: jest.fn(),
+    completeExpiredSuspensionReactivation: jest.fn(),
     resolveAppeal: jest.fn(),
+    completeAppealReactivation: jest.fn(),
     adminAppeals: jest.fn(),
+    claimableAppeals: jest.fn(),
+    claimAppeal: jest.fn(),
+    assignAppeal: jest.fn(),
     adminVoiceIntros: jest.fn(),
     createVoiceIntroReadUrl: jest.fn(),
     reviewVoiceIntro: jest.fn(),
@@ -27,14 +32,24 @@ describe("Companion lifecycle controllers", () => {
     adminReviewDue: jest.fn(),
     adminAccountActions: jest.fn(),
     adminIncidents: jest.fn(),
+    claimableIncidents: jest.fn(),
+    adminIncident: jest.fn(),
+    claimIncident: jest.fn(),
+    assignIncident: jest.fn(),
     resolveIncident: jest.fn(),
     adminWithdrawals: jest.fn(),
     updateWithdrawal: jest.fn()
   } as any;
-  const companionController = new CompanionLifecycleController(lifecycle);
+  const caseEvidence = {
+    reserveForCompanionAccountAppeal: jest.fn(),
+    completeCompanionAccountAppeal: jest.fn(),
+    statusCompanionAccountAppeal: jest.fn()
+  } as any;
+  const companionController = new CompanionLifecycleController(lifecycle, caseEvidence);
   const adminController = new CompanionLifecycleAdminController(lifecycle);
   const companionUser = { id: "owner-1" } as any;
   const adminUser = { id: "admin-1" } as any;
+  const supplyUser = { id: "supply-1" } as any;
 
   beforeEach(() => jest.clearAllMocks());
 
@@ -70,16 +85,16 @@ describe("Companion lifecycle controllers", () => {
     await adminController.voiceIntros(query);
     await adminController.training(query);
     await adminController.reviewDue(query);
-    await adminController.actions(query);
-    await adminController.incidents(query);
+    await adminController.actions(adminUser, query);
+    await adminController.incidents(adminUser, query);
     await adminController.withdrawals(query);
 
-    expect(lifecycle.adminAppeals).toHaveBeenCalledWith("admin-1", "pending", 3, 25);
+    expect(lifecycle.adminAppeals).toHaveBeenCalledWith("admin-1", "pending", 3, 25, undefined);
     expect(lifecycle.adminVoiceIntros).toHaveBeenCalledWith("pendingReview", 3, 25);
     expect(lifecycle.adminTraining).toHaveBeenCalledWith("expired", 3, 25);
     expect(lifecycle.adminReviewDue).toHaveBeenCalledWith(3, 25);
-    expect(lifecycle.adminAccountActions).toHaveBeenCalledWith(true, 3, 25);
-    expect(lifecycle.adminIncidents).toHaveBeenCalledWith("open", 3, 25);
+    expect(lifecycle.adminAccountActions).toHaveBeenCalledWith("admin-1", true, 3, 25, undefined);
+    expect(lifecycle.adminIncidents).toHaveBeenCalledWith("admin-1", "open", 3, 25);
     expect(lifecycle.adminWithdrawals).toHaveBeenCalledWith("requested", 3, 25);
   });
 
@@ -87,6 +102,15 @@ describe("Companion lifecycle controllers", () => {
     await adminController.resolveAppeal(adminUser, "appeal-1", {
       status: "upheld",
       resolution: "经二次核验，原处置证据充分并维持。"
+    });
+    await adminController.assignAppeal(adminUser, "appeal-1", {
+      assignedToUserId: "33333333-3333-4333-8333-333333333333"
+    });
+    await adminController.completeReactivation(adminUser, "appeal-1", {
+      resolution: "已独立核验当前资格，公开上架仍须另行确认。"
+    });
+    await adminController.completeExpiredSuspensionReactivation(adminUser, "action-1", {
+      resolution: "已独立核验临时暂停到期后的当前资格，公开上架仍须另行确认。"
     });
     await adminController.voiceIntroRead(adminUser, "companion-1");
     await adminController.reviewVoiceIntro(adminUser, "companion-1", {
@@ -100,6 +124,21 @@ describe("Companion lifecycle controllers", () => {
     await adminController.updateWithdrawal(adminUser, "withdrawal-1", { status: "reviewing" });
 
     expect(lifecycle.resolveAppeal).toHaveBeenCalledWith("admin-1", "appeal-1", expect.any(Object));
+    expect(lifecycle.assignAppeal).toHaveBeenCalledWith(
+      "admin-1",
+      "appeal-1",
+      { assignedToUserId: "33333333-3333-4333-8333-333333333333" }
+    );
+    expect(lifecycle.completeAppealReactivation).toHaveBeenCalledWith(
+      "admin-1",
+      "appeal-1",
+      { resolution: "已独立核验当前资格，公开上架仍须另行确认。" }
+    );
+    expect(lifecycle.completeExpiredSuspensionReactivation).toHaveBeenCalledWith(
+      "admin-1",
+      "action-1",
+      { resolution: "已独立核验临时暂停到期后的当前资格，公开上架仍须另行确认。" }
+    );
     expect(lifecycle.createVoiceIntroReadUrl).toHaveBeenCalledWith("admin-1", "companion-1");
     expect(lifecycle.reviewVoiceIntro).toHaveBeenCalledWith("admin-1", "companion-1", {
       status: "approved",
@@ -109,11 +148,41 @@ describe("Companion lifecycle controllers", () => {
     expect(lifecycle.updateWithdrawal).toHaveBeenCalledWith("admin-1", "withdrawal-1", { status: "reviewing" });
   });
 
+  it("keeps incident summaries, claims, details and assignments actor-scoped", async () => {
+    const query = { incidentStatus: "open", page: 2, pageSize: 20 } as any;
+    await adminController.claimableIncidents(supplyUser, query);
+    await adminController.incident(supplyUser, "incident-1");
+    await adminController.claimIncident(supplyUser, "incident-1");
+    await adminController.assignIncident(adminUser, "incident-1", {
+      assignedToUserId: "33333333-3333-4333-8333-333333333333"
+    });
+
+    expect(lifecycle.claimableIncidents).toHaveBeenCalledWith("supply-1", "open", 2, 20);
+    expect(lifecycle.adminIncident).toHaveBeenCalledWith("supply-1", "incident-1");
+    expect(lifecycle.claimIncident).toHaveBeenCalledWith("supply-1", "incident-1");
+    expect(lifecycle.assignIncident).toHaveBeenCalledWith(
+      "admin-1",
+      "incident-1",
+      { assignedToUserId: "33333333-3333-4333-8333-333333333333" }
+    );
+  });
+
+  it("keeps companion appeal discovery minimal until a supply claim succeeds", async () => {
+    const query = { page: 2, pageSize: 20 } as any;
+    await adminController.claimableAppeals(supplyUser, query);
+    await adminController.claimAppeal(supplyUser, "appeal-1");
+
+    expect(lifecycle.claimableAppeals).toHaveBeenCalledWith("supply-1", 2, 20);
+    expect(lifecycle.claimAppeal).toHaveBeenCalledWith("supply-1", "appeal-1");
+  });
+
   it("separates supply lifecycle work from finance withdrawal work", () => {
     const prototype = CompanionLifecycleAdminController.prototype;
     for (const method of [
       prototype.createAction,
+      prototype.completeExpiredSuspensionReactivation,
       prototype.resolveAppeal,
+      prototype.completeReactivation,
       prototype.appeals,
       prototype.voiceIntros,
       prototype.voiceIntroRead,
@@ -122,10 +191,17 @@ describe("Companion lifecycle controllers", () => {
       prototype.reviewDue,
       prototype.actions,
       prototype.incidents,
+      prototype.incident,
       prototype.resolveIncident
     ]) {
       expect(Reflect.getMetadata(ROLES_KEY, method)).toEqual(["supply", "admin"]);
     }
+    expect(Reflect.getMetadata(ROLES_KEY, prototype.claimableIncidents)).toEqual(["supply"]);
+    expect(Reflect.getMetadata(ROLES_KEY, prototype.claimIncident)).toEqual(["supply"]);
+    expect(Reflect.getMetadata(ROLES_KEY, prototype.assignIncident)).toEqual(["admin"]);
+    expect(Reflect.getMetadata(ROLES_KEY, prototype.claimableAppeals)).toEqual(["supply"]);
+    expect(Reflect.getMetadata(ROLES_KEY, prototype.claimAppeal)).toEqual(["supply"]);
+    expect(Reflect.getMetadata(ROLES_KEY, prototype.assignAppeal)).toEqual(["admin"]);
     expect(Reflect.getMetadata(ROLES_KEY, prototype.withdrawals)).toEqual(["finance", "admin"]);
     expect(Reflect.getMetadata(ROLES_KEY, prototype.updateWithdrawal)).toEqual(["finance", "admin"]);
   });

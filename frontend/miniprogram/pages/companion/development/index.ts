@@ -1,4 +1,17 @@
-import { ApiError, ensureSession } from "../../../utils/api";
+import { api, ApiError, ensureSession } from "../../../utils/api";
+import {
+  approvedControlledEvidenceIds,
+  chooseEvidenceAudio,
+  chooseEvidenceImage,
+  controlledEvidenceEnabled,
+  ControlledEvidenceDraft,
+  loadControlledEvidenceDrafts,
+  LocalEvidenceFile,
+  refreshControlledEvidenceDrafts,
+  saveControlledEvidenceDrafts,
+  TEXT_ONLY_EVIDENCE_MESSAGE,
+  uploadControlledEvidence
+} from "../../../utils/controlled-evidence";
 import {
   CompanionAccountAction,
   CompanionQuality,
@@ -71,7 +84,9 @@ Page({
     submittingModuleCode: "",
     appealActionId: "",
     appealStatement: "",
-    appealEvidenceReferences: "",
+    appealEvidenceDrafts: [] as ControlledEvidenceDraft[],
+    appealEvidenceUploading: false,
+    appealTextOnly: !controlledEvidenceEnabled(),
     submittingAppeal: false
   },
   onLoad(options: Record<string, string | undefined>) {
@@ -198,20 +213,26 @@ Page({
       this.setData({ submittingModuleCode: "" });
     }
   },
-  openAppeal(event: any) {
+  async openAppeal(event: any) {
+    const actionId = event.currentTarget.dataset.id as string;
+    const drafts = controlledEvidenceEnabled()
+      ? await refreshControlledEvidenceDrafts(
+          loadControlledEvidenceDrafts(this.appealEvidenceStorageKey(actionId)),
+          this.appealEvidenceTransport(actionId)
+        )
+      : [];
     this.setData({
-      appealActionId: event.currentTarget.dataset.id as string,
+      appealActionId: actionId,
       appealStatement: "",
-      appealEvidenceReferences: "",
+      appealEvidenceDrafts: drafts,
       error: ""
     });
   },
   closeAppeal() {
     if (this.data.submittingAppeal) return;
-    this.setData({ appealActionId: "", appealStatement: "", appealEvidenceReferences: "" });
+    this.setData({ appealActionId: "", appealStatement: "", appealEvidenceDrafts: [] });
   },
   setAppealStatement(event: any) { this.setData({ appealStatement: event.detail.value }); },
-  setAppealEvidence(event: any) { this.setData({ appealEvidenceReferences: event.detail.value }); },
   async submitAppeal() {
     if (!this.data.appealActionId || this.data.submittingAppeal) return;
     const statement = this.data.appealStatement.trim();
@@ -219,20 +240,105 @@ Page({
       this.setData({ error: "请至少用10个字说明申诉事实和希望复核的内容。" });
       return;
     }
-    const evidenceReferences: string[] = [...new Set<string>(
-      this.data.appealEvidenceReferences.split(/[,，\n]/).map((item: string) => item.trim()).filter(Boolean)
-    )];
+    if (this.data.appealEvidenceDrafts.some((item) => item.status !== "approved")) {
+      this.setData({ error: "请等待证据审核，或移除未通过文件后再提交。" });
+      return;
+    }
     this.setData({ submittingAppeal: true, error: "" });
     try {
-      await companionCommercialApi.appealAction(this.data.appealActionId, statement, evidenceReferences);
+      await companionCommercialApi.appealAction(
+        this.data.appealActionId,
+        statement,
+        approvedControlledEvidenceIds(this.data.appealEvidenceDrafts)
+      );
       wx.showToast({ title: "申诉已进入待处理", icon: "success" });
-      this.setData({ appealActionId: "", appealStatement: "", appealEvidenceReferences: "" });
+      saveControlledEvidenceDrafts(this.appealEvidenceStorageKey(this.data.appealActionId), []);
+      this.setData({ appealActionId: "", appealStatement: "", appealEvidenceDrafts: [] });
       await this.load();
     } catch (error) {
       this.setData({ error: errorMessage(error, "提交申诉失败，请稍后重试。") });
     } finally {
       this.setData({ submittingAppeal: false });
     }
+  },
+  async addAppealEvidenceImage() {
+    const file = await chooseEvidenceImage();
+    if (file) await this.uploadAppealEvidence(file);
+  },
+  async addAppealEvidenceAudio() {
+    const file = await chooseEvidenceAudio();
+    if (file) await this.uploadAppealEvidence(file);
+  },
+  async uploadAppealEvidence(file: LocalEvidenceFile) {
+    const actionId = this.data.appealActionId;
+    if (!actionId || this.data.appealEvidenceUploading || this.data.appealEvidenceDrafts.length >= 3) return;
+    this.setData({ appealEvidenceUploading: true, error: "" });
+    try {
+      let pendingId = "";
+      const storageKey = this.appealEvidenceStorageKey(actionId);
+      const draft = await uploadControlledEvidence(
+        file,
+        (input) => companionCommercialApi.reserveAppealEvidenceUpload(actionId, input),
+        (next) => {
+          pendingId ||= next.assetId;
+          const drafts = this.data.appealEvidenceDrafts
+            .filter((item) => item.assetId !== pendingId);
+          drafts.push(next);
+          saveControlledEvidenceDrafts(storageKey, drafts);
+          this.setData({ appealEvidenceDrafts: drafts });
+        },
+        this.appealEvidenceTransport(actionId)
+      );
+      if (draft.status !== "approved") wx.showToast({ title: draft.statusText, icon: "none" });
+    } catch (error) {
+      this.setData({ error: errorMessage(error, "证据上传失败，请稍后重试。") });
+    } finally {
+      this.setData({ appealEvidenceUploading: false });
+    }
+  },
+  async refreshAppealEvidence() {
+    const actionId = this.data.appealActionId;
+    if (!actionId || !controlledEvidenceEnabled()) return;
+    const drafts = await refreshControlledEvidenceDrafts(
+      this.data.appealEvidenceDrafts,
+      this.appealEvidenceTransport(actionId)
+    );
+    saveControlledEvidenceDrafts(this.appealEvidenceStorageKey(actionId), drafts);
+    this.setData({ appealEvidenceDrafts: drafts });
+  },
+  removeAppealEvidence(event: any) {
+    const assetId = String(event.currentTarget.dataset.id || "");
+    const drafts = this.data.appealEvidenceDrafts.filter((item) => item.assetId !== assetId);
+    saveControlledEvidenceDrafts(this.appealEvidenceStorageKey(this.data.appealActionId), drafts);
+    this.setData({ appealEvidenceDrafts: drafts });
+  },
+  async openAppealEvidence(event: any) {
+    if (!controlledEvidenceEnabled()) {
+      wx.showToast({ title: TEXT_ONLY_EVIDENCE_MESSAGE, icon: "none" });
+      return;
+    }
+    try {
+      const result = await api.caseEvidenceReadUrl(String(event.currentTarget.dataset.id || ""));
+      if (result.kind === "image") {
+        wx.previewImage({ current: result.url, urls: [result.url] });
+      } else {
+        const audio = wx.createInnerAudioContext();
+        audio.src = result.url;
+        audio.onError(() => wx.showToast({ title: "音频暂时无法播放", icon: "none" }));
+        audio.play();
+      }
+    } catch (error) {
+      this.setData({ error: errorMessage(error, "证据暂时无法查看。") });
+    }
+  },
+  appealEvidenceTransport(actionId: string) {
+    return {
+      complete: (assetId: string) => companionCommercialApi.completeAppealEvidenceUpload(actionId, assetId),
+      status: (assetId: string) => companionCommercialApi.appealEvidenceUploadStatus(actionId, assetId)
+    };
+  },
+  appealEvidenceStorageKey(actionId: string) {
+    return `talkandtalk.caseEvidence.companionAccountAppeal.${actionId}`;
   },
   retry() { void this.load(); }
 });

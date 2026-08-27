@@ -77,15 +77,31 @@
       <view class="action-message">{{action.message}}</view>
       <view class="action-time">开始：{{action.startsAt}}<text wx:if="{{action.endsAt}}"> · 结束：{{action.endsAt}}</text></view>
       <view class="action-time">申诉提交截止：{{action.appealDeadlineAt}}</view>
+      <view wx:if="{{action.reactivation.nextAction === 'awaitExpiryReactivationMaterialization'}}" class="limitation">临时暂停已到期，系统正在登记独立恢复复核；当前仍不会自动恢复商业资格或公开上架。</view>
+      <view wx:elif="{{action.reactivation.status === 'required'}}" class="limitation">临时暂停已到期，正在等待另一名运营人员复核当前资格；公开状态仍保持关闭。</view>
+      <view wx:elif="{{action.reactivation.nextAction === 'awaitExplicitPublicationDecision'}}" class="limitation">本次限制已经结束；平台不会自动恢复公开上架，运营仍须按当前资格显式决定是否发布。<text wx:if="{{action.reactivation.resolution}}"> {{action.reactivation.resolution}}</text></view>
       <view wx:if="{{action.appeals.length}}" class="appeal-result">
         <view wx:for="{{action.appeals}}" wx:key="id" wx:for-item="appeal">
           申诉状态：{{appeal.status}} · 平台处理时限：{{appeal.reviewDueAt}}
           <text wx:if="{{appeal.overdue}}"> · 已逾期，已进入运营告警</text>
           <text wx:if="{{appeal.resolution}}"> · {{appeal.resolution}}</text>
+          <view wx:if="{{!appealTextOnly && appeal.evidenceAttachments.length}}" class="appeal-evidence-list">
+            <button
+              wx:for="{{appeal.evidenceAttachments}}"
+              wx:key="id"
+              wx:for-item="attachment"
+              class="secondary-button evidence-open"
+              size="mini"
+              data-id="{{attachment.id}}"
+              bindtap="openAppealEvidence"
+            >查看{{attachment.kind === 'image' ? '图片' : '音频'}}证据</button>
+          </view>
+          <view wx:if="{{appeal.reactivation.status === 'required'}}" class="limitation">原处置已撤销，但商业资格和公开上架不会自动恢复；正在等待另一名运营人员完成当前资格复核。</view>
+          <view wx:elif="{{appeal.reactivation.status === 'completed'}}" class="limitation">资格恢复复核已完成；平台仍未自动公开上架，是否重新上架由运营另行确认。<text wx:if="{{appeal.reactivation.resolution}}"> {{appeal.reactivation.resolution}}</text></view>
         </view>
       </view>
       <button wx:if="{{!action.appeals.length && action.appealWindowOpen}}" class="secondary-button" data-id="{{action.id}}" bindtap="openAppeal">在期限内提交一次申诉</button>
-      <view wx:elif="{{!action.appeals.length}}" class="limitation">申诉提交期限已结束；如涉及法定权利或新证据，请通过公开客服渠道联系平台。</view>
+      <view wx:elif="{{!action.appeals.length && action.reactivation.nextAction === 'none'}}" class="limitation">申诉提交期限已结束；如涉及法定权利或新证据，请通过公开客服渠道联系平台。</view>
     </view>
     <view wx:if="{{actionsTotalPages > 1}}" class="card">
       <button class="secondary-button" disabled="{{actionsPage <= 1}}" bindtap="previousActionsPage">上一页</button>
@@ -97,9 +113,20 @@
   <view wx:if="{{appealActionId}}" class="modal-mask">
     <view class="modal">
       <view class="modal-title">提交账号处置申诉</view>
-      <view class="modal-copy">只写可核验事实。证据字段只能填写平台受控存储生成的外部引用，不要粘贴证件、联系方式或聊天隐私。</view>
+      <view class="modal-copy">只写可核验事实。图片或音频须先上传到平台受控存储并通过安全审核；不要粘贴证件、联系方式或无关聊天隐私。</view>
       <textarea class="textarea" value="{{appealStatement}}" bindinput="setAppealStatement" maxlength="1000" placeholder="说明事实、时间和希望复核的结论" />
-      <textarea class="textarea compact" value="{{appealEvidenceReferences}}" bindinput="setAppealEvidence" maxlength="1000" placeholder="证据外部引用，逗号或换行分隔（可选）" />
+      <view wx:if="{{appealTextOnly}}" class="modal-copy">当前首发版本仅接收文字申诉；图片、音频证据尚未开放。</view>
+      <block wx:else>
+        <view class="evidence-toolbar">
+          <button class="secondary-button" size="mini" disabled="{{appealEvidenceUploading || appealEvidenceDrafts.length >= 3}}" bindtap="addAppealEvidenceImage">添加图片</button>
+          <button class="secondary-button" size="mini" disabled="{{appealEvidenceUploading || appealEvidenceDrafts.length >= 3}}" bindtap="addAppealEvidenceAudio">添加音频</button>
+          <button wx:if="{{appealEvidenceDrafts.length}}" class="secondary-button" size="mini" disabled="{{appealEvidenceUploading}}" bindtap="refreshAppealEvidence">刷新审核</button>
+        </view>
+        <view wx:for="{{appealEvidenceDrafts}}" wx:key="assetId" class="evidence-draft">
+          <text>{{item.kind === 'image' ? '图片' : '音频'}} · {{item.statusText}}</text>
+          <button class="secondary-button" size="mini" data-id="{{item.assetId}}" bindtap="removeAppealEvidence">移除</button>
+        </view>
+      </block>
       <button class="primary-button" loading="{{submittingAppeal}}" disabled="{{submittingAppeal}}" bindtap="submitAppeal">提交为待处理</button>
       <button class="secondary-button" disabled="{{submittingAppeal}}" bindtap="closeAppeal">取消</button>
     </view>

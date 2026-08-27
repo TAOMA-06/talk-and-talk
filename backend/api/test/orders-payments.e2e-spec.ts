@@ -15,6 +15,7 @@ import {
   WeChatPayProvider
 } from "../src/payments/wechat/wechat-pay.provider";
 import { PaymentsService } from "../src/payments/payments.service";
+import * as publicInteractionIdentity from "../src/users/public-interaction-identity.gate";
 import {
   grantCurrentCustomerAdultEligibility,
   grantCurrentLegalConsent
@@ -27,9 +28,15 @@ describe("Orders and payments (e2e)", () => {
   let jwt: JwtService;
   let wechat: WeChatPayProvider;
   let paymentsService: PaymentsService;
+  let identityGateSpy: jest.SpyInstance;
   let ownerSequence = 0;
 
   beforeAll(async () => {
+    // This suite exercises downstream transaction state behind a hypothetical
+    // approved identity adapter. A dedicated test below restores the real
+    // first-release gate and proves that order/prepay writes fail closed.
+    identityGateSpy = jest.spyOn(publicInteractionIdentity, "assertPublicInteractionIdentity")
+      .mockImplementation(() => undefined);
     process.env.NODE_ENV = "test";
     process.env.API_PREFIX = "api/v1";
     process.env.CORS_ORIGINS = "http://localhost:3000";
@@ -65,6 +72,7 @@ describe("Orders and payments (e2e)", () => {
   afterAll(async () => {
     await cleanup();
     await app.close();
+    identityGateSpy.mockRestore();
   });
 
   async function cleanup() {
@@ -181,6 +189,56 @@ describe("Orders and payments (e2e)", () => {
       .set("Authorization", `Bearer ${ownerToken}`)
       .expect(201);
   }
+
+  it("keeps new order and prepay writes closed without an approved identity authority", async () => {
+    const { token } = await createUser();
+    const orderCountBefore = await prisma.order.count();
+
+    identityGateSpy.mockRestore();
+    try {
+      await request(app.getHttpServer())
+        .post("/api/v1/orders")
+        .set("Authorization", `Bearer ${token}`)
+        .send({ companionId: "c1", themeId: "t1", durationMinutes: 30, scheduledAt: futureScheduledAt() })
+        .expect(403)
+        .expect(({ body }) => {
+          expect(body.error.code).toBe("PUBLIC_INTERACTION_IDENTITY_REQUIRED");
+          expect(body.error.details).toEqual(expect.objectContaining({
+            verificationStatus: "notVerified",
+            publicInteractionBlocked: true
+          }));
+        });
+      expect(await prisma.order.count()).toBe(orderCountBefore);
+    } finally {
+      identityGateSpy = jest.spyOn(publicInteractionIdentity, "assertPublicInteractionIdentity")
+        .mockImplementation(() => undefined);
+    }
+
+    const created = await request(app.getHttpServer())
+      .post("/api/v1/orders")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ companionId: "c1", themeId: "t1", durationMinutes: 30, scheduledAt: futureScheduledAt() })
+      .expect(201);
+    await confirmOrderForPayment(created.body.data.id);
+    const paymentCountBefore = await prisma.paymentTransaction.count();
+
+    identityGateSpy.mockRestore();
+    try {
+      await request(app.getHttpServer())
+        .post(`/api/v1/orders/${created.body.data.id}/prepay`)
+        .set("Authorization", `Bearer ${token}`)
+        .expect(403)
+        .expect(({ body }) => {
+          expect(body.error.code).toBe("PUBLIC_INTERACTION_IDENTITY_REQUIRED");
+        });
+      expect(await prisma.paymentTransaction.count()).toBe(paymentCountBefore);
+      expect((await prisma.order.findUniqueOrThrow({ where: { id: created.body.data.id } })).status)
+        .toBe("pending");
+    } finally {
+      identityGateSpy = jest.spyOn(publicInteractionIdentity, "assertPublicInteractionIdentity")
+        .mockImplementation(() => undefined);
+    }
+  });
 
   it("creates order, mock pays, and activates conversation once", async () => {
     const { token } = await createUser();
@@ -399,43 +457,50 @@ describe("Orders and payments (e2e)", () => {
       .send({ outTradeNo: prepay.body.data.payment.outTradeNo })
       .expect(201);
     const createRefund = jest.spyOn(wechat, "createRefund");
+    try {
+      const results = await Promise.all([
+        request(app.getHttpServer())
+          .post(`/api/v1/orders/${order.body.data.id}/refund`)
+          .set("Authorization", `Bearer ${token}`)
+          .send({ reason: "用户申请" }),
+        request(app.getHttpServer())
+          .post(`/api/v1/orders/${order.body.data.id}/refund`)
+          .set("Authorization", `Bearer ${token}`)
+          .send({ reason: "重复提交" })
+      ]);
 
-    const results = await Promise.all([
-      request(app.getHttpServer())
-        .post(`/api/v1/orders/${order.body.data.id}/refund`)
-        .set("Authorization", `Bearer ${token}`)
-        .send({ reason: "用户申请" }),
-      request(app.getHttpServer())
-        .post(`/api/v1/orders/${order.body.data.id}/refund`)
-        .set("Authorization", `Bearer ${token}`)
-        .send({ reason: "重复提交" })
-    ]);
-
-    expect(results.map((result) => result.status)).toEqual([201, 201]);
-    expect(results[0].body.data.refund.outRefundNo).toBe(results[1].body.data.refund.outRefundNo);
-    for (const result of results) {
-      expect(result.body.data.order).toMatchObject({ id: order.body.data.id });
-      for (const privateOrderField of [
-        "userId",
-        "settlementRecipientRefSnapshot",
-        "taxProfileRefSnapshot",
-        "identityEvidenceRefSnapshot",
-        "serviceAgreementEvidenceRefSnapshot",
-        "refundPolicyVersionSnapshot",
-        "clientRequestId"
-      ]) {
-        expect(result.body.data.order).not.toHaveProperty(privateOrderField);
+      expect(results.map((result) => result.status)).toEqual([201, 201]);
+      expect(results[0].body.data.refund.outRefundNo).toBe(results[1].body.data.refund.outRefundNo);
+      for (const result of results) {
+        expect(result.body.data.order).toMatchObject({ id: order.body.data.id });
+        for (const privateOrderField of [
+          "userId",
+          "customer",
+          "settlementRecipientRefSnapshot",
+          "taxProfileRefSnapshot",
+          "identityEvidenceRefSnapshot",
+          "serviceAgreementEvidenceRefSnapshot",
+          "refundPolicyVersionSnapshot",
+          "refundRequestWindowHoursSnapshot",
+          "clientRequestId"
+        ]) {
+          expect(result.body.data.order).not.toHaveProperty(privateOrderField);
+        }
       }
+      expect(createRefund).toHaveBeenCalledTimes(1);
+      const refunds = await prisma.refundTransaction.findMany({
+        where: { orderId: order.body.data.id }
+      });
+      expect(refunds).toHaveLength(1);
+      expect(refunds[0].status).toBe("success");
+    } finally {
+      createRefund.mockRestore();
     }
-    expect(createRefund).toHaveBeenCalledTimes(1);
-    const refunds = await prisma.refundTransaction.findMany({
-      where: { orderId: order.body.data.id }
-    });
-    expect(refunds).toHaveLength(1);
-    expect(refunds[0].status).toBe("success");
-    createRefund.mockRestore();
   });
 
+  // The budget includes setup plus three requests serializing on one refund
+  // row. Promise.all must still settle every request; letting Jest abandon them
+  // at its 5s default would leak live transactions into cleanup and later cases.
   it("serializes concurrent refund approvals and rejection without a second provider submission", async () => {
     const customer = await createUser("+8613800138012");
     const moderator = await createUser("+8613800138013", "admin");
@@ -475,30 +540,32 @@ describe("Orders and payments (e2e)", () => {
       .set("Authorization", `Bearer ${moderator.token}`)
       .expect(201);
     const createRefund = jest.spyOn(wechat, "createRefund");
+    try {
+      const results = await Promise.all([
+        request(app.getHttpServer())
+          .post(`/api/v1/payments/refunds/${refundId}/approve`)
+          .set("Authorization", `Bearer ${moderator.token}`)
+          .send({ note: "同意退款" }),
+        request(app.getHttpServer())
+          .post(`/api/v1/payments/refunds/${refundId}/approve`)
+          .set("Authorization", `Bearer ${moderator.token}`)
+          .send({ note: "重复同意" }),
+        request(app.getHttpServer())
+          .post(`/api/v1/payments/refunds/${refundId}/reject`)
+          .set("Authorization", `Bearer ${moderator.token}`)
+          .send({ note: "竞态拒绝" })
+      ]);
 
-    const results = await Promise.all([
-      request(app.getHttpServer())
-        .post(`/api/v1/payments/refunds/${refundId}/approve`)
-        .set("Authorization", `Bearer ${moderator.token}`)
-        .send({ note: "同意退款" }),
-      request(app.getHttpServer())
-        .post(`/api/v1/payments/refunds/${refundId}/approve`)
-        .set("Authorization", `Bearer ${moderator.token}`)
-        .send({ note: "重复同意" }),
-      request(app.getHttpServer())
-        .post(`/api/v1/payments/refunds/${refundId}/reject`)
-        .set("Authorization", `Bearer ${moderator.token}`)
-        .send({ note: "竞态拒绝" })
-    ]);
-
-    expect(results.filter((result) => result.status === 201).length).toBeGreaterThanOrEqual(1);
-    const persisted = await prisma.refundTransaction.findUniqueOrThrow({ where: { id: refundId } });
-    expect(["success", "rejected"]).toContain(persisted.status);
-    expect(createRefund).toHaveBeenCalledTimes(persisted.status === "success" ? 1 : 0);
-    expect(persisted.status).not.toBe("pending");
-    expect(persisted.status).not.toBe("processing");
-    createRefund.mockRestore();
-  });
+      expect(results.filter((result) => result.status === 201).length).toBeGreaterThanOrEqual(1);
+      const persisted = await prisma.refundTransaction.findUniqueOrThrow({ where: { id: refundId } });
+      expect(["success", "rejected"]).toContain(persisted.status);
+      expect(createRefund).toHaveBeenCalledTimes(persisted.status === "success" ? 1 : 0);
+      expect(persisted.status).not.toBe("pending");
+      expect(persisted.status).not.toBe("processing");
+    } finally {
+      createRefund.mockRestore();
+    }
+  }, 20_000);
 
   it("never downgrades a successful refund when the provider response later times out", async () => {
     const customer = await createUser("+8613800138016");

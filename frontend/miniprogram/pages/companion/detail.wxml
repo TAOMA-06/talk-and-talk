@@ -217,6 +217,7 @@
       <view wx:else class="availability-state availability-unavailable">{{availabilityMessage}}</view>
     </view>
     <view wx:if="{{selectedAvailabilityCandidate}}" class="booking-summary booking-slot-summary">已选时段：{{selectedAvailabilityCandidate.dateLabel}} {{selectedAvailabilityCandidate.timeLabel}}–{{selectedAvailabilityCandidate.endTimeLabel}}（北京时间）</view>
+    <view wx:if="{{!publicInteractionIdentityAvailable}}" class="availability-state availability-unavailable">身份核验授权通道尚未开放，新预约和支付暂不可用；可前往账号页查看说明与客服入口。</view>
     <button class="primary-button" disabled="{{!canBook || booking}}" loading="{{booking}}" bindtap="book">{{bookingButtonText}}</button>
   </view>
   <view class="title section-title">用户评价</view>

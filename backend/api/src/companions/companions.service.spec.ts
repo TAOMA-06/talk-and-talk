@@ -225,6 +225,12 @@ describe("CompanionsService", () => {
     companionCommercialProfile: {
       findUnique: jest.fn()
     },
+    companionAccountAction: {
+      findFirst: jest.fn()
+    },
+    companionAccountAppeal: {
+      findFirst: jest.fn()
+    },
     companionAvailabilityWindow: {
       findMany: jest.fn(),
       count: jest.fn(),
@@ -289,6 +295,8 @@ describe("CompanionsService", () => {
       return [];
     });
     prisma.accountDeletionRequest.findFirst.mockResolvedValue(null);
+    prisma.companionAccountAction.findFirst.mockResolvedValue(null);
+    prisma.companionAccountAppeal.findFirst.mockResolvedValue(null);
     moderation.moderateAsync.mockResolvedValue({ decision: "allow" });
     availabilityReminderCandidates.recordWindowBecameAvailable.mockResolvedValue({ created: 0 });
     service = new CompanionsService(
@@ -1824,6 +1832,98 @@ describe("CompanionsService", () => {
       where: { id: "c1" },
       data: { isPublished: true }
     });
+  });
+
+  it("does not let the generic publish endpoint bypass an active service restriction", async () => {
+    const unpublished = { ...companionRecord, ownerUserId: "owner-1", isPublished: false };
+    prisma.companionProfile.findUnique
+      .mockResolvedValueOnce(unpublished as any)
+      .mockResolvedValueOnce({
+        id: "c1",
+        ownerUserId: "owner-1",
+        isVerified: true,
+        updatedAt: unpublished.updatedAt
+      } as any);
+    prisma.user.findUnique.mockResolvedValue({
+      id: "owner-1",
+      role: "companion",
+      accountStatus: "active",
+      profile: { isVerified: true }
+    } as any);
+    prisma.companionCommercialProfile.findUnique.mockResolvedValue({
+      status: "verified",
+      adultEligibilityVerdict: "adult",
+      adultEligibilityValidUntil: new Date(Date.now() + 24 * 60 * 60_000)
+    } as any);
+    prisma.companionAccountAction.findFirst.mockResolvedValue({
+      id: "restriction-1",
+      kind: "serviceRestriction"
+    });
+
+    await expect(service.publish("c1")).rejects.toMatchObject({
+      code: "COMPANION_ACCOUNT_ACTION_ACTIVE"
+    });
+    expect(prisma.companionProfile.update).not.toHaveBeenCalled();
+  });
+
+  it("keeps an overturned restriction unpublished until reactivation review completes", async () => {
+    const unpublished = { ...companionRecord, ownerUserId: "owner-1", isPublished: false };
+    prisma.companionProfile.findUnique
+      .mockResolvedValueOnce(unpublished as any)
+      .mockResolvedValueOnce({
+        id: "c1",
+        ownerUserId: "owner-1",
+        isVerified: true,
+        updatedAt: unpublished.updatedAt
+      } as any);
+    prisma.user.findUnique.mockResolvedValue({
+      id: "owner-1",
+      role: "companion",
+      accountStatus: "active",
+      profile: { isVerified: true }
+    } as any);
+    prisma.companionCommercialProfile.findUnique.mockResolvedValue({
+      status: "verified",
+      adultEligibilityVerdict: "adult",
+      adultEligibilityValidUntil: new Date(Date.now() + 24 * 60 * 60_000)
+    } as any);
+    prisma.companionAccountAppeal.findFirst.mockResolvedValue({ id: "appeal-required-1" });
+
+    await expect(service.publish("c1")).rejects.toMatchObject({
+      code: "COMPANION_REACTIVATION_REQUIRED"
+    });
+    expect(prisma.companionProfile.update).not.toHaveBeenCalled();
+  });
+
+  it("keeps an expired temporary suspension unpublished until its action reactivation completes", async () => {
+    const unpublished = { ...companionRecord, ownerUserId: "owner-1", isPublished: false };
+    prisma.companionProfile.findUnique
+      .mockResolvedValueOnce(unpublished as any)
+      .mockResolvedValueOnce({
+        id: "c1",
+        ownerUserId: "owner-1",
+        isVerified: true,
+        updatedAt: unpublished.updatedAt
+      } as any);
+    prisma.user.findUnique.mockResolvedValue({
+      id: "owner-1",
+      role: "companion",
+      accountStatus: "active",
+      profile: { isVerified: true }
+    } as any);
+    prisma.companionCommercialProfile.findUnique.mockResolvedValue({
+      status: "verified",
+      adultEligibilityVerdict: "adult",
+      adultEligibilityValidUntil: new Date(Date.now() + 24 * 60 * 60_000)
+    } as any);
+    prisma.companionAccountAction.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: "expired-suspension-required" });
+
+    await expect(service.publish("c1")).rejects.toMatchObject({
+      code: "COMPANION_REACTIVATION_REQUIRED"
+    });
+    expect(prisma.companionProfile.update).not.toHaveBeenCalled();
   });
 
   it("rejects publication when the owner changes after the preflight read without reversing lock order", async () => {

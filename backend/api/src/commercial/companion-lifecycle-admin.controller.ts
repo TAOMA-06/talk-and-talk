@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, HttpCode, Param, Post, Query, UseGuards } from "@nestjs/common";
 
 import { AuthenticatedUser } from "../auth/auth.service";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
@@ -6,6 +6,9 @@ import { Roles } from "../auth/decorators/roles.decorator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import {
+  AssignCompanionAppealDto,
+  AssignCompanionIncidentDto,
+  CompleteCompanionReactivationDto,
   CreateCompanionAccountActionDto,
   ListCompanionLifecycleAdminDto,
   ResolveCompanionAppealDto,
@@ -30,6 +33,16 @@ export class CompanionLifecycleAdminController {
     return this.lifecycle.createAccountAction(actor.id, dto);
   }
 
+  @Post("actions/:id/reactivation")
+  @Roles("supply", "admin")
+  completeExpiredSuspensionReactivation(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param("id") actionId: string,
+    @Body() dto: CompleteCompanionReactivationDto
+  ) {
+    return this.lifecycle.completeExpiredSuspensionReactivation(actor.id, actionId, dto);
+  }
+
   @Post("appeals/:id/resolution")
   @Roles("supply", "admin")
   resolveAppeal(
@@ -38,6 +51,43 @@ export class CompanionLifecycleAdminController {
     @Body() dto: ResolveCompanionAppealDto
   ) {
     return this.lifecycle.resolveAppeal(actor.id, appealId, dto);
+  }
+
+  @Get("appeals/claimable")
+  @Roles("supply")
+  claimableAppeals(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Query() query: ListCompanionLifecycleAdminDto
+  ) {
+    return this.lifecycle.claimableAppeals(actor.id, query.page, query.pageSize);
+  }
+
+  @Post("appeals/:id/claims")
+  @HttpCode(200)
+  @Roles("supply")
+  claimAppeal(@CurrentUser() actor: AuthenticatedUser, @Param("id") appealId: string) {
+    return this.lifecycle.claimAppeal(actor.id, appealId);
+  }
+
+  @Post("appeals/:id/assignments")
+  @HttpCode(200)
+  @Roles("admin")
+  assignAppeal(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param("id") appealId: string,
+    @Body() dto: AssignCompanionAppealDto
+  ) {
+    return this.lifecycle.assignAppeal(actor.id, appealId, dto);
+  }
+
+  @Post("appeals/:id/reactivation")
+  @Roles("supply", "admin")
+  completeReactivation(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param("id") appealId: string,
+    @Body() dto: CompleteCompanionReactivationDto
+  ) {
+    return this.lifecycle.completeAppealReactivation(actor.id, appealId, dto);
   }
 
   @Get("appeals")
@@ -50,7 +100,8 @@ export class CompanionLifecycleAdminController {
       actor.id,
       query.appealStatus,
       query.page,
-      query.pageSize
+      query.pageSize,
+      query.reactivationStatus
     );
   }
 
@@ -93,18 +144,69 @@ export class CompanionLifecycleAdminController {
 
   @Get("actions")
   @Roles("supply", "admin")
-  actions(@Query() query: ListCompanionLifecycleAdminDto) {
+  actions(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Query() query: ListCompanionLifecycleAdminDto
+  ) {
     return this.lifecycle.adminAccountActions(
+      actor.id,
       query.active === undefined ? undefined : query.active === "true",
       query.page,
-      query.pageSize
+      query.pageSize,
+      query.reactivationStatus
     );
   }
 
   @Get("incidents")
   @Roles("supply", "admin")
-  incidents(@Query() query: ListCompanionLifecycleAdminDto) {
-    return this.lifecycle.adminIncidents(query.incidentStatus, query.page, query.pageSize);
+  incidents(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Query() query: ListCompanionLifecycleAdminDto
+  ) {
+    return this.lifecycle.adminIncidents(
+      actor.id,
+      query.incidentStatus,
+      query.page,
+      query.pageSize
+    );
+  }
+
+  @Get("incidents/claimable")
+  @Roles("supply")
+  claimableIncidents(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Query() query: ListCompanionLifecycleAdminDto
+  ) {
+    return this.lifecycle.claimableIncidents(
+      actor.id,
+      query.incidentStatus,
+      query.page,
+      query.pageSize
+    );
+  }
+
+  @Get("incidents/:id")
+  @Roles("supply", "admin")
+  incident(@CurrentUser() actor: AuthenticatedUser, @Param("id") incidentId: string) {
+    return this.lifecycle.adminIncident(actor.id, incidentId);
+  }
+
+  @Post("incidents/:id/claims")
+  @HttpCode(200)
+  @Roles("supply")
+  claimIncident(@CurrentUser() actor: AuthenticatedUser, @Param("id") incidentId: string) {
+    return this.lifecycle.claimIncident(actor.id, incidentId);
+  }
+
+  @Post("incidents/:id/assignments")
+  @HttpCode(200)
+  @Roles("admin")
+  assignIncident(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param("id") incidentId: string,
+    @Body() dto: AssignCompanionIncidentDto
+  ) {
+    return this.lifecycle.assignIncident(actor.id, incidentId, dto);
   }
 
   @Post("incidents/:id/status")

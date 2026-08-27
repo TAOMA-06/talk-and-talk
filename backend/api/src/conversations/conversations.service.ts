@@ -324,6 +324,17 @@ export class ConversationsService {
       // the boundary for that instant; an already-created order remains intact.
       await db.$queryRaw`SELECT "id" FROM "CompanionProfile" WHERE "id" = ${conversation.companionId} FOR UPDATE`;
       await db.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${conversation.userId} FOR UPDATE`;
+      const lockedCompanion = await db.companionProfile.findUnique({
+        where: { id: conversation.companionId },
+        select: { ownerUserId: true }
+      });
+      if (lockedCompanion?.ownerUserId !== userId) {
+        throw new AppException(
+          "FUTURE_BOOKING_BOUNDARY_COMPANION_ONLY",
+          "Only the current companion owner may manage this private future-booking boundary",
+          HttpStatus.FORBIDDEN
+        );
+      }
       const key = {
         companionId: conversation.companionId,
         customerUserId: conversation.userId

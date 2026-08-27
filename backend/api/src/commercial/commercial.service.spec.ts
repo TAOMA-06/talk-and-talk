@@ -726,6 +726,7 @@ describe("CommercialService", () => {
       authIdentityTombstone: { count: jest.fn().mockResolvedValue(0) },
       userAccountAppeal: { count: jest.fn().mockResolvedValue(7) },
       companionAccountAppeal: { count: jest.fn().mockResolvedValue(8) },
+      companionAccountAction: { count: jest.fn().mockResolvedValue(9) },
       notificationDelivery: { count: jest.fn().mockResolvedValue(0) },
       availabilityReminderFanoutJob: { count: jest.fn().mockResolvedValue(0) },
       companionCommercialProfile: { count: jest.fn().mockResolvedValue(0) },
@@ -775,7 +776,8 @@ describe("CommercialService", () => {
       dataRetentionLegalHoldPolicyUnapproved: 0,
       dataRetentionLegalHoldPendingActions: 0,
       overdueUserAccountAppeals: 7,
-      overdueCompanionAccountAppeals: 8
+      overdueCompanionAccountAppeals: 8,
+      expiredCompanionSuspensionReactivationPending: 9
     }));
     expect(readinessPrisma.accountDeletionRequest.count).toHaveBeenCalledWith({
       where: {
@@ -789,6 +791,14 @@ describe("CommercialService", () => {
     expect(readinessPrisma.companionAccountAppeal.count).toHaveBeenCalledWith({
       where: { status: "pending", reviewDueAt: { lt: expect.any(Date) } }
     });
+    expect(readinessPrisma.companionAccountAction.count).toHaveBeenCalledWith({
+      where: {
+        kind: "suspension",
+        revokedAt: null,
+        endsAt: { lte: expect.any(Date) },
+        reactivationStatus: { in: ["notRequired", "required"] }
+      }
+    });
     expect(readinessPrisma.moderationCase.count).toHaveBeenCalledWith({
       where: {
         status: { in: ["pending", "autoReviewing", "humanReview"] },
@@ -801,6 +811,17 @@ describe("CommercialService", () => {
         matchedRules: { has: "provider.unavailable" }
       }
     });
+    expect(readinessPrisma.mediaAsset.count).toHaveBeenCalledWith({
+      where: {
+        expiresAt: { lte: expect.any(Date) },
+        status: { not: "expired" },
+        OR: [
+          { storageDeleteLastErrorCode: { not: null } },
+          { storageDeleteOutcomeUnknownAt: { not: null } },
+          { lastError: "storage_delete_failed" }
+        ]
+      }
+    });
 
     readinessPrisma.accountDeletionRequest.count.mockResolvedValue(0);
     readinessPrisma.moderationCase.count.mockResolvedValue(0);
@@ -811,11 +832,13 @@ describe("CommercialService", () => {
     expect(appealsOnly.status).toBe("attentionRequired");
     expect(Object.entries(appealsOnly.blockers).filter(([, count]) => count > 0)).toEqual([
       ["overdueUserAccountAppeals", 7],
-      ["overdueCompanionAccountAppeals", 8]
+      ["overdueCompanionAccountAppeals", 8],
+      ["expiredCompanionSuspensionReactivationPending", 9]
     ]);
 
     readinessPrisma.userAccountAppeal.count.mockResolvedValue(0);
     readinessPrisma.companionAccountAppeal.count.mockResolvedValue(0);
+    readinessPrisma.companionAccountAction.count.mockResolvedValue(0);
     readinessPrisma.weChatBillReconciliationRun.findMany.mockResolvedValue(
       reconciliationRuns(["tradeAll", "fundBasic", "fundOperation"])
     );
@@ -921,6 +944,19 @@ describe("CommercialService", () => {
       ["dataRetentionLegalHoldPolicyUnapproved", 1]
     ]);
     legalHoldPolicyApproved = true;
+
+    const internalConfig = config.get.getMockImplementation()!;
+    config.get.mockImplementation((key: string, fallback?: unknown) => {
+      if (key === "COMMERCIAL_RELEASE_MODE") return "commercial";
+      if (key === "REFUND_POLICY_APPROVED") return true;
+      if (key === "REFUND_POLICY_VERSION") return "2026.08-v1";
+      if (key === "REFUND_POLICY_APPROVAL_REFERENCE") return "legal:refund-policy-2026-08";
+      return internalConfig(key, fallback);
+    });
+    const identityAuthorityOnly = await readinessService.operationalReadiness();
+    expect(Object.entries(identityAuthorityOnly.blockers).filter(([, count]) => count > 0))
+      .toEqual([["publicInteractionIdentityAuthorityUnavailable", 1]]);
+    config.get.mockImplementation(internalConfig);
 
     readinessPrisma.$queryRaw.mockImplementation(async (parts: TemplateStringsArray) => {
       const sql = Array.from(parts).join("?");
@@ -1067,6 +1103,7 @@ describe("CommercialService", () => {
       accountDataRetentionLegalHoldAction: { count: jest.fn().mockResolvedValue(0) },
       userAccountAppeal: { count: jest.fn().mockResolvedValue(0) },
       companionAccountAppeal: { count: jest.fn().mockResolvedValue(0) },
+      companionAccountAction: { count: jest.fn().mockResolvedValue(0) },
       notificationDelivery: { count: jest.fn().mockResolvedValue(0) },
       companionCommercialProfile: { count: jest.fn().mockResolvedValue(0) },
       companionRecovery: { count: jest.fn().mockResolvedValue(0) },
@@ -1177,6 +1214,7 @@ describe("CommercialService", () => {
       accountDataRetentionLegalHoldAction: { count: jest.fn().mockResolvedValue(0) },
       userAccountAppeal: { count: jest.fn().mockResolvedValue(0) },
       companionAccountAppeal: { count: jest.fn().mockResolvedValue(0) },
+      companionAccountAction: { count: jest.fn().mockResolvedValue(0) },
       notificationDelivery,
       availabilityReminderCandidate: {
         count: jest.fn().mockImplementation(() => Promise.resolve(scenario === "reminder" ? 5 : 0))

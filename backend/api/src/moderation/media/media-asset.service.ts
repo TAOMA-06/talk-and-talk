@@ -50,15 +50,22 @@ const ALLOWED_MIME_TYPES: Record<MediaKind, ReadonlySet<string>> = {
   audio: new Set(["audio/mpeg", "audio/mp4", "audio/aac", "audio/wav", "audio/x-wav", "audio/amr"])
 };
 
-export type ControlledEvidencePurpose =
-  | "orderSupportFact"
-  | "attendanceDisputeStatement"
-  | "companionIncidentReport";
+export const CONTROLLED_EVIDENCE_PURPOSES = [
+  "orderSupportFact",
+  "attendanceDisputeStatement",
+  "companionIncidentReport",
+  "userAccountAppeal",
+  "companionAccountAppeal"
+] as const;
+
+export type ControlledEvidencePurpose = (typeof CONTROLLED_EVIDENCE_PURPOSES)[number];
 
 export type ControlledEvidenceScope = {
   supportTicketId?: string;
   attendanceDisputeId?: string;
   companionId?: string;
+  userAccountActionId?: string;
+  companionAccountActionId?: string;
 };
 
 @Injectable()
@@ -261,13 +268,22 @@ export class MediaAssetService {
     return { asset: this.toAssetDto(updated) };
   }
 
-  async completeControlled(assetId: string, uploaderId: string) {
+  async completeControlled(
+    assetId: string,
+    uploaderId: string,
+    expected?: { purpose: ControlledEvidencePurpose; scope: ControlledEvidenceScope }
+  ) {
     this.assertCaseEvidenceMediaEnabled();
+    const expectedScope = expected
+      ? this.controlledScopeData(expected.purpose, expected.scope)
+      : {};
     const asset: any = await this.prisma.mediaAsset.findFirst({
       where: {
         id: assetId,
         uploaderId,
-        purpose: { in: ["orderSupportFact", "attendanceDisputeStatement", "companionIncidentReport"] }
+        ...(expected
+          ? { purpose: expected.purpose, ...expectedScope }
+          : { purpose: { in: [...CONTROLLED_EVIDENCE_PURPOSES] } })
       }
     } as any);
     if (!asset) {
@@ -313,13 +329,22 @@ export class MediaAssetService {
     return { asset: this.toAssetDto(updated) };
   }
 
-  async controlledStatus(assetId: string, uploaderId: string) {
+  async controlledStatus(
+    assetId: string,
+    uploaderId: string,
+    expected?: { purpose: ControlledEvidencePurpose; scope: ControlledEvidenceScope }
+  ) {
     this.assertCaseEvidenceMediaEnabled();
+    const expectedScope = expected
+      ? this.controlledScopeData(expected.purpose, expected.scope)
+      : {};
     const asset: any = await this.prisma.mediaAsset.findFirst({
       where: {
         id: assetId,
         uploaderId,
-        purpose: { in: ["orderSupportFact", "attendanceDisputeStatement", "companionIncidentReport"] }
+        ...(expected
+          ? { purpose: expected.purpose, ...expectedScope }
+          : { purpose: { in: [...CONTROLLED_EVIDENCE_PURPOSES] } })
       }
     } as any);
     if (!asset) {
@@ -469,9 +494,39 @@ export class MediaAssetService {
 
   private async claimDueStorageDeletes(now: Date, limit: number): Promise<ClaimedMediaAsset[]> {
     return this.prisma.$queryRawUnsafe<ClaimedMediaAsset[]>(
-      `WITH candidates AS MATERIALIZED (
-         SELECT asset."id"
+      `WITH due_assets AS MATERIALIZED (
+         SELECT
+           asset."id",
+           asset."expiresAt",
+           COALESCE(asset."retentionExpiryRecordId", derived_record."id") AS "effectiveRetentionRecordId",
+           COALESCE(bound_record."retentionEndsAt", derived_record."retentionEndsAt")
+             AS "effectiveRetentionEndsAt"
          FROM "MediaAsset" AS asset
+         LEFT JOIN "AccountDataRetentionRecord" AS bound_record
+           ON bound_record."id" = asset."retentionExpiryRecordId"
+         LEFT JOIN LATERAL (
+           SELECT record."id", record."retentionEndsAt"
+           FROM "AccountDataRetentionRecord" AS record
+           WHERE asset."retentionExpiryRecordId" IS NULL
+             AND record."userId" = asset."uploaderId"
+             AND record."disposition" = 'retainedRestricted'
+             AND record."expiryProcessedAt" IS NULL
+             AND record."category" = CASE
+               WHEN asset."purpose"::TEXT IN (
+                 'chatMessage',
+                 'orderSupportFact',
+                 'attendanceDisputeStatement',
+                 'companionIncidentReport'
+               ) THEN 'support_disputes_safety'
+               WHEN asset."purpose"::TEXT IN (
+                 'userAccountAppeal',
+                 'companionAccountAppeal'
+               ) THEN 'consent_rights_account_governance'
+               ELSE NULL
+             END
+           ORDER BY record."createdAt" DESC, record."id" DESC
+           LIMIT 1
+         ) AS derived_record ON TRUE
          WHERE asset."expiresAt" IS NOT NULL
            AND asset."expiresAt" <= $1
            AND asset."status" <> 'expired'
@@ -484,12 +539,86 @@ export class MediaAssetService {
              asset."storageDeleteLeaseExpiresAt" IS NULL
              OR asset."storageDeleteLeaseExpiresAt" <= CURRENT_TIMESTAMP
            )
+           AND (
+             COALESCE(asset."retentionExpiryRecordId", derived_record."id") IS NULL
+             OR (
+               COALESCE(bound_record."retentionEndsAt", derived_record."retentionEndsAt") IS NOT NULL
+               AND COALESCE(bound_record."retentionEndsAt", derived_record."retentionEndsAt")
+                 <= CURRENT_TIMESTAMP
+               AND NOT EXISTS (
+                 SELECT 1
+                 FROM "AccountDataRetentionLegalHoldAction" AS action
+                 WHERE action."retentionRecordId" = COALESCE(
+                     asset."retentionExpiryRecordId",
+                     derived_record."id"
+                   )
+                   AND action."action" = 'placement'
+                   AND action."status" = 'pending'
+               )
+               AND NOT EXISTS (
+                 SELECT 1
+                 FROM "AccountDataRetentionLegalHold" AS hold
+                 WHERE hold."retentionRecordId" = COALESCE(
+                     asset."retentionExpiryRecordId",
+                     derived_record."id"
+                   )
+                   AND hold."releasedAt" IS NULL
+               )
+             )
+           )
          ORDER BY asset."expiresAt", asset."id"
-         FOR UPDATE SKIP LOCKED
+         LIMIT $2
+       ), due_bound_records AS MATERIALIZED (
+         SELECT
+           due_asset."effectiveRetentionRecordId" AS "id",
+           MIN(due_asset."expiresAt") AS "firstExpiresAt"
+         FROM due_assets AS due_asset
+         WHERE due_asset."effectiveRetentionRecordId" IS NOT NULL
+         GROUP BY due_asset."effectiveRetentionRecordId"
+         ORDER BY MIN(due_asset."expiresAt"), due_asset."effectiveRetentionRecordId"
+       ), locked_records AS MATERIALIZED (
+         SELECT record."id", record."retentionEndsAt"
+         FROM "AccountDataRetentionRecord" AS record
+         JOIN due_bound_records ON due_bound_records."id" = record."id"
+         ORDER BY record."id"
+         FOR UPDATE OF record
+       ), candidates AS MATERIALIZED (
+         SELECT asset."id", due_asset."effectiveRetentionRecordId"
+         FROM due_assets AS due_asset
+         JOIN "MediaAsset" AS asset ON asset."id" = due_asset."id"
+         LEFT JOIN locked_records
+           ON locked_records."id" = due_asset."effectiveRetentionRecordId"
+         WHERE (
+             due_asset."effectiveRetentionRecordId" IS NULL
+             OR (
+               locked_records."id" IS NOT NULL
+               AND locked_records."retentionEndsAt" IS NOT NULL
+               AND locked_records."retentionEndsAt" <= CURRENT_TIMESTAMP
+               AND NOT EXISTS (
+                 SELECT 1
+                 FROM "AccountDataRetentionLegalHoldAction" AS action
+                 WHERE action."retentionRecordId" = locked_records."id"
+                   AND action."action" = 'placement'
+                   AND action."status" = 'pending'
+               )
+               AND NOT EXISTS (
+                 SELECT 1
+                 FROM "AccountDataRetentionLegalHold" AS hold
+                 WHERE hold."retentionRecordId" = locked_records."id"
+                   AND hold."releasedAt" IS NULL
+               )
+             )
+           )
+         ORDER BY asset."expiresAt", asset."id"
+         FOR UPDATE OF asset SKIP LOCKED
          LIMIT $2
        ), leased AS (
          UPDATE "MediaAsset" AS asset
          SET
+           "retentionExpiryRecordId" = COALESCE(
+             asset."retentionExpiryRecordId",
+             candidates."effectiveRetentionRecordId"
+           ),
            "storageDeleteRequestedAt" = COALESCE(asset."storageDeleteRequestedAt", CURRENT_TIMESTAMP),
            "storageDeleteLeaseToken" = md5(random()::TEXT || clock_timestamp()::TEXT || asset."id"),
            "storageDeleteLeaseExpiresAt" = CURRENT_TIMESTAMP + ($3::BIGINT * INTERVAL '1 millisecond'),
@@ -531,8 +660,12 @@ export class MediaAssetService {
         const failed = await this.prisma.$executeRawUnsafe(
           `UPDATE "MediaAsset"
            SET
-             "storageDeleteNextAttemptAt" = $1,
-             "storageDeleteLastErrorCode" = $2,
+           "storageDeleteNextAttemptAt" = $1,
+           "storageDeleteLastErrorCode" = $2,
+             "storageDeleteOutcomeUnknownAt" = COALESCE(
+               "storageDeleteOutcomeUnknownAt",
+               CURRENT_TIMESTAMP
+             ),
              "storageDeleteLeaseToken" = NULL,
              "storageDeleteLeaseExpiresAt" = NULL,
              "updatedAt" = CURRENT_TIMESTAMP
@@ -556,6 +689,7 @@ export class MediaAssetService {
          "storageDeletedAt" = $1,
          "storageDeleteNextAttemptAt" = NULL,
          "storageDeleteLastErrorCode" = NULL,
+         "storageDeleteOutcomeUnknownAt" = NULL,
          "storageDeleteLeaseToken" = NULL,
          "storageDeleteLeaseExpiresAt" = NULL,
          "extractedText" = NULL,
@@ -688,14 +822,30 @@ export class MediaAssetService {
   private controlledScopeData(
     purpose: ControlledEvidencePurpose,
     scope: ControlledEvidenceScope
-  ): { supportTicketId?: string; attendanceDisputeId?: string; companionId?: string } {
-    const values = [scope.supportTicketId, scope.attendanceDisputeId, scope.companionId]
+  ): {
+    supportTicketId?: string;
+    attendanceDisputeId?: string;
+    companionId?: string;
+    userAccountActionId?: string;
+    companionAccountActionId?: string;
+  } {
+    const values = [
+      scope.supportTicketId,
+      scope.attendanceDisputeId,
+      scope.companionId,
+      scope.userAccountActionId,
+      scope.companionAccountActionId
+    ]
       .filter((value): value is string => Boolean(value));
     const expected = purpose === "orderSupportFact"
       ? scope.supportTicketId
       : purpose === "attendanceDisputeStatement"
         ? scope.attendanceDisputeId
-        : scope.companionId;
+        : purpose === "companionIncidentReport"
+          ? scope.companionId
+          : purpose === "userAccountAppeal"
+            ? scope.userAccountActionId
+            : scope.companionAccountActionId;
     if (values.length !== 1 || !expected) {
       throw new AppException(
         "CASE_EVIDENCE_SCOPE_INVALID",
@@ -707,7 +857,11 @@ export class MediaAssetService {
       ? { supportTicketId: expected }
       : purpose === "attendanceDisputeStatement"
         ? { attendanceDisputeId: expected }
-        : { companionId: expected };
+        : purpose === "companionIncidentReport"
+          ? { companionId: expected }
+          : purpose === "userAccountAppeal"
+            ? { userAccountActionId: expected }
+            : { companionAccountActionId: expected };
   }
 
   private toAssetDto(asset: any) {

@@ -7,7 +7,9 @@ describe("ControlledCaseEvidenceService", () => {
     supportTicket: { findUnique: jest.fn() },
     attendanceDispute: { findUnique: jest.fn() },
     companionProfile: { findFirst: jest.fn() },
-    controlledCaseEvidenceAttachment: { findUnique: jest.fn() }
+    userAccountAction: { findFirst: jest.fn() },
+    companionAccountAction: { findFirst: jest.fn() },
+    controlledCaseEvidenceAttachment: { findUnique: jest.fn(), findFirst: jest.fn() }
   };
   const mediaAssets: any = {
     assertCaseEvidenceMediaEnabled: jest.fn(),
@@ -25,6 +27,9 @@ describe("ControlledCaseEvidenceService", () => {
     jest.clearAllMocks();
     mediaAssets.assertCaseEvidenceMediaEnabled.mockImplementation(() => undefined);
     mediaAssets.isCaseEvidenceMediaEnabled.mockReturnValue(true);
+    prisma.userAccountAction.findFirst.mockResolvedValue(null);
+    prisma.companionAccountAction.findFirst.mockResolvedValue(null);
+    prisma.controlledCaseEvidenceAttachment.findFirst.mockResolvedValue(null);
     service = new ControlledCaseEvidenceService(prisma, mediaAssets, worker);
   });
 
@@ -100,6 +105,53 @@ describe("ControlledCaseEvidenceService", () => {
     )).rejects.toMatchObject({ code: "SUPPORT_TICKET_NOT_FOUND", status: 404 });
   });
 
+  it("reserves appeal evidence only inside the owned active action window", async () => {
+    prisma.userAccountAction.findFirst.mockResolvedValue({
+      id: "action-1",
+      userId: "customer-1",
+      revokedAt: null,
+      appeal: null,
+      appealDeadlineAt: new Date(Date.now() + 60_000)
+    });
+    prisma.companionProfile.findFirst.mockResolvedValue({ id: "companion-1" });
+    prisma.companionAccountAction.findFirst.mockResolvedValue({
+      id: "companion-action-1",
+      companionId: "companion-1",
+      revokedAt: null,
+      appeals: [],
+      appealDeadlineAt: new Date(Date.now() + 60_000)
+    });
+    mediaAssets.reserveControlled.mockResolvedValue({ asset: { id: assetId } });
+
+    await service.reserveForUserAccountAppeal("customer-1", "action-1", {
+      kind: "image", mimeType: "image/jpeg", sizeBytes: 10, sha256: "a".repeat(64)
+    });
+    expect(mediaAssets.reserveControlled).toHaveBeenLastCalledWith(expect.objectContaining({
+      uploaderId: "customer-1",
+      purpose: "userAccountAppeal",
+      scope: { userAccountActionId: "action-1" }
+    }));
+
+    await service.reserveForCompanionAccountAppeal("owner-1", "companion-action-1", {
+      kind: "image", mimeType: "image/jpeg", sizeBytes: 10, sha256: "b".repeat(64)
+    });
+    expect(mediaAssets.reserveControlled).toHaveBeenLastCalledWith(expect.objectContaining({
+      uploaderId: "owner-1",
+      purpose: "companionAccountAppeal",
+      scope: { companionAccountActionId: "companion-action-1" }
+    }));
+
+    prisma.userAccountAction.findFirst.mockResolvedValue({
+      id: "action-1",
+      revokedAt: new Date(),
+      appeal: null,
+      appealDeadlineAt: new Date(Date.now() + 60_000)
+    });
+    await expect(service.reserveForUserAccountAppeal("customer-1", "action-1", {
+      kind: "image", mimeType: "image/jpeg", sizeBytes: 10, sha256: "c".repeat(64)
+    })).rejects.toMatchObject({ code: "USER_ACCOUNT_ACTION_REVOKED", status: 409 });
+  });
+
   it("enqueues standalone moderation after idempotent provider completion", async () => {
     mediaAssets.completeControlled.mockResolvedValue({ asset: { id: assetId, status: "scanning" } });
 
@@ -152,6 +204,38 @@ describe("ControlledCaseEvidenceService", () => {
     });
   });
 
+  it("single-binds approved appeal evidence to the exact created appeal", async () => {
+    const db: any = {
+      $queryRaw: jest.fn().mockResolvedValue([]),
+      mediaAsset: {
+        findMany: jest.fn().mockResolvedValue([{
+          id: assetId,
+          uploaderId: "customer-1",
+          purpose: "userAccountAppeal",
+          userAccountActionId: "action-1",
+          status: "approved"
+        }])
+      },
+      controlledCaseEvidenceAttachment: { create: jest.fn() }
+    };
+
+    await service.bindUserAccountAppeal(db, {
+      assetIds: [assetId],
+      userId: "customer-1",
+      actionId: "action-1",
+      appealId: "appeal-1"
+    });
+
+    expect(db.controlledCaseEvidenceAttachment.create).toHaveBeenCalledWith({
+      data: {
+        mediaAssetId: assetId,
+        purpose: "userAccountAppeal",
+        boundByUserId: "customer-1",
+        userAccountAppealId: "appeal-1"
+      }
+    });
+  });
+
   it("fails closed when any requested asset is pending, expired, reused or foreign", async () => {
     const db: any = {
       $queryRaw: jest.fn().mockResolvedValue([]),
@@ -190,5 +274,99 @@ describe("ControlledCaseEvidenceService", () => {
       { id: "support-1", role: "support" } as any,
       "binding-1"
     )).resolves.toMatchObject({ attachmentId: "binding-1", url: "https://storage.example/read" });
+  });
+
+  it("limits account-appeal evidence to the appellant or current independent reviewer", async () => {
+    const attachment = {
+      id: "binding-appeal-1",
+      mediaAsset: { status: "approved", expiresAt: new Date(Date.now() + 60_000) },
+      orderSupportFact: null,
+      attendanceDisputeStatement: null,
+      companionIncidentReport: null,
+      companionAccountAppeal: null,
+      userAccountAppeal: {
+        userId: "customer-1",
+        assignedToUserId: "admin-reviewer",
+        action: { createdById: "admin-original" }
+      }
+    };
+    prisma.controlledCaseEvidenceAttachment.findUnique.mockResolvedValue(attachment);
+
+    await expect(service.createReadUrl(
+      { id: "admin-other", role: "admin" } as any,
+      attachment.id
+    )).rejects.toMatchObject({ code: "CASE_EVIDENCE_NOT_FOUND", status: 404 });
+
+    await expect(service.createReadUrl(
+      { id: "admin-reviewer", role: "admin" } as any,
+      attachment.id
+    )).resolves.toMatchObject({ attachmentId: attachment.id });
+
+    await expect(service.createReadUrl(
+      { id: "customer-1", role: "user" } as any,
+      attachment.id
+    )).resolves.toMatchObject({ attachmentId: attachment.id });
+  });
+
+  it("limits companion-appeal evidence to the owner or current independent assignee", async () => {
+    const attachment = {
+      id: "binding-companion-appeal-1",
+      mediaAsset: { status: "approved", expiresAt: new Date(Date.now() + 60_000) },
+      orderSupportFact: null,
+      attendanceDisputeStatement: null,
+      companionIncidentReport: null,
+      userAccountAppeal: null,
+      companionAccountAppeal: {
+        assignedToUserId: "supply-current",
+        action: { createdById: "supply-original" },
+        companion: { ownerUserId: "owner-1" }
+      }
+    };
+    prisma.controlledCaseEvidenceAttachment.findUnique.mockResolvedValue(attachment);
+
+    for (const user of [
+      { id: "supply-other", role: "supply" },
+      { id: "admin-other", role: "admin" },
+      { id: "supply-original", role: "supply" }
+    ]) {
+      await expect(service.createReadUrl(user as any, attachment.id))
+        .rejects.toMatchObject({ code: "CASE_EVIDENCE_NOT_FOUND", status: 404 });
+    }
+    for (const user of [
+      { id: "supply-current", role: "supply" },
+      { id: "owner-1", role: "companion" }
+    ]) {
+      await expect(service.createReadUrl(user as any, attachment.id))
+        .resolves.toMatchObject({ attachmentId: attachment.id });
+    }
+  });
+
+  it("limits companion incident evidence to its owner, current supply assignee, or admin", async () => {
+    const attachment = {
+      id: "binding-incident-1",
+      mediaAsset: { status: "approved", expiresAt: new Date(Date.now() + 60_000) },
+      orderSupportFact: null,
+      attendanceDisputeStatement: null,
+      userAccountAppeal: null,
+      companionAccountAppeal: null,
+      companionIncidentReport: {
+        assignedToUserId: "supply-current",
+        companion: { ownerUserId: "owner-1" }
+      }
+    };
+    prisma.controlledCaseEvidenceAttachment.findUnique.mockResolvedValue(attachment);
+
+    await expect(service.createReadUrl(
+      { id: "supply-other", role: "supply" } as any,
+      attachment.id
+    )).rejects.toMatchObject({ code: "CASE_EVIDENCE_NOT_FOUND", status: 404 });
+    for (const user of [
+      { id: "supply-current", role: "supply" },
+      { id: "owner-1", role: "companion" },
+      { id: "admin-1", role: "admin" }
+    ]) {
+      await expect(service.createReadUrl(user as any, attachment.id))
+        .resolves.toMatchObject({ attachmentId: attachment.id });
+    }
   });
 });

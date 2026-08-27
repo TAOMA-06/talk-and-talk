@@ -1,12 +1,21 @@
 import { api, ApiError, ensureSession } from "../../utils/api";
 import { handleCustomerAdultEligibilityError } from "../../utils/adult-eligibility-recovery";
-import { clientRealtimeVoiceEnabled, clientVoiceIntroEnabled } from "../../utils/config";
+import {
+  clientPublicInteractionIdentityGrantsAvailable,
+  clientRealtimeVoiceEnabled,
+  clientVoiceIntroEnabled
+} from "../../utils/config";
 import { openCrisisResources, passCrisisGate } from "../../utils/crisis-gate";
 import {
   Companion, CompanionAvailabilityCandidate, CompanionAvailabilityResponse, OrderServiceIntentCode,
   RecommendationCompanionExclusion, Review, ServiceOffering
 } from "../../utils/models";
 import { requestTransactionalSubscriptions } from "../../utils/subscription";
+import {
+  isPublicInteractionIdentityError,
+  publicInteractionErrorUserMessage,
+  publicInteractionRecoveryPath
+} from "../../utils/public-interaction-errors";
 
 type ServiceCatalogStatus = "loading" | "available" | "empty";
 type AvailabilityStatus = "loading" | "structured" | "empty" | "unavailable";
@@ -357,6 +366,7 @@ Page({
     serviceIntentOptions: SERVICE_INTENT_OPTIONS,
     selectedServiceIntent: "" as OrderServiceIntentCode | "",
     selectedServiceIntentLabel: "",
+    publicInteractionIdentityAvailable: clientPublicInteractionIdentityGrantsAvailable(),
     canBook: false,
     bookingButtonText: "加载服务中…",
     rebookingNotice: "",
@@ -879,14 +889,29 @@ Page({
       selectedAvailabilityCandidate: slot,
       selectedAvailabilityCandidateId: slot.id,
       orderClientRequestId: "",
-      canBook: Boolean(this.data.selectedServiceIntent),
-      bookingButtonText: this.data.selectedServiceIntent
+      canBook: Boolean(this.data.selectedServiceIntent)
+        && this.data.publicInteractionIdentityAvailable,
+      bookingButtonText: !this.data.publicInteractionIdentityAvailable
+        ? "身份核验通道尚未开放"
+        : this.data.selectedServiceIntent
         ? (companion ? bookingButtonText(offering, slot) : "预约服务")
         : "先选择本次陪伴方式"
     });
   },
   async book() {
     if (!await passCrisisGate("order")) return;
+    if (!this.data.publicInteractionIdentityAvailable) {
+      const result = await new Promise<any>((resolve) => wx.showModal({
+        title: "身份核验通道尚未开放",
+        content: "当前不能创建新预约或支付。你仍可浏览资料；账号页提供当前说明与客服入口。",
+        confirmText: "查看账号说明",
+        cancelText: "知道了",
+        success: resolve,
+        fail: () => resolve({ confirm: false })
+      }));
+      if (result.confirm) wx.switchTab({ url: "/pages/profile/index" });
+      return;
+    }
     if (!this.data.selectedServiceIntent) {
       wx.showToast({ title: "请选择本次希望的陪伴方式", icon: "none" });
       return;
@@ -967,8 +992,10 @@ Page({
       selectedServiceIntent: option.code,
       selectedServiceIntentLabel: option.title,
       orderClientRequestId: "",
-      canBook: Boolean(candidate),
-      bookingButtonText: candidate && this.data.selectedServiceOffering
+      canBook: Boolean(candidate) && this.data.publicInteractionIdentityAvailable,
+      bookingButtonText: !this.data.publicInteractionIdentityAvailable
+        ? "身份核验通道尚未开放"
+        : candidate && this.data.selectedServiceOffering
         ? bookingButtonText(this.data.selectedServiceOffering, candidate)
         : this.data.bookingButtonText
     });
@@ -1040,6 +1067,32 @@ Page({
     } catch (error) {
       const apiError = error as ApiError;
       if (await handleCustomerAdultEligibilityError(apiError)) return;
+      if (isPublicInteractionIdentityError(apiError)) {
+        // This is an explicit pre-write refusal, not an ambiguous transport
+        // result. Forget the pending idempotency key so a future approved
+        // identity lifecycle begins from a fresh confirmation.
+        try { wx.removeStorageSync(storageKey); } catch { /* explicit rejection is safe to forget */ }
+        this.setData({
+          orderClientRequestId: "",
+          bookingConfirmationVisible: false,
+          bookingBoundaryConfirmed: false,
+          bookingAccuracyConfirmed: false,
+          bookingPreview: null
+        });
+        const recoveryPath = publicInteractionRecoveryPath(apiError);
+        const result = await new Promise<any>((resolve) => wx.showModal({
+          title: "身份核验通道尚未开放",
+          content: publicInteractionErrorUserMessage(apiError),
+          confirmText: "查看账号说明",
+          cancelText: "知道了",
+          success: resolve,
+          fail: () => resolve({ confirm: false })
+        }));
+        if (result.confirm && recoveryPath?.startsWith("/pages/")) {
+          wx.navigateTo({ url: recoveryPath, fail: () => wx.switchTab({ url: recoveryPath }) });
+        }
+        return;
+      }
       if (apiError.code === "CRISIS_RESOURCES_MUST_BE_VIEWED") {
         const interventionId = typeof apiError.details?.interventionId === "string"
           ? apiError.details.interventionId

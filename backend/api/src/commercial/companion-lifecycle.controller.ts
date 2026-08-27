@@ -3,6 +3,8 @@ import { Body, Controller, Get, Param, Post, Query, UseGuards } from "@nestjs/co
 import { AuthenticatedUser } from "../auth/auth.service";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { ControlledCaseEvidenceService } from "../moderation/media/controlled-case-evidence.service";
+import { ReserveControlledCaseEvidenceDto } from "../moderation/media/dto/reserve-controlled-case-evidence.dto";
 import {
   CreateCompanionAppealDto,
   CreateCompanionIncidentDto,
@@ -16,7 +18,10 @@ import { CompanionLifecycleService } from "./companion-lifecycle.service";
 @Controller("commercial/companion")
 @UseGuards(JwtAuthGuard)
 export class CompanionLifecycleController {
-  constructor(private readonly lifecycle: CompanionLifecycleService) {}
+  constructor(
+    private readonly lifecycle: CompanionLifecycleService,
+    private readonly caseEvidence: ControlledCaseEvidenceService
+  ) {}
 
   @Get("overview")
   overview(@CurrentUser() user: AuthenticatedUser) {
@@ -75,6 +80,33 @@ export class CompanionLifecycleController {
     @Body() dto: CreateCompanionAppealDto
   ) {
     return this.lifecycle.appeal(user.id, actionId, dto);
+  }
+
+  @Post("actions/:id/appeal-evidence-uploads")
+  reserveAppealEvidence(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id") actionId: string,
+    @Body() dto: ReserveControlledCaseEvidenceDto
+  ) {
+    return this.caseEvidence.reserveForCompanionAccountAppeal(user.id, actionId, dto);
+  }
+
+  @Post("actions/:id/appeal-evidence-uploads/:assetId/complete")
+  completeAppealEvidence(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id") actionId: string,
+    @Param("assetId") assetId: string
+  ) {
+    return this.caseEvidence.completeCompanionAccountAppeal(user.id, actionId, assetId);
+  }
+
+  @Get("actions/:id/appeal-evidence-uploads/:assetId")
+  appealEvidenceStatus(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id") actionId: string,
+    @Param("assetId") assetId: string
+  ) {
+    return this.caseEvidence.statusCompanionAccountAppeal(user.id, actionId, assetId);
   }
 
   @Get("incidents")

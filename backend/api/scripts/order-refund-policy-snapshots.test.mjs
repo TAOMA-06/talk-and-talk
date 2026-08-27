@@ -25,7 +25,7 @@ test("refund policy snapshot migration and decision paths stay fail closed", asy
     readFile(join(apiRoot, "..", "..", "frontend", "miniprogram", "pages", "order", "detail.wxml"), "utf8")
   ]);
 
-  assert.match(schema, /refundPolicyVersionSnapshot\s+String/);
+  assert.match(schema, /refundPolicyVersionSnapshot\s+String\s+@db\.VarChar\(64\)/);
   assert.match(schema, /refundRequestWindowHoursSnapshot\s+Int/);
   assert.match(migration, /legacy-inferred-v1/);
   assert.match(migration, /legacy-72h-v1/);

@@ -260,8 +260,15 @@ export class FavoritesService {
       );
     }
 
+    const companion = await this.prisma.companionProfile.findUnique({
+      where: { id: normalizedCompanionId },
+      select: { ownerUserId: true }
+    } as any);
     await this.audit.record({
       actorId: userId,
+      subjectUserIds: [userId, companion?.ownerUserId].filter(
+        (subjectUserId): subjectUserId is string => Boolean(subjectUserId)
+      ),
       action: dto.enabled
         ? "favorite.availability_reminder_enabled"
         : "favorite.availability_reminder_disabled",

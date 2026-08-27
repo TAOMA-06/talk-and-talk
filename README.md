@@ -3,7 +3,10 @@
 女性友好的线上陪伴服务工程。**当前唯一发行范围是微信小程序 + NestJS 后端**；`frontend/ios` 仅保留为历史/后续工程，不参与本次商用放行。
 
 - 新人请先读 [docs/GUIDE.md](./docs/GUIDE.md)
+- 各文件夹/文件用途索引：[GUIDE.md](./GUIDE.md)
 - **v0.1 已冻结 `/api/v1` 契约**：[shared/contracts](./shared/contracts)
+- 当前工作树调查与外部门禁：[2026-08-26 商用闭环状态](./docs/cto-self-audit/runs/2026-08-26-commercial-closure/state.md)
+- 最新官方市场交叉复审：[2026-08-26 修复后最终复审](./docs/commercial-market-cross-audit-2026-08-25.md)
 - 未交付能力见 [NEXT_PHASE.md](./NEXT_PHASE.md)（不在本发行范围）
 
 ## 仓库结构
@@ -16,12 +19,14 @@ talk-and-talk/
 ├── shared/contracts/      # OpenAPI v1 前后端共同契约
 ├── infra/                 # Docker Compose、nginx、secrets
 ├── docs/
+├── GUIDE.md               # 目录与文件用途索引
 ├── README.md
 └── NEXT_PHASE.md
 ```
 
 | 路径 | 说明 |
 |------|------|
+| [GUIDE.md](./GUIDE.md) | 各文件夹与文件用途索引 |
 | [docs/GUIDE.md](./docs/GUIDE.md) | 项目总指引 |
 | [shared/contracts](./shared/contracts) | OpenAPI v1 冻结契约 |
 | [docs/auth-api.md](./docs/auth-api.md) | Auth API 说明 |
@@ -166,6 +171,8 @@ node frontend/miniprogram/scripts/smoke.mjs
 `acceptance-smoke.sh` 仅支持 development/mock SMS/mock payment/local seed；不能作为
 staging、真实微信、支付或 provider 的上线证据。外部动作必须按
 [部署与回滚控制参考](./docs/deploy-rollback.md) 与 G2 执行包逐项授权。
+
+当前 identity authority 门固定关闭时，local acceptance 只验证新订单/支付在写入前精确失败关闭并明确声明“不是商用验收”；下游交易状态机由隔离测试中的显式测试 adapter 覆盖。不得为了跑通脚本给生产代码增加身份绕过开关。
 
 iOS：
 

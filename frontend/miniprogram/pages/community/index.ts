@@ -1,5 +1,6 @@
 import { api, ensureSession } from "../../utils/api";
 import { CatalogDisplay, withCatalogDisplays } from "../../utils/catalog";
+import { clientPublicInteractionIdentityGrantsAvailable } from "../../utils/config";
 import { CommunityPost, CommunityReportReceipt, RecommendedCompanion } from "../../utils/models";
 import { ensurePrivacyAuthorization } from "../../utils/privacy";
 import {
@@ -39,9 +40,9 @@ function offerIdentityRecovery(error: unknown): void {
   const recoveryPath = publicInteractionRecoveryPath(error as { code?: string; details?: Record<string, unknown> });
   if (!recoveryPath?.startsWith("/pages/")) return;
   wx.showModal({
-    title: "需要完成身份核验",
+    title: "身份核验通道尚未开放",
     content: publicInteractionErrorUserMessage(error as { code?: string; details?: Record<string, unknown> }),
-    confirmText: "去核验",
+    confirmText: "查看说明",
     cancelText: "稍后",
     success: (result) => {
       if (result.confirm) {
@@ -53,6 +54,7 @@ function offerIdentityRecovery(error: unknown): void {
 
 Page({
   data: {
+    publicInteractionIdentityAvailable: clientPublicInteractionIdentityGrantsAvailable(),
     posts: [] as CommunityPost[], recommendations: [] as DisplayRecommendation[], topic: "", content: "", kind: "femaleRequest",
     reportReceipts: [] as CommunityReportReceiptView[], reportReceiptsError: "",
     postPage: 1, postTotal: 0, postTotalPages: 1, loadingMorePosts: false,
@@ -206,6 +208,10 @@ Page({
   setContent(event: any) { this.setData({ content: event.detail.value }); },
   switchKind() { this.setData({ kind: this.data.kind === "femaleRequest" ? "malePromotion" : "femaleRequest" }); },
   async submit() {
+    if (!this.data.publicInteractionIdentityAvailable) {
+      wx.showToast({ title: "身份核验通道尚未开放，当前不能发布", icon: "none" });
+      return;
+    }
     const { topic, content, kind } = this.data;
     if (!topic.trim() || !content.trim()) { wx.showToast({ title: "请填写话题和内容", icon: "none" }); return; }
     this.setData({ submitting: true });

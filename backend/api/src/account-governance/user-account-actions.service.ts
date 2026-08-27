@@ -12,6 +12,7 @@ import {
   userAccountAppealReviewDueAt
 } from "../common/user-account-action-policy";
 import { PrismaService } from "../database/prisma.service";
+import { ControlledCaseEvidenceService } from "../moderation/media/controlled-case-evidence.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import {
   AssignUserAccountAppealDto,
@@ -49,7 +50,8 @@ export class UserAccountActionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-    private readonly notifications: NotificationsService
+    private readonly notifications: NotificationsService,
+    private readonly caseEvidence: ControlledCaseEvidenceService
   ) {}
 
   async setAccountStatus(
@@ -254,8 +256,8 @@ export class UserAccountActionsService {
             actorId,
             subjectUserIds: [userId],
             action: "account.status_updated",
-            resourceType: "user",
-            resourceId: userId,
+            resourceType: "userAccountAction",
+            resourceId: activeAction?.id ?? null,
             metadata: {
               previousStatus: user.accountStatus,
               nextStatus: "active",
@@ -339,8 +341,8 @@ export class UserAccountActionsService {
           actorId,
           subjectUserIds: [userId],
           action: "account.status_updated",
-          resourceType: "user",
-          resourceId: userId,
+          resourceType: "userAccountAction",
+          resourceId: action.id,
           metadata: {
             previousStatus: user.accountStatus,
             nextStatus: input.status,
@@ -401,7 +403,9 @@ export class UserAccountActionsService {
     const [items, total] = await Promise.all([
       this.prisma.userAccountAction.findMany({
       where,
-      include: { appeal: true },
+      include: {
+        appeal: { include: this.caseEvidence.attachmentInclude() }
+      },
       orderBy: [{ startsAt: "desc" }, { id: "desc" }],
       skip: (query.page - 1) * query.pageSize,
       take: query.pageSize
@@ -425,6 +429,7 @@ export class UserAccountActionsService {
     actionId: string,
     input: CreateUserAccountAppealDto
   ) {
+    this.caseEvidence.assertAttachmentsAllowed(input.evidenceAssetIds);
     try {
       return await this.prisma.$transaction(async (tx) => {
         const db = tx as any;
@@ -496,6 +501,12 @@ export class UserAccountActionsService {
             policyVersion: USER_ACCOUNT_ACTION_POLICY_VERSION
           }
         });
+        await this.caseEvidence.bindUserAccountAppeal(db, {
+          assetIds: input.evidenceAssetIds,
+          userId,
+          actionId,
+          appealId: appeal.id
+        });
         await this.notifications.create(
           userId,
           "supportUpdate",
@@ -517,10 +528,15 @@ export class UserAccountActionsService {
           metadata: {
             actionId,
             policyVersion: appeal.policyVersion,
-            reviewDueAt: appeal.reviewDueAt.toISOString()
+            reviewDueAt: appeal.reviewDueAt.toISOString(),
+            evidenceCount: input.evidenceAssetIds?.length ?? 0
           }
         }, db);
-        return this.appealDto(appeal);
+        const created = await db.userAccountAppeal.findUniqueOrThrow({
+          where: { id: appeal.id },
+          include: this.caseEvidence.attachmentInclude()
+        });
+        return this.appealDto(created);
       });
     } catch (error: any) {
       if (error?.code === "P2002") {
@@ -543,7 +559,10 @@ export class UserAccountActionsService {
     const [items, total] = await Promise.all([
       this.prisma.userAccountAppeal.findMany({
         where,
-        include: { action: true },
+        include: {
+          action: true,
+          ...this.caseEvidence.attachmentInclude()
+        },
         orderBy: [{ reviewDueAt: "asc" }, { createdAt: "asc" }, { id: "asc" }],
         skip: (page - 1) * pageSize,
         take: pageSize
@@ -583,7 +602,10 @@ export class UserAccountActionsService {
       await db.$queryRaw`SELECT "id" FROM "UserAccountAppeal" WHERE "id" = ${appealId} FOR UPDATE`;
       const existing = await db.userAccountAppeal.findUnique({
         where: { id: appealId },
-        include: { action: true }
+        include: {
+          action: true,
+          ...this.caseEvidence.attachmentInclude()
+        }
       });
       this.assertReviewable(existing, actorId);
       if (existing.assignedToUserId === actorId) {
@@ -614,7 +636,11 @@ export class UserAccountActionsService {
           independentReview: true
         }
       }, db);
-      return this.adminAppealDto({ ...updated, action: existing.action }, actorId);
+      return this.adminAppealDto({
+        ...updated,
+        action: existing.action,
+        evidenceAttachments: existing.evidenceAttachments
+      }, actorId);
     });
   }
 
@@ -629,7 +655,10 @@ export class UserAccountActionsService {
       await this.assertEligibleAdmin(db, actorId);
       const existing = await db.userAccountAppeal.findUnique({
         where: { id: appealId },
-        include: { action: true }
+        include: {
+          action: true,
+          ...this.caseEvidence.attachmentInclude()
+        }
       });
       this.assertReviewable(existing, actorId);
       await this.assertEligibleAdmin(db, input.assignedToUserId);
@@ -667,7 +696,11 @@ export class UserAccountActionsService {
           independentReview: true
         }
       }, db);
-      return this.adminAppealDto({ ...updated, action: existing.action }, actorId);
+      return this.adminAppealDto({
+        ...updated,
+        action: existing.action,
+        evidenceAttachments: existing.evidenceAttachments
+      }, actorId);
     });
   }
 
@@ -682,7 +715,10 @@ export class UserAccountActionsService {
       await this.assertEligibleAdmin(db, actorId);
       const existing = await db.userAccountAppeal.findUnique({
         where: { id: appealId },
-        include: { action: true }
+        include: {
+          action: true,
+          ...this.caseEvidence.attachmentInclude()
+        }
       });
       this.assertReviewable(existing, actorId);
       if (existing.assignedToUserId !== actorId) {
@@ -766,7 +802,11 @@ export class UserAccountActionsService {
           overdue: existing.reviewDueAt.getTime() < now.getTime()
         }
       }, db);
-      return this.adminAppealDto({ ...updated, action: existing.action }, actorId);
+      return this.adminAppealDto({
+        ...updated,
+        action: existing.action,
+        evidenceAttachments: existing.evidenceAttachments
+      }, actorId);
     });
   }
 
@@ -1012,6 +1052,7 @@ export class UserAccountActionsService {
       id: appeal.id,
       status: appeal.status,
       statement: appeal.statement,
+      evidenceAttachments: this.caseEvidence.attachmentDtos(appeal),
       reviewDueAt: appeal.reviewDueAt.toISOString(),
       overdue:
         appeal.status === "pending" && appeal.reviewDueAt.getTime() < now.getTime(),
@@ -1074,14 +1115,23 @@ export class UserAccountActionsService {
   }
 
   private adminAppealDto(appeal: any, actorId: string) {
+    const publicAppeal = this.appealDto(appeal);
+    const independentReviewEligible =
+      !appeal.action?.createdById || appeal.action.createdById !== actorId;
     return {
-      ...this.appealDto(appeal),
+      ...publicAppeal,
+      // Claiming is the privacy boundary for raw appeal attachments. Queue
+      // browsers may see that an appeal exists, but only its current independent
+      // reviewer receives attachment metadata and can request a signed URL.
+      evidenceAttachments:
+        independentReviewEligible && appeal.assignedToUserId === actorId
+          ? publicAppeal.evidenceAttachments
+          : [],
       userId: appeal.userId,
       actionId: appeal.actionId,
       assignedToUserId: appeal.assignedToUserId ?? null,
       assignedAt: appeal.assignedAt?.toISOString() ?? null,
-      independentReviewEligible:
-        !appeal.action?.createdById || appeal.action.createdById !== actorId,
+      independentReviewEligible,
       action: appeal.action
         ? {
             id: appeal.action.id,

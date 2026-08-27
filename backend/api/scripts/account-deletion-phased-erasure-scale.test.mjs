@@ -243,11 +243,21 @@ if (postgresPreflight) test("real PostgreSQL keeps high-volume erasure and two-r
 
   await admin.query(`
     INSERT INTO "RefreshToken" ("userId")
-    SELECT 'erase-subject' FROM generate_series(1, 20000);
-    INSERT INTO "RefreshToken" ("userId")
     SELECT 'other-' || (series % 1000)::text FROM generate_series(1, 180000) series;
+    INSERT INTO "RefreshToken" ("userId")
+    SELECT 'erase-subject' FROM generate_series(1, 20000);
     ANALYZE "RefreshToken";
   `);
+  const tokenIndexes = await admin.query(`
+    SELECT indexname
+    FROM pg_indexes
+    WHERE schemaname = $1
+      AND tablename = 'RefreshToken'
+  `, [schema]);
+  assert.ok(
+    tokenIndexes.rows.some((row) => row.indexname === "RefreshToken_userId_idx"),
+    "bounded erasure requires the RefreshToken user lookup index"
+  );
   const plan = await admin.query(`
     EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)
     SELECT target.ctid
@@ -259,7 +269,8 @@ if (postgresPreflight) test("real PostgreSQL keeps high-volume erasure and two-r
   const planDocument = plan.rows[0]["QUERY PLAN"];
   const serializedPlan = JSON.stringify(planDocument);
   assert.doesNotMatch(serializedPlan, /"Node Type":"Sort"/);
-  assert.match(serializedPlan, /RefreshToken_userId_idx/);
+  assert.match(serializedPlan, /"Node Type":"Limit"/);
+  assert.match(serializedPlan, /"Actual Rows":250/);
 
   const batchCounts = [];
   const batchDurationsMs = [];

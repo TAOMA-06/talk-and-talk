@@ -84,11 +84,20 @@ async function stopWorker(worker) {
 
 function optimizedImagePaths(html) {
   return [...new Set(
-    [...html.matchAll(/\/_vinext\/image\?[^"'\s,]+/g)].map(([path]) => path.replaceAll("&amp;", "&")),
+    [...html.matchAll(/\/(?:_vinext|_next)\/image\?[^"'\s,]+/g)]
+      .map(([path]) => path.replaceAll("&amp;", "&")),
   )];
 }
 
-test("built local Worker serves every optimized image emitted by the public home", { timeout: 30_000 }, async (t) => {
+function directImagePaths(html) {
+  return [...new Set(
+    [...html.matchAll(/<img\b[^>]*\bsrc="([^"#?]+)"/g)]
+      .map(([, path]) => path.replaceAll("&amp;", "&"))
+      .filter((path) => path.startsWith("/")),
+  )];
+}
+
+test("built local Worker serves every local image emitted by the public home", { timeout: 30_000 }, async (t) => {
   const runtimeDirectory = await mkdtemp(join(tmpdir(), "talktalk-web-image-runtime-"));
   const port = await reserveLoopbackPort();
   const output = [];
@@ -143,12 +152,26 @@ test("built local Worker serves every optimized image emitted by the public home
     const home = await waitForResponse(`${origin}/`);
     assert.equal(home.status, 200);
     const html = await home.text();
-    const imagePaths = optimizedImagePaths(html);
-    assert.ok(imagePaths.length > 0, "public home must emit optimized local image URLs");
+    const optimizedPaths = optimizedImagePaths(html);
+    const directPaths = directImagePaths(html);
+    const imagePaths = [...new Set([...optimizedPaths, ...directPaths])];
+    assert.ok(imagePaths.length > 0, "public home must emit local image URLs");
 
-    const emittedWidths = new Set(imagePaths.map((path) => new URL(path, origin).searchParams.get("w")));
-    for (const width of ["36", "44", "220", "420", "640"]) {
-      assert.ok(emittedWidths.has(width), `public home must retain width ${width}`);
+    if (optimizedPaths.length > 0) {
+      for (const path of optimizedPaths) {
+        const url = new URL(path, origin);
+        const width = Number(url.searchParams.get("w"));
+        const quality = Number(url.searchParams.get("q"));
+        assert.match(url.searchParams.get("url") ?? "", /^\/brand\//);
+        assert.ok(Number.isInteger(width) && width > 0 && width <= 2048, path);
+        assert.ok(Number.isInteger(quality) && quality > 0 && quality <= 100, path);
+      }
+    } else {
+      // Vinext 1 emits safe same-origin static assets instead of routing every
+      // Next Image through its optimizer. Preserve runtime proof rather than
+      // requiring an obsolete implementation detail.
+      assert.ok(directPaths.includes("/brand/app-icon.png"));
+      assert.ok(directPaths.some((path) => path.startsWith("/brand/bubbles-")));
     }
 
     const staticResponse = await fetchOk(`${origin}/brand/app-icon.png`);
@@ -157,7 +180,8 @@ test("built local Worker serves every optimized image emitted by the public home
 
     for (const path of imagePaths) {
       const response = await fetchOk(new URL(path, origin));
-      assert.match(response.headers.get("content-type") ?? "", /^image\/png\b/i, path);
+      assert.match(response.headers.get("content-type") ?? "", /^image\/(?:png|jpeg|webp|svg\+xml)\b/i, path);
+      assert.equal(response.headers.get("x-content-type-options"), "nosniff", path);
       await assertNonEmptyBody(response, path);
     }
 

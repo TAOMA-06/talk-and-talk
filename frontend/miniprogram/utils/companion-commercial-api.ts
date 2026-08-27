@@ -1,4 +1,5 @@
-import { request } from "./api";
+import { ControlledEvidenceAsset, MediaUploadReservation, request } from "./api";
+import { MediaAttachment } from "./models";
 
 export type CompanionApplicationInput = {
   role: string;
@@ -133,6 +134,20 @@ export type CompanionQuality = {
 
 export type RateMetric = { value: number | null; numerator: number; denominator: number };
 
+export type CompanionReactivationState = {
+  status: "notRequired" | "required" | "completed";
+  required: boolean;
+  requiredAt: string | null;
+  completedAt: string | null;
+  resolution: string | null;
+  publicationRestored: false;
+  nextAction:
+    | "none"
+    | "awaitExpiryReactivationMaterialization"
+    | "awaitIndependentOperationalReview"
+    | "awaitExplicitPublicationDecision";
+};
+
 export type CompanionAccountAction = {
   id: string;
   kind: "warning" | "serviceRestriction" | "suspension";
@@ -144,15 +159,18 @@ export type CompanionAccountAction = {
   appealWindowOpen: boolean;
   revokedAt: string | null;
   active: boolean;
+  reactivation: CompanionReactivationState;
   createdAt: string;
   appeals: Array<{
     id: string;
     status: "pending" | "upheld" | "overturned" | "dismissed";
     statement: string;
-    evidenceReferences: string[];
+    evidenceAttachments: MediaAttachment[];
+    legacyEvidenceReferenceCount: number;
     reviewDueAt: string;
     overdue: boolean;
     resolution: string | null;
+    reactivation: CompanionReactivationState;
     createdAt: string;
   }>;
 };
@@ -314,10 +332,29 @@ export const companionCommercialApi = {
       `/commercial/companion/actions${query ? `?${query}` : ""}`
     );
   },
-  appealAction: (actionId: string, statement: string, evidenceReferences: string[]) =>
+  reserveAppealEvidenceUpload: (actionId: string, data: {
+    kind: "image" | "audio";
+    mimeType: string;
+    sizeBytes: number;
+    sha256: string;
+    durationMs?: number;
+  }) => request<{ asset: ControlledEvidenceAsset; upload: MediaUploadReservation["upload"] }>(
+    `/commercial/companion/actions/${encodeURIComponent(actionId)}/appeal-evidence-uploads`,
+    { method: "POST", data }
+  ),
+  completeAppealEvidenceUpload: (actionId: string, assetId: string) =>
+    request<{ asset: ControlledEvidenceAsset }>(
+      `/commercial/companion/actions/${encodeURIComponent(actionId)}/appeal-evidence-uploads/${encodeURIComponent(assetId)}/complete`,
+      { method: "POST" }
+    ),
+  appealEvidenceUploadStatus: (actionId: string, assetId: string) =>
+    request<{ asset: ControlledEvidenceAsset }>(
+      `/commercial/companion/actions/${encodeURIComponent(actionId)}/appeal-evidence-uploads/${encodeURIComponent(assetId)}`
+    ),
+  appealAction: (actionId: string, statement: string, evidenceAssetIds: string[]) =>
     request<Record<string, unknown>>(`/commercial/companion/actions/${encodeURIComponent(actionId)}/appeals`, {
       method: "POST",
-      data: { statement, evidenceReferences }
+      data: { statement, ...(evidenceAssetIds.length ? { evidenceAssetIds } : {}) }
     }),
   incidents: (options: { page?: number; pageSize?: number; status?: CompanionIncident["status"] } = {}) => {
     const query = [

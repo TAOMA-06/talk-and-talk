@@ -14,6 +14,7 @@ import {
 import { WECHAT_PREPAY_TTL_MS } from "../payments/wechat/wechat-pay.provider";
 import { evaluateWeChatReconciliationGate } from "../payments/wechat-reconciliation-gate";
 import { PaymentDisputesService } from "../payments/payment-disputes.service";
+import { PUBLIC_INTERACTION_IDENTITY_AUTHORITY_AVAILABLE } from "../users/public-interaction-identity.gate";
 
 type ListEarningsQuery = { page?: number; pageSize?: number; status?: string };
 type CommercialProfileInput = {
@@ -28,6 +29,7 @@ export type CommercialReadinessBlockers = {
   orderIntakeDisabled: number;
   payoutClaimsDisabled: number;
   paymentDisputeIntakeDisabled: number;
+  publicInteractionIdentityAuthorityUnavailable: number;
   refundPolicyUnapproved: number;
   refundPolicySnapshotGaps: number;
   wechatDailyBillReconciliationDisabled: number;
@@ -54,6 +56,7 @@ export type CommercialReadinessBlockers = {
   retainedExpiryFailures: number;
   overdueUserAccountAppeals: number;
   overdueCompanionAccountAppeals: number;
+  expiredCompanionSuspensionReactivationPending: number;
   overduePaymentDisputes: number;
   paymentDisputeSyncFailures: number;
   notificationDeliveryDisabledWithPending: number;
@@ -534,6 +537,7 @@ export class CommercialService {
       latestRetentionFailure,
       overdueUserAccountAppeals,
       overdueCompanionAccountAppeals,
+      expiredCompanionSuspensionReactivationPending,
       overduePaymentDisputes,
       paymentDisputeSyncFailures,
       failedNotifications,
@@ -683,6 +687,14 @@ export class CommercialService {
       this.prisma.companionAccountAppeal.count({
         where: { status: "pending", reviewDueAt: { lt: now } }
       } as any),
+      this.prisma.companionAccountAction.count({
+        where: {
+          kind: "suspension",
+          revokedAt: null,
+          endsAt: { lte: now },
+          reactivationStatus: { in: ["notRequired", "required"] }
+        }
+      } as any),
       (this.prisma as any).paymentDispute.count({
         where: {
           status: { in: ["pendingSync", "open", "processing", "syncFailed"] },
@@ -744,7 +756,13 @@ export class CommercialService {
         where: {
           expiresAt: { lte: now },
           status: { not: "expired" },
-          lastError: "storage_delete_failed"
+          OR: [
+            { storageDeleteLastErrorCode: { not: null } },
+            { storageDeleteOutcomeUnknownAt: { not: null } },
+            // Legacy rows used the moderation error field before the durable
+            // storage-deletion state machine gained dedicated columns.
+            { lastError: "storage_delete_failed" }
+          ]
         }
       } as any),
       this.prisma.paymentTransaction.count({
@@ -823,6 +841,8 @@ export class CommercialService {
       orderIntakeDisabled: this.config.get<boolean>("ORDER_INTAKE_ENABLED", true) ? 0 : 1,
       payoutClaimsDisabled: this.config.get<boolean>("PAYOUT_CLAIMS_ENABLED", true) ? 0 : 1,
       paymentDisputeIntakeDisabled: this.config.get<boolean>("WECHAT_PAY_COMPLAINTS_ENABLED", false) ? 0 : 1,
+      publicInteractionIdentityAuthorityUnavailable:
+        commercialMode && !PUBLIC_INTERACTION_IDENTITY_AUTHORITY_AVAILABLE ? 1 : 0,
       refundPolicyUnapproved: refundPolicyConfigurationApproved ? 0 : 1,
       refundPolicySnapshotGaps,
       wechatDailyBillReconciliationDisabled: dailyBillConfigured ? 0 : 1,
@@ -858,6 +878,7 @@ export class CommercialService {
       retainedExpiryFailures,
       overdueUserAccountAppeals,
       overdueCompanionAccountAppeals,
+      expiredCompanionSuspensionReactivationPending,
       overduePaymentDisputes,
       paymentDisputeSyncFailures,
       notificationDeliveryDisabledWithPending:
@@ -1040,7 +1061,8 @@ export class CommercialService {
           adultEligibilityEvidenceRef: null,
           suspendedAt: null,
           suspendedById: null,
-          suspendedReason: null
+          suspendedReason: null,
+          suspendedByAccountActionId: null
         }
       });
       if (companion.isPublished) {
@@ -1183,7 +1205,8 @@ export class CommercialService {
           status: "suspended",
           suspendedAt: new Date(),
           suspendedById: actorId,
-          suspendedReason: normalizedReason
+          suspendedReason: normalizedReason,
+          suspendedByAccountActionId: null
         }
       });
       await db.companionProfile.updateMany({ where: { id: companionId }, data: { isPublished: false } });

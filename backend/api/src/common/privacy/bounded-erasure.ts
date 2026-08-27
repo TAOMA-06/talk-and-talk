@@ -399,7 +399,7 @@ async function boundMediaRetention(
       SELECT asset."id"
       FROM "MediaAsset" AS asset
       WHERE asset."uploaderId" = ${subject.userId}
-        AND (asset."expiresAt" IS NULL OR asset."expiresAt" > ${subject.mediaRetentionEndsAt})
+        AND asset."expiresAt" IS DISTINCT FROM ${subject.mediaRetentionEndsAt}
       ORDER BY asset."id"
       FOR UPDATE SKIP LOCKED
       LIMIT ${batchSize}
@@ -416,7 +416,7 @@ async function boundMediaRetention(
     SELECT EXISTS (
       SELECT 1 FROM "MediaAsset"
       WHERE "uploaderId" = ${subject.userId}
-        AND ("expiresAt" IS NULL OR "expiresAt" > ${subject.mediaRetentionEndsAt})
+        AND "expiresAt" IS DISTINCT FROM ${subject.mediaRetentionEndsAt}
     ) AS exists
   `;
   return {

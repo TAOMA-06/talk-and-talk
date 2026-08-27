@@ -1,5 +1,6 @@
 <view class="page chat-page">
   <view class="notice">请在平台内完成沟通，勿交换私人联系方式、线下见面或私下转账。</view>
+  <view wx:if="{{!publicInteractionIdentityAvailable}}" class="identity-unavailable-notice">身份核验授权通道尚未开放，消息记录仍可查看，但当前不能发送新消息。订单、退款、客服和安全入口不受影响。</view>
   <view wx:if="{{textOnly}}" class="notice">当前首发版本仅支持文字消息；图片和语音消息暂未开放。</view>
   <view wx:if="{{hasConversation && messageInteractionAvailable}}" class="message-notification-setting">
     <view class="message-notification-copy">
@@ -74,7 +75,7 @@
     </view>
     <view wx:if="{{syncing}}" class="sync-status">正在同步新消息…</view>
   </view>
-  <view wx:if="{{hasLoadedInitial && messageInteractionAvailable}}" class="composer">
+  <view wx:if="{{hasLoadedInitial && messageInteractionAvailable && publicInteractionIdentityAvailable}}" class="composer">
     <input value="{{draft}}" bindinput="setDraft" maxlength="2000" placeholder="输入消息…" confirm-type="send" bindconfirm="send" disabled="{{restrictionEndsAt !== ''}}" />
     <button wx:if="{{mediaEnabled && !textOnly}}" class="media" disabled="{{sending || mediaUploading || restrictionEndsAt}}" bindtap="chooseImage">图片</button>
     <button wx:if="{{mediaEnabled && !textOnly}}" class="media {{recording ? 'recording' : ''}}" disabled="{{sending || mediaUploading || restrictionEndsAt}}" bindtap="toggleRecord">{{recording ? '结束' : '语音'}}</button>

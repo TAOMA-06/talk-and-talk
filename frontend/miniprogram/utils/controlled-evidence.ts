@@ -49,6 +49,16 @@ type ReserveEvidence = (input: {
   durationMs?: number;
 }) => Promise<{ asset: ControlledEvidenceAsset; upload: MediaUploadReservation["upload"] }>;
 
+export type ControlledEvidenceTransport = {
+  complete: (assetId: string) => Promise<{ asset: ControlledEvidenceAsset }>;
+  status: (assetId: string) => Promise<{ asset: ControlledEvidenceAsset }>;
+};
+
+const DEFAULT_TRANSPORT: ControlledEvidenceTransport = {
+  complete: (assetId) => api.completeCaseEvidenceUpload(assetId),
+  status: (assetId) => api.caseEvidenceUploadStatus(assetId)
+};
+
 const STATUS_TEXT: Record<ControlledEvidenceAsset["status"], string> = {
   reserved: "等待上传",
   uploaded: "等待审核",
@@ -95,12 +105,13 @@ export function saveControlledEvidenceDrafts(storageKey: string, drafts: Control
 }
 
 export async function refreshControlledEvidenceDrafts(
-  drafts: ControlledEvidenceDraft[]
+  drafts: ControlledEvidenceDraft[],
+  transport: ControlledEvidenceTransport = DEFAULT_TRANSPORT
 ): Promise<ControlledEvidenceDraft[]> {
   if (!controlledEvidenceEnabled()) return [];
   const refreshed = await Promise.all(drafts.map(async (draft) => {
     try {
-      const result = await api.caseEvidenceUploadStatus(draft.assetId);
+      const result = await transport.status(draft.assetId);
       return controlledEvidenceDraft(result.asset, draft.localPath);
     } catch {
       return { ...draft, status: "failed" as const, statusText: STATUS_TEXT.failed };
@@ -176,7 +187,8 @@ export function chooseEvidenceAudio(): Promise<LocalEvidenceFile | null> {
 export async function uploadControlledEvidence(
   file: LocalEvidenceFile,
   reserve: ReserveEvidence,
-  onUpdate?: (draft: ControlledEvidenceDraft) => void
+  onUpdate?: (draft: ControlledEvidenceDraft) => void,
+  transport: ControlledEvidenceTransport = DEFAULT_TRANSPORT
 ): Promise<ControlledEvidenceDraft> {
   assertControlledEvidenceEnabled();
   const bytes = await readLocalFile(file.path);
@@ -193,25 +205,26 @@ export async function uploadControlledEvidence(
   // Completion is idempotent server-side, so a lost response can retry safely.
   let completion;
   try {
-    completion = await api.completeCaseEvidenceUpload(reservation.asset.id);
+    completion = await transport.complete(reservation.asset.id);
   } catch {
-    completion = await api.completeCaseEvidenceUpload(reservation.asset.id);
+    completion = await transport.complete(reservation.asset.id);
   }
   draft = controlledEvidenceDraft(completion.asset, file.path);
   onUpdate?.(draft);
-  return pollControlledEvidence(draft, onUpdate);
+  return pollControlledEvidence(draft, onUpdate, 20, transport);
 }
 
 export async function pollControlledEvidence(
   initial: ControlledEvidenceDraft,
   onUpdate?: (draft: ControlledEvidenceDraft) => void,
-  attempts = 20
+  attempts = 20,
+  transport: ControlledEvidenceTransport = DEFAULT_TRANSPORT
 ): Promise<ControlledEvidenceDraft> {
   assertControlledEvidenceEnabled();
   let draft = initial;
   for (let attempt = 0; attempt < attempts && ["reserved", "uploaded", "scanning"].includes(draft.status); attempt += 1) {
     await delay(750);
-    const result = await api.caseEvidenceUploadStatus(draft.assetId);
+    const result = await transport.status(draft.assetId);
     draft = controlledEvidenceDraft(result.asset, draft.localPath);
     onUpdate?.(draft);
   }

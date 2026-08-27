@@ -273,7 +273,49 @@ test("companion appeal contract declares bounded pagination and a typed queue", 
   );
   assert.deepEqual(
     document.components.schemas.CompanionAppealQueueEnvelope.allOf[1].properties.data.required,
-    ["items", "pagination"]
+    ["items", "pagination", "scope"]
+  );
+  assert.equal(
+    document.paths["/admin/commercial/companion-lifecycle/appeals/claimable"]
+      .get.responses["200"].content["application/json"].schema.$ref,
+    "#/components/schemas/CompanionAppealClaimableListEnvelope"
+  );
+  assert.equal(
+    document.paths["/admin/commercial/companion-lifecycle/appeals/{id}/claims"]
+      .post.responses["200"].description,
+    "Appeal claimed"
+  );
+  assert.ok(document.components.schemas.CompanionAppealQueueItem.required.includes("reactivation"));
+  assert.ok(document.components.schemas.CompanionAppealQueueItem.required.includes("reactivationReviewEligible"));
+  assert.deepEqual(
+    document.components.schemas.CompanionReactivationState.properties.publicationRestored.enum,
+    [false]
+  );
+  assert.equal(
+    document.paths["/admin/commercial/companion-lifecycle/appeals/{id}/reactivation"]
+      .post.requestBody.content["application/json"].schema.$ref,
+    "#/components/schemas/CompanionReactivationCompletion"
+  );
+  assert.match(
+    document.paths["/admin/commercial/companion-lifecycle/appeals/{id}/reactivation"].post.description,
+    /never republishes/
+  );
+  assert.equal(
+    document.paths["/admin/commercial/companion-lifecycle/actions/{id}/reactivation"]
+      .post.requestBody.content["application/json"].schema.$ref,
+    "#/components/schemas/CompanionReactivationCompletion"
+  );
+  assert.match(
+    document.paths["/admin/commercial/companion-lifecycle/actions/{id}/reactivation"].post.description,
+    /remains unpublished, offline, and busy/
+  );
+  assert.ok(
+    document.components.schemas.CompanionReactivationState.properties.nextAction.enum
+      .includes("awaitExpiryReactivationMaterialization")
+  );
+  assert.ok(
+    document.components.schemas.CommercialReadinessBlockers.required
+      .includes("expiredCompanionSuspensionReactivationPending")
   );
 });
 
@@ -699,6 +741,7 @@ test("conversation cursor and customer refund contracts match their public runti
   const refundSyncEnvelope = document.components.schemas.RefundSyncEnvelope;
   const refundSyncData = refundSyncEnvelope.allOf[1].properties.data;
   const customerRefund = document.components.schemas.CustomerRefund;
+  const customerRefundOrder = document.components.schemas.CustomerRefundOrder;
 
   assert.equal(refund.requestBody.required, true);
   assert.equal(refundInput.additionalProperties, false);
@@ -718,6 +761,42 @@ test("conversation cursor and customer refund contracts match their public runti
   assert.deepEqual(refundSyncData.required, ["refund", "order"]);
   assert.equal(refundSyncData.additionalProperties, false);
   assert.equal(refundSyncData.properties.refund.$ref, "#/components/schemas/CustomerRefund");
+  assert.equal(refundData.properties.order.$ref, "#/components/schemas/CustomerRefundOrder");
+  assert.equal(refundSyncData.properties.order.$ref, "#/components/schemas/CustomerRefundOrder");
+  assert.equal(customerRefundOrder.additionalProperties, false);
+  assert.deepEqual(customerRefundOrder.required, [
+    "id",
+    "companionId",
+    "themeId",
+    "durationMinutes",
+    "amountCents",
+    "amountYuan",
+    "currency",
+    "status",
+    "scheduledAt",
+    "companionSnapshot",
+    "themeNameSnapshot",
+    "conversationId",
+    "paidAt",
+    "cancelledAt",
+    "completedAt",
+    "createdAt",
+    "updatedAt"
+  ]);
+  for (const field of [
+    "userId",
+    "customer",
+    "refundPolicyVersionSnapshot",
+    "refundRequestWindowHoursSnapshot",
+    "clientRequestId",
+    "settlementRecipientRefSnapshot",
+    "taxProfileRefSnapshot",
+    "identityEvidenceRefSnapshot",
+    "serviceAgreementEvidenceRefSnapshot"
+  ]) {
+    assert.equal(customerRefundOrder.properties[field], undefined,
+      `customer refund order must omit ${field}`);
+  }
   for (const status of ["400", "401", "404", "409", "503"]) {
     assert.equal(refund.responses[status].$ref, "#/components/responses/Error");
   }
@@ -817,8 +896,10 @@ test("safe order DTO schema and serializers cannot expose settlement or commerci
   assert.match(customerList, /this\.toParticipantDto\(order, "customer"\)/);
   assert.match(participantDetail, /this\.toParticipantDto\(order, viewerRole\)/);
   assert.match(customerRefund, /this\.requestRefund\(userId, orderId, reason\)/);
+  assert.match(customerRefund, /this\.customerRefundOrderDto\(result\.order\)/);
   assert.match(requestRefund, /order:\s*this\.ordersService\.toDto\(result\.order\)/);
-  assert.match(syncRefund, /order:\s*this\.ordersService\.toDto\(current\.order\)/);
+  assert.match(syncRefund,
+    /order:\s*this\.customerRefundOrderDto\(this\.ordersService\.toDto\(current\.order\)\)/);
 });
 
 test("accepted reschedule response uses the strict participant order projection", async () => {
@@ -991,6 +1072,18 @@ test("first-release authority decisions remain fail-closed in the public contrac
   assert.match(identitySubmission.properties.isVerified.description, /Must be false/);
   assert.match(document.paths["/admin/users/{id}/verification"].patch.description, /New true grants are frozen/);
   assert.match(document.paths["/admin/identity-verification-requests/{id}/approve"].post.description, /true grant is rejected/);
+
+  const orderCreate = document.paths["/orders"].post;
+  const prepay = document.paths["/orders/{id}/prepay"].post;
+  assert.match(orderCreate.responses["403"].description, /only first-release delivery channel/);
+  assert.match(orderCreate.responses["403"].description, /no order/);
+  assert.match(prepay.responses["403"].description, /No provider prepay call/);
+  const readinessBlockers = document.components.schemas.CommercialReadinessBlockers;
+  assert.ok(readinessBlockers.required.includes("publicInteractionIdentityAuthorityUnavailable"));
+  assert.match(
+    readinessBlockers.properties.publicInteractionIdentityAuthorityUnavailable.description,
+    /new orders and prepay fail before writes/
+  );
 });
 
 test("text-only first release declares in-scope media and real-time voice operations as conditionally unavailable", async () => {

@@ -138,6 +138,9 @@ interface Environment {
   DATA_EXPORT_MAX_BYTES: number;
   COMPANION_APPEAL_SUBMISSION_DAYS: number;
   COMPANION_APPEAL_RESPONSE_HOURS: number;
+  COMPANION_ACTION_EXPIRY_ENABLED: boolean;
+  COMPANION_ACTION_EXPIRY_INTERVAL_SECONDS: number;
+  COMPANION_ACTION_EXPIRY_BATCH_SIZE: number;
   NOTIFICATION_DELIVERY_ENABLED: boolean;
   NOTIFICATION_DELIVERY_INTERVAL_SECONDS: number;
   NOTIFICATION_DELIVERY_BATCH_SIZE: number;
@@ -956,6 +959,24 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     1,
     24 * 30
   );
+  const companionActionExpiryEnabled = parseBoolean(
+    env.COMPANION_ACTION_EXPIRY_ENABLED,
+    nodeEnv !== "test"
+  );
+  const companionActionExpiryIntervalSeconds = boundedInteger(
+    "COMPANION_ACTION_EXPIRY_INTERVAL_SECONDS",
+    env.COMPANION_ACTION_EXPIRY_INTERVAL_SECONDS,
+    60,
+    5,
+    60 * 60
+  );
+  const companionActionExpiryBatchSize = boundedInteger(
+    "COMPANION_ACTION_EXPIRY_BATCH_SIZE",
+    env.COMPANION_ACTION_EXPIRY_BATCH_SIZE,
+    50,
+    1,
+    200
+  );
   const notificationDeliveryEnabled = parseBoolean(
     env.NOTIFICATION_DELIVERY_ENABLED,
     nodeEnv !== "test"
@@ -1373,11 +1394,19 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
       "DATA_EXPORT_DELIVERY_TIMEOUT_MS",
       "DATA_EXPORT_MAX_BYTES",
       "COMPANION_APPEAL_SUBMISSION_DAYS",
-      "COMPANION_APPEAL_RESPONSE_HOURS"
+      "COMPANION_APPEAL_RESPONSE_HOURS",
+      "COMPANION_ACTION_EXPIRY_ENABLED",
+      "COMPANION_ACTION_EXPIRY_INTERVAL_SECONDS",
+      "COMPANION_ACTION_EXPIRY_BATCH_SIZE"
     ]) {
       if (env[name] === undefined || env[name]?.trim() === "") {
         throw new Error(`${name} must be explicitly configured in production`);
       }
+    }
+    if (!companionActionExpiryEnabled) {
+      throw new Error(
+        "COMPANION_ACTION_EXPIRY_ENABLED=true is required for a production commercial release"
+      );
     }
     assertProductionValue("SUPPORT_PUBLIC_SERVICE_HOURS", supportPublicServiceHours);
     assertProductionValue("SUPPORT_PUBLIC_STATUS_URL", supportPublicStatusUrl);
@@ -1623,6 +1652,9 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     DATA_EXPORT_MAX_BYTES: dataExportMaxBytes,
     COMPANION_APPEAL_SUBMISSION_DAYS: companionAppealSubmissionDays,
     COMPANION_APPEAL_RESPONSE_HOURS: companionAppealResponseHours,
+    COMPANION_ACTION_EXPIRY_ENABLED: companionActionExpiryEnabled,
+    COMPANION_ACTION_EXPIRY_INTERVAL_SECONDS: companionActionExpiryIntervalSeconds,
+    COMPANION_ACTION_EXPIRY_BATCH_SIZE: companionActionExpiryBatchSize,
     NOTIFICATION_DELIVERY_ENABLED: notificationDeliveryEnabled,
     NOTIFICATION_DELIVERY_INTERVAL_SECONDS: notificationDeliveryIntervalSeconds,
     NOTIFICATION_DELIVERY_BATCH_SIZE: notificationDeliveryBatchSize,

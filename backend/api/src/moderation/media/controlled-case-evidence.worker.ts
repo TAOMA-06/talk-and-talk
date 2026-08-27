@@ -4,18 +4,16 @@ import { randomUUID } from "node:crypto";
 import { PrismaService } from "../../database/prisma.service";
 import { ModerationCategory, ModerationService } from "../moderation.service";
 import { RuleEngine } from "../rule-engine";
-import { MediaAssetService } from "./media-asset.service";
+import {
+  CONTROLLED_EVIDENCE_PURPOSES,
+  MediaAssetService
+} from "./media-asset.service";
 import {
   MEDIA_ANALYSIS_PROVIDER,
   MediaAnalysisProvider,
   MediaAnalysisResult
 } from "./media-provider.interface";
 
-const CONTROLLED_PURPOSES = [
-  "orderSupportFact",
-  "attendanceDisputeStatement",
-  "companionIncidentReport"
-] as const;
 const PROCESSING_LEASE_MS = 10 * 60_000;
 const MAX_RETRIES = 3;
 const RETRY_DELAYS_MS = [30_000, 2 * 60_000, 10 * 60_000];
@@ -41,7 +39,7 @@ export class ControlledCaseEvidenceWorker implements OnModuleInit, OnModuleDestr
   ) {}
 
   onModuleInit() {
-    if (!this.mediaAssets.isFeatureEnabled()) return;
+    if (!this.mediaAssets.isCaseEvidenceMediaEnabled()) return;
     this.timer = setInterval(() => this.processPendingSafely(), 30_000);
     this.timer.unref?.();
     this.processPendingSafely();
@@ -53,19 +51,19 @@ export class ControlledCaseEvidenceWorker implements OnModuleInit, OnModuleDestr
   }
 
   enqueue(assetId: string) {
-    if (!this.mediaAssets.isFeatureEnabled()) return;
+    if (!this.mediaAssets.isCaseEvidenceMediaEnabled()) return;
     setTimeout(() => this.processAssetSafely(assetId), 0).unref?.();
   }
 
   async processPending() {
-    if (!this.mediaAssets.isFeatureEnabled() || this.running) return;
+    if (!this.mediaAssets.isCaseEvidenceMediaEnabled() || this.running) return;
     this.running = true;
     try {
       const now = new Date();
       const staleBefore = new Date(now.getTime() - PROCESSING_LEASE_MS);
       const assets: any[] = await this.prisma.mediaAsset.findMany({
         where: {
-          purpose: { in: [...CONTROLLED_PURPOSES] },
+          purpose: { in: [...CONTROLLED_EVIDENCE_PURPOSES] },
           status: "scanning",
           OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now } }],
           AND: [{
@@ -89,7 +87,7 @@ export class ControlledCaseEvidenceWorker implements OnModuleInit, OnModuleDestr
     const asset: any = await this.prisma.mediaAsset.findFirst({
       where: {
         id: assetId,
-        purpose: { in: [...CONTROLLED_PURPOSES] },
+        purpose: { in: [...CONTROLLED_EVIDENCE_PURPOSES] },
         status: "scanning"
       }
     } as any);

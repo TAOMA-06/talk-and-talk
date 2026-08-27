@@ -3,6 +3,7 @@ import { createHash, createHmac } from "node:crypto";
 import { HttpStatus, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 
+import { lockStaffCredentialRowsInOrder } from "../admin/staff-credential-lock-order";
 import { AuditService } from "../common/audit/audit.service";
 import { AppException } from "../common/errors/app.exception";
 import { isFirstReleaseCapabilityEnabled } from "../config/first-release-capability-matrix";
@@ -10,6 +11,9 @@ import { PrismaService } from "../database/prisma.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { ControlledCaseEvidenceService } from "../moderation/media/controlled-case-evidence.service";
 import {
+  AssignCompanionAppealDto,
+  AssignCompanionIncidentDto,
+  CompleteCompanionReactivationDto,
   CreateCompanionAccountActionDto,
   CreateCompanionAppealDto,
   CreateCompanionIncidentDto,
@@ -178,6 +182,7 @@ const TRAINING_MODULES: TrainingModule[] = [
 
 const REQUIRED_TRAINING_CODES = TRAINING_MODULES.map((module) => module.code);
 const ACTIVE_WITHDRAWAL_STATUSES = ["requested", "reviewing", "approved", "processing"] as const;
+const ACTIVE_COMPANION_INCIDENT_STATUSES = ["open", "inReview"] as const;
 
 @Injectable()
 export class CompanionLifecycleService {
@@ -349,42 +354,80 @@ export class CompanionLifecycleService {
   }
 
   async appeal(userId: string, actionId: string, input: CreateCompanionAppealDto) {
+    this.caseEvidence.assertAttachmentsAllowed(input.evidenceAssetIds);
     const companion = await this.ownCompanion(userId);
-    const action = await this.prisma.companionAccountAction.findFirst({
-      where: { id: actionId, companionId: companion.id }
-    } as any);
-    if (!action) {
-      throw new AppException("COMPANION_ACTION_NOT_FOUND", "Account action not found", HttpStatus.NOT_FOUND);
-    }
-    if (action.revokedAt) {
-      throw new AppException(
-        "COMPANION_ACTION_ALREADY_REVOKED",
-        "A revoked account action no longer requires an appeal",
-        HttpStatus.CONFLICT
-      );
-    }
-    const now = new Date();
-    if (action.appealDeadlineAt.getTime() <= now.getTime()) {
-      throw new AppException(
-        "COMPANION_ACTION_APPEAL_WINDOW_CLOSED",
-        "The appeal submission window has closed",
-        HttpStatus.CONFLICT,
-        { appealDeadlineAt: action.appealDeadlineAt.toISOString() }
-      );
-    }
     const responseHours = this.config.get<number>("COMPANION_APPEAL_RESPONSE_HOURS") ?? 72;
-    const evidenceReferences = this.normalizeReferences(input.evidenceReferences);
     try {
       const appeal = await this.prisma.$transaction(async (tx) => {
         const db = tx as any;
+        await db.$queryRaw`SELECT "id" FROM "CompanionProfile" WHERE "id" = ${companion.id} FOR UPDATE`;
+        const currentCompanion = await db.companionProfile.findUnique({
+          where: { id: companion.id },
+          select: { id: true, ownerUserId: true }
+        });
+        if (!currentCompanion || currentCompanion.ownerUserId !== userId) {
+          throw new AppException("COMPANION_PROFILE_NOT_FOUND", "Companion profile not found", HttpStatus.NOT_FOUND);
+        }
+        await db.$queryRaw`SELECT "id" FROM "CompanionAccountAction" WHERE "id" = ${actionId} FOR UPDATE`;
+        const action = await db.companionAccountAction.findFirst({
+          where: { id: actionId, companionId: companion.id }
+        });
+        if (!action) {
+          throw new AppException("COMPANION_ACTION_NOT_FOUND", "Account action not found", HttpStatus.NOT_FOUND);
+        }
+        if (action.revokedAt) {
+          throw new AppException(
+            "COMPANION_ACTION_ALREADY_REVOKED",
+            "A revoked account action no longer requires an appeal",
+            HttpStatus.CONFLICT
+          );
+        }
+        const now = new Date();
+        if (action.endsAt instanceof Date && action.endsAt.getTime() <= now.getTime()) {
+          throw new AppException(
+            "COMPANION_ACTION_ALREADY_ENDED",
+            "An expired temporary account action follows the reactivation workflow instead of a new appeal",
+            HttpStatus.CONFLICT,
+            { endsAt: action.endsAt.toISOString() }
+          );
+        }
+        if (action.appealDeadlineAt.getTime() <= now.getTime()) {
+          throw new AppException(
+            "COMPANION_ACTION_APPEAL_WINDOW_CLOSED",
+            "The appeal submission window has closed",
+            HttpStatus.CONFLICT,
+            { appealDeadlineAt: action.appealDeadlineAt.toISOString() }
+          );
+        }
+        const duplicate = await db.companionAccountAppeal.findUnique({
+          where: {
+            actionId_companionId: {
+              actionId: action.id,
+              companionId: companion.id
+            }
+          },
+          select: { id: true }
+        });
+        if (duplicate) {
+          throw new AppException(
+            "COMPANION_ACTION_APPEAL_EXISTS",
+            "An appeal already exists for this account action",
+            HttpStatus.CONFLICT
+          );
+        }
         const created = await db.companionAccountAppeal.create({
           data: {
             actionId: action.id,
             companionId: companion.id,
             statement: input.statement.trim(),
-            evidenceReferences,
             reviewDueAt: new Date(now.getTime() + responseHours * 60 * 60_000)
           }
+        });
+        await this.caseEvidence.bindCompanionAccountAppeal(db, {
+          assetIds: input.evidenceAssetIds,
+          userId,
+          actionId: action.id,
+          appealId: created.id
         });
         await this.notifications.createTransactional(db, {
           userId,
@@ -409,12 +452,15 @@ export class CompanionLifecycleService {
           metadata: {
             companionId: companion.id,
             appealId: created.id,
-            evidenceCount: evidenceReferences.length,
+            evidenceCount: input.evidenceAssetIds?.length ?? 0,
             appealDeadlineAt: action.appealDeadlineAt.toISOString(),
             reviewDueAt: created.reviewDueAt.toISOString()
           }
         }, db);
-        return created;
+        return db.companionAccountAppeal.findUniqueOrThrow({
+          where: { id: created.id },
+          include: this.caseEvidence.attachmentInclude()
+        });
       });
       return this.appealDto(appeal);
     } catch (error: any) {
@@ -645,7 +691,8 @@ export class CompanionLifecycleService {
             status: "suspended",
             suspendedAt: new Date(),
             suspendedById: actorId,
-            suspendedReason: input.message.trim()
+            suspendedReason: input.message.trim(),
+            suspendedByAccountActionId: created.id
           }
         });
       }
@@ -689,15 +736,327 @@ export class CompanionLifecycleService {
     return this.actionDto(action);
   }
 
+  async materializeExpiredSuspensionReactivations(
+    batchSize = 50,
+    now = new Date()
+  ): Promise<{ scanned: number; materialized: number; hasMore: boolean }> {
+    const boundedBatchSize = Math.min(200, Math.max(1, Math.floor(batchSize)));
+    const transitioned = await this.prisma.$transaction(async (tx) => {
+      const db = tx as any;
+      const rows = await db.$queryRaw<Array<{
+        id: string;
+        companionId: string;
+        endsAt: Date;
+        ownerUserId: string | null;
+      }>>`
+        WITH candidates AS MATERIALIZED (
+          SELECT action."id"
+          FROM "CompanionAccountAction" AS action
+          WHERE action."kind" = 'suspension'
+            AND action."revokedAt" IS NULL
+            AND action."endsAt" <= ${now}
+            AND action."reactivationStatus" = 'notRequired'
+            AND NOT EXISTS (
+              SELECT 1 FROM "CompanionAccountAppeal" AS appeal
+              WHERE appeal."actionId" = action."id"
+                AND appeal."status" = 'pending'
+            )
+          ORDER BY action."endsAt", action."id"
+          FOR UPDATE OF action SKIP LOCKED
+          LIMIT ${boundedBatchSize}
+        ), updated AS (
+          UPDATE "CompanionAccountAction" AS action
+          SET
+            "reactivationStatus" = 'required',
+            "reactivationRequiredAt" = ${now},
+            "updatedAt" = CURRENT_TIMESTAMP
+          FROM candidates
+          WHERE action."id" = candidates."id"
+            AND action."revokedAt" IS NULL
+            AND action."reactivationStatus" = 'notRequired'
+            AND action."endsAt" <= ${now}
+          RETURNING action."id", action."companionId", action."endsAt"
+        )
+        SELECT updated."id", updated."companionId", updated."endsAt",
+               companion."ownerUserId"
+        FROM updated
+        JOIN "CompanionProfile" AS companion ON companion."id" = updated."companionId"
+        ORDER BY updated."endsAt", updated."id"
+      `;
+      for (const action of rows) {
+        if (!action.ownerUserId) {
+          throw new Error("Expired companion suspension has no owner for reactivation notice");
+        }
+        await this.audit.record({
+          actorId: "system",
+          subjectUserIds: [action.ownerUserId],
+          action: "commercial.companion_suspension_expiry_reactivation_required",
+          resourceType: "companionAccountAction",
+          resourceId: action.id,
+          metadata: {
+            companionId: action.companionId,
+            endsAt: action.endsAt.toISOString(),
+            publicationRestored: false
+          }
+        }, db);
+        await this.notifications.createTransactional(db, {
+          userId: action.ownerUserId,
+          type: "supportUpdate",
+          title: "陪伴者临时暂停已到期，资格恢复待复核",
+          body: "暂停期限已经结束；平台不会自动恢复商业资格或公开上架，须由另一名运营人员复核当前资格。",
+          data: {
+            route: "companionDevelopment",
+            actionId: action.id,
+            reactivationStatus: "required",
+            publicationRestored: false
+          },
+          eventKey: `companion-account-action:${action.id}:expiry-reactivation-required:${action.ownerUserId}`,
+          templateKey: "supportUpdate"
+        });
+      }
+      return rows;
+    });
+    return {
+      scanned: transitioned.length,
+      materialized: transitioned.length,
+      hasMore: transitioned.length === boundedBatchSize
+    };
+  }
+
+  async completeExpiredSuspensionReactivation(
+    actorId: string,
+    actionId: string,
+    input: CompleteCompanionReactivationDto
+  ) {
+    const resolution = input.resolution.trim();
+    const pointer: any = await this.prisma.companionAccountAction.findUnique({
+      where: { id: actionId },
+      select: {
+        companionId: true,
+        companion: { select: { ownerUserId: true } }
+      }
+    } as any);
+    if (!pointer) {
+      throw new AppException("COMPANION_ACTION_NOT_FOUND", "Account action not found", HttpStatus.NOT_FOUND);
+    }
+    const pointerOwnerUserId = pointer.companion?.ownerUserId;
+    if (!pointerOwnerUserId) {
+      throw new AppException(
+        "COMPANION_REACTIVATION_OWNER_UNAVAILABLE",
+        "The companion has no current owner account for reactivation review",
+        HttpStatus.CONFLICT
+      );
+    }
+    const action = await this.prisma.$transaction(async (tx) => {
+      const db = tx as any;
+      await db.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${pointerOwnerUserId} FOR UPDATE`;
+      await db.$queryRaw`SELECT "id" FROM "CompanionProfile" WHERE "id" = ${pointer.companionId} FOR UPDATE`;
+      await db.$queryRaw`SELECT "id" FROM "CompanionAccountAction" WHERE "id" = ${actionId} FOR UPDATE`;
+      const existing = await db.companionAccountAction.findUnique({
+        where: { id: actionId },
+        include: {
+          companion: {
+            include: {
+              owner: { include: { profile: true } },
+              commercialProfile: true
+            }
+          }
+        }
+      });
+      if (!existing) {
+        throw new AppException("COMPANION_ACTION_NOT_FOUND", "Account action not found", HttpStatus.NOT_FOUND);
+      }
+      const ownerUserId = existing.companion?.ownerUserId;
+      if (ownerUserId !== pointerOwnerUserId || existing.companionId !== pointer.companionId) {
+        throw new AppException(
+          "COMPANION_REACTIVATION_OWNER_CHANGED",
+          "The companion owner changed while reactivation was being reviewed",
+          HttpStatus.CONFLICT
+        );
+      }
+      const now = new Date();
+      this.assertExpiredSuspensionReactivationState(existing, actorId, now);
+
+      const competingAction = await db.companionAccountAction.findFirst({
+        where: {
+          companionId: existing.companionId,
+          id: { not: existing.id },
+          kind: { in: ["serviceRestriction", "suspension"] },
+          revokedAt: null,
+          startsAt: { lte: now },
+          OR: [{ endsAt: null }, { endsAt: { gt: now } }]
+        },
+        select: { id: true, kind: true }
+      });
+      if (competingAction) {
+        throw new AppException(
+          "COMPANION_REACTIVATION_OTHER_ACTION_ACTIVE",
+          "Another active account restriction must be resolved before reactivation",
+          HttpStatus.CONFLICT,
+          { actionKind: competingAction.kind }
+        );
+      }
+
+      const companion = existing.companion;
+      const owner = companion?.owner;
+      const profile = companion?.commercialProfile;
+      if (
+        !companion?.isVerified
+        || !owner
+        || !["user", "companion"].includes(owner.role)
+        || owner.accountStatus !== "active"
+        || owner.profile?.isVerified !== true
+      ) {
+        throw new AppException(
+          "COMPANION_REACTIVATION_OWNER_NOT_ELIGIBLE",
+          "The companion and current owner must remain active and identity-verified",
+          HttpStatus.CONFLICT
+        );
+      }
+      const activeDeletion = await db.accountDeletionRequest.findFirst({
+        where: {
+          userId: ownerUserId,
+          status: { in: ["pending", "processing", "completed"] }
+        },
+        select: { id: true, status: true }
+      });
+      if (activeDeletion) {
+        throw new AppException(
+          "COMPANION_REACTIVATION_ACCOUNT_DELETION_ACTIVE",
+          "Reactivation is unavailable while account deletion is pending, processing, or completed",
+          HttpStatus.CONFLICT,
+          { deletionStatus: activeDeletion.status }
+        );
+      }
+      if (!Number.isInteger(owner.profile.age) || owner.profile.age < 18) {
+        throw new AppException(
+          "COMPANION_REACTIVATION_ADULT_ELIGIBILITY_REQUIRED",
+          "Current adult eligibility is required before reactivation",
+          HttpStatus.CONFLICT
+        );
+      }
+      if (
+        !profile
+        || !["suspended", "verified"].includes(profile.status)
+        || profile.adultEligibilityVerdict !== "adult"
+        || !(profile.adultEligibilityVerifiedAt instanceof Date)
+        || !(profile.adultEligibilityValidUntil instanceof Date)
+        || profile.adultEligibilityValidUntil.getTime() <= now.getTime()
+        || !(profile.nextReviewDueAt instanceof Date)
+        || profile.nextReviewDueAt.getTime() <= now.getTime()
+      ) {
+        throw new AppException(
+          "COMPANION_REACTIVATION_COMMERCIAL_REVIEW_REQUIRED",
+          "Current commercial evidence, adult eligibility and scheduled review must pass before reactivation",
+          HttpStatus.CONFLICT
+        );
+      }
+      const suspensionCausedByAction = profile.status === "suspended"
+        && profile.suspendedByAccountActionId === existing.id;
+      const independentlyReverified = profile.status === "verified"
+        && profile.suspendedByAccountActionId == null;
+      if (!suspensionCausedByAction && !independentlyReverified) {
+        throw new AppException(
+          "COMPANION_REACTIVATION_SUSPENSION_SOURCE_MISMATCH",
+          "The current commercial suspension is not provably caused by this expired action; resubmit and independently verify the commercial profile first",
+          HttpStatus.CONFLICT
+        );
+      }
+
+      const trainingRecords = await db.companionTrainingRecord.findMany({
+        where: {
+          companionId: existing.companionId,
+          status: "passed",
+          OR: [{ expiresAt: null }, { expiresAt: { gt: now } }]
+        },
+        select: { moduleCode: true, moduleVersion: true }
+      });
+      const currentTraining = new Set(
+        trainingRecords.map((record: any) => `${record.moduleCode}:${record.moduleVersion}`)
+      );
+      const missingTraining = TRAINING_MODULES.filter(
+        (module) => !currentTraining.has(`${module.code}:${module.version}`)
+      ).map((module) => module.code);
+      if (missingTraining.length) {
+        throw new AppException(
+          "COMPANION_REACTIVATION_TRAINING_REQUIRED",
+          "Every required training module must remain current before reactivation",
+          HttpStatus.CONFLICT,
+          { missingModuleCodes: missingTraining }
+        );
+      }
+
+      if (suspensionCausedByAction) {
+        await db.companionCommercialProfile.update({
+          where: { companionId: existing.companionId },
+          data: {
+            status: "verified",
+            suspendedAt: null,
+            suspendedById: null,
+            suspendedReason: null,
+            suspendedByAccountActionId: null
+          }
+        });
+      }
+      await db.companionProfile.update({
+        where: { id: existing.companionId },
+        data: { isPublished: false, isOnline: false, availability: "busy" }
+      });
+      const updated = await db.companionAccountAction.update({
+        where: { id: existing.id },
+        data: {
+          reactivationStatus: "completed",
+          reactivationCompletedAt: now,
+          reactivationCompletedById: actorId,
+          reactivationResolution: resolution
+        }
+      });
+      await this.audit.record({
+        actorId,
+        subjectUserIds: [ownerUserId],
+        action: "commercial.companion_action_reactivation_completed",
+        resourceType: "companionAccountAction",
+        resourceId: existing.id,
+        metadata: {
+          companionId: existing.companionId,
+          actionKind: existing.kind,
+          originalActionCreatedById: existing.createdById,
+          independentReactivationReview: true,
+          commercialProfileRestored: suspensionCausedByAction,
+          publicationRestored: false
+        }
+      }, db);
+      await this.notifications.createTransactional(db, {
+        userId: ownerUserId,
+        type: "supportUpdate",
+        title: "陪伴者临时暂停恢复复核已完成",
+        body: "当前资格复核已完成；平台未自动恢复公开上架，公开状态仍须由运营另行确认。",
+        data: {
+          route: "companionDevelopment",
+          actionId: existing.id,
+          reactivationStatus: "completed",
+          publicationRestored: false
+        },
+        eventKey: `companion-account-action:${existing.id}:reactivation-completed:${ownerUserId}`,
+        templateKey: "supportUpdate"
+      });
+      return updated;
+    });
+    return this.actionDto(action);
+  }
+
   async resolveAppeal(actorId: string, appealId: string, input: ResolveCompanionAppealDto) {
     const appeal = await this.prisma.$transaction(async (tx) => {
       const db = tx as any;
+      await lockStaffCredentialRowsInOrder(db, [actorId]);
+      await this.assertCompanionAppealStaff(db, actorId, ["supply", "admin"]);
       await db.$queryRaw`SELECT "id" FROM "CompanionAccountAppeal" WHERE "id" = ${appealId} FOR UPDATE`;
       const existing = await db.companionAccountAppeal.findUnique({
         where: { id: appealId },
         include: {
           action: true,
-          companion: { select: { ownerUserId: true } }
+          companion: { select: { ownerUserId: true } },
+          ...this.caseEvidence.attachmentInclude()
         }
       });
       if (!existing) {
@@ -713,20 +1072,45 @@ export class CompanionLifecycleService {
           HttpStatus.CONFLICT
         );
       }
+      if (existing.assignedToUserId !== actorId) {
+        throw new AppException(
+          "COMPANION_APPEAL_ASSIGNEE_REQUIRED",
+          "Claim or receive assignment before resolving this appeal",
+          HttpStatus.FORBIDDEN
+        );
+      }
       const now = new Date();
+      const reactivationRequired = input.status === "overturned"
+        && ["serviceRestriction", "suspension"].includes(existing.action.kind);
       const updated = await db.companionAccountAppeal.update({
         where: { id: existing.id },
         data: {
           status: input.status,
           resolution: input.resolution.trim(),
           resolvedAt: now,
-          resolvedById: actorId
+          resolvedById: actorId,
+          reactivationStatus: reactivationRequired ? "required" : "notRequired",
+          reactivationRequiredAt: reactivationRequired ? now : null,
+          reactivationCompletedAt: null,
+          reactivationCompletedById: null,
+          reactivationResolution: null
         }
       });
       if (input.status === "overturned") {
         await db.companionAccountAction.update({
           where: { id: existing.actionId },
-          data: { revokedAt: now, revokedById: actorId }
+          data: {
+            revokedAt: now,
+            revokedById: actorId,
+            ...(existing.action.reactivationStatus === "required"
+              ? {
+                  reactivationStatus: "completed",
+                  reactivationCompletedAt: now,
+                  reactivationCompletedById: actorId,
+                  reactivationResolution: `Superseded by overturned appeal ${existing.id}`
+                }
+              : {})
+          }
         });
       }
       await this.audit.record({
@@ -742,28 +1126,270 @@ export class CompanionLifecycleService {
           actionId: existing.actionId,
           status: input.status,
           originalActionCreatedById: existing.action.createdById,
-          independentReview: true
+          independentReview: true,
+          reactivationRequired,
+          publicationRestored: false
         }
       }, db);
       if (existing.companion?.ownerUserId) {
         await this.notifications.createTransactional(db, {
           userId: existing.companion.ownerUserId,
           type: "supportUpdate",
-          title: input.status === "overturned"
-            ? "陪伴者申诉已撤销原处置"
+          title: reactivationRequired
+            ? "陪伴者申诉已撤销原处置，恢复待复核"
+            : input.status === "overturned"
+              ? "陪伴者申诉已撤销原处置"
             : "陪伴者申诉已有结果",
-          body: input.resolution.trim(),
+          body: reactivationRequired
+            ? "原账号处置已撤销；平台不会自动恢复商业资格或公开上架，须由另一名运营人员完成当前资格复核。"
+            : input.resolution.trim(),
           data: {
             route: "companionDevelopment",
             actionId: existing.actionId,
             appealId: existing.id,
-            appealStatus: input.status
+            appealStatus: input.status,
+            reactivationStatus: reactivationRequired ? "required" : "notRequired",
+            publicationRestored: false
           },
           eventKey: `companion-account-appeal:${existing.id}:resolved:${input.status}:${existing.companion.ownerUserId}`,
           templateKey: "supportUpdate"
         });
       }
-      return updated;
+      return { ...updated, evidenceAttachments: existing.evidenceAttachments };
+    });
+    return this.appealDto(appeal);
+  }
+
+  async completeAppealReactivation(
+    actorId: string,
+    appealId: string,
+    input: CompleteCompanionReactivationDto
+  ) {
+    const resolution = input.resolution.trim();
+    const appeal = await this.prisma.$transaction(async (tx) => {
+      const db = tx as any;
+      await db.$queryRaw`SELECT "id" FROM "CompanionAccountAppeal" WHERE "id" = ${appealId} FOR UPDATE`;
+      let existing = await db.companionAccountAppeal.findUnique({
+        where: { id: appealId },
+        include: {
+          action: true,
+          companion: { select: { id: true, ownerUserId: true } },
+          ...this.caseEvidence.attachmentInclude()
+        }
+      });
+      if (!existing) {
+        throw new AppException("COMPANION_APPEAL_NOT_FOUND", "Appeal not found", HttpStatus.NOT_FOUND);
+      }
+      this.assertReactivationReviewState(existing, actorId);
+      const ownerUserId = existing.companion?.ownerUserId;
+      if (!ownerUserId) {
+        throw new AppException(
+          "COMPANION_REACTIVATION_OWNER_UNAVAILABLE",
+          "The companion has no current owner account for reactivation review",
+          HttpStatus.CONFLICT
+        );
+      }
+
+      // Publication uses User -> CompanionProfile. Keep the same order so a
+      // reactivation review cannot deadlock a simultaneous explicit publish.
+      await db.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${ownerUserId} FOR UPDATE`;
+      await db.$queryRaw`SELECT "id" FROM "CompanionProfile" WHERE "id" = ${existing.companionId} FOR UPDATE`;
+      existing = await db.companionAccountAppeal.findUnique({
+        where: { id: appealId },
+        include: {
+          action: true,
+          companion: {
+            include: {
+              owner: { include: { profile: true } },
+              commercialProfile: true
+            }
+          },
+          ...this.caseEvidence.attachmentInclude()
+        }
+      });
+      if (!existing) {
+        throw new AppException("COMPANION_APPEAL_NOT_FOUND", "Appeal not found", HttpStatus.NOT_FOUND);
+      }
+      this.assertReactivationReviewState(existing, actorId);
+
+      const now = new Date();
+      const competingAction = await db.companionAccountAction.findFirst({
+        where: {
+          companionId: existing.companionId,
+          id: { not: existing.actionId },
+          kind: { in: ["serviceRestriction", "suspension"] },
+          revokedAt: null,
+          startsAt: { lte: now },
+          OR: [{ endsAt: null }, { endsAt: { gt: now } }]
+        },
+        select: { id: true, kind: true }
+      });
+      if (competingAction) {
+        throw new AppException(
+          "COMPANION_REACTIVATION_OTHER_ACTION_ACTIVE",
+          "Another active account restriction must be resolved before reactivation",
+          HttpStatus.CONFLICT,
+          { actionKind: competingAction.kind }
+        );
+      }
+
+      const companion = existing.companion;
+      const owner = companion?.owner;
+      const profile = companion?.commercialProfile;
+      if (
+        !companion?.isVerified
+        || !owner
+        || !["user", "companion"].includes(owner.role)
+        || owner.accountStatus !== "active"
+        || owner.profile?.isVerified !== true
+      ) {
+        throw new AppException(
+          "COMPANION_REACTIVATION_OWNER_NOT_ELIGIBLE",
+          "The companion and current owner must remain active and identity-verified",
+          HttpStatus.CONFLICT
+        );
+      }
+      const activeDeletion = await db.accountDeletionRequest.findFirst({
+        where: {
+          userId: ownerUserId,
+          status: { in: ["pending", "processing", "completed"] }
+        },
+        select: { id: true, status: true }
+      });
+      if (activeDeletion) {
+        throw new AppException(
+          "COMPANION_REACTIVATION_ACCOUNT_DELETION_ACTIVE",
+          "Reactivation is unavailable while account deletion is pending, processing, or completed",
+          HttpStatus.CONFLICT,
+          { deletionStatus: activeDeletion.status }
+        );
+      }
+      if (!Number.isInteger(owner.profile.age) || owner.profile.age < 18) {
+        throw new AppException(
+          "COMPANION_REACTIVATION_ADULT_ELIGIBILITY_REQUIRED",
+          "Current adult eligibility is required before reactivation",
+          HttpStatus.CONFLICT
+        );
+      }
+      if (!profile) {
+        throw new AppException(
+          "COMPANION_REACTIVATION_COMMERCIAL_PROFILE_MISSING",
+          "The commercial profile must be reviewed before reactivation",
+          HttpStatus.CONFLICT
+        );
+      }
+      const expectedProfileStatus = existing.action.kind === "suspension" ? "suspended" : "verified";
+      if (
+        profile.status !== expectedProfileStatus
+        || profile.adultEligibilityVerdict !== "adult"
+        || !(profile.adultEligibilityVerifiedAt instanceof Date)
+        || !(profile.adultEligibilityValidUntil instanceof Date)
+        || profile.adultEligibilityValidUntil.getTime() <= now.getTime()
+        || !(profile.nextReviewDueAt instanceof Date)
+        || profile.nextReviewDueAt.getTime() <= now.getTime()
+      ) {
+        throw new AppException(
+          "COMPANION_REACTIVATION_COMMERCIAL_REVIEW_REQUIRED",
+          "Current commercial evidence, adult eligibility and scheduled review must pass before reactivation",
+          HttpStatus.CONFLICT,
+          { expectedProfileStatus }
+        );
+      }
+      if (
+        existing.action.kind === "suspension"
+        && profile.suspendedByAccountActionId !== existing.actionId
+      ) {
+        throw new AppException(
+          "COMPANION_REACTIVATION_SUSPENSION_SOURCE_MISMATCH",
+          "The current commercial suspension is not provably caused by this overturned action",
+          HttpStatus.CONFLICT
+        );
+      }
+
+      const trainingRecords = await db.companionTrainingRecord.findMany({
+        where: {
+          companionId: existing.companionId,
+          status: "passed",
+          OR: [{ expiresAt: null }, { expiresAt: { gt: now } }]
+        },
+        select: { moduleCode: true, moduleVersion: true }
+      });
+      const currentTraining = new Set(
+        trainingRecords.map((record: any) => `${record.moduleCode}:${record.moduleVersion}`)
+      );
+      const missingTraining = TRAINING_MODULES.filter(
+        (module) => !currentTraining.has(`${module.code}:${module.version}`)
+      ).map((module) => module.code);
+      if (missingTraining.length) {
+        throw new AppException(
+          "COMPANION_REACTIVATION_TRAINING_REQUIRED",
+          "Every required training module must remain current before reactivation",
+          HttpStatus.CONFLICT,
+          { missingModuleCodes: missingTraining }
+        );
+      }
+
+      if (existing.action.kind === "suspension") {
+        await db.companionCommercialProfile.update({
+          where: { companionId: existing.companionId },
+          data: {
+            status: "verified",
+            suspendedAt: null,
+            suspendedById: null,
+            suspendedReason: null,
+            suspendedByAccountActionId: null
+          }
+        });
+      }
+      // Revoking a restriction does not prove that the profile was public before
+      // it. Keep every public/online signal fail-closed until a separate publish.
+      await db.companionProfile.update({
+        where: { id: existing.companionId },
+        data: { isPublished: false, isOnline: false, availability: "busy" }
+      });
+      const updated = await db.companionAccountAppeal.update({
+        where: { id: existing.id },
+        data: {
+          reactivationStatus: "completed",
+          reactivationCompletedAt: now,
+          reactivationCompletedById: actorId,
+          reactivationResolution: resolution
+        }
+      });
+      await this.audit.record({
+        actorId,
+        subjectUserIds: [ownerUserId],
+        action: "commercial.companion_action_reactivation_completed",
+        resourceType: "companionAccountAppeal",
+        resourceId: existing.id,
+        metadata: {
+          companionId: existing.companionId,
+          actionId: existing.actionId,
+          actionKind: existing.action.kind,
+          originalActionCreatedById: existing.action.createdById,
+          appealResolvedById: existing.resolvedById,
+          independentReactivationReview: true,
+          commercialProfileRestored: existing.action.kind === "suspension",
+          publicationRestored: false
+        }
+      }, db);
+      await this.notifications.createTransactional(db, {
+        userId: ownerUserId,
+        type: "supportUpdate",
+        title: "陪伴者资格恢复复核已完成",
+        body: "当前资格复核已完成；平台未自动恢复公开上架，公开状态仍须由运营另行确认。",
+        data: {
+          route: "companionDevelopment",
+          actionId: existing.actionId,
+          appealId: existing.id,
+          appealStatus: "overturned",
+          reactivationStatus: "completed",
+          publicationRestored: false
+        },
+        eventKey: `companion-account-appeal:${existing.id}:reactivation-completed:${ownerUserId}`,
+        templateKey: "supportUpdate"
+      });
+      return { ...updated, evidenceAttachments: existing.evidenceAttachments };
     });
     return this.appealDto(appeal);
   }
@@ -932,21 +1558,172 @@ export class CompanionLifecycleService {
     return createHash("sha256").update(assetReference).digest("hex");
   }
 
+  async claimableAppeals(actorId: string, page = 1, pageSize = 50) {
+    await this.assertCompanionAppealStaff(this.prisma as any, actorId, ["supply"]);
+    const safePage = Math.max(1, Math.floor(page));
+    const safePageSize = Math.min(100, Math.max(1, Math.floor(pageSize)));
+    const where = {
+      assignedToUserId: null,
+      status: "pending",
+      action: { createdById: { not: actorId } }
+    };
+    const [items, total] = await Promise.all([
+      this.prisma.companionAccountAppeal.findMany({
+        where,
+        select: { id: true, status: true, reviewDueAt: true, createdAt: true },
+        orderBy: [{ reviewDueAt: "asc" }, { createdAt: "asc" }, { id: "asc" }],
+        skip: (safePage - 1) * safePageSize,
+        take: safePageSize
+      } as any),
+      this.prisma.companionAccountAppeal.count({ where } as any)
+    ]);
+    const now = Date.now();
+    return {
+      items: items.map((item: any) => ({
+        id: item.id,
+        status: item.status,
+        submittedAt: item.createdAt.toISOString(),
+        reviewDueAt: item.reviewDueAt.toISOString(),
+        overdue: item.reviewDueAt.getTime() <= now
+      })),
+      pagination: this.pagination(safePage, safePageSize, total),
+      scope: "claimableSummary" as const
+    };
+  }
+
+  async claimAppeal(actorId: string, appealId: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const db = tx as any;
+      await lockStaffCredentialRowsInOrder(db, [actorId]);
+      await this.assertCompanionAppealStaff(db, actorId, ["supply"]);
+      await db.$queryRaw`SELECT "id" FROM "CompanionAccountAppeal" WHERE "id" = ${appealId} FOR UPDATE`;
+      const existing = await db.companionAccountAppeal.findUnique({
+        where: { id: appealId },
+        include: this.companionAppealAdminInclude()
+      });
+      this.assertCompanionAppealReviewable(existing, actorId);
+      if (existing.assignedToUserId === actorId) {
+        return this.companionAppealStaffDto(existing, actorId);
+      }
+      if (existing.assignedToUserId) {
+        throw new AppException(
+          "COMPANION_APPEAL_ALREADY_ASSIGNED",
+          "The appeal is already assigned to another operator",
+          HttpStatus.CONFLICT
+        );
+      }
+      const assignedAt = new Date();
+      const updated = await db.companionAccountAppeal.update({
+        where: { id: appealId },
+        data: { assignedToUserId: actorId, assignedAt }
+      });
+      await this.audit.record({
+        actorId,
+        subjectUserIds: [
+          existing.companion?.ownerUserId,
+          existing.action.createdById
+        ].filter((value): value is string => Boolean(value)),
+        action: "commercial.companion_action_appeal_claimed",
+        resourceType: "companionAccountAppeal",
+        resourceId: appealId,
+        metadata: {
+          companionId: existing.companionId,
+          actionId: existing.actionId,
+          assignedToUserId: actorId,
+          originalActionCreatedById: existing.action.createdById
+        }
+      }, db);
+      return this.companionAppealStaffDto({
+        ...existing,
+        ...updated,
+        assignedTo: null
+      }, actorId);
+    });
+  }
+
+  async assignAppeal(
+    actorId: string,
+    appealId: string,
+    input: AssignCompanionAppealDto
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const db = tx as any;
+      await lockStaffCredentialRowsInOrder(db, [actorId, input.assignedToUserId]);
+      await this.assertCompanionAppealStaff(db, actorId, ["admin"]);
+      await this.assertCompanionAppealStaff(db, input.assignedToUserId, ["supply", "admin"]);
+      await db.$queryRaw`SELECT "id" FROM "CompanionAccountAppeal" WHERE "id" = ${appealId} FOR UPDATE`;
+      const existing = await db.companionAccountAppeal.findUnique({
+        where: { id: appealId },
+        include: this.companionAppealAdminInclude()
+      });
+      this.assertCompanionAppealReviewable(existing, actorId);
+      if (existing.action.createdById === input.assignedToUserId) {
+        throw new AppException(
+          "COMPANION_APPEAL_INDEPENDENT_REVIEW_REQUIRED",
+          "The original account-action creator cannot be assigned its appeal",
+          HttpStatus.CONFLICT
+        );
+      }
+      if (existing.assignedToUserId === input.assignedToUserId) {
+        return this.companionAppealStaffDto(existing, actorId);
+      }
+      const previousAssignedToUserId = existing.assignedToUserId ?? null;
+      const assignedAt = new Date();
+      const updated = await db.companionAccountAppeal.update({
+        where: { id: appealId },
+        data: { assignedToUserId: input.assignedToUserId, assignedAt }
+      });
+      await this.audit.record({
+        actorId,
+        subjectUserIds: [
+          existing.companion?.ownerUserId,
+          existing.action.createdById,
+          previousAssignedToUserId,
+          input.assignedToUserId
+        ].filter((value): value is string => Boolean(value)),
+        action: "commercial.companion_action_appeal_assigned",
+        resourceType: "companionAccountAppeal",
+        resourceId: appealId,
+        metadata: {
+          companionId: existing.companionId,
+          actionId: existing.actionId,
+          previousAssignedToUserId,
+          assignedToUserId: input.assignedToUserId,
+          originalActionCreatedById: existing.action.createdById
+        }
+      }, db);
+      return this.companionAppealStaffDto({
+        ...existing,
+        ...updated,
+        assignedTo: null
+      }, actorId);
+    });
+  }
+
   async adminAppeals(
     actorId: string,
     status = "pending",
     page = 1,
-    pageSize = 50
+    pageSize = 50,
+    reactivationStatus?: "notRequired" | "required" | "completed"
   ) {
+    const actor = await this.assertCompanionAppealStaff(
+      this.prisma as any,
+      actorId,
+      ["supply", "admin"]
+    );
     const safePage = Math.max(1, Math.floor(page));
     const safePageSize = Math.min(100, Math.max(1, Math.floor(pageSize)));
-    const where = { status };
+    const where = {
+      status,
+      ...(reactivationStatus ? { reactivationStatus } : {}),
+      ...(actor.role === "supply" ? { assignedToUserId: actorId } : {})
+    };
     const [items, total] = await Promise.all([
       this.prisma.companionAccountAppeal.findMany({
         where,
         include: {
-          action: true,
-          companion: { select: { id: true, name: true, ownerUserId: true } }
+          ...this.companionAppealAdminInclude()
         },
         orderBy: [{ reviewDueAt: "asc" }, { createdAt: "asc" }, { id: "asc" }],
         skip: (safePage - 1) * safePageSize,
@@ -955,19 +1732,14 @@ export class CompanionLifecycleService {
       this.prisma.companionAccountAppeal.count({ where } as any)
     ]);
     return {
-      items: items.map((item: any) => ({
-        ...this.appealDto(item),
-        companion: item.companion,
-        action: this.actionDto(item.action),
-        independentReviewEligible:
-          Boolean(item.action?.createdById) && item.action.createdById !== actorId
-      })),
+      items: items.map((item: any) => this.companionAppealStaffDto(item, actorId)),
       pagination: {
         total,
         totalPages: Math.ceil(total / safePageSize),
         page: safePage,
         pageSize: safePageSize
-      }
+      },
+      scope: actor.role === "admin" ? "all" : "assignedToMe"
     };
   }
 
@@ -1075,11 +1847,17 @@ export class CompanionLifecycleService {
     };
   }
 
-  async adminAccountActions(active?: boolean, page = 1, pageSize = 50) {
+  async adminAccountActions(
+    actorId: string,
+    active?: boolean,
+    page = 1,
+    pageSize = 50,
+    reactivationStatus?: "notRequired" | "required" | "completed"
+  ) {
     const now = new Date();
     const safePage = Math.max(1, Math.floor(page));
     const safePageSize = Math.min(100, Math.max(1, Math.floor(pageSize)));
-    const where = active === undefined ? {} : active ? {
+    const activityWhere = active === undefined ? {} : active ? {
       revokedAt: null,
       startsAt: { lte: now },
       OR: [{ endsAt: null }, { endsAt: { gt: now } }]
@@ -1088,6 +1866,10 @@ export class CompanionLifecycleService {
         { revokedAt: { not: null } },
         { endsAt: { lte: now } }
       ]
+    };
+    const where = {
+      ...activityWhere,
+      ...(reactivationStatus ? { reactivationStatus } : {})
     };
     const [items, total] = await Promise.all([
       this.prisma.companionAccountAction.findMany({
@@ -1105,35 +1887,203 @@ export class CompanionLifecycleService {
     return {
       items: items.map((item: any) => ({
         ...this.actionDto(item),
+        createdById: item.createdById,
         companion: item.companion,
-        appeals: item.appeals.map((appeal: any) => this.appealDto(appeal))
+        appeals: item.appeals.map((appeal: any) => this.appealDto(appeal)),
+        reactivationReviewEligible:
+          item.reactivationStatus === "required"
+          && Boolean(item.createdById)
+          && item.createdById !== actorId
       })),
       pagination: this.pagination(safePage, safePageSize, total)
     };
   }
 
-  async adminIncidents(status?: string, page = 1, pageSize = 50) {
+  async adminIncidents(actorId: string, status?: string, page = 1, pageSize = 50) {
+    const actor = await this.assertIncidentStaff(this.prisma as any, actorId, ["supply", "admin"]);
     const safePage = Math.max(1, Math.floor(page));
     const safePageSize = Math.min(100, Math.max(1, Math.floor(pageSize)));
-    const where = status ? { status } : {};
+    const where = {
+      ...(status ? { status } : {}),
+      ...(actor.role === "supply" ? { assignedToUserId: actorId } : {})
+    };
     const [items, total] = await Promise.all([
       this.prisma.companionIncidentReport.findMany({
-      where,
-      include: {
-        companion: { select: { id: true, name: true, ownerUserId: true } },
-        order: { select: { id: true, status: true, scheduledAt: true } },
-        ...this.caseEvidence.attachmentInclude()
-      },
-      orderBy: [{ status: "asc" }, { createdAt: "asc" }, { id: "asc" }],
-      skip: (safePage - 1) * safePageSize,
-      take: safePageSize
-    } as any),
+        where,
+        include: this.incidentAdminInclude(),
+        orderBy: [{ status: "asc" }, { createdAt: "asc" }, { id: "asc" }],
+        skip: (safePage - 1) * safePageSize,
+        take: safePageSize
+      } as any),
       this.prisma.companionIncidentReport.count({ where } as any)
     ]);
     return {
       items: items.map((item: any) => this.incidentDto(item, true)),
-      pagination: this.pagination(safePage, safePageSize, total)
+      pagination: this.pagination(safePage, safePageSize, total),
+      scope: actor.role === "admin" ? "all" : "assignedToMe"
     };
+  }
+
+  async claimableIncidents(actorId: string, status?: string, page = 1, pageSize = 50) {
+    await this.assertIncidentStaff(this.prisma as any, actorId, ["supply"]);
+    const safePage = Math.max(1, Math.floor(page));
+    const safePageSize = Math.min(100, Math.max(1, Math.floor(pageSize)));
+    if (status && !ACTIVE_COMPANION_INCIDENT_STATUSES.includes(status as any)) {
+      return {
+        items: [],
+        pagination: this.pagination(safePage, safePageSize, 0),
+        scope: "claimableSummary" as const
+      };
+    }
+    const statuses = status
+      ? status
+      : { in: [...ACTIVE_COMPANION_INCIDENT_STATUSES] };
+    const where = { assignedToUserId: null, status: statuses };
+    const [items, total] = await Promise.all([
+      this.prisma.companionIncidentReport.findMany({
+        where,
+        select: { id: true, status: true, createdAt: true, orderId: true },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        skip: (safePage - 1) * safePageSize,
+        take: safePageSize
+      } as any),
+      this.prisma.companionIncidentReport.count({ where } as any)
+    ]);
+    return {
+      items: items.map((item: any) => ({
+        id: item.id,
+        status: item.status,
+        submittedAt: item.createdAt.toISOString(),
+        hasOrder: Boolean(item.orderId)
+      })),
+      pagination: this.pagination(safePage, safePageSize, total),
+      scope: "claimableSummary"
+    };
+  }
+
+  async adminIncident(actorId: string, incidentId: string) {
+    const actor = await this.assertIncidentStaff(this.prisma as any, actorId, ["supply", "admin"]);
+    const incident = await this.prisma.companionIncidentReport.findFirst({
+      where: {
+        id: incidentId,
+        ...(actor.role === "supply" ? { assignedToUserId: actorId } : {})
+      },
+      include: this.incidentAdminInclude()
+    } as any);
+    if (!incident) this.throwIncidentNotFound();
+    return this.incidentDto(incident, true);
+  }
+
+  async claimIncident(actorId: string, incidentId: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const db = tx as any;
+      await db.$queryRaw`SELECT "id" FROM "StaffCredential" WHERE "userId" = ${actorId} FOR UPDATE`;
+      await this.assertIncidentStaff(db, actorId, ["supply"]);
+      await db.$queryRaw`SELECT "id" FROM "CompanionIncidentReport" WHERE "id" = ${incidentId} FOR UPDATE`;
+      const incident = await db.companionIncidentReport.findUnique({
+        where: { id: incidentId },
+        include: { companion: { select: { ownerUserId: true } } }
+      });
+      if (!incident) this.throwIncidentNotFound();
+      if (!ACTIVE_COMPANION_INCIDENT_STATUSES.includes(incident.status)) {
+        throw new AppException(
+          "COMPANION_INCIDENT_NOT_CLAIMABLE",
+          "Only an unresolved incident can be claimed",
+          HttpStatus.CONFLICT
+        );
+      }
+      if (incident.assignedToUserId === actorId) {
+        return db.companionIncidentReport.findUniqueOrThrow({
+          where: { id: incidentId },
+          include: this.incidentAdminInclude()
+        });
+      }
+      if (incident.assignedToUserId) {
+        throw new AppException(
+          "COMPANION_INCIDENT_ALREADY_ASSIGNED",
+          "The incident has already been claimed by another operator",
+          HttpStatus.CONFLICT
+        );
+      }
+      const claimedAt = new Date();
+      await db.companionIncidentReport.update({
+        where: { id: incidentId },
+        data: { assignedToUserId: actorId, assignedAt: claimedAt, status: "inReview" }
+      });
+      await this.audit.record({
+        actorId,
+        subjectUserIds: incident.companion?.ownerUserId ? [incident.companion.ownerUserId] : [],
+        action: "commercial.companion_incident_claimed",
+        resourceType: "companionIncidentReport",
+        resourceId: incidentId,
+        metadata: { companionId: incident.companionId, assignedToUserId: actorId }
+      }, db);
+      return db.companionIncidentReport.findUniqueOrThrow({
+        where: { id: incidentId },
+        include: this.incidentAdminInclude()
+      });
+    }).then((incident) => this.incidentDto(incident, true));
+  }
+
+  async assignIncident(
+    actorId: string,
+    incidentId: string,
+    input: AssignCompanionIncidentDto
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const db = tx as any;
+      await lockStaffCredentialRowsInOrder(db, [actorId, input.assignedToUserId]);
+      await this.assertIncidentStaff(db, actorId, ["admin"]);
+      await this.assertIncidentStaff(db, input.assignedToUserId, ["supply"]);
+      await db.$queryRaw`SELECT "id" FROM "CompanionIncidentReport" WHERE "id" = ${incidentId} FOR UPDATE`;
+      const incident = await db.companionIncidentReport.findUnique({
+        where: { id: incidentId },
+        include: { companion: { select: { ownerUserId: true } } }
+      });
+      if (!incident) this.throwIncidentNotFound();
+      if (!ACTIVE_COMPANION_INCIDENT_STATUSES.includes(incident.status)) {
+        throw new AppException(
+          "COMPANION_INCIDENT_NOT_ASSIGNABLE",
+          "Only an unresolved incident can be assigned",
+          HttpStatus.CONFLICT
+        );
+      }
+      if (incident.assignedToUserId === input.assignedToUserId) {
+        return db.companionIncidentReport.findUniqueOrThrow({
+          where: { id: incidentId },
+          include: this.incidentAdminInclude()
+        });
+      }
+      const previousAssignedToUserId = incident.assignedToUserId ?? null;
+      await db.companionIncidentReport.update({
+        where: { id: incidentId },
+        data: {
+          assignedToUserId: input.assignedToUserId,
+          assignedAt: new Date(),
+          status: "inReview"
+        }
+      });
+      await this.audit.record({
+        actorId,
+        subjectUserIds: [
+          incident.companion?.ownerUserId,
+          previousAssignedToUserId,
+          input.assignedToUserId
+        ].filter((value): value is string => Boolean(value)),
+        action: "commercial.companion_incident_assigned",
+        resourceType: "companionIncidentReport",
+        resourceId: incidentId,
+        metadata: {
+          companionId: incident.companionId,
+          previousAssignedToUserId,
+          assignedToUserId: input.assignedToUserId
+        }
+      }, db);
+      return db.companionIncidentReport.findUniqueOrThrow({
+        where: { id: incidentId },
+        include: this.incidentAdminInclude()
+      });
+    }).then((incident) => this.incidentDto(incident, true));
   }
 
   async resolveIncident(actorId: string, incidentId: string, input: ResolveCompanionIncidentDto) {
@@ -1146,6 +2096,8 @@ export class CompanionLifecycleService {
     }
     const incident = await this.prisma.$transaction(async (tx) => {
       const db = tx as any;
+      await db.$queryRaw`SELECT "id" FROM "StaffCredential" WHERE "userId" = ${actorId} FOR UPDATE`;
+      const actor = await this.assertIncidentStaff(db, actorId, ["supply", "admin"]);
       await db.$queryRaw`SELECT "id" FROM "CompanionIncidentReport" WHERE "id" = ${incidentId} FOR UPDATE`;
       const existing = await db.companionIncidentReport.findUnique({ where: { id: incidentId } });
       if (!existing) {
@@ -1153,6 +2105,13 @@ export class CompanionLifecycleService {
       }
       if (["resolved", "closed"].includes(existing.status)) {
         throw new AppException("COMPANION_INCIDENT_ALREADY_RESOLVED", "Incident is already resolved", HttpStatus.CONFLICT);
+      }
+      if (actor.role === "supply" && existing.assignedToUserId !== actorId) {
+        throw new AppException(
+          "COMPANION_INCIDENT_ASSIGNEE_REQUIRED",
+          "Only the current incident assignee may update this incident",
+          HttpStatus.FORBIDDEN
+        );
       }
       const terminal = ["resolved", "closed"].includes(input.status);
       const updated = await db.companionIncidentReport.update({
@@ -1178,10 +2137,10 @@ export class CompanionLifecycleService {
       }, db);
       return db.companionIncidentReport.findUniqueOrThrow({
         where: { id: updated.id },
-        include: this.caseEvidence.attachmentInclude()
+        include: this.incidentAdminInclude()
       });
     });
-    return this.incidentDto(incident);
+    return this.incidentDto(incident, true);
   }
 
   async adminWithdrawals(status?: string, page = 1, pageSize = 50) {
@@ -1545,7 +2504,12 @@ export class CompanionLifecycleService {
     const [items, total] = await Promise.all([
       this.prisma.companionAccountAction.findMany({
       where,
-      include: { appeals: { orderBy: { createdAt: "desc" } } },
+      include: {
+        appeals: {
+          include: this.caseEvidence.attachmentInclude(),
+          orderBy: { createdAt: "desc" }
+        }
+      },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       skip: (safePage - 1) * safePageSize,
       take: safePageSize
@@ -1563,6 +2527,17 @@ export class CompanionLifecycleService {
 
   private actionDto(action: any) {
     const now = Date.now();
+    const reactivationStatus = action.reactivationStatus ?? "notRequired";
+    const expired = action.endsAt instanceof Date && action.endsAt.getTime() <= now;
+    const nextAction = reactivationStatus === "required"
+      ? "awaitIndependentOperationalReview"
+      : reactivationStatus === "completed"
+        ? "awaitExplicitPublicationDecision"
+        : !action.revokedAt && expired && action.kind === "suspension"
+          ? "awaitExpiryReactivationMaterialization"
+          : !action.revokedAt && expired && action.kind === "serviceRestriction"
+            ? "awaitExplicitPublicationDecision"
+            : "none";
     return {
       id: action.id,
       companionId: action.companionId,
@@ -1573,29 +2548,245 @@ export class CompanionLifecycleService {
       endsAt: action.endsAt?.toISOString() ?? null,
       appealDeadlineAt: action.appealDeadlineAt.toISOString(),
       appealWindowOpen:
-        !action.revokedAt && action.appealDeadlineAt.getTime() > now,
+        !action.revokedAt
+        && (!action.endsAt || action.endsAt.getTime() > now)
+        && action.appealDeadlineAt.getTime() > now,
       revokedAt: action.revokedAt?.toISOString() ?? null,
       active: !action.revokedAt
         && action.startsAt.getTime() <= now
         && (!action.endsAt || action.endsAt.getTime() > now),
+      reactivation: {
+        status: reactivationStatus,
+        required: reactivationStatus === "required",
+        requiredAt: action.reactivationRequiredAt?.toISOString?.() ?? null,
+        completedAt: action.reactivationCompletedAt?.toISOString?.() ?? null,
+        resolution: action.reactivationResolution ?? null,
+        publicationRestored: false,
+        nextAction
+      },
       createdAt: action.createdAt.toISOString()
     };
   }
 
+  private assertExpiredSuspensionReactivationState(
+    action: any,
+    actorId: string,
+    now: Date
+  ) {
+    if (
+      action.kind !== "suspension"
+      || action.revokedAt
+      || !(action.endsAt instanceof Date)
+      || action.endsAt.getTime() > now.getTime()
+      || action.reactivationStatus !== "required"
+    ) {
+      throw new AppException(
+        "COMPANION_REACTIVATION_NOT_REQUIRED",
+        "This temporary suspension is not awaiting an expiry reactivation review",
+        HttpStatus.CONFLICT
+      );
+    }
+    if (!action.createdById || action.createdById === actorId) {
+      throw new AppException(
+        "COMPANION_REACTIVATION_INDEPENDENT_REVIEW_REQUIRED",
+        "The original suspension creator cannot complete its reactivation review",
+        HttpStatus.CONFLICT
+      );
+    }
+  }
+
+  private assertReactivationReviewState(appeal: any, actorId: string) {
+    if (
+      appeal.status !== "overturned"
+      || appeal.reactivationStatus !== "required"
+      || !["serviceRestriction", "suspension"].includes(appeal.action?.kind)
+      || !appeal.action?.revokedAt
+    ) {
+      throw new AppException(
+        "COMPANION_REACTIVATION_NOT_REQUIRED",
+        "This appeal is not awaiting a reactivation review",
+        HttpStatus.CONFLICT
+      );
+    }
+    if (
+      !appeal.action.createdById
+      || !appeal.resolvedById
+      || appeal.action.createdById === actorId
+      || appeal.resolvedById === actorId
+    ) {
+      throw new AppException(
+        "COMPANION_REACTIVATION_INDEPENDENT_REVIEW_REQUIRED",
+        "Reactivation must be completed by someone other than the original action creator and appeal reviewer",
+        HttpStatus.CONFLICT
+      );
+    }
+  }
+
   private appealDto(appeal: any) {
+    const reactivationStatus = appeal.reactivationStatus ?? "notRequired";
     return {
       id: appeal.id,
       actionId: appeal.actionId,
       statement: appeal.statement,
-      evidenceReferences: appeal.evidenceReferences,
+      evidenceAttachments: this.caseEvidence.attachmentDtos(appeal),
+      legacyEvidenceReferenceCount: appeal.legacyEvidenceReferenceCount ?? 0,
       status: appeal.status,
       reviewDueAt: appeal.reviewDueAt.toISOString(),
       overdue:
         appeal.status === "pending" && appeal.reviewDueAt.getTime() <= Date.now(),
       resolution: appeal.resolution ?? null,
       resolvedAt: appeal.resolvedAt?.toISOString() ?? null,
+      reactivation: {
+        status: reactivationStatus,
+        required: reactivationStatus === "required",
+        requiredAt: appeal.reactivationRequiredAt?.toISOString?.() ?? null,
+        completedAt: appeal.reactivationCompletedAt?.toISOString?.() ?? null,
+        resolution: appeal.reactivationResolution ?? null,
+        publicationRestored: false,
+        nextAction: reactivationStatus === "required"
+          ? "awaitIndependentOperationalReview"
+          : reactivationStatus === "completed"
+            ? "awaitExplicitPublicationDecision"
+            : "none"
+      },
       createdAt: appeal.createdAt.toISOString()
     };
+  }
+
+  private companionAppealAdminInclude() {
+    return {
+      action: true,
+      companion: { select: { id: true, name: true, ownerUserId: true } },
+      assignedTo: {
+        select: { id: true, role: true, profile: { select: { displayName: true } } }
+      },
+      ...this.caseEvidence.attachmentInclude()
+    } as const;
+  }
+
+  private companionAppealStaffDto(appeal: any, actorId: string) {
+    const dto = this.appealDto(appeal);
+    const independentReviewEligible =
+      Boolean(appeal.action?.createdById) && appeal.action.createdById !== actorId;
+    const assignedToActor = appeal.assignedToUserId === actorId;
+    return {
+      ...dto,
+      // Queue routing can expose the appeal record to an administrator, but
+      // raw evidence metadata and signed URLs belong only to the current
+      // independent assignee.
+      evidenceAttachments:
+        independentReviewEligible && assignedToActor ? dto.evidenceAttachments : [],
+      companion: appeal.companion,
+      action: this.actionDto(appeal.action),
+      assignedToUserId: appeal.assignedToUserId ?? null,
+      assignedAt: appeal.assignedAt?.toISOString?.() ?? null,
+      assignedTo: appeal.assignedTo
+        ? {
+            userId: appeal.assignedTo.id,
+            role: appeal.assignedTo.role,
+            displayName: appeal.assignedTo.profile?.displayName ?? null
+          }
+        : null,
+      independentReviewEligible,
+      assignedToActor,
+      reactivationReviewEligible:
+        appeal.status === "overturned"
+        && appeal.reactivationStatus === "required"
+        && independentReviewEligible
+        && Boolean(appeal.resolvedById)
+        && appeal.resolvedById !== actorId
+    };
+  }
+
+  private assertCompanionAppealReviewable(existing: any, actorId: string): asserts existing {
+    if (!existing) {
+      throw new AppException(
+        "COMPANION_APPEAL_NOT_FOUND",
+        "Appeal not found",
+        HttpStatus.NOT_FOUND
+      );
+    }
+    if (existing.status !== "pending") {
+      throw new AppException(
+        "COMPANION_APPEAL_ALREADY_RESOLVED",
+        "Appeal is already resolved",
+        HttpStatus.CONFLICT
+      );
+    }
+    if (!existing.action?.createdById || existing.action.createdById === actorId) {
+      throw new AppException(
+        "COMPANION_APPEAL_INDEPENDENT_REVIEW_REQUIRED",
+        "The original account-action creator cannot process its appeal",
+        HttpStatus.CONFLICT
+      );
+    }
+  }
+
+  private async assertCompanionAppealStaff(
+    db: any,
+    actorId: string,
+    allowedRoles: readonly ("supply" | "admin")[]
+  ): Promise<{ id: string; role: "supply" | "admin" }> {
+    const credential = await (db.staffCredential ?? this.prisma.staffCredential).findUnique({
+      where: { userId: actorId },
+      include: { user: { select: { id: true, role: true, accountStatus: true } } }
+    });
+    if (
+      !credential
+      || credential.status !== "active"
+      || credential.user.accountStatus !== "active"
+      || !allowedRoles.includes(credential.user.role)
+    ) {
+      throw new AppException(
+        "COMPANION_APPEAL_STAFF_REQUIRED",
+        "An active authorized companion-appeal operator is required",
+        HttpStatus.FORBIDDEN
+      );
+    }
+    return { id: credential.user.id, role: credential.user.role };
+  }
+
+  private incidentAdminInclude() {
+    return {
+      companion: { select: { id: true, name: true, ownerUserId: true } },
+      order: { select: { id: true, status: true, scheduledAt: true } },
+      assignedTo: {
+        select: { id: true, role: true, profile: { select: { displayName: true } } }
+      },
+      ...this.caseEvidence.attachmentInclude()
+    } as const;
+  }
+
+  private async assertIncidentStaff(
+    db: any,
+    actorId: string,
+    allowedRoles: readonly ("supply" | "admin")[]
+  ): Promise<{ id: string; role: "supply" | "admin" }> {
+    const credential = await db.staffCredential.findUnique({
+      where: { userId: actorId },
+      include: { user: { select: { id: true, role: true, accountStatus: true } } }
+    });
+    if (
+      !credential
+      || credential.status !== "active"
+      || credential.user.accountStatus !== "active"
+      || !allowedRoles.includes(credential.user.role)
+    ) {
+      throw new AppException(
+        "COMPANION_INCIDENT_STAFF_REQUIRED",
+        "An active authorized incident operator is required",
+        HttpStatus.FORBIDDEN
+      );
+    }
+    return { id: credential.user.id, role: credential.user.role };
+  }
+
+  private throwIncidentNotFound(): never {
+    throw new AppException(
+      "COMPANION_INCIDENT_NOT_FOUND",
+      "Incident not found",
+      HttpStatus.NOT_FOUND
+    );
   }
 
   private async incidentsForCompanion(companionId: string, status?: string, page = 1, pageSize = 100) {
@@ -1634,6 +2825,14 @@ export class CompanionLifecycleService {
     } as Record<string, unknown>;
     if (includeOperations) {
       dto.companion = incident.companion ?? null;
+      dto.assignedTo = incident.assignedTo
+        ? {
+            userId: incident.assignedTo.id,
+            displayName: incident.assignedTo.profile?.displayName ?? null,
+            role: incident.assignedTo.role
+          }
+        : null;
+      dto.assignedAt = incident.assignedAt?.toISOString?.() ?? null;
       dto.order = incident.order ? {
         id: incident.order.id,
         status: incident.order.status,
@@ -1687,7 +2886,4 @@ export class CompanionLifecycleService {
     return dto;
   }
 
-  private normalizeReferences(references?: string[]) {
-    return [...new Set((references ?? []).map((reference) => reference.trim()).filter(Boolean))];
-  }
 }

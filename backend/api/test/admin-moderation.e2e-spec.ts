@@ -131,9 +131,9 @@ describe("Admin Moderation (e2e)", () => {
             phone: role === "user" ? "+8613800138000" : `+8613800${role === "admin" ? "000001" : "000002"}`,
             age: 22,
             gender: "female",
-            // Public interaction is intentionally identity-gated in the
-            // first release. Test fixtures that exercise a real chat/report
-            // route must model the verified state explicitly.
+            // This is only the legacy profile display flag. The production
+            // interaction gate deliberately does not treat it as an
+            // authority-backed identity grant.
             isVerified: role === "user"
           }
         }
@@ -817,7 +817,11 @@ describe("Admin Moderation (e2e)", () => {
       .expect(200);
 
     expect(filtered.body.data.cases.length).toBe(1);
-    expect(filtered.body.data.cases[0].content).toContain("微信");
+    // Keyword matching still runs against the retained case record, but chat
+    // case summaries must not project legacy text that may have originated in
+    // media OCR or transcription while media playback is disabled.
+    expect(filtered.body.data.cases[0].content).toBe("历史媒体审核证据已在文本首发版本中隐藏。");
+    expect(JSON.stringify(filtered.body.data.cases[0])).not.toContain("微信");
   });
 
   it("lets review staff create labels and a review lead export them", async () => {
@@ -912,7 +916,7 @@ describe("Admin Moderation (e2e)", () => {
   });
 
   it("returns linked conversation evidence only through the independent review department", async () => {
-    const { user, token: userToken } = await createUser("user");
+    const { user } = await createUser("user");
     const { token: reviewToken } = await createReviewStaff("reviewer");
     const companion = await prisma.companionProfile.findUniqueOrThrow({ where: { id: "c1" } });
     const conversation = await prisma.conversation.create({
@@ -939,26 +943,59 @@ describe("Admin Moderation (e2e)", () => {
       }
     });
 
-    await request(app.getHttpServer())
-      .post("/api/v1/conversations/c1/messages")
-      .set("Authorization", `Bearer ${userToken}`)
-      .send({ content: "加我微信私下聊转账", senderId: user.id })
-      .expect(201);
-
-    const openCases = await prisma.moderationCase.findMany({
-      where: { source: "chat" },
-      orderBy: { createdAt: "desc" },
-      take: 1
+    // This test exercises the review evidence boundary, not public message
+    // admission. Seed the already-moderated records explicitly: production
+    // messaging must continue to fail closed until an approved, revocable
+    // identity authority exists.
+    const message = await prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        senderId: user.id,
+        senderName: "普通用户",
+        content: "加我微信私下聊转账",
+        type: "text",
+        moderationStatus: "blocked",
+        visibility: "senderOnly",
+        moderationDecision: "block",
+        policyVersion: "chat-v2"
+      }
     });
-    expect(openCases.length).toBe(1);
+    const linkedCase = await prisma.moderationCase.create({
+      data: {
+        title: "聊天拦截：加我微信私下聊转账",
+        category: "实时风控",
+        riskLevel: "high",
+        status: "humanReview",
+        source: "chat",
+        content: message.content,
+        targetId: conversation.externalId,
+        messageId: message.id,
+        automaticCaseKey: `chat:${message.id}`,
+        conversationId: conversation.id,
+        subjectUserId: user.id,
+        priority: "high",
+        policyVersion: "chat-v2",
+        aiScore: 0.96,
+        aiReason: "疑似私联及站外转账",
+        decision: "block",
+        matchedRules: ["private.contact", "payment.off_platform"],
+        usedAI: false
+      }
+    });
 
     const evidence = await request(app.getHttpServer())
-      .get(`/api/v1/review/cases/${openCases[0].id}/conversation`)
+      .get(`/api/v1/review/cases/${linkedCase.id}/conversation`)
       .set("Authorization", `Bearer ${reviewToken}`)
       .expect(200);
 
-    expect(evidence.body.data.caseId).toBe(openCases[0].id);
-    // targetId is external conversation id; messages may exist if message was stored
-    expect(Array.isArray(evidence.body.data.messages)).toBe(true);
+    expect(evidence.body.data.caseId).toBe(linkedCase.id);
+    expect(evidence.body.data.anchorMessage).toMatchObject({
+      id: message.id,
+      content: message.content,
+      attachments: []
+    });
+    expect(evidence.body.data.messages).toEqual([
+      expect.objectContaining({ id: message.id, attachments: [] })
+    ]);
   });
 });

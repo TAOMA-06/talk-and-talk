@@ -106,6 +106,26 @@ describe("bounded account erasure graph", () => {
     expect(sql).not.toMatch(/\bAVG\s*\(/i);
   });
 
+  it("moves both shorter and longer media expiries to the exact retained deadline", async () => {
+    const { tx, subject } = createHarness();
+    const retentionEndsAt = new Date("2029-08-26T00:00:00.000Z");
+    tx.$queryRaw
+      .mockResolvedValueOnce([{ count: 2, cursor: "asset-2" }])
+      .mockResolvedValueOnce([{ exists: false }]);
+
+    await eraseSubjectPhaseBatch(tx, "media_retention", {
+      ...subject,
+      mediaRetentionEndsAt: retentionEndsAt
+    }, 20);
+
+    const sql = tx.$queryRaw.mock.calls
+      .map((call: any[]) => Array.from(call[0] as readonly string[]).join(""))
+      .join("\n");
+    expect(sql).toContain('asset."expiresAt" IS DISTINCT FROM');
+    expect(sql).toContain('SET "expiresAt" =');
+    expect(sql).not.toContain('asset."expiresAt" >');
+  });
+
   it("allows bounded deletion of auth identity tombstones", async () => {
     const { tx } = createHarness();
 

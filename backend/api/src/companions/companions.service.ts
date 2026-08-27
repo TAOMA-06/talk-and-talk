@@ -2215,7 +2215,48 @@ export class CompanionsService {
     }
     const owner = ownerAlreadyChecked
       ?? await this.assertAssignableOwnerUnderLock(db, ownerUserId);
-    const commercialProfile = await db.companionCommercialProfile.findUnique({ where: { companionId } });
+    const now = new Date();
+    const [
+      commercialProfile,
+      activeRestriction,
+      pendingAppealReactivation,
+      pendingExpiryReactivation
+    ] = await Promise.all([
+      db.companionCommercialProfile.findUnique({ where: { companionId } }),
+      db.companionAccountAction.findFirst({
+        where: {
+          companionId,
+          kind: { in: ["serviceRestriction", "suspension"] },
+          revokedAt: null,
+          startsAt: { lte: now },
+          OR: [{ endsAt: null }, { endsAt: { gt: now } }]
+        },
+        select: { id: true, kind: true }
+      }),
+      db.companionAccountAppeal.findFirst({
+        where: { companionId, reactivationStatus: "required" },
+        select: { id: true }
+      }),
+      db.companionAccountAction.findFirst({
+        where: { companionId, reactivationStatus: "required" },
+        select: { id: true }
+      })
+    ]);
+    if (activeRestriction) {
+      throw new AppException(
+        "COMPANION_ACCOUNT_ACTION_ACTIVE",
+        "An active service restriction or suspension prevents publication",
+        HttpStatus.CONFLICT,
+        { actionKind: activeRestriction.kind }
+      );
+    }
+    if (pendingAppealReactivation || pendingExpiryReactivation) {
+      throw new AppException(
+        "COMPANION_REACTIVATION_REQUIRED",
+        "Independent operational reactivation review must finish before publication",
+        HttpStatus.CONFLICT
+      );
+    }
     if (owner.profile?.isVerified !== true) {
       throw new AppException(
         "COMPANION_OWNER_NOT_ELIGIBLE",

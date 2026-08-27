@@ -11,6 +11,7 @@ import { NotificationsService } from "../notifications/notifications.service";
 import { OrdersService } from "../orders/orders.service";
 import { VoiceRoomControlService } from "../voice/voice-room-control.service";
 import { assertCurrentCustomerAdultEligibility } from "../users/customer-adult-eligibility.service";
+import { assertPublicInteractionIdentity } from "../users/public-interaction-identity.gate";
 import {
   WECHAT_PAY_PROVIDER,
   WeChatNotifyPayload,
@@ -121,6 +122,12 @@ export class PaymentsService implements OnModuleInit {
         where: { id: orderId },
         include: {
           conversation: { select: { externalId: true } },
+          user: {
+            select: {
+              accountStatus: true,
+              profile: { select: { isVerified: true } }
+            }
+          },
           companion: {
             include: { owner: { include: { profile: true } } }
           }
@@ -528,10 +535,10 @@ export class PaymentsService implements OnModuleInit {
     const result = await this.requestRefund(userId, orderId, reason);
     return {
       refund: this.customerRefundDto(result.refund),
-      // requestRefund returns the declared OrderDto on every branch. Do not
-      // re-project it here: the DTO carries ISO strings, whereas toDto expects
-      // a Prisma record and would turn a safe response into a runtime error.
-      order: result.order,
+      // Refund actions do not need the customer's stable user id, review-policy
+      // snapshots, or the broader participant order surface. result.order is
+      // already an ISO-string DTO, so apply the dedicated allowlist directly.
+      order: this.customerRefundOrderDto(result.order),
       created: result.created
     };
   }
@@ -1088,7 +1095,10 @@ export class PaymentsService implements OnModuleInit {
       );
     }
     const current: any = await this.prisma.refundTransaction.findUnique({ where: { id: refund.id }, include: { order: true } } as any);
-    return { refund: this.customerRefundDto(current), order: this.ordersService.toDto(current.order) };
+    return {
+      refund: this.customerRefundDto(current),
+      order: this.customerRefundOrderDto(this.ordersService.toDto(current.order))
+    };
   }
 
   async syncRefundForAdmin(actorId: string, refundId: string) {
@@ -1676,6 +1686,10 @@ export class PaymentsService implements OnModuleInit {
         HttpStatus.CONFLICT
       );
     }
+    // A text-only order must never accept money when neither participant can
+    // use the only in-scope delivery channel. This uses the same authority gate
+    // as message sending; current first-release grants are deliberately frozen.
+    assertPublicInteractionIdentity(order.user ?? { accountStatus: "unavailable" });
     if (!(order.scheduledAt instanceof Date) ||
         order.scheduledAt.getTime() <= Date.now() + MIN_PREPAY_LEAD_MS +
           MIN_PREPAY_USABLE_WINDOW_MS + PREPAY_ISSUANCE_ALLOWANCE_MS) {
@@ -1693,6 +1707,7 @@ export class PaymentsService implements OnModuleInit {
         HttpStatus.CONFLICT
       );
     }
+    assertPublicInteractionIdentity(owner);
     if (!(order.companionConfirmedAt instanceof Date)) {
       throw new AppException(
         "ORDER_NOT_CONFIRMED",
@@ -2462,6 +2477,28 @@ export class PaymentsService implements OnModuleInit {
       failureReason: refund.failureReason ?? null,
       reviewDueAt: refund.reviewDueAt ?? null,
       resolutionDueAt: refund.resolutionDueAt ?? null
+    };
+  }
+
+  private customerRefundOrderDto(order: any) {
+    return {
+      id: order.id,
+      companionId: order.companionId,
+      themeId: order.themeId,
+      durationMinutes: order.durationMinutes,
+      amountCents: order.amountCents,
+      amountYuan: order.amountYuan,
+      currency: order.currency,
+      status: order.status,
+      scheduledAt: order.scheduledAt,
+      companionSnapshot: order.companionSnapshot,
+      themeNameSnapshot: order.themeNameSnapshot,
+      conversationId: order.conversationId,
+      paidAt: order.paidAt,
+      cancelledAt: order.cancelledAt,
+      completedAt: order.completedAt,
+      createdAt: order.createdAt,
+      updatedAt: order.updatedAt
     };
   }
 

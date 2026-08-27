@@ -78,6 +78,9 @@ test("commercial admin exposes real queues and controlled mutation safeguards", 
     "/admin/commercial/companion-lifecycle/training",
     "/admin/commercial/companion-lifecycle/review-due",
     "/admin/commercial/companion-lifecycle/actions",
+    "/admin/commercial/companion-lifecycle/actions/${encodeURIComponent(item.id)}/reactivation",
+    "/admin/commercial/companion-lifecycle/appeals/${encodeURIComponent(item.id)}/reactivation",
+    "/case-evidence/attachments/${encodeURIComponent(attachmentId)}/read-url",
     "/admin/commercial/companion-lifecycle/companions/${encodeURIComponent(companionId)}/voice-intro-read",
     "/admin/users/${encodeURIComponent(item.ownerUserId)}/verification",
     "/admin/identity-verification-requests?status=",
@@ -133,10 +136,15 @@ test("commercial admin exposes real queues and controlled mutation safeguards", 
   assert.match(adminScript, /activeSupportTicketCount/);
   assert.match(adminScript, /item\.submittedBy\?\.id === state\.user\?\.id/);
   assert.match(adminScript, /const ownerIsVerified = item\.owner\?\.isVerified === true/);
-  assert.match(adminScript, /const next = !\(item\.owner\?\.isVerified === true\)/);
+  assert.match(adminScript, /const identityAction = ownerIsVerified[\s\S]*?提交撤销实名复核/);
+  assert.match(adminScript, /const identityAction = item\.isVerified[\s\S]*?提交撤销实名复核/);
+  assert.match(adminScript, /grantFrozen \? "" : actionButton\("批准撤销并应用"/);
   assert.match(adminScript, /item\.isVerified \? "资料已核验" : "资料未核验"/);
-  assert.match(adminScript, /不会立即改变实名状态/);
-  assert.match(adminScript, /批准后服务端才会应用实名状态/);
+  assert.match(adminScript, /if \(!item\.isVerified\)[\s\S]*?真实、可撤销的身份授权通道尚未接入[\s\S]*?return;/);
+  assert.match(adminScript, /item\.owner\?\.isVerified !== true[\s\S]*?真实、可撤销的身份授权通道尚未接入[\s\S]*?return;/);
+  assert.match(adminScript, /approve && item\.requestedIsVerified === true[\s\S]*?只能拒绝该请求[\s\S]*?return;/);
+  assert.doesNotMatch(adminScript, /actionButton\("提交实名核验复核"/);
+  assert.doesNotMatch(adminScript, /actionButton\("提交陪伴者实名核验复核"/);
   assert.match(adminScript, /resolutionEvidenceReference/);
   assert.match(adminScript, /evidenceReference/);
   assert.match(adminHtml, /id="identityVerificationStatusFilter"/);
@@ -145,13 +153,23 @@ test("commercial admin exposes real queues and controlled mutation safeguards", 
   assert.match(adminScript, /客户端辅助事件不能单独作为结论/);
   assert.match(adminScript, /INDEPENDENT FINAL REVIEW/);
   assert.match(adminScript, /尚未确认渠道成功/);
-  assert.match(adminHtml, /提交不等于生效/);
+  assert.match(adminHtml, /新实名授权 No-Go/);
+  assert.match(adminHtml, /后台不提供新授权提交或批准/);
   assert.match(adminHtml, /id="dataRightsStatusFilter"/);
   assert.match(adminHtml, /id="invoiceStatusFilter"/);
   assert.match(adminHtml, /本后台不生成票据、下载链接或伪造事实/);
   assert.match(adminHtml, /value="voided"/);
   assert.match(adminScript, /overdueUserAccountAppeals:\s*"普通用户账号申诉复核超时"/);
   assert.match(adminScript, /overdueCompanionAccountAppeals:\s*"陪伴者账号申诉复核超时"/);
+  assert.match(adminScript, /completeCompanionReactivation/);
+  assert.match(adminScript, /INDEPENDENT REACTIVATION · NO AUTO-PUBLISH/);
+  assert.match(adminScript, /是否重新公开必须另走显式发布操作/);
+  assert.match(adminScript, /THIRD REVIEW · NO AUTO-PUBLISH/);
+  assert.match(adminHtml, /id="suspensionReactivationList"/);
+  assert.match(adminHtml, /id="suspensionReactivationPagination" class="pagination"/);
+  assert.match(adminScript, /reactivationStatus=required/);
+  assert.match(adminScript, /data-case-evidence-id/);
+  assert.doesNotMatch(adminScript, /item\.evidenceReferences\?\.length/);
   assert.match(adminScript, /accountDeletionRetentionPolicyUnapproved:\s*"账号注销保留政策未获外部法律批准"/);
   assert.match(adminScript, /accountDeletionRetentionApprovalBacklog:\s*"账号注销保留分类待法律批准入账"/);
   for (const blocker of [
@@ -200,6 +218,7 @@ test("commercial growth queues paginate independently and assignee search never 
     "trainingPagination",
     "reviewDuePagination",
     "accountActionPagination",
+    "suspensionReactivationPagination",
     "incidentPagination",
     "withdrawalPagination",
     "voiceIntroPagination"
@@ -213,7 +232,7 @@ test("commercial growth queues paginate independently and assignee search never 
   assert.match(adminScript, /loadSupport\(state\.pages\.supportAssigned, next\)/);
   assert.match(adminScript, /state\.pages\.earnings = earningPage/);
   assert.match(adminScript, /state\.pages\.recoveries = recoveryPage/);
-  for (const pageKey of ["training", "reviewDue", "accountActions", "incidents", "withdrawals", "voiceIntros"]) {
+  for (const pageKey of ["training", "reviewDue", "accountActions", "suspensionReactivations", "incidents", "withdrawals", "voiceIntros"]) {
     assert.match(adminScript, new RegExp(`page=\\$\\{state\\.pages\\.${pageKey}\\}&pageSize=50`));
   }
   assert.match(adminScript, /\/admin\/operations\/support-assignees\?keyword=/);
@@ -428,6 +447,7 @@ test("companion appeal controls expose and enforce independent review in the adm
   );
 
   assert.match(adminHtml, /id="companionAppealStatusFilter"/);
+  assert.match(adminHtml, /id="companionAppealClaimablePanel" class="panel hidden"/);
   assert.match(adminHtml, /id="companionAppealPagination" class="pagination"/);
   assert.match(adminScript, /companionAppeals:\s*1/);
   assert.match(companionAppealLoader, /state\.pages\.companionAppeals = page/);
@@ -438,6 +458,11 @@ test("companion appeal controls expose and enforce independent review in the adm
   assert.match(adminScript, /item\.independentReviewEligible/);
   assert.match(adminScript, /不可复核自己的处置/);
   assert.match(adminScript, /必须由另一名授权人员独立复核/);
+  assert.match(companionAppealLoader, /appeals\/claimable\?page=\$\{page\}&pageSize=50/);
+  assert.match(adminScript, /陪伴者、正文与附件：认领后可见/);
+  assert.match(adminScript, /item\.assignedToActor/);
+  assert.match(adminScript, /appeals\/\$\{encodeURIComponent\(item\.id\)\}\/claims/);
+  assert.match(adminScript, /appeals\/\$\{encodeURIComponent\(item\.id\)\}\/assignments/);
 });
 
 test("ordinary consumer account appeals are a loaded, paginated, independently controlled queue", () => {
@@ -450,6 +475,11 @@ test("ordinary consumer account appeals are a loaded, paginated, independently c
   assert.match(adminScript, /account-appeals\/\$\{encodeURIComponent\(item\.id\)\}\/resolve/);
   assert.match(adminScript, /item\.independentReviewEligible/);
   assert.match(adminScript, /item\.assignedToUserId === state\.user\?\.id/);
+  assert.match(adminScript, /caseEvidenceButtons\(item\.evidenceAttachments\)/);
+  assert.match(adminScript, /data-case-evidence-id/);
+  assert.match(adminScript, /\/case-evidence\/attachments\/\$\{encodeURIComponent\(attachmentId\)\}\/read-url/);
+  assert.match(adminScript, /safeNavigationUrl\(result\.url\)/);
+  assert.match(adminScript, /window\.open\(url, "_blank", "noopener,noreferrer"\)/);
   assert.match(adminScript, /name: "resolution"/);
   assert.match(adminScript, /minlength: 10/);
   assert.match(adminScript, /maxlength: 1000/);
@@ -473,6 +503,18 @@ test("customer adult eligibility is an independent, paginated and privacy-bounde
   assert.match(adminScript, /仅允许不透明业务引用/);
   assert.match(adminScript, /服务结束时间超出有效期时仍会被服务端拒绝/);
   assert.match(adminScript, /#customerAdultEligibilityStatusFilter"\)\.addEventListener\("change", \(\) => loadCustomerAdultEligibility\(1\)\)/);
+});
+
+test("companion incidents separate anonymous claim summaries from assigned evidence access", () => {
+  assert.match(adminHtml, /id="incidentAssignedPanel"/);
+  assert.match(adminHtml, /id="incidentClaimablePanel" class="panel hidden"/);
+  assert.match(adminHtml, /不会返回陪伴者、类别、正文、订单号或附件标识/);
+  assert.match(adminScript, /incidents\/claimable\?page=\$\{page\}&pageSize=50/);
+  assert.match(adminScript, /scope.*claimableSummary|正文与附件：认领后可见/s);
+  assert.match(adminScript, /incidents\/\$\{encodeURIComponent\(item\.id\)\}\/claims/);
+  assert.match(adminScript, /incidents\/\$\{encodeURIComponent\(item\.id\)\}\/assignments/);
+  assert.match(adminScript, /role=supply&page=\$\{page\}&pageSize=100/);
+  assert.match(adminScript, /companionIncidents: "陪伴者事件"/);
 });
 
 test("admin and review JavaScript parse without executing", () => {

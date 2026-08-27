@@ -18,6 +18,7 @@ const prisma = {
   },
   userAccountAppeal: {
     findUnique: jest.fn(),
+    findUniqueOrThrow: jest.fn(),
     findMany: jest.fn(),
     count: jest.fn(),
     create: jest.fn(),
@@ -56,6 +57,14 @@ const prisma = {
 
 const audit = { record: jest.fn() };
 const notifications = { create: jest.fn() };
+const caseEvidence = {
+  assertAttachmentsAllowed: jest.fn(),
+  bindUserAccountAppeal: jest.fn(),
+  attachmentInclude: jest.fn().mockReturnValue({
+    evidenceAttachments: { include: { mediaAsset: true } }
+  }),
+  attachmentDtos: jest.fn((record: any) => record.evidenceAttachments ?? [])
+};
 
 const ordinaryUser = (overrides: Record<string, unknown> = {}) => ({
   id: "user-1",
@@ -92,6 +101,7 @@ const action = (overrides: Record<string, unknown> = {}) => ({
   revokedById: null,
   createdAt: new Date("2026-08-01T00:00:00.000Z"),
   updatedAt: new Date("2026-08-01T00:00:00.000Z"),
+  evidenceAttachments: [],
   appeal: null,
   ...overrides
 });
@@ -143,7 +153,15 @@ describe("UserAccountActionsService", () => {
     prisma.conversation.findFirst.mockResolvedValue(null);
     audit.record.mockResolvedValue({});
     notifications.create.mockResolvedValue({});
-    service = new UserAccountActionsService(prisma as any, audit as any, notifications as any);
+    caseEvidence.assertAttachmentsAllowed.mockImplementation(() => undefined);
+    caseEvidence.bindUserAccountAppeal.mockResolvedValue([]);
+    prisma.userAccountAppeal.findUniqueOrThrow.mockImplementation(async () => appeal());
+    service = new UserAccountActionsService(
+      prisma as any,
+      audit as any,
+      notifications as any,
+      caseEvidence as any
+    );
   });
 
   afterEach(() => jest.useRealTimers());
@@ -173,6 +191,7 @@ describe("UserAccountActionsService", () => {
           id: "appeal-1",
           status: "pending",
           statement: "我认为该处置依据不完整，请重新核验全部事实。",
+          evidenceAttachments: [],
           reviewDueAt: "2026-08-04T00:00:00.000Z",
           overdue: false,
           resolution: null,
@@ -245,7 +264,8 @@ describe("UserAccountActionsService", () => {
     expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({
       subjectUserIds: ["user-1"],
       action: "account.status_updated",
-      resourceId: "user-1"
+      resourceType: "userAccountAction",
+      resourceId: "action-new"
     }), prisma);
     expect(prisma.order.count).toHaveBeenCalledWith({
       where: { userId: "user-1", status: { in: ["paying", "paid", "inService"] } }
@@ -528,11 +548,13 @@ describe("UserAccountActionsService", () => {
     prisma.userAccountAppeal.create.mockImplementation(async ({ data }: any) => appeal(data));
 
     await expect(service.createAppeal("user-1", "action-1", {
-      statement: "我认为该处置依据不完整，请重新核验全部事实。"
+      statement: "我认为该处置依据不完整，请重新核验全部事实。",
+      evidenceAssetIds: ["11111111-1111-4111-8111-111111111111"]
     })).resolves.toEqual({
       id: "appeal-1",
       status: "pending",
       statement: "我认为该处置依据不完整，请重新核验全部事实。",
+      evidenceAttachments: [],
       reviewDueAt: "2026-08-04T00:00:00.000Z",
       overdue: false,
       resolution: null,
@@ -547,6 +569,12 @@ describe("UserAccountActionsService", () => {
         reviewDueAt: new Date("2026-08-04T00:00:00.000Z"),
         policyVersion: "2026.1"
       })
+    });
+    expect(caseEvidence.bindUserAccountAppeal).toHaveBeenCalledWith(prisma, {
+      assetIds: ["11111111-1111-4111-8111-111111111111"],
+      userId: "user-1",
+      actionId: "action-1",
+      appealId: "appeal-1"
     });
     expect(notifications.create).toHaveBeenCalledWith(
       "user-1",

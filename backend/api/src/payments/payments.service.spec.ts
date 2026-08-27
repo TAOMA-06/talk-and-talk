@@ -1,6 +1,7 @@
 import { HttpStatus } from "@nestjs/common";
 
 import { AppException } from "../common/errors/app.exception";
+import * as publicInteractionIdentity from "../users/public-interaction-identity.gate";
 import { MockWeChatPayProvider, TEST_MOCK_WECHAT_NOTIFY_SECRET } from "./wechat/mock-wechat-pay.provider";
 import { PaymentsService } from "./payments.service";
 
@@ -104,6 +105,10 @@ describe("PaymentsService", () => {
         profile: { isVerified: true }
       }
     },
+    user: {
+      accountStatus: "active",
+      profile: { isVerified: true }
+    },
     conversationId: null as string | null,
     paidAt: null,
     cancelledAt: null,
@@ -132,6 +137,8 @@ describe("PaymentsService", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.spyOn(publicInteractionIdentity, "assertPublicInteractionIdentity")
+      .mockImplementation(() => undefined);
     prisma.order.findUnique.mockResolvedValue(baseOrder);
     prisma.paymentTransaction.findUnique.mockResolvedValue({ orderId: "o1" });
     prisma.paymentTransaction.updateMany.mockResolvedValue({ count: 1 });
@@ -164,6 +171,43 @@ describe("PaymentsService", () => {
       provider: "mock",
       productionReady: false
     });
+  });
+
+  it("refuses prepay before any payment write when the text-delivery identity gate is closed", async () => {
+    const providerPrepay = jest.spyOn(wechat, "createMiniProgramPrepay");
+    jest.spyOn(publicInteractionIdentity, "assertPublicInteractionIdentity")
+      .mockImplementationOnce(() => {
+        throw new AppException(
+          "PUBLIC_INTERACTION_IDENTITY_REQUIRED",
+          "identity authority unavailable",
+          HttpStatus.FORBIDDEN,
+          {
+            verificationStatus: "notVerified",
+            recoveryPath: "/pages/profile/index",
+            publicInteractionBlocked: true
+          }
+        );
+      });
+    const db = {
+      $queryRaw: jest.fn(),
+      order: { findUnique: jest.fn().mockResolvedValue(baseOrder) },
+      paymentTransaction: {
+        findFirst: jest.fn(),
+        create: jest.fn(),
+        updateMany: jest.fn()
+      }
+    };
+    prisma.$transaction.mockImplementationOnce(async (fn: any) => fn(db));
+
+    await expect(service.prepay("u1", "o1", "miniProgram"))
+      .rejects.toMatchObject({
+        code: "PUBLIC_INTERACTION_IDENTITY_REQUIRED",
+        status: HttpStatus.FORBIDDEN
+      });
+
+    expect(db.paymentTransaction.findFirst).not.toHaveBeenCalled();
+    expect(db.paymentTransaction.create).not.toHaveBeenCalled();
+    expect(providerPrepay).not.toHaveBeenCalled();
   });
 
   it("warms WeChat platform certificates before a real provider accepts traffic", async () => {
@@ -307,9 +351,23 @@ describe("PaymentsService", () => {
       created: false,
       order: {
         id: "o1",
+        userId: "u1-must-not-leak",
         status: "paid",
         amountCents: 3900,
+        amountYuan: 39,
+        currency: "CNY",
         companionId: "c1",
+        themeId: "t1",
+        durationMinutes: 30,
+        scheduledAt: "2026-08-10T00:00:00.000Z",
+        companionSnapshot: { name: "陪伴者", role: "倾听", initials: "陪" },
+        themeNameSnapshot: "情绪倾听",
+        conversationId: null,
+        paidAt: "2026-08-09T00:00:00.000Z",
+        cancelledAt: null,
+        completedAt: null,
+        refundPolicyVersionSnapshot: "2026.08-private",
+        refundRequestWindowHoursSnapshot: 72,
         createdAt: "2026-08-09T00:00:00.000Z",
         updatedAt: "2026-08-09T00:00:00.000Z"
       },
@@ -343,7 +401,18 @@ describe("PaymentsService", () => {
         id: "o1",
         status: "paid",
         amountCents: 3900,
+        amountYuan: 39,
+        currency: "CNY",
         companionId: "c1",
+        themeId: "t1",
+        durationMinutes: 30,
+        scheduledAt: "2026-08-10T00:00:00.000Z",
+        companionSnapshot: { name: "陪伴者", role: "倾听", initials: "陪" },
+        themeNameSnapshot: "情绪倾听",
+        conversationId: null,
+        paidAt: "2026-08-09T00:00:00.000Z",
+        cancelledAt: null,
+        completedAt: null,
         createdAt: "2026-08-09T00:00:00.000Z",
         updatedAt: "2026-08-09T00:00:00.000Z"
       },
@@ -371,8 +440,12 @@ describe("PaymentsService", () => {
     ]) {
       expect(result.refund).not.toHaveProperty(privateField);
     }
-    expect(result.order).toBe(internalResult.order);
     for (const privateField of [
+      "userId",
+      "customer",
+      "refundPolicyVersionSnapshot",
+      "refundRequestWindowHoursSnapshot",
+      "clientRequestId",
       "settlementRecipientRefSnapshot",
       "taxProfileRefSnapshot",
       "identityEvidenceRefSnapshot",
@@ -444,6 +517,15 @@ describe("PaymentsService", () => {
       "updatedAt"
     ]) {
       expect(result.refund).not.toHaveProperty(privateField);
+    }
+    for (const privateField of [
+      "userId",
+      "customer",
+      "refundPolicyVersionSnapshot",
+      "refundRequestWindowHoursSnapshot",
+      "clientRequestId"
+    ]) {
+      expect(result.order).not.toHaveProperty(privateField);
     }
     expect(providerQuery).not.toHaveBeenCalled();
   });

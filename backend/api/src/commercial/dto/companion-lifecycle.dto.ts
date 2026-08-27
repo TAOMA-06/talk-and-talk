@@ -44,19 +44,17 @@ export class SubmitTrainingAttemptDto {
 
 export class CreateCompanionAppealDto {
   @IsString()
+  @IsSafeOperationalText()
   @MinLength(10)
   @MaxLength(1000)
   statement!: string;
 
   @IsOptional()
   @IsArray()
-  @ArrayMaxSize(8)
+  @ArrayMaxSize(3)
   @ArrayUnique()
-  @IsString({ each: true })
-  @MinLength(6, { each: true })
-  @MaxLength(160, { each: true })
-  @Matches(EXTERNAL_REFERENCE, { each: true })
-  evidenceReferences?: string[];
+  @IsUUID("4", { each: true })
+  evidenceAssetIds?: string[];
 }
 
 export class CreateCompanionIncidentDto {
@@ -128,6 +126,19 @@ export class ResolveCompanionAppealDto {
   resolution!: string;
 }
 
+export class AssignCompanionAppealDto {
+  @IsUUID("4")
+  assignedToUserId!: string;
+}
+
+export class CompleteCompanionReactivationDto {
+  @IsString()
+  @IsSafeOperationalText()
+  @MinLength(10)
+  @MaxLength(1000)
+  resolution!: string;
+}
+
 export class ResolveCompanionIncidentDto {
   @IsIn(["inReview", "resolved", "closed"])
   status!: "inReview" | "resolved" | "closed";
@@ -138,6 +149,11 @@ export class ResolveCompanionIncidentDto {
   @MinLength(5)
   @MaxLength(1000)
   resolution?: string;
+}
+
+export class AssignCompanionIncidentDto {
+  @IsUUID("4")
+  assignedToUserId!: string;
 }
 
 export class ReviewCompanionVoiceIntroDto {
@@ -192,6 +208,10 @@ export class ListCompanionLifecycleAdminDto {
   @IsOptional()
   @IsIn(["notSubmitted", "pendingReview", "approved", "rejected"])
   voiceIntroStatus?: "notSubmitted" | "pendingReview" | "approved" | "rejected";
+
+  @IsOptional()
+  @IsIn(["notRequired", "required", "completed"])
+  reactivationStatus?: "notRequired" | "required" | "completed";
 
   @IsOptional()
   @IsIn(["inProgress", "passed", "expired"])

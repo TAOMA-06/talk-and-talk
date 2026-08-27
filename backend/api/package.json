@@ -11,9 +11,9 @@
     "verify:prod-artifacts": "npm run build && node scripts/verify-production-artifacts.mjs",
     "test": "npm run prisma:generate && node scripts/assert-zero-skips.mjs --jest --runInBand",
     "test:preflight": "npm run test:preflight:static && npm run test:preflight:postgres",
-    "test:preflight:static": "node scripts/assert-zero-skips.mjs --node-test scripts/deployment-preflight.test.mjs scripts/voice-release-artifacts.test.mjs scripts/cloudbase-template.test.mjs scripts/admin-review-static-assets.test.mjs scripts/staff-offboarding-static-assets.test.mjs scripts/staff-offboarding-concurrency.test.mjs scripts/notification-delivery-claim-concurrency.test.mjs scripts/openapi-controller-contract.test.mjs scripts/readme-postgres-boundary.test.mjs scripts/finance-terminal-audit-controls.test.mjs scripts/availability-capacity-worker-scale.test.mjs scripts/account-deletion-phased-erasure-scale.test.mjs scripts/account-deletion-auth-tombstone-concurrency.test.mjs scripts/order-refund-policy-snapshots.test.mjs scripts/future-booking-boundary.test.mjs ../../infra/nginx/assert-commercial-surface.mjs",
-    "test:preflight:postgres": "node scripts/isolated-postgres-preflight-environment.mjs && node scripts/assert-zero-skips.mjs --node-test scripts/staff-offboarding-concurrency.test.mjs scripts/notification-delivery-claim-concurrency.test.mjs scripts/finance-terminal-audit-controls.test.mjs scripts/availability-capacity-worker-scale.test.mjs scripts/account-deletion-phased-erasure-scale.test.mjs scripts/account-deletion-auth-tombstone-concurrency.test.mjs scripts/order-refund-policy-snapshots.test.mjs",
-    "test:e2e": "npm run assert:e2e:runtime && npm run assert:e2e:environment && npm run verify:e2e:ownership && npm run prisma:generate && node scripts/assert-zero-skips.mjs --jest --config test/jest-e2e.json --runInBand",
+    "test:preflight:static": "node scripts/assert-zero-skips.mjs --node-test scripts/deployment-preflight.test.mjs scripts/voice-release-artifacts.test.mjs scripts/cloudbase-template.test.mjs scripts/admin-review-static-assets.test.mjs scripts/staff-offboarding-static-assets.test.mjs scripts/staff-offboarding-concurrency.test.mjs scripts/notification-delivery-claim-concurrency.test.mjs scripts/openapi-controller-contract.test.mjs scripts/readme-postgres-boundary.test.mjs scripts/finance-terminal-audit-controls.test.mjs scripts/availability-capacity-worker-scale.test.mjs scripts/account-deletion-phased-erasure-scale.test.mjs scripts/account-deletion-auth-tombstone-concurrency.test.mjs scripts/order-refund-policy-snapshots.test.mjs scripts/future-booking-boundary.test.mjs scripts/controlled-account-appeal-evidence.test.mjs scripts/retention-expiry-graph-completion.test.mjs scripts/audit-subject-policy-v3.test.mjs scripts/companion-incident-assignment-acl.test.mjs scripts/companion-appeal-assignment-acl.test.mjs ../../infra/nginx/assert-commercial-surface.mjs",
+    "test:preflight:postgres": "npm run build && node scripts/isolated-postgres-preflight-environment.mjs && npm run prisma:assert-schema-sync && node scripts/assert-zero-skips.mjs --node-test --test-concurrency=1 scripts/staff-offboarding-concurrency.test.mjs scripts/notification-delivery-claim-concurrency.test.mjs scripts/finance-terminal-audit-controls.test.mjs scripts/availability-capacity-worker-scale.test.mjs scripts/account-deletion-phased-erasure-scale.test.mjs scripts/account-deletion-auth-tombstone-concurrency.test.mjs scripts/order-refund-policy-snapshots.test.mjs scripts/controlled-account-appeal-evidence-postgres.test.mjs scripts/account-data-retention-legal-hold-concurrency.test.mjs scripts/retention-expiry-graph-postgres.test.mjs scripts/retention-media-legal-hold-concurrency.test.mjs scripts/retention-graph-migrations.test.mjs scripts/audit-subject-policy-v3-postgres.test.mjs scripts/companion-incident-assignment-acl-postgres.test.mjs scripts/companion-appeal-assignment-acl-postgres.test.mjs",
+    "test:e2e": "npm run assert:e2e:runtime && npm run assert:e2e:environment && npm run verify:e2e:ownership && npm run prisma:generate && node scripts/assert-zero-skips.mjs --jest --config test/jest-e2e.json --runInBand --silent",
     "test:e2e:guard": "node scripts/assert-zero-skips.mjs --node-test scripts/assert-zero-skips.test.mjs scripts/e2e-no-skip.test.mjs scripts/isolated-e2e-environment.test.mjs scripts/e2e-target-ownership.test.mjs scripts/local-docker-endpoint.test.mjs scripts/default-jest-e2e-isolation.test.mjs scripts/isolated-e2e-safe-runtime.test.mjs scripts/ci-e2e-safe-runtime.test.mjs scripts/e2e-teardown-guard.test.mjs scripts/isolated-postgres-preflight-environment.test.mjs scripts/run-isolated-e2e.test.mjs scripts/run-migration-compatibility.test.mjs scripts/smoke-authorization.test.mjs ../../scripts/g2-browser-evidence-card-contract.test.mjs ../../scripts/oci-builder-custody-contract.test.mjs",
     "assert:e2e:environment": "node scripts/assert-disposable-e2e-environment.cjs",
     "assert:e2e:runtime": "node scripts/isolated-e2e-safe-runtime.cjs",
@@ -23,6 +23,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
+    "prisma:assert-schema-sync": "prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code",
     "prisma:seed": "ts-node src/database/seed.ts",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "ts-node src/database/seed.ts",
@@ -82,6 +83,8 @@
   },
   "overrides": {
     "@hono/node-server": "1.19.13",
+    "deepmerge-ts": "8.0.2",
+    "fast-uri": "3.1.6",
     "find-my-way": "9.7.0",
     "valibot": "1.4.2"
   }

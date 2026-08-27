@@ -73,6 +73,79 @@ const orderDetailTemplate = readFileSync(join(root, "pages/order/detail.wxml"), 
 const orderDetailSource = readFileSync(join(root, "pages/order/detail.ts"), "utf8");
 const ordersTemplate = readFileSync(join(root, "pages/orders/index.wxml"), "utf8");
 const ordersSource = readFileSync(join(root, "pages/orders/index.ts"), "utf8");
+const paymentSource = readFileSync(join(root, "pages/order/payment.ts"), "utf8");
+const chatTemplate = readFileSync(join(root, "pages/chat/index.wxml"), "utf8");
+const communityTemplate = readFileSync(join(root, "pages/community/index.wxml"), "utf8");
+const companionDetailTemplate = readFileSync(join(root, "pages/companion/detail.wxml"), "utf8");
+const publicInteractionConfigSource = readFileSync(join(root, "utils/config.ts"), "utf8");
+const modelsSource = readFileSync(join(root, "utils/models.ts"), "utf8");
+const customerRefundOrderFields = [
+  "id", "companionId", "themeId", "durationMinutes", "amountCents", "amountYuan",
+  "currency", "status", "scheduledAt", "companionSnapshot", "themeNameSnapshot",
+  "conversationId", "paidAt", "cancelledAt", "completedAt", "createdAt", "updatedAt"
+];
+const customerRefundOrderType = /export type CustomerRefundOrder = \{\n([\s\S]*?)\n\};/.exec(modelsSource);
+assert.ok(customerRefundOrderType, "Mini Program must declare the customer refund order projection");
+assert.deepEqual(
+  [...customerRefundOrderType[1].matchAll(/^  ([A-Za-z][A-Za-z0-9]*):/gm)].map((match) => match[1]),
+  customerRefundOrderFields,
+  "CustomerRefundOrder must match the exact 17-field OpenAPI projection"
+);
+assert.match(
+  modelsSource,
+  /export type RefundRequestResult = \{[\s\S]*?order: CustomerRefundOrder;/,
+  "refund results must not widen the minimal order projection back to Order"
+);
+assert.match(
+  chatTemplate,
+  /messageInteractionAvailable && publicInteractionIdentityAvailable[\s\S]*class="composer"/,
+  "the chat composer must stay hidden while the first-release identity authority is frozen"
+);
+assert.match(
+  communityTemplate,
+  /wx:if="\{\{publicInteractionIdentityAvailable\}\}" class="card compose"/,
+  "the community composer must stay hidden while the first-release identity authority is frozen"
+);
+assert.match(
+  communityTemplate,
+  /publicInteractionIdentityAvailable \? '广场还很安静，发第一条内容吧。' : '当前没有可浏览的广场内容；公开发布尚未开放。'/,
+  "an empty frozen community must not invite an impossible first post"
+);
+assert.match(
+  companionDetailTemplate,
+  /!publicInteractionIdentityAvailable[\s\S]*新预约和支付暂不可用/,
+  "booking detail must explain the closed identity gate before payment"
+);
+assert.match(
+  publicInteractionConfigSource,
+  /clientPublicInteractionIdentityGrantsAvailable[\s\S]*!isExplicitDevelopmentEnvironment\(\)[\s\S]*return false/,
+  "trial, release and unknown builds must ignore any Developer Tools identity override"
+);
+assert.match(
+  ordersTemplate,
+  /publicInteractionIdentityAvailable && \(item\.status === 'pending' \|\| item\.status === 'paying'\)[\s\S]*?去支付/,
+  "the order list must hide payment while the identity authority is frozen"
+);
+assert.match(
+  ordersSource,
+  /async pay\(event: any\)[\s\S]*?!clientPublicInteractionIdentityGrantsAvailable\(\)[\s\S]*?return;[\s\S]*?wx\.showModal/,
+  "the order list must refuse before confirmation, subscription grants, or prepay"
+);
+assert.match(
+  orderDetailTemplate,
+  /view\.paymentUnavailableNotice[\s\S]*?view\.canPay[\s\S]*?进入安全支付与结果页/,
+  "order detail must replace the impossible payment control with an honest notice"
+);
+assert.match(
+  orderDetailSource,
+  /canPay: otherwisePayable && identityAvailable[\s\S]*?openPayment\(\)[\s\S]*?!clientPublicInteractionIdentityGrantsAvailable\(\)[\s\S]*?return;[\s\S]*?wx\.navigateTo/,
+  "order detail must hide and handler-block payment navigation"
+);
+assert.match(
+  paymentSource,
+  /!clientPublicInteractionIdentityGrantsAvailable\(\)[\s\S]*?paymentState: "unavailable"[\s\S]*?不会请求订阅授权、创建预支付或调用微信支付/,
+  "a direct payment-page entry must render unavailable before any payment side effect"
+);
 assert.match(
   orderDetailTemplate,
   /view\.canConfirmServiceOrder\s*&&\s*!view\.isTextOnlyHistoricalVoiceOrder[\s\S]*?确认接单[\s\S]*?view\.canStartService\s*&&\s*!view\.isTextOnlyHistoricalVoiceOrder[\s\S]*?开始服务/,
@@ -193,6 +266,7 @@ let updatedProfilePayload = null;
 let currentProfileGender = "female";
 let paymentIsMock = true;
 let failNextOrderCreate = false;
+let publicInteractionOrderBlocked = false;
 let failServiceOfferingsLoad = false;
 let returnMalformedServiceOffering = false;
 let failAvailabilityLoad = false;
@@ -460,6 +534,34 @@ const order = {
   experienceFeedback: null,
   createdAt: new Date().toISOString()
 };
+
+function customerRefundOrderProjection(source) {
+  const projection = {
+    id: source.id,
+    companionId: source.companionId,
+    themeId: source.themeId,
+    durationMinutes: source.durationMinutes,
+    amountCents: source.amountCents,
+    amountYuan: source.amountCents / 100,
+    currency: source.currency || source.serviceOfferingSnapshot?.currency || "CNY",
+    status: source.status,
+    scheduledAt: source.scheduledAt,
+    companionSnapshot: { ...source.companionSnapshot },
+    themeNameSnapshot: source.themeNameSnapshot || "情绪倾听",
+    conversationId: source.conversationId ?? null,
+    paidAt: source.paidAt ?? null,
+    cancelledAt: source.cancelledAt ?? null,
+    completedAt: source.completedAt ?? null,
+    createdAt: source.createdAt,
+    updatedAt: source.updatedAt || source.createdAt
+  };
+  assert.deepEqual(
+    Object.keys(projection),
+    customerRefundOrderFields,
+    "refund smoke responses must expose only the exact customer-safe order fields"
+  );
+  return projection;
+}
 const paymentDisputes = [{
   id: "00000000-0000-4000-8000-000000000301",
   channel: "wechat",
@@ -496,6 +598,21 @@ let accountSessions = [
     current: false
   }
 ];
+const userAccountActions = [{
+  id: "account-action-1",
+  kind: "restriction",
+  reasonCode: "policy_boundary",
+  message: "平台正在复核一次账号安全处置。",
+  policyVersion: "2026.1",
+  startsAt: new Date(Date.now() - 60 * 60_000).toISOString(),
+  endsAt: null,
+  appealDeadlineAt: new Date(Date.now() + 30 * 24 * 60 * 60_000).toISOString(),
+  revokedAt: null,
+  canAppeal: true,
+  appeal: null
+}];
+const controlledAppealAssets = new Map();
+let nextControlledAppealAsset = 1;
 let nextDataRightsRequestNumber = 2;
 const dataRightsRequests = [{
   id: "data-right-1",
@@ -743,7 +860,8 @@ let lifecycleIncidents = [{
   orderId: serviceOrder.id,
   category: "technicalIssue",
   summary: "实时语音连接中断，已退出并保留订单内记录。",
-  evidenceReferences: ["evidence://incident-1"],
+  evidenceAttachments: [],
+  legacyEvidenceReferenceCount: 1,
   status: "open",
   resolution: null,
   resolvedAt: null,
@@ -1349,6 +1467,20 @@ function responseFor(path, method, data, query = new URLSearchParams()) {
     createdOrderPayload = data;
     assert.ok(Date.parse(data.scheduledAt) > Date.now(), "created order must include a future scheduledAt");
     assert.match(data.clientRequestId, /^[A-Za-z0-9_-]{16,64}$/, "created order must carry a stable idempotency key");
+    if (publicInteractionOrderBlocked) {
+      return {
+        __smokeError: {
+          statusCode: 403,
+          code: "PUBLIC_INTERACTION_IDENTITY_REQUIRED",
+          message: "identity authority unavailable",
+          details: {
+            verificationStatus: "notVerified",
+            recoveryPath: "/pages/profile/index",
+            publicInteractionBlocked: true
+          }
+        }
+      };
+    }
     if (nextOrderApiErrorCode) {
       const code = nextOrderApiErrorCode;
       nextOrderApiErrorCode = "";
@@ -1481,7 +1613,11 @@ function responseFor(path, method, data, query = new URLSearchParams()) {
       id: "refund-1", outRefundNo: "R100", amountCents: order.amountCents, status: "pendingReview",
       reason: data.reason.trim(), reviewNote: null, failureReason: null
     };
-    return { refund: { ...order.refund }, order: { ...order }, created: true };
+    return {
+      refund: { ...order.refund },
+      order: customerRefundOrderProjection(order),
+      created: true
+    };
   }
   if (path === `/orders/${order.id}/reschedule-requests` && method === "POST") {
     if (rescheduleSubmitError) return { __smokeError: rescheduleSubmitError };
@@ -1634,6 +1770,44 @@ function responseFor(path, method, data, query = new URLSearchParams()) {
       .map((item) => ({ ...item, appeals: item.appeals.map((appeal) => ({ ...appeal })) }));
     return paginatedItems(items, query);
   }
+  const companionAppealReserveMatch = path.match(/^\/commercial\/companion\/actions\/([^/]+)\/appeal-evidence-uploads$/);
+  if (companionAppealReserveMatch && method === "POST") {
+    const actionId = decodeURIComponent(companionAppealReserveMatch[1]);
+    const action = lifecycleActions.find((item) => item.id === actionId);
+    assert.ok(action?.appealWindowOpen && !action.appeals.length, "companion appeal evidence must stay inside an open owned action");
+    const assetId = `30000000-0000-4000-8000-${String(nextControlledAppealAsset++).padStart(12, "0")}`;
+    const asset = {
+      id: assetId,
+      purpose: "companionAccountAppeal",
+      actionId,
+      kind: data.kind,
+      status: "reserved",
+      mimeType: data.mimeType,
+      sizeBytes: data.sizeBytes,
+      durationMs: data.durationMs || null,
+      expiresAt: new Date(Date.now() + 24 * 60 * 60_000).toISOString()
+    };
+    controlledAppealAssets.set(assetId, asset);
+    return {
+      asset: { ...asset },
+      upload: { url: `mock://case-evidence/${assetId}`, method: "PUT", headers: {}, expiresAt: asset.expiresAt }
+    };
+  }
+  const companionAppealCompleteMatch = path.match(/^\/commercial\/companion\/actions\/([^/]+)\/appeal-evidence-uploads\/([^/]+)\/complete$/);
+  if (companionAppealCompleteMatch && method === "POST") {
+    const actionId = decodeURIComponent(companionAppealCompleteMatch[1]);
+    const asset = controlledAppealAssets.get(decodeURIComponent(companionAppealCompleteMatch[2]));
+    assert.equal(asset?.actionId, actionId);
+    asset.status = "approved";
+    return { asset: { ...asset } };
+  }
+  const companionAppealStatusMatch = path.match(/^\/commercial\/companion\/actions\/([^/]+)\/appeal-evidence-uploads\/([^/]+)$/);
+  if (companionAppealStatusMatch && method === "GET") {
+    const actionId = decodeURIComponent(companionAppealStatusMatch[1]);
+    const asset = controlledAppealAssets.get(decodeURIComponent(companionAppealStatusMatch[2]));
+    assert.equal(asset?.actionId, actionId);
+    return { asset: { ...asset } };
+  }
   const companionAppealMatch = path.match(/^\/commercial\/companion\/actions\/([^/]+)\/appeals$/);
   if (companionAppealMatch && method === "POST") {
     const action = lifecycleActions.find((item) => item.id === decodeURIComponent(companionAppealMatch[1]));
@@ -1642,7 +1816,20 @@ function responseFor(path, method, data, query = new URLSearchParams()) {
       id: `companion-appeal-${action.appeals.length + 1}`,
       status: "pending",
       statement: data.statement,
-      evidenceReferences: data.evidenceReferences || [],
+      evidenceAttachments: (data.evidenceAssetIds || []).map((assetId, index) => {
+        const asset = controlledAppealAssets.get(assetId);
+        assert.ok(asset?.purpose === "companionAccountAppeal" && asset.actionId === action.id && asset.status === "approved");
+        return {
+          id: `40000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+          kind: asset.kind,
+          status: "approved",
+          mimeType: asset.mimeType,
+          sizeBytes: asset.sizeBytes,
+          durationMs: asset.durationMs,
+          expiresAt: asset.expiresAt
+        };
+      }),
+      legacyEvidenceReferenceCount: 0,
       reviewDueAt: new Date(Date.now() + 72 * 60 * 60_000).toISOString(),
       overdue: false,
       resolution: null,
@@ -1665,7 +1852,8 @@ function responseFor(path, method, data, query = new URLSearchParams()) {
       orderId: data.orderId || null,
       category: data.category,
       summary: data.summary,
-      evidenceReferences: data.evidenceReferences || [],
+      evidenceAttachments: [],
+      legacyEvidenceReferenceCount: 0,
       status: "open",
       resolution: null,
       resolvedAt: null,
@@ -1735,13 +1923,29 @@ function responseFor(path, method, data, query = new URLSearchParams()) {
       }
     };
   }
-  if (path === `/orders/${order.id}/prepay`) return {
+  if (path === `/orders/${order.id}/prepay`) {
+    if (publicInteractionOrderBlocked) {
+      return {
+        __smokeError: {
+          statusCode: 403,
+          code: "PUBLIC_INTERACTION_IDENTITY_REQUIRED",
+          message: "identity authority unavailable",
+          details: {
+            verificationStatus: "notVerified",
+            recoveryPath: "/pages/profile/index",
+            publicInteractionBlocked: true
+          }
+        }
+      };
+    }
+    return {
     order: { ...order, status: "paying" },
     payment: {
       outTradeNo: "T100", mock: paymentIsMock, channel: "miniProgram",
       wechatMiniProgramParams: { timeStamp: "1", nonceStr: "nonce", package: "prepay_id=mock", signType: "RSA", paySign: "sign" }
     }
-  };
+    };
+  }
   if (path === `/orders/${order.id}/payment/sync` && method === "POST") return {
     code: "SUCCESS", message: "支付已确认",
     data: { alreadyProcessed: false, orderId: order.id, orderStatus: "paid" }
@@ -2043,7 +2247,81 @@ function responseFor(path, method, data, query = new URLSearchParams()) {
     return { success: true, id };
   }
   if (path === "/me/account-actions" && method === "GET") {
-    return { accountStatus: "active", ...paginatedItems([], query, 50) };
+    const actionId = query.get("actionId");
+    const appealId = query.get("appealId");
+    const items = userAccountActions.filter((item) =>
+      (!actionId || item.id === actionId)
+      && (!appealId || item.appeal?.id === appealId || item.id === actionId)
+    );
+    return { accountStatus: "active", ...paginatedItems(items, query, 50) };
+  }
+  const userAppealReserveMatch = path.match(/^\/me\/account-actions\/([^/]+)\/appeal-evidence-uploads$/);
+  if (userAppealReserveMatch && method === "POST") {
+    const actionId = decodeURIComponent(userAppealReserveMatch[1]);
+    const action = userAccountActions.find((item) => item.id === actionId);
+    assert.ok(action?.canAppeal && !action.appeal, "user appeal evidence must stay inside an open owned action");
+    const assetId = `10000000-0000-4000-8000-${String(nextControlledAppealAsset++).padStart(12, "0")}`;
+    const asset = {
+      id: assetId,
+      purpose: "userAccountAppeal",
+      actionId,
+      kind: data.kind,
+      status: "reserved",
+      mimeType: data.mimeType,
+      sizeBytes: data.sizeBytes,
+      durationMs: data.durationMs || null,
+      expiresAt: new Date(Date.now() + 24 * 60 * 60_000).toISOString()
+    };
+    controlledAppealAssets.set(assetId, asset);
+    return {
+      asset: { ...asset },
+      upload: { url: `mock://case-evidence/${assetId}`, method: "PUT", headers: {}, expiresAt: asset.expiresAt }
+    };
+  }
+  const userAppealCompleteMatch = path.match(/^\/me\/account-actions\/([^/]+)\/appeal-evidence-uploads\/([^/]+)\/complete$/);
+  if (userAppealCompleteMatch && method === "POST") {
+    const actionId = decodeURIComponent(userAppealCompleteMatch[1]);
+    const asset = controlledAppealAssets.get(decodeURIComponent(userAppealCompleteMatch[2]));
+    assert.equal(asset?.actionId, actionId);
+    asset.status = "approved";
+    return { asset: { ...asset } };
+  }
+  const userAppealStatusMatch = path.match(/^\/me\/account-actions\/([^/]+)\/appeal-evidence-uploads\/([^/]+)$/);
+  if (userAppealStatusMatch && method === "GET") {
+    const actionId = decodeURIComponent(userAppealStatusMatch[1]);
+    const asset = controlledAppealAssets.get(decodeURIComponent(userAppealStatusMatch[2]));
+    assert.equal(asset?.actionId, actionId);
+    return { asset: { ...asset } };
+  }
+  const userAppealSubmitMatch = path.match(/^\/me\/account-actions\/([^/]+)\/appeals$/);
+  if (userAppealSubmitMatch && method === "POST") {
+    const actionId = decodeURIComponent(userAppealSubmitMatch[1]);
+    const action = userAccountActions.find((item) => item.id === actionId);
+    assert.ok(action?.canAppeal && !action.appeal);
+    const evidenceAssets = (data.evidenceAssetIds || []).map((assetId) => controlledAppealAssets.get(assetId));
+    assert.ok(evidenceAssets.every((asset) => asset?.purpose === "userAccountAppeal" && asset.actionId === actionId && asset.status === "approved"));
+    action.appeal = {
+      id: "account-appeal-1",
+      status: "pending",
+      statement: data.statement,
+      evidenceAttachments: evidenceAssets.map((asset, index) => ({
+        id: `20000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+        kind: asset.kind,
+        status: "approved",
+        mimeType: asset.mimeType,
+        sizeBytes: asset.sizeBytes,
+        durationMs: asset.durationMs,
+        expiresAt: asset.expiresAt
+      })),
+      reviewDueAt: new Date(Date.now() + 72 * 60 * 60_000).toISOString(),
+      overdue: false,
+      resolution: null,
+      resolvedAt: null,
+      policyVersion: "2026.1",
+      createdAt: new Date().toISOString()
+    };
+    action.canAppeal = false;
+    return structuredClone(action.appeal);
   }
   if (path === "/me/data-rights" && method === "GET") {
     const status = query.get("status");
@@ -2331,6 +2609,7 @@ globalThis.getApp = () => smokeApp;
 // Capability-path coverage for dormant MEDIA/TRTC code. Shipping UX stays
 // text-only via utils/config.ts unless this override is set.
 globalThis.__TALK_AND_TALK_COMMERCIAL_TEXT_ONLY__ = false;
+globalThis.__TALK_AND_TALK_PUBLIC_INTERACTION_IDENTITY_AVAILABLE__ = true;
 globalThis.__TALK_AND_TALK_TRTC_SDK__ = class SmokeTrtc {
   constructor(page) {
     this.page = page;
@@ -2463,6 +2742,11 @@ globalThis.wx = {
   switchTab: (options) => { navigations.push(options.url); },
   reLaunch: (options) => { navigations.push(options.url); queueMicrotask(() => options.complete?.()); },
   setNavigationBarTitle: () => undefined,
+  getFileSystemManager: () => ({
+    readFile: ({ success }) => queueMicrotask(() => success({
+      data: Uint8Array.from([84, 97, 108, 107, 38, 84, 97, 108, 107]).buffer
+    }))
+  }),
   openPrivacyContract: ({ success }) => queueMicrotask(() => success?.()),
   showModal: (options) => { modalInvocations.push(options); queueMicrotask(() => options.success?.({ confirm: modalConfirm, content: modalContent })); },
   showActionSheet: () => undefined
@@ -2965,9 +3249,21 @@ const voiceSlot = detail.data.availabilityCandidates[0];
 assert.equal(voiceSlot.availabilityWindowId, "window-service-voice-60");
 detail.selectAvailabilityCandidate({ currentTarget: { dataset: { id: voiceSlot.id } } });
 assert.equal(detail.data.selectedAvailabilityCandidateId, voiceSlot.id);
-assert.equal(detail.data.canBook, true);
-assert.match(detail.data.bookingButtonText, /¥69/);
-failNextOrderCreate = true;
+  assert.equal(detail.data.canBook, true);
+  assert.match(detail.data.bookingButtonText, /¥69/);
+  publicInteractionOrderBlocked = true;
+  await detail.book();
+  detail.toggleBookingBoundary();
+  detail.toggleBookingAccuracy();
+  await detail.confirmBooking();
+  assert.equal(detail.data.bookingConfirmationVisible, false, "an identity refusal must close the booking review without creating an order");
+  assert.equal(detail.data.orderClientRequestId, "", "an explicit pre-write identity refusal may forget its pending idempotency key");
+  assert.match(modalInvocations.at(-1).title, /身份核验通道尚未开放/);
+  assert.match(modalInvocations.at(-1).content, /新预约、支付、公开发帖和即时消息暂不可用/);
+  assert.equal(navigations.at(-1) === "/pages/profile/index", false, "cancelling the explanation modal must not force navigation");
+  publicInteractionOrderBlocked = false;
+  attemptedOrderRequestIds.length = 0;
+  failNextOrderCreate = true;
 await detail.book();
 assert.equal(detail.data.bookingConfirmationVisible, true, "booking must show a review step before creating an order");
 detail.toggleBookingBoundary();
@@ -4334,8 +4630,57 @@ const previousCompanionConfirmation = order.companionConfirmedAt;
 const previousOrderStatus = order.status;
 order.status = "pending";
 order.companionConfirmedAt = new Date().toISOString();
+const paymentEnvironmentBeforeFrozenCheck = environmentVersion;
+environmentVersion = "release";
+await orders.load();
+assert.equal(orders.data.publicInteractionIdentityAvailable, false,
+  "a release order list must project the frozen identity authority into its template state");
+const frozenListPrepayCalls = calls.filter((call) =>
+  call.path === `/orders/${order.id}/prepay` && call.method === "POST"
+).length;
+const frozenListSubscriptionRequests = subscriptionRequests.length;
+const frozenListModals = modalInvocations.length;
+await orders.pay({ currentTarget: { dataset: { id: order.id } } });
+assert.equal(calls.filter((call) =>
+  call.path === `/orders/${order.id}/prepay` && call.method === "POST"
+).length, frozenListPrepayCalls, "a frozen order list must not call prepay");
+assert.equal(subscriptionRequests.length, frozenListSubscriptionRequests,
+  "a frozen order list must not request subscription authorization before refusing payment");
+assert.equal(modalInvocations.length, frozenListModals,
+  "a frozen order list must refuse before opening payment confirmation");
+
+await orderDetail.load();
+assert.equal(orderDetail.data.view.canPay, false, "release order detail must hide payment");
+assert.match(orderDetail.data.view.paymentUnavailableNotice, /当前不能支付/);
+const frozenDetailNavigations = navigations.length;
+orderDetail.openPayment();
+assert.equal(navigations.length, frozenDetailNavigations,
+  "a frozen order detail must block direct payment navigation");
+
 const payment = await loadPage("order/payment");
 payment.onLoad({ orderId: order.id });
+await payment.load();
+assert.equal(payment.data.paymentState, "unavailable",
+  "a direct release payment-page entry must be unavailable before payment side effects");
+assert.match(payment.data.stateMessage, /不会请求订阅授权、创建预支付或调用微信支付/);
+const frozenPagePrepayCalls = calls.filter((call) =>
+  call.path === `/orders/${order.id}/prepay` && call.method === "POST"
+).length;
+const frozenPageSubscriptionRequests = subscriptionRequests.length;
+const frozenPagePaymentInvocations = paymentInvocations.length;
+payment.setData({ paymentState: "ready", termsConfirmed: true });
+await payment.pay();
+assert.equal(payment.data.paymentState, "unavailable");
+assert.equal(calls.filter((call) =>
+  call.path === `/orders/${order.id}/prepay` && call.method === "POST"
+).length, frozenPagePrepayCalls, "the frozen payment handler must not call prepay");
+assert.equal(subscriptionRequests.length, frozenPageSubscriptionRequests,
+  "the frozen payment handler must not request subscription authorization");
+assert.equal(paymentInvocations.length, frozenPagePaymentInvocations,
+  "the frozen payment handler must not invoke wx.requestPayment");
+
+environmentVersion = paymentEnvironmentBeforeFrozenCheck;
+payment.setData({ termsConfirmed: false });
 await payment.load();
 assert.equal(payment.data.paymentState, "ready", "a confirmed pending order must expose an independent payment state");
 assert.equal(payment.data.view.refundPolicyVersion, "2026.08-v1", "payment must disclose the order's immutable refund policy version");
@@ -4345,12 +4690,22 @@ order.refundPolicyVersionSnapshot = "";
 await payment.load();
 assert.equal(payment.data.paymentState, "error", "payment must fail closed when the order refund policy snapshot is malformed");
 assert.match(payment.data.stateMessage, /请勿支付并联系平台客服/);
-order.refundPolicyVersionSnapshot = previousRefundPolicyVersionSnapshot;
-await payment.load();
-assert.equal(payment.data.paymentState, "ready", "payment may recover only after the authoritative order returns a valid snapshot");
-payment.toggleTerms();
-modalConfirm = true;
-await payment.pay();
+  order.refundPolicyVersionSnapshot = previousRefundPolicyVersionSnapshot;
+  await payment.load();
+  assert.equal(payment.data.paymentState, "ready", "payment may recover only after the authoritative order returns a valid snapshot");
+  payment.toggleTerms();
+  modalConfirm = true;
+  publicInteractionOrderBlocked = true;
+  const paymentCallsBeforeIdentityRefusal = paymentInvocations.length;
+  await payment.pay();
+  assert.equal(payment.data.paymentState, "unavailable", "payment must fail closed when text delivery identity is unavailable");
+  assert.match(payment.data.stateTitle, /身份核验通道尚未开放/);
+  assert.match(payment.data.stateMessage, /新预约、支付、公开发帖和即时消息暂不可用/);
+  assert.equal(paymentInvocations.length, paymentCallsBeforeIdentityRefusal, "an identity refusal must happen before wx.requestPayment");
+  publicInteractionOrderBlocked = false;
+  await payment.load();
+  assert.equal(payment.data.paymentState, "ready");
+  await payment.pay();
 assert.equal(payment.data.paymentState, "success", "payment success must be based on backend synchronization");
 assert.ok(calls.some((call) => call.path === `/orders/${order.id}/payment/sync` && call.method === "POST"));
 assert.ok(calls.some((call) => call.path === "/payments/wechat/mock-notify" && call.method === "POST"));
@@ -4566,6 +4921,20 @@ assert.ok(calls.some((call) => call.path === "/me/account-actions"
   && call.query.actionId === "account-action-1"
   && call.query.appealId === "account-appeal-1"),
 "the account notification focus must stay inside the caller-owned exact action query");
+await accountCenter.openAccountAppeal({ currentTarget: { dataset: { id: "account-action-1" } } });
+accountCenter.setAccountAppealStatement({ detail: { value: "原处置遗漏了完整时间线，请由独立复核人员重新核验。" } });
+await accountCenter.uploadAccountAppealEvidence({
+  kind: "image",
+  path: "/tmp/account-appeal.jpg",
+  mimeType: "image/jpeg"
+});
+assert.equal(accountCenter.data.accountAppealEvidenceDrafts.length, 1);
+assert.equal(accountCenter.data.accountAppealEvidenceDrafts[0].status, "approved");
+modalConfirm = true;
+await accountCenter.submitAccountAppeal();
+assert.equal(userAccountActions[0].appeal.evidenceAttachments.length, 1,
+  "ordinary account appeals must bind only an approved action-scoped upload");
+assert.equal(accountCenter.data.accountAppealActionId, "");
 accountCenter.openAdultEligibility();
 assert.equal(navigations.at(-1), "/pages/account/adult-eligibility");
 
@@ -4727,11 +5096,19 @@ assert.equal(companionDevelopment.data.actions.length, 1, "development must expo
 assert.ok(calls.some((call) => call.path === "/commercial/companion/actions"
   && call.query.actionId === lifecycleActions[0].id),
 "the companion notification focus must use the exact owner-scoped action query");
-companionDevelopment.openAppeal({ currentTarget: { dataset: { id: lifecycleActions[0].id } } });
+await companionDevelopment.openAppeal({ currentTarget: { dataset: { id: lifecycleActions[0].id } } });
 companionDevelopment.setAppealStatement({ detail: { value: "本次响应记录存在时间差，希望平台复核完整订单时间线。" } });
-companionDevelopment.setAppealEvidence({ detail: { value: "evidence://appeal-1" } });
+await companionDevelopment.uploadAppealEvidence({
+  kind: "image",
+  path: "/tmp/companion-appeal.jpg",
+  mimeType: "image/jpeg"
+});
+assert.equal(companionDevelopment.data.appealEvidenceDrafts.length, 1);
+assert.equal(companionDevelopment.data.appealEvidenceDrafts[0].status, "approved");
 await companionDevelopment.submitAppeal();
 assert.equal(lifecycleActions[0].appeals.length, 1);
+assert.equal(lifecycleActions[0].appeals[0].evidenceAttachments.length, 1,
+  "companion appeals must replace arbitrary references with one approved single-bound attachment");
 assert.equal(companionDevelopment.data.appealActionId, "", "a successful appeal must close the modal even while its request flag is active");
 
 const companionSchedule = await loadPage("companion/schedule/index");
@@ -5006,19 +5383,26 @@ const apiModule = await import(`${pathToFileURL(join(output, "utils/api.js")).hr
 const configModule = await import(`${pathToFileURL(join(output, "utils/config.js")).href}`);
 const controlledEvidenceModule = await import(`${pathToFileURL(join(output, "utils/controlled-evidence.js")).href}`);
 assert.equal(configModule.isCommercialTextOnly(), false, "smoke enables the dormant voice/media capability path");
+assert.equal(configModule.clientPublicInteractionIdentityGrantsAvailable(), true, "smoke explicitly enables downstream interaction UX only in Developer Tools");
+delete globalThis.__TALK_AND_TALK_PUBLIC_INTERACTION_IDENTITY_AVAILABLE__;
+assert.equal(configModule.clientPublicInteractionIdentityGrantsAvailable(), false, "develop must default to the frozen identity-authority UI");
+globalThis.__TALK_AND_TALK_PUBLIC_INTERACTION_IDENTITY_AVAILABLE__ = true;
 delete globalThis.__TALK_AND_TALK_COMMERCIAL_TEXT_ONLY__;
 assert.equal(configModule.isCommercialTextOnly(), true, "develop must still default to text-only without an explicit test override");
 globalThis.__TALK_AND_TALK_COMMERCIAL_TEXT_ONLY__ = false;
 environmentVersion = "trial";
 assert.equal(configModule.isCommercialTextOnly(), true, "trial must fail closed even when a global override requests media");
+assert.equal(configModule.clientPublicInteractionIdentityGrantsAvailable(), false, "trial must ignore the Developer Tools identity override");
 assert.equal(configModule.backendConfig().baseUrl, "https://api-staging.talkandtalk.app/api/v1");
 environmentVersion = "unknown";
 assert.equal(configModule.isCommercialTextOnly(), true, "an unrecognized Mini Program environment must fail closed even when an override requests media");
+assert.equal(configModule.clientPublicInteractionIdentityGrantsAvailable(), false, "an unknown environment must keep public-interaction writes hidden");
 accountInfoThrows = true;
 assert.equal(configModule.isCommercialTextOnly(), true, "missing Mini Program environment information must fail closed even when an override requests media");
 accountInfoThrows = false;
 environmentVersion = "release";
 assert.equal(configModule.isCommercialTextOnly(), true, "release must fail closed even when a global override requests media");
+assert.equal(configModule.clientPublicInteractionIdentityGrantsAvailable(), false, "release must keep impossible order, community and chat writes hidden");
 assert.equal(configModule.clientChatMediaEnabled(true), false, "text-only scope must hide chat attachments even if the server flag is true");
 assert.equal(configModule.clientRealtimeVoiceEnabled(), false, "text-only scope must hide realtime voice entry points");
 assert.equal(configModule.clientVoiceIntroEnabled(), false, "text-only scope must hide voice intro entry points");

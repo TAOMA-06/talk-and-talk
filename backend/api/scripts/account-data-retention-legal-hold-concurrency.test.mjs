@@ -7,6 +7,8 @@ import test from "node:test";
 
 import pg from "pg";
 
+import { assertIsolatedPostgresPreflightEnvironment } from "./isolated-postgres-preflight-environment.mjs";
+
 const here = dirname(fileURLToPath(import.meta.url));
 const apiRoot = join(here, "..");
 const migrationsRoot = join(apiRoot, "prisma", "migrations");
@@ -193,6 +195,7 @@ test("real PostgreSQL linearizes legal holds with expiry work and keeps queues i
     ? false
     : "set ACCOUNT_DATA_RETENTION_LEGAL_HOLD_TEST_DATABASE_URL to a disposable PostgreSQL database"
 }, async (t) => {
+  await assertIsolatedPostgresPreflightEnvironment();
   const schemaName = `retention_legal_hold_${randomBytes(8).toString("hex")}`;
   const admin = new pg.Client({ connectionString: integrationUrl });
   const worker = new pg.Client({ connectionString: integrationUrl });
@@ -587,25 +590,33 @@ test("real PostgreSQL linearizes legal holds with expiry work and keeps queues i
   await expectPgCode(admin.query(`DELETE FROM "AccountDataRetentionLegalHold" WHERE "id" = 'hold-active'`), "23514");
 
   await admin.query(`ALTER TABLE "AccountDataRetentionLegalHoldAction" DISABLE TRIGGER USER`);
-  await admin.query(`
-    INSERT INTO "AccountDataRetentionLegalHoldAction" (
-      "id", "retentionRecordId", "action", "status", "reasonCode",
-      "authorityReference", "policyVersion", "policyApprovalReference",
-      "requestedById", "requestedAt", "decidedById", "decidedAt",
-      "decisionReference", "decisionReasonCode", "clientRequestId",
-      "partialErasedRecordCount", "partialExpiryAttemptCount", "updatedAt"
-    )
-    SELECT 'scale-action-' || lpad(series::text, 6, '0'), 'record-scale',
-           'placement', 'rejected', 'LITIGATION_PRESERVATION',
-           'authority:scale-' || lpad(series::text, 6, '0'),
-           'legal-hold-v1', 'legal:approved-hold-v1', 'admin-a', CURRENT_TIMESTAMP,
-           'admin-b', CURRENT_TIMESTAMP,
-           'decision:scale-' || lpad(series::text, 6, '0'),
-           'DUPLICATE_OR_SUPERSEDED',
-           'scale-request-' || lpad(series::text, 6, '0'), 0, 0, CURRENT_TIMESTAMP
-    FROM generate_series(1, 100000) series
-  `);
-  await admin.query(`ALTER TABLE "AccountDataRetentionLegalHoldAction" ENABLE TRIGGER USER`);
+  try {
+    // Loading the 100k-row scale fixture is not the bounded production query
+    // under test. Keep it finite but allow slower CI disks; restore the normal
+    // 20-second statement boundary before measuring the indexed queue read.
+    await admin.query("SET statement_timeout TO '60s'");
+    await admin.query(`
+      INSERT INTO "AccountDataRetentionLegalHoldAction" (
+        "id", "retentionRecordId", "action", "status", "reasonCode",
+        "authorityReference", "policyVersion", "policyApprovalReference",
+        "requestedById", "requestedAt", "decidedById", "decidedAt",
+        "decisionReference", "decisionReasonCode", "clientRequestId",
+        "partialErasedRecordCount", "partialExpiryAttemptCount", "updatedAt"
+      )
+      SELECT 'scale-action-' || lpad(series::text, 6, '0'), 'record-scale',
+             'placement', 'rejected', 'LITIGATION_PRESERVATION',
+             'authority:scale-' || lpad(series::text, 6, '0'),
+             'legal-hold-v1', 'legal:approved-hold-v1', 'admin-a', CURRENT_TIMESTAMP,
+             'admin-b', CURRENT_TIMESTAMP,
+             'decision:scale-' || lpad(series::text, 6, '0'),
+             'DUPLICATE_OR_SUPERSEDED',
+             'scale-request-' || lpad(series::text, 6, '0'), 0, 0, CURRENT_TIMESTAMP
+      FROM generate_series(1, 100000) series
+    `);
+  } finally {
+    await admin.query("SET statement_timeout TO '20s'");
+    await admin.query(`ALTER TABLE "AccountDataRetentionLegalHoldAction" ENABLE TRIGGER USER`);
+  }
   await admin.query(`ANALYZE "AccountDataRetentionLegalHoldAction"`);
   const plan = await admin.query(`
     EXPLAIN (FORMAT JSON)

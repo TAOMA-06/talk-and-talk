@@ -3,6 +3,7 @@ import { HttpStatus, Injectable } from "@nestjs/common";
 import { AuditService } from "../common/audit/audit.service";
 import { AppException } from "../common/errors/app.exception";
 import { PrismaService } from "../database/prisma.service";
+import { lockStaffCredentialRowsInOrder } from "./staff-credential-lock-order";
 import {
   ListEligibleStaffSuccessorsDto,
   ListStaffCredentialsDto,
@@ -14,6 +15,7 @@ const ACTIVE_REFUND_STATUSES = ["pendingReview", "pending", "processing", "faile
 const ACTIVE_PAYMENT_DISPUTE_STATUSES = ["pendingSync", "open", "processing", "syncFailed"];
 const ACTIVE_DATA_RIGHTS_STATUSES = ["submitted", "inReview", "needsInformation"];
 const ACTIVE_INVOICE_STATUSES = ["submitted", "inReview"];
+const ACTIVE_COMPANION_INCIDENT_STATUSES = ["open", "inReview"];
 
 type AssignmentCounts = {
   supportTickets: number;
@@ -22,9 +24,11 @@ type AssignmentCounts = {
   attendanceReviews: number;
   attendanceAppeals: number;
   userAccountAppeals: number;
+  companionAccountAppeals: number;
   dataRightsRequests: number;
   invoiceRequests: number;
   companionWithdrawals: number;
+  companionIncidents: number;
 };
 
 const ASSIGNMENT_KEYS: (keyof AssignmentCounts)[] = [
@@ -34,9 +38,11 @@ const ASSIGNMENT_KEYS: (keyof AssignmentCounts)[] = [
   "attendanceReviews",
   "attendanceAppeals",
   "userAccountAppeals",
+  "companionAccountAppeals",
   "dataRightsRequests",
   "invoiceRequests",
-  "companionWithdrawals"
+  "companionWithdrawals",
+  "companionIncidents"
 ];
 
 function emptyAssignmentCounts(): AssignmentCounts {
@@ -47,9 +53,11 @@ function emptyAssignmentCounts(): AssignmentCounts {
     attendanceReviews: 0,
     attendanceAppeals: 0,
     userAccountAppeals: 0,
+    companionAccountAppeals: 0,
     dataRightsRequests: 0,
     invoiceRequests: 0,
-    companionWithdrawals: 0
+    companionWithdrawals: 0,
+    companionIncidents: 0
   };
 }
 
@@ -224,8 +232,11 @@ export class StaffOffboardingService {
       // All commercial-staff offboarding operations share one short lock so two
       // administrators cannot simultaneously remove the last active leader.
       await db.$queryRaw`SELECT pg_advisory_xact_lock(hashtext('talk-and-talk:staff-offboarding'))::text AS "lock"`;
-      await db.$queryRaw`SELECT "id" FROM "StaffCredential" WHERE "userId" = ${actorUserId} FOR UPDATE`;
-      await db.$queryRaw`SELECT "id" FROM "StaffCredential" WHERE "userId" = ${targetUserId} FOR UPDATE`;
+      await lockStaffCredentialRowsInOrder(db, [
+        actorUserId,
+        targetUserId,
+        dto.replacementUserId
+      ]);
 
       const actor = await db.staffCredential.findUnique({
         where: { userId: actorUserId },
@@ -300,7 +311,7 @@ export class StaffOffboardingService {
       const before = beforeMap.get(targetUserId) ?? emptyAssignmentCounts();
       const beforeTotal = assignmentTotal(before);
       const replacement = dto.replacementUserId
-        ? await this.loadAndLockReplacement(db, dto.replacementUserId, targetUserId)
+        ? await this.loadReplacementUnderLock(db, dto.replacementUserId, targetUserId)
         : null;
       if (beforeTotal > 0 && !replacement) {
         throw new AppException(
@@ -396,7 +407,7 @@ export class StaffOffboardingService {
     });
   }
 
-  private async loadAndLockReplacement(db: any, replacementUserId: string, targetUserId: string) {
+  private async loadReplacementUnderLock(db: any, replacementUserId: string, targetUserId: string) {
     if (replacementUserId === targetUserId) {
       throw new AppException(
         "STAFF_HANDOFF_ASSIGNEE_INVALID",
@@ -404,7 +415,6 @@ export class StaffOffboardingService {
         HttpStatus.CONFLICT
       );
     }
-    await db.$queryRaw`SELECT "id" FROM "StaffCredential" WHERE "userId" = ${replacementUserId} FOR UPDATE`;
     const replacement = await db.staffCredential.findUnique({
       where: { userId: replacementUserId },
       include: { user: true }
@@ -436,9 +446,11 @@ export class StaffOffboardingService {
       attendanceReviews,
       attendanceAppeals,
       userAccountAppeals,
+      companionAccountAppeals,
       dataRightsRequests,
       invoiceRequests,
-      companionWithdrawals
+      companionWithdrawals,
+      companionIncidents
     ] = await Promise.all([
       db.supportTicket.groupBy({
         by: ["assignedToUserId"],
@@ -470,6 +482,11 @@ export class StaffOffboardingService {
         where: { assignedToUserId: { in: userIds }, status: "pending" },
         _count: { _all: true }
       }),
+      db.companionAccountAppeal.groupBy({
+        by: ["assignedToUserId"],
+        where: { assignedToUserId: { in: userIds }, status: "pending" },
+        _count: { _all: true }
+      }),
       db.dataRightsRequest.groupBy({
         by: ["handledById"],
         where: { handledById: { in: userIds }, status: { in: ACTIVE_DATA_RIGHTS_STATUSES } },
@@ -483,6 +500,14 @@ export class StaffOffboardingService {
       db.companionWithdrawalRequest.groupBy({
         by: ["reviewedById"],
         where: { reviewedById: { in: userIds }, status: "reviewing" },
+        _count: { _all: true }
+      }),
+      db.companionIncidentReport.groupBy({
+        by: ["assignedToUserId"],
+        where: {
+          assignedToUserId: { in: userIds },
+          status: { in: ACTIVE_COMPANION_INCIDENT_STATUSES }
+        },
         _count: { _all: true }
       })
     ]);
@@ -500,9 +525,11 @@ export class StaffOffboardingService {
     apply(attendanceReviews, "assignedToUserId", "attendanceReviews");
     apply(attendanceAppeals, "appealAssignedToUserId", "attendanceAppeals");
     apply(userAccountAppeals, "assignedToUserId", "userAccountAppeals");
+    apply(companionAccountAppeals, "assignedToUserId", "companionAccountAppeals");
     apply(dataRightsRequests, "handledById", "dataRightsRequests");
     apply(invoiceRequests, "handledById", "invoiceRequests");
     apply(companionWithdrawals, "reviewedById", "companionWithdrawals");
+    apply(companionIncidents, "assignedToUserId", "companionIncidents");
     return result;
   }
 
@@ -569,6 +596,22 @@ export class StaffOffboardingService {
       },
       data: { assignedToUserId: replacementUserId, assignedAt: now }
     });
+    const companionAccountAppealsUnassigned = await db.companionAccountAppeal.updateMany({
+      where: {
+        assignedToUserId: targetUserId,
+        status: "pending",
+        action: { createdById: replacementUserId }
+      },
+      data: { assignedToUserId: null, assignedAt: null }
+    });
+    const companionAccountAppealsReassigned = await db.companionAccountAppeal.updateMany({
+      where: {
+        assignedToUserId: targetUserId,
+        status: "pending",
+        action: { createdById: { not: replacementUserId } }
+      },
+      data: { assignedToUserId: replacementUserId, assignedAt: now }
+    });
 
     const dataRightsRequests = await db.dataRightsRequest.updateMany({
       where: { handledById: targetUserId, status: { in: ACTIVE_DATA_RIGHTS_STATUSES } },
@@ -582,6 +625,13 @@ export class StaffOffboardingService {
       where: { reviewedById: targetUserId, status: "reviewing" },
       data: { reviewedById: replacementUserId, reviewedAt: now }
     });
+    const companionIncidents = await db.companionIncidentReport.updateMany({
+      where: {
+        assignedToUserId: targetUserId,
+        status: { in: ACTIVE_COMPANION_INCIDENT_STATUSES }
+      },
+      data: { assignedToUserId: replacementUserId, assignedAt: now }
+    });
 
     return {
       supportTickets: supportTickets.count,
@@ -592,9 +642,12 @@ export class StaffOffboardingService {
       attendanceAppealsUnassignedForIndependence: attendanceAppealsUnassigned.count,
       userAccountAppealsReassigned: userAccountAppealsReassigned.count,
       userAccountAppealsUnassignedForIndependence: userAccountAppealsUnassigned.count,
+      companionAccountAppealsReassigned: companionAccountAppealsReassigned.count,
+      companionAccountAppealsUnassignedForIndependence: companionAccountAppealsUnassigned.count,
       dataRightsRequests: dataRightsRequests.count,
       invoiceRequests: invoiceRequests.count,
-      companionWithdrawals: companionWithdrawals.count
+      companionWithdrawals: companionWithdrawals.count,
+      companionIncidents: companionIncidents.count
     };
   }
 
@@ -608,9 +661,12 @@ export class StaffOffboardingService {
       attendanceAppealsUnassignedForIndependence: 0,
       userAccountAppealsReassigned: 0,
       userAccountAppealsUnassignedForIndependence: 0,
+      companionAccountAppealsReassigned: 0,
+      companionAccountAppealsUnassignedForIndependence: 0,
       dataRightsRequests: 0,
       invoiceRequests: 0,
-      companionWithdrawals: 0
+      companionWithdrawals: 0,
+      companionIncidents: 0
     };
   }
 

@@ -1,6 +1,7 @@
 # Talk&Talk 项目指引
 
 > 新人 / 协作者 / AI 助手请先读本文，再改代码或回答问题。
+> 按文件夹查找具体文件用途，见仓库根目录 [GUIDE.md](../GUIDE.md)。
 
 ## 1. 产品是什么
 
@@ -39,6 +40,7 @@ talk-and-talk/
 ├── shared/contracts/      # OpenAPI v1，前后端共同契约
 ├── infra/                 # Docker Compose、nginx、secrets
 ├── docs/                  # 项目文档
+├── GUIDE.md               # 目录与文件用途索引
 ├── README.md
 └── NEXT_PHASE.md
 ```

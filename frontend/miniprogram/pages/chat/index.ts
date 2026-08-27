@@ -1,5 +1,9 @@
 import { api, ApiError, ensureSession, readLocalFile, uploadAuthorizedMedia } from "../../utils/api";
-import { clientChatMediaEnabled, isCommercialTextOnly } from "../../utils/config";
+import {
+  clientChatMediaEnabled,
+  clientPublicInteractionIdentityGrantsAvailable,
+  isCommercialTextOnly
+} from "../../utils/config";
 import { openCrisisResources } from "../../utils/crisis-gate";
 import { ChatMessage } from "../../utils/models";
 import { ensurePrivacyAuthorization } from "../../utils/privacy";
@@ -81,6 +85,7 @@ Page({
     mediaUploading: false,
     mediaEnabled: false,
     textOnly: isCommercialTextOnly(),
+    publicInteractionIdentityAvailable: clientPublicInteractionIdentityGrantsAvailable(),
     messageNotificationsMuted: false,
     messageNotificationUpdating: false,
     conversationBlockedByYou: false,
@@ -373,9 +378,9 @@ Page({
     if (isPublicInteractionIdentityError(error as ApiError)) {
       const recoveryPath = publicInteractionRecoveryPath(error as ApiError);
       wx.showModal({
-        title: "需要完成身份核验",
+        title: "身份核验通道尚未开放",
         content: publicInteractionErrorUserMessage(error as ApiError),
-        confirmText: "去核验",
+        confirmText: "查看说明",
         cancelText: "稍后",
         success: (result) => {
           if (result.confirm && recoveryPath?.startsWith("/pages/")) {
@@ -388,6 +393,10 @@ Page({
     wx.showToast({ title: (error as Error).message || fallback, icon: "none" });
   },
   async send() {
+    if (!this.data.publicInteractionIdentityAvailable) {
+      wx.showToast({ title: "身份核验通道尚未开放，当前不能发送消息", icon: "none" });
+      return;
+    }
     const content = this.data.draft.trim();
     if (!content || this.data.sending || this.data.mediaUploading || this.data.restrictionEndsAt || !this.data.messageInteractionAvailable) return;
     this.setData({ sending: true });

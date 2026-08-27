@@ -46,7 +46,10 @@ describe("FavoritesService", () => {
   const audit = { record: jest.fn() } as any;
   const service = new FavoritesService(prisma, audit);
 
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    prisma.companionProfile.findUnique.mockResolvedValue({ ownerUserId: "companion-owner-1" });
+  });
 
   it("returns only currently public favorites in the customer's private list", async () => {
     prisma.companionFavorite.findMany.mockResolvedValue([{
@@ -219,6 +222,7 @@ describe("FavoritesService", () => {
     expect(result).not.toHaveProperty("subscriptionGrantId");
     expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({
       actorId: "customer-1",
+      subjectUserIds: ["customer-1", "companion-owner-1"],
       action: "favorite.availability_reminder_enabled",
       resourceType: "companionFavorite",
       metadata: { companionId: "companion-1", minimumIntervalHours: 24 }
@@ -240,6 +244,8 @@ describe("FavoritesService", () => {
       }
     }));
     expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({
+      actorId: "customer-1",
+      subjectUserIds: ["customer-1", "companion-owner-1"],
       action: "favorite.availability_reminder_disabled",
       metadata: { companionId: "companion-1", minimumIntervalHours: 24 }
     }));

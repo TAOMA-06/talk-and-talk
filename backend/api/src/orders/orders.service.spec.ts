@@ -1,6 +1,7 @@
 import { HttpStatus } from "@nestjs/common";
 
 import { AppException } from "../common/errors/app.exception";
+import * as publicInteractionIdentity from "../users/public-interaction-identity.gate";
 import { OrdersService } from "./orders.service";
 
 describe("OrdersService", () => {
@@ -54,6 +55,7 @@ describe("OrdersService", () => {
     customerAdultEligibility: {
       findFirst: jest.fn()
     },
+    user: { findUnique: jest.fn() },
     companionCustomerFutureBoundary: { findUnique: jest.fn() },
     $transaction: jest.fn()
   } as any;
@@ -64,6 +66,8 @@ describe("OrdersService", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.spyOn(publicInteractionIdentity, "assertPublicInteractionIdentity")
+      .mockImplementation(() => undefined);
     prisma.order.findUnique.mockReset().mockResolvedValue({
       userId: "u1",
       companion: { ownerUserId: "u-companion" }
@@ -73,6 +77,10 @@ describe("OrdersService", () => {
     prisma.orderTimelineEvent.count.mockResolvedValue(0);
     prisma.accountDeletionRequest.findFirst.mockResolvedValue(null);
     prisma.companionCustomerFutureBoundary.findUnique.mockResolvedValue(null);
+    prisma.user.findUnique.mockResolvedValue({
+      accountStatus: "active",
+      profile: { isVerified: true }
+    });
     prisma.companionCommercialProfile.findUnique.mockResolvedValue({
       status: "verified",
       adultEligibilityVerdict: "adult",
@@ -177,11 +185,56 @@ describe("OrdersService", () => {
       where: expect.objectContaining({
         id: "c1"
       }),
-      include: { commercialProfile: true }
+      include: {
+        commercialProfile: true,
+        owner: {
+          select: {
+            accountStatus: true,
+            profile: { select: { isVerified: true } }
+          }
+        }
+      }
     }));
     expect(prisma.companionCommercialProfile.findUnique).toHaveBeenCalledWith(expect.objectContaining({
       where: { companionId: "c1" }
     }));
+  });
+
+  it("refuses a new text-only order before writes when the shared identity authority gate is closed", async () => {
+    jest.spyOn(publicInteractionIdentity, "assertPublicInteractionIdentity")
+      .mockImplementationOnce(() => {
+        throw new AppException(
+          "PUBLIC_INTERACTION_IDENTITY_REQUIRED",
+          "identity authority unavailable",
+          HttpStatus.FORBIDDEN,
+          {
+            verificationStatus: "notVerified",
+            recoveryPath: "/pages/profile/index",
+            publicInteractionBlocked: true
+          }
+        );
+      });
+
+    await expect(service.create("u1", {
+      companionId: "c1",
+      themeId: "t1",
+      durationMinutes: 60,
+      serviceIntent: "listen",
+      scheduledAt: new Date(Date.now() + 3_600_000).toISOString()
+    })).rejects.toMatchObject({
+      code: "PUBLIC_INTERACTION_IDENTITY_REQUIRED",
+      status: HttpStatus.FORBIDDEN
+    });
+
+    expect(prisma.user.findUnique).toHaveBeenCalledWith({
+      where: { id: "u1" },
+      select: {
+        accountStatus: true,
+        profile: { select: { isVerified: true } }
+      }
+    });
+    expect(prisma.order.create).not.toHaveBeenCalled();
+    expect(prisma.orderTimelineEvent.create).not.toHaveBeenCalled();
   });
 
   it("fails a new order closed with a generic unavailable response for a private future-booking boundary", async () => {
@@ -813,12 +866,16 @@ describe("OrdersService", () => {
     }));
   });
 
-  it("rejects unpublished companion", async () => {
+  it("uses the same public unavailable envelope for an unpublished companion", async () => {
     prisma.companionProfile.findFirst.mockResolvedValue(null);
 
     await expect(
       service.create("u1", { companionId: "c9", themeId: "t1", durationMinutes: 30, scheduledAt: new Date(Date.now() + 3_600_000).toISOString() })
-    ).rejects.toMatchObject({ code: "COMPANION_NOT_FOUND", status: HttpStatus.NOT_FOUND });
+    ).rejects.toMatchObject({
+      code: "ORDER_COMPANION_UNAVAILABLE",
+      message: "This companion is currently unavailable for a new order",
+      status: HttpStatus.CONFLICT
+    });
   });
 
   it("returns a participant-safe timeline with linked reschedule facts", async () => {

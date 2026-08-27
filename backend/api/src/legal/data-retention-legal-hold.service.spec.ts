@@ -62,6 +62,7 @@ function retentionRecord(overrides: Record<string, unknown> = {}) {
     expiryLeaseToken: "lease-before-hold",
     expiryLeaseExpiresAt: new Date("2026-08-01T12:05:00.000Z"),
     expiryErasedRecordCount: 17,
+    mediaDeletionClaimedAt: null,
     processingRestrictedAt: new Date("2026-01-01T00:00:00.000Z"),
     createdAt: new Date("2026-01-01T00:00:00.000Z"),
     updatedAt: now,
@@ -122,6 +123,7 @@ function createDatabase() {
     accountDataRetentionRecord: delegate(),
     accountDataRetentionLegalHold: delegate(),
     accountDataRetentionLegalHoldAction: delegate(),
+    mediaAsset: delegate(),
     user: delegate(),
     auditLog: delegate(),
     $queryRaw: jest.fn().mockResolvedValue([{ id: ADMIN_ONE }, { id: SUBJECT }])
@@ -136,6 +138,7 @@ function createDatabase() {
   db.accountDataRetentionLegalHold.findFirst.mockResolvedValue(null);
   db.accountDataRetentionLegalHoldAction.findFirst.mockResolvedValue(null);
   db.accountDataRetentionLegalHoldAction.findUnique.mockResolvedValue(null);
+  db.mediaAsset.findFirst.mockResolvedValue(null);
   return db;
 }
 
@@ -250,6 +253,63 @@ describe("DataRetentionLegalHoldService", () => {
       legalHold: null,
       wakeRetentionWorker: false
     });
+  });
+
+  it.each([
+    { storageDeleteLeaseToken: "media-delete-lease", storageDeleteOutcomeUnknownAt: null },
+    { storageDeleteLeaseToken: null, storageDeleteOutcomeUnknownAt: now },
+    { storageDeleteLeaseToken: null, storageDeleteOutcomeUnknownAt: null, storageDeletedAt: now }
+  ])("rejects placement when bound media deletion can no longer guarantee preservation", async (media) => {
+    const { db, service } = createService();
+    db.mediaAsset.findFirst.mockResolvedValue({ id: "media-in-flight", ...media });
+
+    await expect(service.requestPlacement(actorOne, RECORD_ID, placementDto())).rejects.toMatchObject({
+      code: "DATA_RETENTION_LEGAL_HOLD_MEDIA_DELETE_ALREADY_STARTED",
+      status: 409
+    });
+    expect(db.mediaAsset.findFirst).toHaveBeenCalledWith({
+      where: {
+        OR: [
+          { retentionExpiryRecordId: RECORD_ID },
+          {
+            retentionExpiryRecordId: null,
+            uploaderId: SUBJECT,
+            purpose: {
+              in: [
+                "chatMessage",
+                "orderSupportFact",
+                "attendanceDisputeStatement",
+                "companionIncidentReport"
+              ]
+            }
+          }
+        ],
+        AND: [{
+          OR: [
+            { storageDeleteLeaseToken: { not: null } },
+            { storageDeleteOutcomeUnknownAt: { not: null } },
+            { storageDeletedAt: { not: null } }
+          ]
+        }]
+      },
+      select: { id: true }
+    });
+    expect(db.accountDataRetentionRecord.update).not.toHaveBeenCalled();
+    expect(db.accountDataRetentionLegalHoldAction.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects placement after the durable retention media claim marker was set", async () => {
+    const { db, service } = createService();
+    db.accountDataRetentionRecord.findUnique.mockResolvedValue(
+      retentionRecord({ mediaDeletionClaimedAt: now })
+    );
+
+    await expect(service.requestPlacement(actorOne, RECORD_ID, placementDto())).rejects.toMatchObject({
+      code: "DATA_RETENTION_LEGAL_HOLD_MEDIA_DELETE_ALREADY_STARTED",
+      status: 409
+    });
+    expect(db.mediaAsset.findFirst).not.toHaveBeenCalled();
+    expect(db.accountDataRetentionLegalHoldAction.create).not.toHaveBeenCalled();
   });
 
   it("rejects a new placement on an active hold without clearing expiry scheduling", async () => {

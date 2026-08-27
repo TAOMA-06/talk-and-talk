@@ -1,8 +1,13 @@
 import { api, ensureSession } from "../../utils/api";
 import { handleCustomerAdultEligibilityError } from "../../utils/adult-eligibility-recovery";
+import { clientPublicInteractionIdentityGrantsAvailable } from "../../utils/config";
 import { Order } from "../../utils/models";
 import { ensurePrivacyAuthorization, openLegalDocument } from "../../utils/privacy";
 import { requestTransactionalSubscriptions } from "../../utils/subscription";
+import {
+  isPublicInteractionIdentityError,
+  publicInteractionErrorUserMessage
+} from "../../utils/public-interaction-errors";
 import {
   canPayOrder,
   formatCny,
@@ -111,6 +116,16 @@ Page({
         });
         return;
       }
+      if (!clientPublicInteractionIdentityGrantsAvailable()) {
+        this.setData({
+          order,
+          view: paymentView(order),
+          paymentState: "unavailable",
+          stateTitle: "身份核验通道尚未开放",
+          stateMessage: "当前不能发起新支付；不会请求订阅授权、创建预支付或调用微信支付。可返回订单取消或联系平台协助。"
+        });
+        return;
+      }
       if (!canPayOrder(order)) {
         this.setData({
           order,
@@ -148,6 +163,14 @@ Page({
   },
   async pay() {
     if (this.paymentInFlight || this.data.paymentState !== "ready") return;
+    if (!clientPublicInteractionIdentityGrantsAvailable()) {
+      this.setData({
+        paymentState: "unavailable",
+        stateTitle: "身份核验通道尚未开放",
+        stateMessage: "当前不能发起新支付；不会请求订阅授权、创建预支付或调用微信支付。"
+      });
+      return;
+    }
     if (!this.data.termsConfirmed) {
       wx.showToast({ title: "请先确认金额、服务与退款规则", icon: "none" });
       return;
@@ -202,6 +225,14 @@ Page({
           paymentState: "ready",
           stateTitle: "请先处理成年资格核验",
           stateMessage: "完成并通过独立核验后，再从订单重新发起支付。"
+        });
+        return;
+      }
+      if (isPublicInteractionIdentityError(error as any)) {
+        this.setData({
+          paymentState: "unavailable",
+          stateTitle: "身份核验通道尚未开放",
+          stateMessage: publicInteractionErrorUserMessage(error as any)
         });
         return;
       }

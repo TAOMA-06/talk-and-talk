@@ -145,6 +145,8 @@ enum MediaAssetPurpose {
   orderSupportFact
   attendanceDisputeStatement
   companionIncidentReport
+  userAccountAppeal
+  companionAccountAppeal
 }
 
 enum ModerationDecision {
@@ -459,6 +461,12 @@ enum CompanionAppealStatus {
   dismissed
 }
 
+enum CompanionReactivationStatus {
+  notRequired
+  required
+  completed
+}
+
 enum CompanionIncidentCategory {
   technicalIssue
   lateArrival
@@ -708,7 +716,7 @@ model User {
   recommendationTags                   UserRecommendationTag[]
   recommendationRequests               RecommendationRequest[]
   companionRecommendationExclusions    UserCompanionRecommendationExclusion[]
-  futureBookingBoundariesAsCustomer    CompanionCustomerFutureBoundary[]         @relation("FutureBookingBoundaryCustomer")
+  futureBookingBoundariesAsCustomer    CompanionCustomerFutureBoundary[]        @relation("FutureBookingBoundaryCustomer")
   companionFavorites                   CompanionFavorite[]
   companionRecentViews                 CompanionRecentView[]
   voiceAttendanceEvents                VoiceAttendanceEvent[]                   @relation("VoiceAttendanceEventParticipant")
@@ -729,6 +737,8 @@ model User {
   revokedUserAccountActions            UserAccountAction[]                      @relation("UserAccountActionRevoker")
   userAccountAppeals                   UserAccountAppeal[]                      @relation("UserAccountAppealSubject")
   assignedUserAccountAppeals           UserAccountAppeal[]                      @relation("UserAccountAppealAssignee")
+  assignedCompanionAccountAppeals      CompanionAccountAppeal[]                 @relation("CompanionAccountAppealAssignee")
+  assignedCompanionIncidents           CompanionIncidentReport[]                @relation("CompanionIncidentAssignee")
   resolvedUserAccountAppeals           UserAccountAppeal[]                      @relation("UserAccountAppealResolver")
   accountDataRetentionRecords          AccountDataRetentionRecord[]
   requestedRetentionLegalHoldActions   AccountDataRetentionLegalHoldAction[]    @relation("RetentionLegalHoldActionRequester")
@@ -1115,7 +1125,7 @@ model Order {
   customerServiceGuidelinesConfirmedAt  DateTime?
   companionServiceGuidelinesConfirmedAt DateTime?
   refundRequestDeadlineAt               DateTime?
-  refundPolicyVersionSnapshot           String
+  refundPolicyVersionSnapshot           String                            @db.VarChar(64)
   refundRequestWindowHoursSnapshot      Int
   settlementRecipientRefSnapshot        String?
   settlementRecipientMaskedSnapshot     String?
@@ -2091,41 +2101,45 @@ model Message {
 }
 
 model MediaAsset {
-  id                          String            @id @default(uuid())
-  uploaderId                  String
-  conversationId              String?
-  messageId                   String?
-  purpose                     MediaAssetPurpose @default(chatMessage)
-  supportTicketId             String?
-  attendanceDisputeId         String?
-  companionId                 String?
-  kind                        MediaAssetKind
-  status                      MediaAssetStatus  @default(reserved)
-  storageKey                  String            @unique
-  mimeType                    String
-  sizeBytes                   Int
-  sha256                      String
-  durationMs                  Int?
-  extractedText               String?
-  analysis                    Json?
-  provider                    String?
-  providerVersion             String?
-  retryCount                  Int               @default(0)
-  nextAttemptAt               DateTime?
-  lastError                   String?
-  uploadExpiresAt             DateTime?
-  moderationProcessingToken   String?           @unique
-  moderationProcessingAt      DateTime?
-  expiresAt                   DateTime?
-  storageDeleteRequestedAt    DateTime?
-  storageDeletedAt            DateTime?
-  storageDeleteLeaseToken     String?           @unique
-  storageDeleteLeaseExpiresAt DateTime?
-  storageDeleteAttemptCount   Int               @default(0)
-  storageDeleteNextAttemptAt  DateTime?
-  storageDeleteLastErrorCode  String?
-  createdAt                   DateTime          @default(now())
-  updatedAt                   DateTime          @updatedAt
+  id                            String            @id @default(uuid())
+  uploaderId                    String
+  conversationId                String?
+  messageId                     String?
+  purpose                       MediaAssetPurpose @default(chatMessage)
+  supportTicketId               String?
+  attendanceDisputeId           String?
+  companionId                   String?
+  userAccountActionId           String?
+  companionAccountActionId      String?
+  kind                          MediaAssetKind
+  status                        MediaAssetStatus  @default(reserved)
+  storageKey                    String            @unique
+  mimeType                      String
+  sizeBytes                     Int
+  sha256                        String
+  durationMs                    Int?
+  extractedText                 String?
+  analysis                      Json?
+  provider                      String?
+  providerVersion               String?
+  retryCount                    Int               @default(0)
+  nextAttemptAt                 DateTime?
+  lastError                     String?
+  uploadExpiresAt               DateTime?
+  moderationProcessingToken     String?           @unique
+  moderationProcessingAt        DateTime?
+  expiresAt                     DateTime?
+  storageDeleteRequestedAt      DateTime?
+  storageDeletedAt              DateTime?
+  storageDeleteLeaseToken       String?           @unique
+  storageDeleteLeaseExpiresAt   DateTime?
+  storageDeleteAttemptCount     Int               @default(0)
+  storageDeleteNextAttemptAt    DateTime?
+  storageDeleteLastErrorCode    String?
+  storageDeleteOutcomeUnknownAt DateTime?
+  retentionExpiryRecordId       String?
+  createdAt                     DateTime          @default(now())
+  updatedAt                     DateTime          @updatedAt
 
   uploader                 User                              @relation("MediaAssetUploader", fields: [uploaderId], references: [id], onDelete: Cascade)
   conversation             Conversation?                     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
@@ -2133,6 +2147,9 @@ model MediaAsset {
   supportTicket            SupportTicket?                    @relation("SupportTicketEvidenceScope", fields: [supportTicketId], references: [id], onDelete: Restrict)
   attendanceDispute        AttendanceDispute?                @relation("AttendanceDisputeEvidenceScope", fields: [attendanceDisputeId], references: [id], onDelete: Restrict)
   companion                CompanionProfile?                 @relation("CompanionIncidentEvidenceScope", fields: [companionId], references: [id], onDelete: Restrict)
+  userAccountAction        UserAccountAction?                @relation("UserAccountAppealEvidenceScope", fields: [userAccountActionId], references: [id], onDelete: Restrict)
+  companionAccountAction   CompanionAccountAction?           @relation("CompanionAccountAppealEvidenceScope", fields: [companionAccountActionId], references: [id], onDelete: Restrict)
+  retentionExpiryRecord    AccountDataRetentionRecord?       @relation("RetentionExpiryMediaAssets", fields: [retentionExpiryRecordId], references: [id], onDelete: Restrict, map: "MediaAsset_retention_expiry_record_fkey")
   controlledCaseAttachment ControlledCaseEvidenceAttachment?
 
   @@index([conversationId, status, createdAt])
@@ -2140,11 +2157,14 @@ model MediaAsset {
   @@index([purpose, supportTicketId, uploaderId, status, createdAt], map: "MediaAsset_support_evidence_scope")
   @@index([purpose, attendanceDisputeId, uploaderId, status, createdAt], map: "MediaAsset_attendance_evidence_scope")
   @@index([purpose, companionId, uploaderId, status, createdAt], map: "MediaAsset_incident_evidence_scope")
+  @@index([purpose, userAccountActionId, uploaderId, status, createdAt], map: "MediaAsset_user_appeal_evidence_scope")
+  @@index([purpose, companionAccountActionId, uploaderId, status, createdAt], map: "MediaAsset_companion_appeal_evidence_scope")
   @@index([purpose, status, nextAttemptAt, moderationProcessingAt, createdAt], map: "MediaAsset_controlled_moderation_queue")
   @@index([messageId])
   @@index([expiresAt])
   @@index([storageDeletedAt, expiresAt, storageDeleteNextAttemptAt, id], map: "MediaAsset_storage_delete_due")
   @@index([storageDeleteLeaseExpiresAt, id], map: "MediaAsset_storage_delete_lease")
+  @@index([retentionExpiryRecordId, storageDeletedAt, storageDeleteLeaseToken, id], map: "MediaAsset_retention_expiry_barrier")
 }
 
 model MessageReadState {
@@ -2479,11 +2499,13 @@ model CompanionCommercialProfile {
   suspendedAt                 DateTime?
   suspendedById               String?
   suspendedReason             String?
+  suspendedByAccountActionId  String?                          @unique
   nextReviewDueAt             DateTime?
   createdAt                   DateTime                         @default(now())
   updatedAt                   DateTime                         @updatedAt
 
-  companion CompanionProfile @relation(fields: [companionId], references: [id], onDelete: Cascade)
+  companion                CompanionProfile        @relation(fields: [companionId], references: [id], onDelete: Cascade)
+  suspendedByAccountAction CompanionAccountAction? @relation("CommercialProfileSuspensionAction", fields: [suspendedByAccountActionId], references: [id], onDelete: SetNull)
 
   @@index([status, adultEligibilityVerdict, adultEligibilityValidUntil], map: "CompanionCommercialProfile_status_adultEligibilityVerdict_adult")
   @@index([status, updatedAt])
@@ -2510,48 +2532,67 @@ model CompanionTrainingRecord {
 }
 
 model CompanionAccountAction {
-  id               String                     @id @default(uuid())
-  companionId      String
-  kind             CompanionAccountActionKind
-  reasonCode       String
-  message          String
-  startsAt         DateTime                   @default(now())
-  endsAt           DateTime?
-  appealDeadlineAt DateTime
-  createdById      String
-  revokedAt        DateTime?
-  revokedById      String?
-  createdAt        DateTime                   @default(now())
-  updatedAt        DateTime                   @updatedAt
+  id                        String                      @id @default(uuid())
+  companionId               String
+  kind                      CompanionAccountActionKind
+  reasonCode                String
+  message                   String
+  startsAt                  DateTime                    @default(now())
+  endsAt                    DateTime?
+  appealDeadlineAt          DateTime
+  createdById               String
+  revokedAt                 DateTime?
+  revokedById               String?
+  reactivationStatus        CompanionReactivationStatus @default(notRequired)
+  reactivationRequiredAt    DateTime?
+  reactivationCompletedAt   DateTime?
+  reactivationCompletedById String?
+  reactivationResolution    String?
+  createdAt                 DateTime                    @default(now())
+  updatedAt                 DateTime                    @updatedAt
 
-  companion CompanionProfile         @relation(fields: [companionId], references: [id], onDelete: Cascade)
-  appeals   CompanionAccountAppeal[]
+  companion                  CompanionProfile            @relation(fields: [companionId], references: [id], onDelete: Cascade)
+  appeals                    CompanionAccountAppeal[]
+  evidenceUploadAssets       MediaAsset[]                @relation("CompanionAccountAppealEvidenceScope")
+  suspendedCommercialProfile CompanionCommercialProfile? @relation("CommercialProfileSuspensionAction")
 
   @@index([companionId, revokedAt, startsAt])
   @@index([kind, revokedAt, createdAt])
   @@index([appealDeadlineAt])
+  @@index([reactivationStatus, endsAt])
 }
 
 model CompanionAccountAppeal {
-  id                 String                @id @default(uuid())
-  actionId           String
-  companionId        String
-  statement          String
-  evidenceReferences String[]              @default([])
-  status             CompanionAppealStatus @default(pending)
-  reviewDueAt        DateTime
-  resolution         String?
-  resolvedAt         DateTime?
-  resolvedById       String?
-  createdAt          DateTime              @default(now())
-  updatedAt          DateTime              @updatedAt
+  id                           String                      @id @default(uuid())
+  actionId                     String
+  companionId                  String
+  statement                    String
+  legacyEvidenceReferenceCount Int                         @default(0)
+  status                       CompanionAppealStatus       @default(pending)
+  reviewDueAt                  DateTime
+  resolution                   String?
+  resolvedAt                   DateTime?
+  resolvedById                 String?
+  assignedToUserId             String?
+  assignedAt                   DateTime?
+  reactivationStatus           CompanionReactivationStatus @default(notRequired)
+  reactivationRequiredAt       DateTime?
+  reactivationCompletedAt      DateTime?
+  reactivationCompletedById    String?
+  reactivationResolution       String?
+  createdAt                    DateTime                    @default(now())
+  updatedAt                    DateTime                    @updatedAt
 
-  action    CompanionAccountAction @relation(fields: [actionId], references: [id], onDelete: Cascade)
-  companion CompanionProfile       @relation(fields: [companionId], references: [id], onDelete: Cascade)
+  action              CompanionAccountAction             @relation(fields: [actionId], references: [id], onDelete: Cascade)
+  companion           CompanionProfile                   @relation(fields: [companionId], references: [id], onDelete: Cascade)
+  assignedTo          User?                              @relation("CompanionAccountAppealAssignee", fields: [assignedToUserId], references: [id], onDelete: Restrict)
+  evidenceAttachments ControlledCaseEvidenceAttachment[]
 
   @@unique([actionId, companionId])
   @@index([companionId, status, createdAt])
   @@index([status, reviewDueAt])
+  @@index([assignedToUserId, status, reviewDueAt, id], map: "CompanionAccountAppeal_assignee_status_due")
+  @@index([reactivationStatus, resolvedAt])
 }
 
 model CompanionIncidentReport {
@@ -2565,15 +2606,19 @@ model CompanionIncidentReport {
   resolution                   String?
   resolvedAt                   DateTime?
   resolvedById                 String?
+  assignedToUserId             String?
+  assignedAt                   DateTime?
   createdAt                    DateTime                  @default(now())
   updatedAt                    DateTime                  @updatedAt
 
   companion           CompanionProfile                   @relation(fields: [companionId], references: [id], onDelete: Cascade)
   order               Order?                             @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  assignedTo          User?                              @relation("CompanionIncidentAssignee", fields: [assignedToUserId], references: [id], onDelete: Restrict)
   evidenceAttachments ControlledCaseEvidenceAttachment[]
 
   @@index([companionId, status, createdAt])
   @@index([status, createdAt])
+  @@index([assignedToUserId, status, createdAt, id], map: "CompanionIncidentReport_assignee_status_created")
   @@index([orderId])
 }
 
@@ -2687,6 +2732,8 @@ model ControlledCaseEvidenceAttachment {
   orderSupportFactId           String?
   attendanceDisputeStatementId String?
   companionIncidentReportId    String?
+  userAccountAppealId          String?
+  companionAccountAppealId     String?
   boundByUserId                String?
   createdAt                    DateTime          @default(now())
 
@@ -2694,11 +2741,15 @@ model ControlledCaseEvidenceAttachment {
   orderSupportFact           OrderSupportFact?           @relation(fields: [orderSupportFactId], references: [id], onDelete: Cascade, map: "CaseEvidence_order_fact_fk")
   attendanceDisputeStatement AttendanceDisputeStatement? @relation(fields: [attendanceDisputeStatementId], references: [id], onDelete: Cascade, map: "CaseEvidence_attendance_statement_fk")
   companionIncidentReport    CompanionIncidentReport?    @relation(fields: [companionIncidentReportId], references: [id], onDelete: Cascade, map: "CaseEvidence_companion_incident_fk")
+  userAccountAppeal          UserAccountAppeal?          @relation(fields: [userAccountAppealId], references: [id], onDelete: Cascade, map: "CaseEvidence_user_account_appeal_fk")
+  companionAccountAppeal     CompanionAccountAppeal?     @relation(fields: [companionAccountAppealId], references: [id], onDelete: Cascade, map: "CaseEvidence_companion_account_appeal_fk")
   boundBy                    User?                       @relation("CaseEvidenceBoundBy", fields: [boundByUserId], references: [id], onDelete: SetNull, map: "CaseEvidence_bound_by_fk")
 
   @@index([orderSupportFactId, createdAt], map: "CaseEvidence_order_fact_created")
   @@index([attendanceDisputeStatementId, createdAt], map: "CaseEvidence_attendance_statement_created")
   @@index([companionIncidentReportId, createdAt], map: "CaseEvidence_companion_incident_created")
+  @@index([userAccountAppealId, createdAt], map: "CaseEvidence_user_account_appeal_created")
+  @@index([companionAccountAppealId, createdAt], map: "CaseEvidence_companion_account_appeal_created")
   @@index([boundByUserId, createdAt], map: "CaseEvidence_bound_by_created")
 }
 
@@ -2723,10 +2774,11 @@ model UserAccountAction {
   createdAt            DateTime                     @default(now())
   updatedAt            DateTime                     @updatedAt
 
-  user      User               @relation("UserAccountActionSubject", fields: [userId], references: [id], onDelete: Cascade)
-  createdBy User?              @relation("UserAccountActionCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  revokedBy User?              @relation("UserAccountActionRevoker", fields: [revokedById], references: [id], onDelete: Restrict)
-  appeal    UserAccountAppeal?
+  user                 User               @relation("UserAccountActionSubject", fields: [userId], references: [id], onDelete: Cascade)
+  createdBy            User?              @relation("UserAccountActionCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  revokedBy            User?              @relation("UserAccountActionRevoker", fields: [revokedById], references: [id], onDelete: Restrict)
+  appeal               UserAccountAppeal?
+  evidenceUploadAssets MediaAsset[]       @relation("UserAccountAppealEvidenceScope")
 
   @@index([userId, revokedAt, startsAt])
   @@index([kind, revokedAt, createdAt])
@@ -2750,10 +2802,11 @@ model UserAccountAppeal {
   createdAt        DateTime                @default(now())
   updatedAt        DateTime                @updatedAt
 
-  action     UserAccountAction @relation(fields: [actionId], references: [id], onDelete: Cascade)
-  user       User              @relation("UserAccountAppealSubject", fields: [userId], references: [id], onDelete: Cascade)
-  assignedTo User?             @relation("UserAccountAppealAssignee", fields: [assignedToUserId], references: [id], onDelete: Restrict)
-  resolvedBy User?             @relation("UserAccountAppealResolver", fields: [resolvedById], references: [id], onDelete: Restrict)
+  action              UserAccountAction                  @relation(fields: [actionId], references: [id], onDelete: Cascade)
+  user                User                               @relation("UserAccountAppealSubject", fields: [userId], references: [id], onDelete: Cascade)
+  assignedTo          User?                              @relation("UserAccountAppealAssignee", fields: [assignedToUserId], references: [id], onDelete: Restrict)
+  resolvedBy          User?                              @relation("UserAccountAppealResolver", fields: [resolvedById], references: [id], onDelete: Restrict)
+  evidenceAttachments ControlledCaseEvidenceAttachment[]
 
   @@index([userId, status, createdAt])
   @@index([status, reviewDueAt, createdAt])
@@ -2876,14 +2929,16 @@ model AccountDataRetentionRecord {
   expiryLeaseToken        String?   @unique
   expiryLeaseExpiresAt    DateTime?
   expiryErasedRecordCount Int       @default(0)
+  mediaDeletionClaimedAt  DateTime?
   details                 Json?
   createdAt               DateTime  @default(now())
   updatedAt               DateTime  @updatedAt
 
-  deletionRequest  AccountDeletionRequest                @relation(fields: [deletionRequestId], references: [id], onDelete: Cascade)
-  user             User                                  @relation(fields: [userId], references: [id], onDelete: Restrict)
-  legalHolds       AccountDataRetentionLegalHold[]
-  legalHoldActions AccountDataRetentionLegalHoldAction[]
+  deletionRequest   AccountDeletionRequest                @relation(fields: [deletionRequestId], references: [id], onDelete: Cascade)
+  user              User                                  @relation(fields: [userId], references: [id], onDelete: Restrict)
+  legalHolds        AccountDataRetentionLegalHold[]
+  legalHoldActions  AccountDataRetentionLegalHoldAction[]
+  expiryMediaAssets MediaAsset[]                          @relation("RetentionExpiryMediaAssets")
 
   @@unique([deletionRequestId, category])
   @@index([userId, disposition])

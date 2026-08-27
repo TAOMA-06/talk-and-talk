@@ -238,7 +238,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </div>
             <p>
               女性友好的线上陪伴平台。网页说明品牌、路径与边界；
-              真实服务请使用微信小程序。
+              服务开放状态请以微信小程序页面与正式公告为准；身份核验通道完成前不开放新预约、支付或聊天。
             </p>
           </div>
           <div className="footer-nav-groups">

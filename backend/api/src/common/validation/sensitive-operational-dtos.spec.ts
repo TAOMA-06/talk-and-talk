@@ -9,6 +9,7 @@ import { UpdateAccountStatusDto } from "../../admin/dto/update-account-status.dt
 import { UpdateUserVerificationDto } from "../../admin/dto/update-user-verification.dto";
 import { CancelPayoutClaimDto } from "../../commercial/dto/cancel-payout-claim.dto";
 import {
+  CompleteCompanionReactivationDto,
   CreateCompanionAccountActionDto,
   ResolveCompanionAppealDto,
   ResolveCompanionIncidentDto,
@@ -48,6 +49,7 @@ const dtoCases: Array<{
   { name: "review label note", Type: CreateReviewLabelDto, field: "note", input: { text: "synthetic example", expectedDecision: "allow", actualDecision: "allow", note: SAFE_TEXT } },
   { name: "companion account action message", Type: CreateCompanionAccountActionDto, field: "message", input: { companionId: "companion-1", kind: "warning", reasonCode: "policy-boundary", message: SAFE_TEXT } },
   { name: "companion appeal resolution", Type: ResolveCompanionAppealDto, field: "resolution", input: { status: "upheld", resolution: SAFE_TEXT } },
+  { name: "companion reactivation resolution", Type: CompleteCompanionReactivationDto, field: "resolution", input: { resolution: SAFE_TEXT } },
   { name: "companion incident resolution", Type: ResolveCompanionIncidentDto, field: "resolution", input: { status: "resolved", resolution: SAFE_TEXT } },
   { name: "withdrawal rejection reason", Type: UpdateWithdrawalRequestDto, field: "rejectionReason", input: { status: "rejected", rejectionReason: SAFE_TEXT } }
 ];

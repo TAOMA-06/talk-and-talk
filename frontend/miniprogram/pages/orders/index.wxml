@@ -188,7 +188,8 @@
         <button wx:if="{{item.rescheduleState === 'empty' || item.rescheduleState === 'unavailable'}}" class="reschedule-refresh" bindtap="reloadReschedule" data-id="{{item.id}}">重新读取可约时段</button>
       </view>
       <view class="actions">
-        <button wx:if="{{(item.status === 'pending' || item.status === 'paying') && item.companionConfirmedAt}}" class="primary-button action" loading="{{payingId === item.id}}" bindtap="pay" data-id="{{item.id}}">去支付</button>
+        <view wx:if="{{(item.status === 'pending' || item.status === 'paying') && item.companionConfirmedAt && !publicInteractionIdentityAvailable}}" class="muted">身份核验授权通道尚未开放，当前不能支付；仍可取消订单或联系平台协助。</view>
+        <button wx:if="{{publicInteractionIdentityAvailable && (item.status === 'pending' || item.status === 'paying') && item.companionConfirmedAt}}" class="primary-button action" loading="{{payingId === item.id}}" bindtap="pay" data-id="{{item.id}}">去支付</button>
         <button wx:if="{{item.status === 'pending' || item.status === 'paying'}}" class="plain action" bindtap="cancel" data-id="{{item.id}}">取消订单</button>
         <button wx:if="{{item.canInitiateReschedule && !item.pendingReschedule && !item.isTextOnlyHistoricalVoiceOrder}}" class="plain action" bindtap="toggleReschedule" data-id="{{item.id}}">{{item.rescheduleToggleText}}</button>
         <button wx:if="{{item.canOpenRealtimeVoice}}" class="primary-button action" bindtap="openVoiceRoom" data-id="{{item.id}}">进入实时语音</button>

@@ -27,7 +27,7 @@ const RETENTION_LEASE_MS = 30_000;
 const LOW_RISK_MAX_BATCHES_PER_RUN = 10;
 const RETENTION_RUN_BUDGET_MS = 4_000;
 const MEDIA_STORAGE_WAIT_RETRY_MS = 30_000;
-const AUDIT_SUBJECT_BACKFILL_VERSION = "controlled-v2";
+const AUDIT_SUBJECT_BACKFILL_VERSION = "controlled-v3";
 const AUDIT_SUBJECT_BACKFILL_MAX_BATCHES_PER_RUN = 10;
 
 type RetentionPhaseBatchResult = ErasureBatchResult & { nextAttemptAt?: Date };
@@ -239,6 +239,141 @@ function partyModerationCasePredicate(alias: string): string {
   )`;
 }
 
+function partyAttendanceDisputePredicate(alias: string): string {
+  return `(
+    ${alias}."openedByUserId" = $1
+    OR ${alias}."counterpartyUserId" = $1
+    OR ${partyOrderExists(`${alias}."orderId"`)}
+  )`;
+}
+
+/**
+ * The safety-retention media graph is purpose-scoped. In particular, account
+ * governance evidence must never be collected merely because the same user
+ * uploaded it: that category can have a different legal hold and expiry date.
+ */
+function partySafetyMediaPredicate(alias: string): string {
+  return `(
+    ${alias}."purpose" IN (
+      'chatMessage',
+      'orderSupportFact',
+      'attendanceDisputeStatement',
+      'companionIncidentReport'
+    )
+    AND (
+      ${alias}."uploaderId" = $1
+      OR (
+        ${alias}."purpose" = 'orderSupportFact'
+        AND (
+          EXISTS (
+            SELECT 1 FROM "SupportTicket" support_scope
+            WHERE support_scope."id" = ${alias}."supportTicketId"
+              AND support_scope."userId" = $1
+          )
+          OR EXISTS (
+            SELECT 1
+            FROM "ControlledCaseEvidenceAttachment" attachment
+            JOIN "OrderSupportFact" fact
+              ON fact."id" = attachment."orderSupportFactId"
+            JOIN "SupportTicket" ticket
+              ON ticket."id" = fact."supportTicketId"
+            WHERE attachment."mediaAssetId" = ${alias}."id"
+              AND (fact."submittedByUserId" = $1 OR ticket."userId" = $1)
+          )
+        )
+      )
+      OR (
+        ${alias}."purpose" = 'attendanceDisputeStatement'
+        AND EXISTS (
+          SELECT 1
+          FROM "ControlledCaseEvidenceAttachment" attachment
+          JOIN "AttendanceDisputeStatement" statement
+            ON statement."id" = attachment."attendanceDisputeStatementId"
+          WHERE attachment."mediaAssetId" = ${alias}."id"
+            AND statement."submittedByUserId" = $1
+        )
+      )
+      OR (
+        ${alias}."purpose" = 'companionIncidentReport'
+        AND $2::TEXT IS NOT NULL
+        AND (
+          ${alias}."companionId" = $2
+          OR EXISTS (
+            SELECT 1
+            FROM "ControlledCaseEvidenceAttachment" attachment
+            JOIN "CompanionIncidentReport" incident
+              ON incident."id" = attachment."companionIncidentReportId"
+            WHERE attachment."mediaAssetId" = ${alias}."id"
+              AND incident."companionId" = $2
+          )
+        )
+      )
+    )
+  )`;
+}
+
+function partySafetyAttachmentPredicate(alias: string): string {
+  return `EXISTS (
+    SELECT 1 FROM "MediaAsset" safety_media
+    WHERE safety_media."id" = ${alias}."mediaAssetId"
+      AND ${partySafetyMediaPredicate("safety_media")}
+  )`;
+}
+
+function partyGovernanceMediaPredicate(alias: string): string {
+  return `(
+    ${alias}."purpose" IN ('userAccountAppeal', 'companionAccountAppeal')
+    AND (
+      ${alias}."uploaderId" = $1
+      OR (
+        ${alias}."purpose" = 'userAccountAppeal'
+        AND (
+          EXISTS (
+            SELECT 1 FROM "UserAccountAction" account_action
+            WHERE account_action."id" = ${alias}."userAccountActionId"
+              AND account_action."userId" = $1
+          )
+          OR EXISTS (
+            SELECT 1
+            FROM "ControlledCaseEvidenceAttachment" attachment
+            JOIN "UserAccountAppeal" appeal
+              ON appeal."id" = attachment."userAccountAppealId"
+            WHERE attachment."mediaAssetId" = ${alias}."id"
+              AND appeal."userId" = $1
+          )
+        )
+      )
+      OR (
+        ${alias}."purpose" = 'companionAccountAppeal'
+        AND $2::TEXT IS NOT NULL
+        AND (
+          EXISTS (
+            SELECT 1 FROM "CompanionAccountAction" account_action
+            WHERE account_action."id" = ${alias}."companionAccountActionId"
+              AND account_action."companionId" = $2
+          )
+          OR EXISTS (
+            SELECT 1
+            FROM "ControlledCaseEvidenceAttachment" attachment
+            JOIN "CompanionAccountAppeal" appeal
+              ON appeal."id" = attachment."companionAccountAppealId"
+            WHERE attachment."mediaAssetId" = ${alias}."id"
+              AND appeal."companionId" = $2
+          )
+        )
+      )
+    )
+  )`;
+}
+
+function partyGovernanceAttachmentPredicate(alias: string): string {
+  return `EXISTS (
+    SELECT 1 FROM "MediaAsset" governance_media
+    WHERE governance_media."id" = ${alias}."mediaAssetId"
+      AND ${partyGovernanceMediaPredicate("governance_media")}
+  )`;
+}
+
 const RETENTION_RESTRICTED_PHASES: Record<string, readonly string[]> = {
   transactions_tax_invoices: [
     "invoice_request",
@@ -264,15 +399,18 @@ const RETENTION_RESTRICTED_PHASES: Record<string, readonly string[]> = {
     "retention_verify"
   ],
   support_disputes_safety: [
+    "media_storage_schedule",
+    "media_storage_wait",
     "controlled_evidence_attachment",
+    "media_asset_delete",
     "order_support_fact",
     "support_ticket",
     "payment_dispute_attachment",
     "payment_dispute_notification",
     "payment_dispute_negotiation_event",
     "payment_dispute_reply",
-    "payment_dispute_order",
     "payment_dispute",
+    "payment_dispute_order",
     "attendance_statement",
     "attendance_dispute",
     "order_reschedule_request",
@@ -289,13 +427,14 @@ const RETENTION_RESTRICTED_PHASES: Record<string, readonly string[]> = {
     "companion_incident",
     "message",
     "conversation",
-    "media_storage_schedule",
-    "media_storage_wait",
-    "media_asset_delete",
     "companion_detach",
     "retention_verify"
   ],
   consent_rights_account_governance: [
+    "governance_media_storage_schedule",
+    "governance_media_storage_wait",
+    "governance_controlled_evidence_attachment",
+    "governance_media_asset_delete",
     "data_rights_follow_up",
     "data_rights_request",
     "legal_consent",
@@ -484,7 +623,7 @@ export class DataRetentionWorker implements OnModuleInit, OnModuleDestroy {
         referencesTouched: number;
         completed: boolean;
       }>>`
-        SELECT * FROM "backfill_audit_subject_references_v2"(${ERASURE_BATCH_SIZE})
+        SELECT * FROM "backfill_audit_subject_references_v3"(${ERASURE_BATCH_SIZE})
       `;
       processed += Number(rows[0]?.processed ?? 0);
       completed = rows[0]?.completed === true;
@@ -824,7 +963,7 @@ export class DataRetentionWorker implements OnModuleInit, OnModuleDestroy {
             expiryLeaseExpiresAt: null
           }
         });
-        await this.audit.record({
+        const terminalAudit = await this.audit.record({
           subjectUserIds: [record.userId],
           action: "privacy.retention_category_pseudonymized",
           resourceType: "accountDataRetentionRecord",
@@ -838,6 +977,9 @@ export class DataRetentionWorker implements OnModuleInit, OnModuleDestroy {
             observedMutatedRecordCount: record.expiryErasedRecordCount
           }
         }, db);
+        if (record.category === "deletion_audit_evidence") {
+          await this.expireGeneratedAuditReference(db, terminalAudit, record.userId);
+        }
         return { category: record.category, completed: true, progressed: false };
       }
       const mutated = await this.processRetainedPhaseBatch(
@@ -845,7 +987,8 @@ export class DataRetentionWorker implements OnModuleInit, OnModuleDestroy {
         retainedPhase,
         record.deletionRequestId,
         record.userId,
-        companionId
+        companionId,
+        record.id
       );
       const retainedIndex = retainedPhases.indexOf(retainedPhase);
       if (retainedIndex < 0) {
@@ -863,7 +1006,7 @@ export class DataRetentionWorker implements OnModuleInit, OnModuleDestroy {
             ? `${retainedPhase}:${mutated.cursor}`
             : `${retainedPhase}:${record.expiryErasedRecordCount + mutated.affectedCount}`,
           expiryErasedRecordCount: record.expiryErasedRecordCount + mutated.affectedCount,
-          expiryNextAttemptAt: new Date(),
+          expiryNextAttemptAt: mutated.nextAttemptAt ?? new Date(),
           expiryLeaseToken: null,
           expiryLeaseExpiresAt: null
         }
@@ -968,7 +1111,7 @@ export class DataRetentionWorker implements OnModuleInit, OnModuleDestroy {
           expiryLeaseExpiresAt: null
         }
       });
-      await this.audit.record({
+      const failureAudit = await this.audit.record({
         subjectUserIds: [record.userId],
         action: "privacy.retention_category_failed",
         resourceType: "accountDataRetentionRecord",
@@ -981,6 +1124,9 @@ export class DataRetentionWorker implements OnModuleInit, OnModuleDestroy {
           errorCode
         }
       }, tx);
+      if (record.category === "deletion_audit_evidence") {
+        await this.expireGeneratedAuditReference(tx, failureAudit, record.userId);
+      }
       return { category: record.category, errorCode, nextAttemptAt };
     });
   }
@@ -1129,13 +1275,15 @@ export class DataRetentionWorker implements OnModuleInit, OnModuleDestroy {
     phase: string,
     deletionRequestId: string,
     userId: string,
-    companionId: string | null
+    companionId: string | null,
+    retentionRecordId: string = deletionRequestId
   ): Promise<RetentionPhaseBatchResult> {
     const graphResult = await this.processRestrictedGraphPhaseBatch(
       tx,
       phase,
       userId,
-      companionId
+      companionId,
+      retentionRecordId
     );
     if (graphResult) return graphResult;
     const del = (
@@ -1301,86 +1449,6 @@ export class DataRetentionWorker implements OnModuleInit, OnModuleDestroy {
         : empty;
     }
 
-    if (phase === "order_support_fact") {
-      // Drain every child row of the subject's tickets before deleting the
-      // parent. A ticket may contain facts submitted by staff or a companion;
-      // relying on ON DELETE CASCADE would otherwise turn the next phase into
-      // an unbounded transaction.
-      return del(
-        "OrderSupportFact",
-        `target."submittedByUserId" = $1 OR EXISTS (
-          SELECT 1 FROM "SupportTicket" ticket
-          WHERE ticket."id" = target."supportTicketId" AND ticket."userId" = $1
-        )`,
-        [userId]
-      );
-    }
-    if (phase === "attendance_statement") {
-      return del("AttendanceDisputeStatement", 'target."submittedByUserId" = $1', [userId]);
-    }
-    if (phase === "voice_attendance_event") {
-      return update(
-        "VoiceAttendanceEvent",
-        'target."participantUserId" = $1',
-        [userId],
-        `"participantUserId" = NULL, "providerUniqueId" = NULL,
-         "clientEventId" = NULL, "clientClaimedAt" = NULL`
-      );
-    }
-    if (phase === "support_ticket") {
-      return del("SupportTicket", 'target."userId" = $1', [userId]);
-    }
-    if (phase === "payment_dispute_reply") {
-      return del("PaymentDisputeReply", 'target."actorId" = $1', [userId]);
-    }
-    if (phase === "moderation_appeal") {
-      return del("ModerationAppeal", 'target."subjectUserId" = $1', [userId]);
-    }
-    if (phase === "moderation_case") {
-      return update(
-        "ModerationCase",
-        'target."subjectUserId" = $1 OR target."reporterUserId" = $1',
-        [userId],
-        `"title" = '已匿名化安全记录',
-         "content" = '[留存期届满，内容已匿名化]',
-         "aiReason" = 'retention_expired', "matchedRules" = ARRAY[]::TEXT[],
-         "provider" = NULL, "providerVersion" = NULL, "targetId" = NULL,
-         "subjectUserId" = NULL, "reporterUserId" = NULL,
-         "updatedAt" = CURRENT_TIMESTAMP`
-      );
-    }
-    if (phase === "chat_restriction") {
-      return del("ChatRestriction", 'target."userId" = $1', [userId]);
-    }
-    if (phase === "crisis_intervention") {
-      return del("CrisisIntervention", 'target."userId" = $1', [userId]);
-    }
-    if (phase === "moderation_action_log") {
-      return update(
-        "ModerationActionLog",
-        'target."actorId" = $1',
-        [userId],
-        '"actorId" = NULL, "note" = NULL'
-      );
-    }
-    if (phase === "companion_incident") {
-      return companionId
-        ? del("CompanionIncidentReport", 'target."companionId" = $1', [companionId])
-        : empty;
-    }
-    if (phase === "message") {
-      return update(
-        "Message",
-        'target."senderId" = $1',
-        [userId],
-        `"senderId" = 'retention-expired:' || $1,
-         "content" = '[留存期届满，内容已匿名化]', "senderName" = NULL`
-      );
-    }
-    if (phase === "media_asset") {
-      return del("MediaAsset", 'target."uploaderId" = $1', [userId]);
-    }
-
     if (phase === "data_rights_follow_up") {
       return del(
         "DataRightsRequestFollowUp",
@@ -1404,9 +1472,21 @@ export class DataRetentionWorker implements OnModuleInit, OnModuleDestroy {
       return del("CustomerAdultEligibility", 'target."userId" = $1', [userId]);
     }
     if (phase === "user_account_appeal") {
+      const lateMedia = await this.drainGovernanceMediaDependencies(
+        tx, userId, companionId, retentionRecordId
+      );
+      if (lateMedia) return lateMedia;
       return del("UserAccountAppeal", 'target."userId" = $1', [userId]);
     }
     if (phase === "user_account_action") {
+      const lateMedia = await this.drainGovernanceMediaDependencies(
+        tx, userId, companionId, retentionRecordId
+      );
+      if (lateMedia) return lateMedia;
+      const lateAppeals = await del("UserAccountAppeal", 'target."userId" = $1', [userId]);
+      if (lateAppeals.affectedCount > 0 || lateAppeals.hasMore) {
+        return { ...lateAppeals, hasMore: true };
+      }
       return del("UserAccountAction", 'target."userId" = $1', [userId]);
     }
     if (phase === "companion_training") {
@@ -1415,11 +1495,29 @@ export class DataRetentionWorker implements OnModuleInit, OnModuleDestroy {
         : empty;
     }
     if (phase === "companion_account_appeal") {
+      const lateMedia = await this.drainGovernanceMediaDependencies(
+        tx, userId, companionId, retentionRecordId
+      );
+      if (lateMedia) return lateMedia;
       return companionId
         ? del("CompanionAccountAppeal", 'target."companionId" = $1', [companionId])
         : empty;
     }
     if (phase === "companion_account_action") {
+      const lateMedia = await this.drainGovernanceMediaDependencies(
+        tx, userId, companionId, retentionRecordId
+      );
+      if (lateMedia) return lateMedia;
+      if (companionId) {
+        const lateAppeals = await del(
+          "CompanionAccountAppeal",
+          'target."companionId" = $1',
+          [companionId]
+        );
+        if (lateAppeals.affectedCount > 0 || lateAppeals.hasMore) {
+          return { ...lateAppeals, hasMore: true };
+        }
+      }
       return companionId
         ? del("CompanionAccountAction", 'target."companionId" = $1', [companionId])
         : empty;
@@ -1455,12 +1553,7 @@ export class DataRetentionWorker implements OnModuleInit, OnModuleDestroy {
       );
     }
     if (phase === "audit_subject_reference") {
-      return update(
-        "AuditLog",
-        'target."actorId" = $1 OR target."resourceId" = $1',
-        [userId],
-        '"actorId" = NULL, "resourceId" = NULL, "metadata" = \'{"retentionExpired":true}\'::JSONB'
-      );
+      return this.expireAuditSubjectReferenceBatch(tx, userId, companionId);
     }
     if (phase === "audit_deletion_request_reference") {
       return update(
@@ -1500,7 +1593,8 @@ export class DataRetentionWorker implements OnModuleInit, OnModuleDestroy {
     tx: any,
     phase: string,
     userId: string,
-    companionId: string | null
+    companionId: string | null,
+    retentionRecordId: string
   ): Promise<RetentionPhaseBatchResult | null> {
     const del = (
       table: string,
@@ -1818,8 +1912,837 @@ export class DataRetentionWorker implements OnModuleInit, OnModuleDestroy {
         : empty;
     }
 
+    if (phase === "governance_media_storage_schedule") {
+      return this.scheduleGovernanceMediaDeletionBatch(
+        tx, userId, companionId, retentionRecordId
+      );
+    }
+    if (phase === "governance_media_storage_wait") {
+      const scheduled = await this.scheduleGovernanceMediaDeletionBatch(
+        tx, userId, companionId, retentionRecordId
+      );
+      if (scheduled.affectedCount > 0 || scheduled.hasMore) {
+        return {
+          ...scheduled,
+          hasMore: true,
+          nextAttemptAt: new Date(Date.now() + MEDIA_STORAGE_WAIT_RETRY_MS)
+        };
+      }
+      return this.waitForGovernanceMediaStorageDeletion(
+        tx, userId, companionId, retentionRecordId
+      );
+    }
+    if (phase === "governance_controlled_evidence_attachment") {
+      const scheduled = await this.scheduleGovernanceMediaDeletionBatch(
+        tx, userId, companionId, retentionRecordId
+      );
+      if (scheduled.affectedCount > 0 || scheduled.hasMore) {
+        return {
+          ...scheduled,
+          hasMore: true,
+          nextAttemptAt: new Date(Date.now() + MEDIA_STORAGE_WAIT_RETRY_MS)
+        };
+      }
+      const waiting = await this.waitForGovernanceMediaStorageDeletion(
+        tx, userId, companionId, retentionRecordId
+      );
+      if (waiting.hasMore) return waiting;
+      return del(
+        "ControlledCaseEvidenceAttachment",
+        `${partyGovernanceAttachmentPredicate("target")}
+         AND EXISTS (
+           SELECT 1 FROM "MediaAsset" bound_media
+           WHERE bound_media."id" = target."mediaAssetId"
+             AND bound_media."retentionExpiryRecordId" = $3
+         )`,
+        [...partyParameters, retentionRecordId]
+      );
+    }
+    if (phase === "governance_media_asset_delete") {
+      const scheduled = await this.scheduleGovernanceMediaDeletionBatch(
+        tx, userId, companionId, retentionRecordId
+      );
+      if (scheduled.affectedCount > 0 || scheduled.hasMore) {
+        return {
+          ...scheduled,
+          hasMore: true,
+          nextAttemptAt: new Date(Date.now() + MEDIA_STORAGE_WAIT_RETRY_MS)
+        };
+      }
+      const waiting = await this.waitForGovernanceMediaStorageDeletion(
+        tx, userId, companionId, retentionRecordId
+      );
+      if (waiting.hasMore) return waiting;
+      return del(
+        "MediaAsset",
+        `${partyGovernanceMediaPredicate("target")}
+         AND target."retentionExpiryRecordId" = $3
+         AND target."storageDeletedAt" IS NOT NULL`,
+        [...partyParameters, retentionRecordId]
+      );
+    }
+
+    if (phase === "media_storage_schedule") {
+      return this.scheduleSafetyMediaDeletionBatch(tx, userId, companionId, retentionRecordId);
+    }
+    if (phase === "media_storage_wait") {
+      const scheduled = await this.scheduleSafetyMediaDeletionBatch(
+        tx, userId, companionId, retentionRecordId
+      );
+      if (scheduled.affectedCount > 0 || scheduled.hasMore) {
+        return {
+          ...scheduled,
+          hasMore: true,
+          nextAttemptAt: new Date(Date.now() + MEDIA_STORAGE_WAIT_RETRY_MS)
+        };
+      }
+      return this.waitForSafetyMediaStorageDeletion(
+        tx, userId, companionId, retentionRecordId
+      );
+    }
+    if (phase === "controlled_evidence_attachment") {
+      // Records produced by the earlier incomplete worker may already be
+      // parked at this phase. Make the phase self-healing rather than relying
+      // on an operational migration that would be blocked by active holds.
+      const scheduled = await this.scheduleSafetyMediaDeletionBatch(
+        tx, userId, companionId, retentionRecordId
+      );
+      if (scheduled.affectedCount > 0 || scheduled.hasMore) {
+        return {
+          ...scheduled,
+          hasMore: true,
+          nextAttemptAt: new Date(Date.now() + MEDIA_STORAGE_WAIT_RETRY_MS)
+        };
+      }
+      const waiting = await this.waitForSafetyMediaStorageDeletion(
+        tx, userId, companionId, retentionRecordId
+      );
+      if (waiting.hasMore) return waiting;
+      return del(
+        "ControlledCaseEvidenceAttachment",
+        `${partySafetyAttachmentPredicate("target")}
+         AND EXISTS (
+           SELECT 1 FROM "MediaAsset" bound_media
+           WHERE bound_media."id" = target."mediaAssetId"
+             AND bound_media."retentionExpiryRecordId" = $3
+         )`,
+        [...partyParameters, retentionRecordId]
+      );
+    }
+    if (phase === "media_asset_delete") {
+      // Recheck scheduling here as a fail-closed fence for rows inserted after
+      // the dedicated scheduling phase but before the subject was fully sealed.
+      const scheduled = await this.scheduleSafetyMediaDeletionBatch(
+        tx, userId, companionId, retentionRecordId
+      );
+      if (scheduled.affectedCount > 0 || scheduled.hasMore) {
+        return {
+          ...scheduled,
+          hasMore: true,
+          nextAttemptAt: new Date(Date.now() + MEDIA_STORAGE_WAIT_RETRY_MS)
+        };
+      }
+      const waiting = await this.waitForSafetyMediaStorageDeletion(
+        tx, userId, companionId, retentionRecordId
+      );
+      if (waiting.hasMore) return waiting;
+      return del(
+        "MediaAsset",
+        `${partySafetyMediaPredicate("target")}
+         AND target."retentionExpiryRecordId" = $3
+         AND target."storageDeletedAt" IS NOT NULL`,
+        [...partyParameters, retentionRecordId]
+      );
+    }
+    if (phase === "order_support_fact") {
+      const lateMedia = await this.drainSafetyMediaDependencies(
+        tx, userId, companionId, retentionRecordId
+      );
+      if (lateMedia) return lateMedia;
+      return del(
+        "OrderSupportFact",
+        `target."submittedByUserId" = $1 OR EXISTS (
+          SELECT 1 FROM "SupportTicket" ticket
+          WHERE ticket."id" = target."supportTicketId" AND ticket."userId" = $1
+        )`,
+        [userId]
+      );
+    }
+    if (phase === "support_ticket") {
+      const lateMedia = await this.drainSafetyMediaDependencies(
+        tx, userId, companionId, retentionRecordId
+      );
+      if (lateMedia) return lateMedia;
+      const lateFacts = await del(
+        "OrderSupportFact",
+        `EXISTS (
+          SELECT 1 FROM "SupportTicket" ticket
+          WHERE ticket."id" = target."supportTicketId" AND ticket."userId" = $1
+        )`,
+        [userId]
+      );
+      if (lateFacts.affectedCount > 0 || lateFacts.hasMore) {
+        return { ...lateFacts, hasMore: true };
+      }
+      return del("SupportTicket", 'target."userId" = $1', [userId]);
+    }
+    if (phase === "payment_dispute_attachment") {
+      // Drain attachments owned by a subject-authored reply first. The next
+      // reply phase can then delete at most 250 replies without an unbounded
+      // ON DELETE CASCADE fan-out. Attachments shared by the dispute skeleton
+      // are retained but stripped of provider identifiers.
+      const authoredAttachments = await del(
+        "PaymentDisputeAttachment",
+        `EXISTS (
+          SELECT 1 FROM "PaymentDisputeReply" reply
+          WHERE reply."id" = target."replyId" AND reply."actorId" = $1
+        )`,
+        [userId]
+      );
+      if (authoredAttachments.affectedCount > 0 || authoredAttachments.hasMore) {
+        return { ...authoredAttachments, hasMore: true };
+      }
+      return update(
+        "PaymentDisputeAttachment",
+        `${partyDisputePredicate('target."disputeId"')} AND (
+          target."providerMediaId" IS NOT NULL OR target."remoteUrlDigest" IS NOT NULL
+        )`,
+        partyParameters,
+        '"providerMediaId" = NULL, "remoteUrlDigest" = NULL'
+      );
+    }
+    if (phase === "payment_dispute_notification") {
+      return update(
+        "PaymentDisputeNotification",
+        `${partyDisputePredicate('target."disputeId"')} AND target."summary" IS NOT NULL`,
+        partyParameters,
+        '"summary" = NULL'
+      );
+    }
+    if (phase === "payment_dispute_negotiation_event") {
+      return update(
+        "PaymentDisputeNegotiationEvent",
+        `${partyDisputePredicate('target."disputeId"')} AND (
+          target."operateDetails" IS NOT NULL OR cardinality(target."mediaDigests") > 0
+        )`,
+        partyParameters,
+        '"operateDetails" = NULL, "mediaDigests" = ARRAY[]::TEXT[]'
+      );
+    }
+    if (phase === "payment_dispute_reply") {
+      // A reply is authored by exactly one user and cannot be unlinked because
+      // actorId is a required FK. Re-drain late child attachments so the bounded
+      // reply delete can never hide an unbounded cascade. Counterparty/provider
+      // replies remain intact.
+      const lateAttachments = await del(
+        "PaymentDisputeAttachment",
+        `EXISTS (
+          SELECT 1 FROM "PaymentDisputeReply" reply
+          WHERE reply."id" = target."replyId" AND reply."actorId" = $1
+        )`,
+        [userId]
+      );
+      if (lateAttachments.affectedCount > 0 || lateAttachments.hasMore) {
+        return { ...lateAttachments, hasMore: true };
+      }
+      return del("PaymentDisputeReply", 'target."actorId" = $1', [userId]);
+    }
+    if (phase === "payment_dispute") {
+      return update(
+        "PaymentDispute",
+        `${partyDisputePredicate('target."id"')} AND (
+          (${partyOrderExists('target."orderId"')} AND target."orderId" IS NOT NULL)
+          OR (${partyPaymentExists('target."paymentId"')} AND target."paymentId" IS NOT NULL)
+          OR (${partyOutTradeNoExists('target."outTradeNo"')} AND target."outTradeNo" IS NOT NULL)
+          OR target."complaintDetail" IS NOT NULL
+          OR target."assignedSupportUserId" = $1
+          OR target."completionRequestedById" = $1
+        )`,
+        partyParameters,
+        `"orderId" = CASE WHEN ${partyOrderExists('target."orderId"')} THEN NULL ELSE target."orderId" END,
+         "paymentId" = CASE WHEN ${partyPaymentExists('target."paymentId"')} THEN NULL ELSE target."paymentId" END,
+         "outTradeNo" = CASE WHEN ${partyOutTradeNoExists('target."outTradeNo"')} THEN NULL ELSE target."outTradeNo" END,
+         "complaintDetail" = NULL,
+         "assignedSupportUserId" = CASE WHEN target."assignedSupportUserId" = $1
+           THEN NULL ELSE target."assignedSupportUserId" END,
+         "completionRequestedById" = CASE WHEN target."completionRequestedById" = $1
+           THEN NULL ELSE target."completionRequestedById" END,
+         "updatedAt" = CURRENT_TIMESTAMP`
+      );
+    }
+    if (phase === "payment_dispute_order") {
+      return update(
+        "PaymentDisputeOrder",
+        `${directPartyDisputeOrderPredicate("target")} AND (
+          target."orderId" IS NOT NULL OR target."paymentId" IS NOT NULL
+          OR target."transactionId" IS NOT NULL
+          OR target."outTradeNo" IS DISTINCT FROM 'retention-expired:' || target."id"
+        )`,
+        partyParameters,
+        `"orderId" = NULL, "paymentId" = NULL, "transactionId" = NULL,
+         "outTradeNo" = 'retention-expired:' || target."id"`
+      );
+    }
+    if (phase === "attendance_statement") {
+      const lateMedia = await this.drainSafetyMediaDependencies(
+        tx, userId, companionId, retentionRecordId
+      );
+      if (lateMedia) return lateMedia;
+      return del("AttendanceDisputeStatement", 'target."submittedByUserId" = $1', [userId]);
+    }
+    if (phase === "attendance_dispute") {
+      return update(
+        "AttendanceDispute",
+        `target."openedByUserId" = $1 OR target."counterpartyUserId" = $1
+          OR target."assignedToUserId" = $1 OR target."decidedByUserId" = $1
+          OR target."appealedByUserId" = $1 OR target."appealAssignedToUserId" = $1
+          OR target."appealReviewedByUserId" = $1`,
+        [userId],
+        `"openedByUserId" = CASE WHEN target."openedByUserId" = $1 THEN NULL ELSE target."openedByUserId" END,
+         "counterpartyUserId" = CASE WHEN target."counterpartyUserId" = $1 THEN NULL ELSE target."counterpartyUserId" END,
+         "assignedToUserId" = CASE WHEN target."assignedToUserId" = $1 THEN NULL ELSE target."assignedToUserId" END,
+         "decidedByUserId" = CASE WHEN target."decidedByUserId" = $1 THEN NULL ELSE target."decidedByUserId" END,
+         "appealedByUserId" = CASE WHEN target."appealedByUserId" = $1 THEN NULL ELSE target."appealedByUserId" END,
+         "appealAssignedToUserId" = CASE WHEN target."appealAssignedToUserId" = $1 THEN NULL ELSE target."appealAssignedToUserId" END,
+         "appealReviewedByUserId" = CASE WHEN target."appealReviewedByUserId" = $1 THEN NULL ELSE target."appealReviewedByUserId" END,
+         "updatedAt" = CURRENT_TIMESTAMP`
+      );
+    }
+    if (phase === "order_reschedule_request") {
+      return update(
+        "OrderRescheduleRequest",
+        'target."requestedByUserId" = $1 OR target."respondedByUserId" = $1',
+        [userId],
+        `"requestedByUserId" = CASE WHEN target."requestedByUserId" = $1
+           THEN NULL ELSE target."requestedByUserId" END,
+         "respondedByUserId" = CASE WHEN target."respondedByUserId" = $1
+           THEN NULL ELSE target."respondedByUserId" END,
+         "updatedAt" = CURRENT_TIMESTAMP`
+      );
+    }
+    if (phase === "order_timeline_event") {
+      return update(
+        "OrderTimelineEvent",
+        'target."actorId" = $1',
+        [userId],
+        `"actorId" = NULL, "payload" = '{"retentionExpired":true}'::JSONB`
+      );
+    }
+    if (phase === "order_experience_feedback") {
+      return del(
+        "OrderExperienceFeedback",
+        `EXISTS (
+          SELECT 1 FROM "Order" feedback_order
+          WHERE feedback_order."id" = target."orderId" AND feedback_order."userId" = $1
+        )`,
+        [userId]
+      );
+    }
+    if (phase === "voice_attendance_event") {
+      return update(
+        "VoiceAttendanceEvent",
+        'target."participantUserId" = $1',
+        [userId],
+        `"participantUserId" = NULL, "providerUniqueId" = NULL,
+         "clientEventId" = NULL, "clientClaimedAt" = NULL`
+      );
+    }
+    if (phase === "voice_session") {
+      return update(
+        "VoiceSession",
+        `${partyOrderExists('target."orderId"')} AND (
+          target."terminationReason" IS NOT NULL
+          OR target."terminationProviderRequestId" IS NOT NULL
+        )`,
+        partyParameters,
+        `"terminationReason" = NULL, "terminationProviderRequestId" = NULL,
+         "updatedAt" = CURRENT_TIMESTAMP`
+      );
+    }
+    if (phase === "moderation_evidence") {
+      return update(
+        "ModerationEvidence",
+        `EXISTS (
+          SELECT 1 FROM "ModerationCase" moderation_case
+          WHERE moderation_case."id" = target."caseId"
+            AND ${partyModerationCasePredicate("moderation_case")}
+        ) AND target."payload" IS DISTINCT FROM '{"retentionExpired":true}'::JSONB`,
+        [userId],
+        `"payload" = '{"retentionExpired":true}'::JSONB`
+      );
+    }
+    if (phase === "moderation_action_log") {
+      return update(
+        "ModerationActionLog",
+        `(target."actorId" = $1 OR EXISTS (
+          SELECT 1 FROM "ModerationCase" moderation_case
+          WHERE moderation_case."id" = target."caseId"
+            AND ${partyModerationCasePredicate("moderation_case")}
+        )) AND (target."actorId" = $1 OR target."note" IS NOT NULL)`,
+        [userId],
+        `"actorId" = CASE WHEN target."actorId" = $1 THEN NULL ELSE target."actorId" END,
+         "note" = NULL`
+      );
+    }
+    if (phase === "moderation_appeal") {
+      return del("ModerationAppeal", 'target."subjectUserId" = $1', [userId]);
+    }
+    if (phase === "chat_restriction") {
+      return del("ChatRestriction", 'target."userId" = $1', [userId]);
+    }
+    if (phase === "moderation_case") {
+      return update(
+        "ModerationCase",
+        partyModerationCasePredicate("target"),
+        [userId],
+        `"title" = '已匿名化安全记录',
+         "content" = '[留存期届满，内容已匿名化]',
+         "aiReason" = 'retention_expired', "matchedRules" = ARRAY[]::TEXT[],
+         "provider" = NULL, "providerVersion" = NULL,
+         "targetId" = NULL, "messageId" = NULL, "conversationId" = NULL,
+         "subjectUserId" = CASE WHEN target."subjectUserId" = $1
+           THEN NULL ELSE target."subjectUserId" END,
+         "reporterUserId" = CASE WHEN target."reporterUserId" = $1
+           THEN NULL ELSE target."reporterUserId" END`
+      );
+    }
+    if (phase === "crisis_intervention") {
+      return del("CrisisIntervention", 'target."userId" = $1', [userId]);
+    }
+    if (phase === "companion_incident") {
+      const lateMedia = await this.drainSafetyMediaDependencies(
+        tx, userId, companionId, retentionRecordId
+      );
+      if (lateMedia) return lateMedia;
+      return companionId
+        ? del("CompanionIncidentReport", 'target."companionId" = $1', [companionId])
+        : empty;
+    }
+    if (phase === "message") {
+      return update(
+        "Message",
+        'target."senderId" = $1',
+        [userId],
+        `"senderId" = 'retention-expired:' || $1,
+         "content" = '[留存期届满，内容已匿名化]', "senderName" = NULL`
+      );
+    }
+    if (phase === "conversation") {
+      // Conversation is a bilateral order surface. User and companion records
+      // are already pseudonymized/detached by their own phases, so deleting the
+      // shared conversation would destroy the counterparty's retained history.
+      return empty;
+    }
+
     // Phases not owned by the restricted graph continue in processRetainedPhaseBatch.
     return null;
+  }
+
+  private async scheduleSafetyMediaDeletionBatch(
+    tx: any,
+    userId: string,
+    companionId: string | null,
+    retentionRecordId: string
+  ): Promise<RetentionPhaseBatchResult> {
+    return updateBoundedRows(
+      tx,
+      "MediaAsset",
+      `${partySafetyMediaPredicate("target")}
+       AND target."storageDeletedAt" IS NULL
+       AND (
+         target."retentionExpiryRecordId" IS NULL
+         OR target."retentionExpiryRecordId" = $3
+       )
+       AND (
+         target."retentionExpiryRecordId" IS NULL
+         OR target."expiresAt" IS NULL
+         OR target."expiresAt" > CURRENT_TIMESTAMP
+         OR target."storageDeleteNextAttemptAt" > CURRENT_TIMESTAMP
+         OR target."status" = 'expired'
+       )`,
+      [userId, companionId, retentionRecordId],
+      `"retentionExpiryRecordId" = COALESCE(target."retentionExpiryRecordId", $3),
+       "expiresAt" = CURRENT_TIMESTAMP,
+       "storageDeleteRequestedAt" = COALESCE(target."storageDeleteRequestedAt", CURRENT_TIMESTAMP),
+       "storageDeleteNextAttemptAt" = CURRENT_TIMESTAMP,
+       "status" = CASE WHEN target."status" = 'expired' THEN 'failed' ELSE target."status" END,
+       "updatedAt" = CURRENT_TIMESTAMP`,
+      ERASURE_BATCH_SIZE
+    );
+  }
+
+  private async waitForSafetyMediaStorageDeletion(
+    tx: any,
+    userId: string,
+    companionId: string | null,
+    retentionRecordId: string
+  ): Promise<RetentionPhaseBatchResult> {
+    const rows: Array<{ exists: boolean }> = await tx.$queryRawUnsafe(
+      `SELECT EXISTS (
+         SELECT 1 FROM "MediaAsset" AS target
+         WHERE ${partySafetyMediaPredicate("target")}
+           AND target."retentionExpiryRecordId" = $3
+           AND target."storageDeletedAt" IS NULL
+       ) AS exists`,
+      userId,
+      companionId,
+      retentionRecordId
+    );
+    const pending = rows[0]?.exists === true;
+    return {
+      affectedCount: 0,
+      hasMore: pending,
+      cursor: null,
+      ...(pending ? { nextAttemptAt: new Date(Date.now() + MEDIA_STORAGE_WAIT_RETRY_MS) } : {})
+    };
+  }
+
+  private async drainSafetyMediaDependencies(
+    tx: any,
+    userId: string,
+    companionId: string | null,
+    retentionRecordId: string
+  ): Promise<RetentionPhaseBatchResult | null> {
+    const scheduled = await this.scheduleSafetyMediaDeletionBatch(
+      tx, userId, companionId, retentionRecordId
+    );
+    if (scheduled.affectedCount > 0 || scheduled.hasMore) {
+      return {
+        ...scheduled,
+        hasMore: true,
+        nextAttemptAt: new Date(Date.now() + MEDIA_STORAGE_WAIT_RETRY_MS)
+      };
+    }
+    const waiting = await this.waitForSafetyMediaStorageDeletion(
+      tx, userId, companionId, retentionRecordId
+    );
+    if (waiting.hasMore) return waiting;
+    const attachments = await deleteBoundedRows(
+      tx,
+      "ControlledCaseEvidenceAttachment",
+      `${partySafetyAttachmentPredicate("target")}
+       AND EXISTS (
+         SELECT 1 FROM "MediaAsset" bound_media
+         WHERE bound_media."id" = target."mediaAssetId"
+           AND bound_media."retentionExpiryRecordId" = $3
+       )`,
+      [userId, companionId, retentionRecordId],
+      ERASURE_BATCH_SIZE
+    );
+    if (attachments.affectedCount > 0 || attachments.hasMore) {
+      return { ...attachments, hasMore: true };
+    }
+    const assets = await deleteBoundedRows(
+      tx,
+      "MediaAsset",
+      `${partySafetyMediaPredicate("target")}
+       AND target."retentionExpiryRecordId" = $3
+       AND target."storageDeletedAt" IS NOT NULL`,
+      [userId, companionId, retentionRecordId],
+      ERASURE_BATCH_SIZE
+    );
+    if (assets.affectedCount > 0 || assets.hasMore) {
+      return { ...assets, hasMore: true };
+    }
+    return null;
+  }
+
+  private async scheduleGovernanceMediaDeletionBatch(
+    tx: any,
+    userId: string,
+    companionId: string | null,
+    retentionRecordId: string
+  ): Promise<RetentionPhaseBatchResult> {
+    return updateBoundedRows(
+      tx,
+      "MediaAsset",
+      `${partyGovernanceMediaPredicate("target")}
+       AND target."storageDeletedAt" IS NULL
+       AND (
+         target."retentionExpiryRecordId" IS NULL
+         OR target."retentionExpiryRecordId" = $3
+       )
+       AND (
+         target."retentionExpiryRecordId" IS NULL
+         OR target."expiresAt" IS NULL
+         OR target."expiresAt" > CURRENT_TIMESTAMP
+         OR target."storageDeleteNextAttemptAt" > CURRENT_TIMESTAMP
+         OR target."status" = 'expired'
+       )`,
+      [userId, companionId, retentionRecordId],
+      `"retentionExpiryRecordId" = COALESCE(target."retentionExpiryRecordId", $3),
+       "expiresAt" = CURRENT_TIMESTAMP,
+       "storageDeleteRequestedAt" = COALESCE(target."storageDeleteRequestedAt", CURRENT_TIMESTAMP),
+       "storageDeleteNextAttemptAt" = CURRENT_TIMESTAMP,
+       "status" = CASE WHEN target."status" = 'expired' THEN 'failed' ELSE target."status" END,
+       "updatedAt" = CURRENT_TIMESTAMP`,
+      ERASURE_BATCH_SIZE
+    );
+  }
+
+  private async waitForGovernanceMediaStorageDeletion(
+    tx: any,
+    userId: string,
+    companionId: string | null,
+    retentionRecordId: string
+  ): Promise<RetentionPhaseBatchResult> {
+    const rows: Array<{ exists: boolean }> = await tx.$queryRawUnsafe(
+      `SELECT EXISTS (
+         SELECT 1 FROM "MediaAsset" AS target
+         WHERE ${partyGovernanceMediaPredicate("target")}
+           AND target."retentionExpiryRecordId" = $3
+           AND target."storageDeletedAt" IS NULL
+       ) AS exists`,
+      userId,
+      companionId,
+      retentionRecordId
+    );
+    const pending = rows[0]?.exists === true;
+    return {
+      affectedCount: 0,
+      hasMore: pending,
+      cursor: null,
+      ...(pending ? { nextAttemptAt: new Date(Date.now() + MEDIA_STORAGE_WAIT_RETRY_MS) } : {})
+    };
+  }
+
+  private async drainGovernanceMediaDependencies(
+    tx: any,
+    userId: string,
+    companionId: string | null,
+    retentionRecordId: string
+  ): Promise<RetentionPhaseBatchResult | null> {
+    const scheduled = await this.scheduleGovernanceMediaDeletionBatch(
+      tx, userId, companionId, retentionRecordId
+    );
+    if (scheduled.affectedCount > 0 || scheduled.hasMore) {
+      return {
+        ...scheduled,
+        hasMore: true,
+        nextAttemptAt: new Date(Date.now() + MEDIA_STORAGE_WAIT_RETRY_MS)
+      };
+    }
+    const waiting = await this.waitForGovernanceMediaStorageDeletion(
+      tx, userId, companionId, retentionRecordId
+    );
+    if (waiting.hasMore) return waiting;
+    const attachments = await deleteBoundedRows(
+      tx,
+      "ControlledCaseEvidenceAttachment",
+      `${partyGovernanceAttachmentPredicate("target")}
+       AND EXISTS (
+         SELECT 1 FROM "MediaAsset" bound_media
+         WHERE bound_media."id" = target."mediaAssetId"
+           AND bound_media."retentionExpiryRecordId" = $3
+       )`,
+      [userId, companionId, retentionRecordId],
+      ERASURE_BATCH_SIZE
+    );
+    if (attachments.affectedCount > 0 || attachments.hasMore) {
+      return { ...attachments, hasMore: true };
+    }
+    const assets = await deleteBoundedRows(
+      tx,
+      "MediaAsset",
+      `${partyGovernanceMediaPredicate("target")}
+       AND target."retentionExpiryRecordId" = $3
+       AND target."storageDeletedAt" IS NOT NULL`,
+      [userId, companionId, retentionRecordId],
+      ERASURE_BATCH_SIZE
+    );
+    if (assets.affectedCount > 0 || assets.hasMore) {
+      return { ...assets, hasMore: true };
+    }
+    return null;
+  }
+
+  private async expireAuditSubjectReferenceBatch(
+    tx: any,
+    userId: string,
+    companionId: string | null
+  ): Promise<RetentionPhaseBatchResult> {
+    type Candidate = {
+      id: string;
+      auditLogId: string;
+      actorId: string | null;
+      action: string;
+      resourceId: string | null;
+      metadata: unknown;
+    };
+    const candidates: Candidate[] = await tx.$queryRawUnsafe(
+      `WITH candidates AS MATERIALIZED (
+         SELECT reference."id", reference."auditLogId"
+         FROM "AuditSubjectReference" AS reference
+         WHERE reference."subjectUserId" = $1
+         ORDER BY reference."id"
+         FOR UPDATE SKIP LOCKED
+         LIMIT $2
+       ), locked_logs AS MATERIALIZED (
+         SELECT
+           log."id",
+           log."actorId",
+           log."action",
+           log."resourceId",
+           log."metadata"
+         FROM "AuditLog" AS log
+         JOIN candidates ON candidates."auditLogId" = log."id"
+         ORDER BY log."id"
+         FOR UPDATE OF log
+       )
+       SELECT
+         candidates."id",
+         candidates."auditLogId",
+         locked_logs."actorId",
+         locked_logs."action",
+         locked_logs."resourceId",
+         locked_logs."metadata"
+       FROM candidates
+       JOIN locked_logs ON locked_logs."id" = candidates."auditLogId"
+       ORDER BY candidates."id"`,
+      userId,
+      ERASURE_BATCH_SIZE
+    );
+    if (candidates.length > ERASURE_BATCH_SIZE) {
+      throw new Error("Audit subject expiry batch exceeded bound");
+    }
+
+    if (candidates.length > 0) {
+      const patches = candidates.map((candidate) => {
+        const metadata = candidate.metadata
+          && typeof candidate.metadata === "object"
+          && !Array.isArray(candidate.metadata)
+          ? candidate.metadata as Record<string, unknown>
+          : null;
+        const redacted = redactControlledAuditSubjectMetadata(
+          candidate.action,
+          metadata,
+          {
+            userIds: new Set([userId]),
+            companionIds: companionId ? new Set([companionId]) : undefined
+          }
+        );
+        return {
+          id: candidate.auditLogId,
+          actorId: candidate.actorId === userId ? null : candidate.actorId,
+          resourceId: candidate.resourceId === userId ? null : candidate.resourceId,
+          metadata: {
+            ...(redacted.metadata ?? {}),
+            retentionExpired: true
+          }
+        };
+      });
+      const updated: Array<{ id: string }> = await tx.$queryRawUnsafe(
+        `WITH patches AS MATERIALIZED (
+           SELECT *
+           FROM jsonb_to_recordset($1::JSONB) AS patch(
+             "id" TEXT,
+             "actorId" TEXT,
+             "resourceId" TEXT,
+             "metadata" JSONB
+           )
+         ), updated AS (
+           UPDATE "AuditLog" AS log
+           SET
+             "actorId" = patch."actorId",
+             "resourceId" = patch."resourceId",
+             "metadata" = patch."metadata"
+           FROM patches AS patch
+           WHERE log."id" = patch."id"
+           RETURNING log."id"
+         )
+         SELECT "id" FROM updated ORDER BY "id"`,
+        JSON.stringify(patches)
+      );
+      if (updated.length !== patches.length) {
+        throw new Error("Audit subject expiry lost a locked audit log");
+      }
+
+      const deleted: Array<{ count: number }> = await tx.$queryRawUnsafe(
+        `WITH candidates AS MATERIALIZED (
+           SELECT patch."id"
+           FROM jsonb_to_recordset($1::JSONB) AS patch("id" TEXT)
+         ), deleted AS (
+           DELETE FROM "AuditSubjectReference" AS reference
+           USING candidates
+           WHERE reference."id" = candidates."id"
+             AND reference."subjectUserId" = $2
+           RETURNING reference."id"
+         )
+         SELECT COUNT(*)::INTEGER AS count FROM deleted`,
+        JSON.stringify(candidates.map((candidate) => ({ id: candidate.id }))),
+        userId
+      );
+      if (Number(deleted[0]?.count ?? 0) !== candidates.length) {
+        throw new Error("Audit subject expiry lost a locked subject reference");
+      }
+    }
+
+    const remaining: Array<{ exists: boolean }> = await tx.$queryRawUnsafe(
+      `SELECT EXISTS (
+         SELECT 1 FROM "AuditSubjectReference" AS reference
+         WHERE reference."subjectUserId" = $1
+       ) AS exists`,
+      userId
+    );
+    return {
+      affectedCount: candidates.length,
+      hasMore: remaining[0]?.exists === true,
+      cursor: candidates.at(-1)?.id ?? null
+    };
+  }
+
+  /**
+   * The terminal/failure audit for the audit-evidence category is itself a
+   * controlled system-with-subject event. Remove that one freshly-created edge
+   * in the same transaction, otherwise the category would recreate the exact
+   * subject reference it just proved absent and could never converge.
+   */
+  private async expireGeneratedAuditReference(
+    tx: any,
+    auditEntry: unknown,
+    userId: string
+  ): Promise<void> {
+    const auditLogId = auditEntry
+      && typeof auditEntry === "object"
+      && typeof (auditEntry as { id?: unknown }).id === "string"
+      ? (auditEntry as { id: string }).id
+      : null;
+    if (!auditLogId) {
+      throw new Error("Retention audit write did not return its audit log id");
+    }
+    const updated: Array<{ id: string }> = await tx.$queryRawUnsafe(
+      `UPDATE "AuditLog" AS log
+       SET
+         "actorId" = CASE WHEN log."actorId" = $2 THEN NULL ELSE log."actorId" END,
+         "resourceId" = CASE WHEN log."resourceId" = $2 THEN NULL ELSE log."resourceId" END,
+         "metadata" = COALESCE(log."metadata", '{}'::JSONB)
+           || '{"retentionExpired":true}'::JSONB
+       WHERE log."id" = $1
+       RETURNING log."id"`,
+      auditLogId,
+      userId
+    );
+    if (updated.length !== 1) {
+      throw new Error("Retention audit write disappeared before subject expiry");
+    }
+    await tx.$queryRawUnsafe(
+      `DELETE FROM "AuditSubjectReference" AS reference
+       WHERE reference."auditLogId" = $1
+         AND reference."subjectUserId" = $2`,
+      auditLogId,
+      userId
+    );
+    const remaining: Array<{ count: number }> = await tx.$queryRawUnsafe(
+      `SELECT COUNT(*)::INTEGER AS count
+       FROM "AuditSubjectReference" AS reference
+       WHERE reference."auditLogId" = $1
+         AND reference."subjectUserId" = $2`,
+      auditLogId,
+      userId
+    );
+    if (Number(remaining[0]?.count ?? 0) !== 0) {
+      throw new Error("Retention audit write recreated a subject reference");
+    }
   }
 
   private async verifyRetainedCategory(
@@ -1903,30 +2826,92 @@ export class DataRetentionWorker implements OnModuleInit, OnModuleDestroy {
       return;
     }
     if (category === "support_disputes_safety") {
-      const remaining = await Promise.all([
-        tx.orderSupportFact.count({ where: {
-          OR: [
-            { submittedByUserId: userId },
-            { supportTicket: { userId } }
-          ]
-        } }),
-        tx.attendanceDisputeStatement.count({ where: { submittedByUserId: userId } }),
-        tx.voiceAttendanceEvent.count({ where: { participantUserId: userId } }),
-        tx.supportTicket.count({ where: { userId } }),
-        tx.paymentDisputeReply.count({ where: { actorId: userId } }),
-        tx.moderationAppeal.count({ where: { subjectUserId: userId } }),
-        tx.moderationCase.count({ where: { OR: [{ subjectUserId: userId }, { reporterUserId: userId }] } }),
-        tx.chatRestriction.count({ where: { userId } }),
-        tx.crisisIntervention.count({ where: { userId } }),
-        tx.moderationActionLog.count({ where: { actorId: userId } }),
-        tx.message.count({ where: { senderId: userId } }),
-        tx.mediaAsset.count({ where: { uploaderId: userId } }),
-        ...(companionId ? [
-          tx.companionIncidentReport.count({ where: { companionId } }),
-          tx.companionProfile.count({ where: { id: companionId, ownerUserId: { not: null } } })
-        ] : [])
-      ]);
-      if (remaining.some((value: number) => value > 0)) {
+      const remaining: Array<{ exists: boolean }> = await tx.$queryRawUnsafe(
+        `SELECT (
+          EXISTS (
+            SELECT 1 FROM "OrderSupportFact" fact
+            WHERE fact."submittedByUserId" = $1
+              OR EXISTS (
+                SELECT 1 FROM "SupportTicket" ticket
+                WHERE ticket."id" = fact."supportTicketId" AND ticket."userId" = $1
+              )
+          )
+          OR EXISTS (SELECT 1 FROM "SupportTicket" ticket WHERE ticket."userId" = $1)
+          OR EXISTS (
+            SELECT 1 FROM "ControlledCaseEvidenceAttachment" attachment
+            WHERE ${partySafetyAttachmentPredicate("attachment")}
+          )
+          OR EXISTS (
+            SELECT 1 FROM "MediaAsset" safety_media
+            WHERE ${partySafetyMediaPredicate("safety_media")}
+          )
+          OR EXISTS (SELECT 1 FROM "PaymentDisputeReply" reply WHERE reply."actorId" = $1)
+          OR EXISTS (
+            SELECT 1 FROM "PaymentDisputeOrder" complaint_order
+            WHERE ${directPartyDisputeOrderPredicate("complaint_order")}
+          )
+          OR EXISTS (
+            SELECT 1 FROM "PaymentDispute" dispute
+            WHERE ${partyDisputePredicate('dispute."id"')}
+          )
+          OR EXISTS (
+            SELECT 1 FROM "AttendanceDisputeStatement" statement
+            WHERE statement."submittedByUserId" = $1
+          )
+          OR EXISTS (
+            SELECT 1 FROM "AttendanceDispute" dispute
+            WHERE dispute."openedByUserId" = $1 OR dispute."counterpartyUserId" = $1
+              OR dispute."assignedToUserId" = $1 OR dispute."decidedByUserId" = $1
+              OR dispute."appealedByUserId" = $1 OR dispute."appealAssignedToUserId" = $1
+              OR dispute."appealReviewedByUserId" = $1
+          )
+          OR EXISTS (
+            SELECT 1 FROM "OrderRescheduleRequest" request
+            WHERE request."requestedByUserId" = $1 OR request."respondedByUserId" = $1
+          )
+          OR EXISTS (SELECT 1 FROM "OrderTimelineEvent" event WHERE event."actorId" = $1)
+          OR EXISTS (
+            SELECT 1 FROM "OrderExperienceFeedback" feedback
+            JOIN "Order" feedback_order ON feedback_order."id" = feedback."orderId"
+            WHERE feedback_order."userId" = $1
+          )
+          OR EXISTS (
+            SELECT 1 FROM "VoiceAttendanceEvent" event WHERE event."participantUserId" = $1
+          )
+          OR EXISTS (
+            SELECT 1 FROM "VoiceSession" session
+            WHERE ${partyOrderExists('session."orderId"')}
+              AND (session."terminationReason" IS NOT NULL
+                OR session."terminationProviderRequestId" IS NOT NULL)
+          )
+          OR EXISTS (SELECT 1 FROM "ModerationAppeal" appeal WHERE appeal."subjectUserId" = $1)
+          OR EXISTS (
+            SELECT 1 FROM "ModerationCase" moderation_case
+            WHERE ${partyModerationCasePredicate("moderation_case")}
+          )
+          OR EXISTS (SELECT 1 FROM "ChatRestriction" restriction WHERE restriction."userId" = $1)
+          OR EXISTS (SELECT 1 FROM "CrisisIntervention" crisis WHERE crisis."userId" = $1)
+          OR EXISTS (SELECT 1 FROM "ModerationActionLog" action_log WHERE action_log."actorId" = $1)
+          OR EXISTS (SELECT 1 FROM "Message" message WHERE message."senderId" = $1)
+          OR (
+            $2::TEXT IS NOT NULL
+            AND EXISTS (
+              SELECT 1 FROM "CompanionIncidentReport" incident
+              WHERE incident."companionId" = $2
+            )
+          )
+          OR (
+            $2::TEXT IS NOT NULL
+            AND EXISTS (
+              SELECT 1 FROM "CompanionProfile" companion
+              WHERE companion."id" = $2 AND companion."ownerUserId" IS NOT NULL
+            )
+          )
+        ) AS exists`,
+        userId,
+        companionId
+      );
+      if (!remaining[0] || remaining[0].exists === true) {
         throw new Error("Safety retention postcondition failed");
       }
       return;
@@ -1949,10 +2934,27 @@ export class DataRetentionWorker implements OnModuleInit, OnModuleDestroy {
       if (remaining.some((value: number) => value > 0)) {
         throw new Error("Governance retention postcondition failed");
       }
+      const evidenceRemaining: Array<{ exists: boolean }> = await tx.$queryRawUnsafe(
+        `SELECT (
+          EXISTS (
+            SELECT 1 FROM "ControlledCaseEvidenceAttachment" attachment
+            WHERE ${partyGovernanceAttachmentPredicate("attachment")}
+          )
+          OR EXISTS (
+            SELECT 1 FROM "MediaAsset" governance_media
+            WHERE ${partyGovernanceMediaPredicate("governance_media")}
+          )
+        ) AS exists`,
+        userId,
+        companionId
+      );
+      if (!evidenceRemaining[0] || evidenceRemaining[0].exists === true) {
+        throw new Error("Governance retention postcondition failed");
+      }
       return;
     }
     if (category === "deletion_audit_evidence") {
-      const [tombstones, requests, jobs, logs] = await Promise.all([
+      const [tombstones, requests, jobs, subjectReferences, logs] = await Promise.all([
         tx.authIdentityTombstone.count({ where: { deletionRequestId } }),
         tx.accountDeletionRequest.count({
           where: {
@@ -1964,6 +2966,7 @@ export class DataRetentionWorker implements OnModuleInit, OnModuleDestroy {
         tx.accountDeletionRatingRefreshJob.count({
           where: { deletionRequest: { userId } }
         }),
+        tx.auditSubjectReference.count({ where: { subjectUserId: userId } }),
         tx.$queryRaw<Array<{ count: number }>>`
           SELECT COUNT(*)::INTEGER AS count
           FROM "AuditLog" AS log
@@ -1978,7 +2981,8 @@ export class DataRetentionWorker implements OnModuleInit, OnModuleDestroy {
             )
         `
       ]);
-      if (tombstones > 0 || requests > 0 || jobs > 0 || Number(logs[0]?.count ?? 0) > 0) {
+      if (tombstones > 0 || requests > 0 || jobs > 0 || subjectReferences > 0
+        || Number(logs[0]?.count ?? 0) > 0) {
         throw new Error("Deletion-audit retention postcondition failed");
       }
       return;

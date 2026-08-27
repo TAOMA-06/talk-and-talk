@@ -90,6 +90,7 @@
       </view>
       <button wx:if="{{view.canConfirmServiceOrder && !view.isTextOnlyHistoricalVoiceOrder}}" class="primary-button action-button" loading="{{action === 'confirm'}}" disabled="{{action !== ''}}" bindtap="confirmServiceOrder">确认接单</button>
       <button wx:if="{{view.canRejectServiceOrder}}" class="danger-button action-button" loading="{{action === 'reject'}}" disabled="{{action !== ''}}" bindtap="rejectServiceOrder">无法接单</button>
+      <view wx:if="{{view.paymentUnavailableNotice}}" class="service-action-notice">{{view.paymentUnavailableNotice}}</view>
       <button wx:if="{{view.canPay}}" class="primary-button action-button" bindtap="openPayment">进入安全支付与结果页</button>
       <button wx:if="{{view.canConfirmGuidelines}}" class="secondary-button action-button" loading="{{action === 'guidelines'}}" disabled="{{action !== ''}}" bindtap="confirmGuidelines">{{view.guidelinesActionText}}</button>
       <button wx:if="{{view.canChat}}" class="secondary-button action-button" bindtap="openConversation">进入订单会话</button>

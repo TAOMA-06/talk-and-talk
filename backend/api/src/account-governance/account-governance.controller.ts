@@ -4,6 +4,8 @@ import { AuthenticatedUser } from "../auth/auth.service";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { SkipLegalConsent } from "../auth/decorators/skip-legal-consent.decorator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { ControlledCaseEvidenceService } from "../moderation/media/controlled-case-evidence.service";
+import { ReserveControlledCaseEvidenceDto } from "../moderation/media/dto/reserve-controlled-case-evidence.dto";
 import { AccountGovernanceService } from "./account-governance.service";
 import { AddDataRightsFollowUpDto } from "./dto/add-data-rights-follow-up.dto";
 import { CreateDataRightsRequestDto } from "./dto/create-data-rights-request.dto";
@@ -25,7 +27,8 @@ import { UserAccountActionsService } from "./user-account-actions.service";
 export class AccountGovernanceController {
   constructor(
     private readonly governance: AccountGovernanceService,
-    private readonly accountActions: UserAccountActionsService
+    private readonly accountActions: UserAccountActionsService,
+    private readonly caseEvidence: ControlledCaseEvidenceService
   ) {}
 
   @Get("account-actions")
@@ -45,6 +48,46 @@ export class AccountGovernanceController {
     @Body() dto: CreateUserAccountAppealDto
   ) {
     return this.accountActions.createAppeal(user.id, actionId, dto);
+  }
+
+  @Post("account-actions/:id/appeal-evidence-uploads")
+  @SkipLegalConsent()
+  reserveAccountActionAppealEvidence(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id") actionId: string,
+    @Body() dto: ReserveControlledCaseEvidenceDto
+  ) {
+    return this.caseEvidence.reserveForUserAccountAppeal(user.id, actionId, dto);
+  }
+
+  @Post("account-actions/:id/appeal-evidence-uploads/:assetId/complete")
+  @SkipLegalConsent()
+  completeAccountActionAppealEvidence(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id") actionId: string,
+    @Param("assetId") assetId: string
+  ) {
+    return this.caseEvidence.completeUserAccountAppeal(user.id, actionId, assetId);
+  }
+
+  @Get("account-actions/:id/appeal-evidence-uploads/:assetId")
+  @SkipLegalConsent()
+  accountActionAppealEvidenceStatus(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id") actionId: string,
+    @Param("assetId") assetId: string
+  ) {
+    return this.caseEvidence.statusUserAccountAppeal(user.id, actionId, assetId);
+  }
+
+  @Get("account-actions/:id/appeal-evidence-attachments/:attachmentId/read-url")
+  @SkipLegalConsent()
+  accountActionAppealEvidenceReadUrl(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id") actionId: string,
+    @Param("attachmentId") attachmentId: string
+  ) {
+    return this.caseEvidence.createUserAccountAppealReadUrl(user, actionId, attachmentId);
   }
 
   @Get("sessions")

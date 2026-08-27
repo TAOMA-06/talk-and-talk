@@ -135,7 +135,7 @@
           <div id="companionPagination" class="pagination"></div>
           <article id="identityVerificationPanel" class="panel">
             <div class="panel-heading"><div><p class="eyebrow">KYC FOUR-EYES</p><h2>实名变更复核</h2></div><select id="identityVerificationStatusFilter" aria-label="实名变更复核状态"><option value="pending">待复核</option><option value="approved">已批准</option><option value="rejected">已拒绝</option></select></div>
-            <div class="section-callout"><strong>提交不等于生效</strong><span>实名核验或撤销必须由另一名授权人员复核；批准后才更新真实状态，撤销批准还会按规则下架公开陪伴者。</span></div>
+            <div class="section-callout"><strong>新实名授权 No-Go</strong><span>真实、可撤销的身份授权通道尚未接入：后台不提供新授权提交或批准。这里只允许拒绝遗留的新授权请求，以及由另一名授权人员复核实名撤销；撤销批准还会按规则下架公开陪伴者。</span></div>
             <div id="identityVerificationList" class="compact-list"></div>
             <div id="identityVerificationPagination" class="pagination"></div>
           </article>
@@ -271,10 +271,14 @@
             <article class="panel"><div class="panel-heading"><div><p class="eyebrow">TRAINING</p><h2>培训资质</h2></div></div><div id="trainingList" class="compact-list"></div><div id="trainingPagination" class="pagination"></div></article>
             <article class="panel"><div class="panel-heading"><div><p class="eyebrow">PERIODIC REVIEW</p><h2>商业资质复审到期</h2></div></div><div id="reviewDueList" class="compact-list"></div><div id="reviewDuePagination" class="pagination"></div></article>
             <article class="panel"><div class="panel-heading"><div><p class="eyebrow">ACCOUNT ACTIONS</p><h2>当前账号处置</h2></div></div><div id="accountActionList" class="compact-list"></div><div id="accountActionPagination" class="pagination"></div></article>
-            <article class="panel"><div class="panel-heading"><div><p class="eyebrow">INCIDENTS</p><h2>履约与安全事件</h2></div></div><div id="incidentList" class="compact-list"></div><div id="incidentPagination" class="pagination"></div></article>
+            <article class="panel"><div class="panel-heading"><div><p class="eyebrow">EXPIRY REACTIVATION</p><h2>临时暂停到期恢复复核</h2></div></div><div class="section-callout"><strong>不自动上架</strong><span>暂停到期只生成复核待办；通过后仍保持下架、离线和忙碌，须另行显式发布。</span></div><div id="suspensionReactivationList" class="compact-list"></div><div id="suspensionReactivationPagination" class="pagination"></div></article>
+            <article id="incidentAssignedPanel" class="panel"><div class="panel-heading"><div><p class="eyebrow">ASSIGNED INCIDENTS</p><h2>已授权履约与安全事件</h2></div></div><div class="section-callout"><strong>按当前归属读取</strong><span>供应运营只读取自己已认领的完整案件；管理员可查看全局。附件始终通过短期受控地址读取。</span></div><div id="incidentList" class="compact-list"></div><div id="incidentPagination" class="pagination"></div></article>
+            <article id="incidentClaimablePanel" class="panel hidden"><div class="panel-heading"><div><p class="eyebrow">CLAIMABLE INCIDENTS</p><h2>匿名事件待认领</h2></div></div><div class="section-callout"><strong>认领前最小披露</strong><span>这里只显示提交时间、状态和是否关联订单；不会返回陪伴者、类别、正文、订单号或附件标识。</span></div><div id="incidentClaimableList" class="compact-list"></div><div id="incidentClaimablePagination" class="pagination"></div></article>
             <article class="panel"><div class="panel-heading"><div><p class="eyebrow">WITHDRAWALS</p><h2>提现请求</h2></div></div><div id="withdrawalList" class="compact-list"></div><div id="withdrawalPagination" class="pagination"></div></article>
+            <article id="companionAppealClaimablePanel" class="panel hidden"><div class="panel-heading"><div><p class="eyebrow">CLAIMABLE APPEALS</p><h2>匿名陪伴者申诉待认领</h2></div></div><div class="section-callout"><strong>认领前最小披露</strong><span>这里只显示案件号、提交时间与复核期限；不会返回陪伴者、原处置、申诉正文或附件标识。</span></div><div id="companionAppealClaimableList" class="compact-list"></div><div id="companionAppealClaimablePagination" class="pagination"></div></article>
             <article id="companionAppealsPanel" class="panel">
-              <div class="panel-heading"><div><p class="eyebrow">APPEALS</p><h2>陪伴者申诉</h2></div><select id="companionAppealStatusFilter" aria-label="陪伴者申诉状态"><option value="pending">待独立复核</option><option value="upheld">维持处置</option><option value="overturned">撤销处置</option><option value="dismissed">已关闭</option></select></div>
+              <div class="panel-heading"><div><p class="eyebrow">ASSIGNED APPEALS</p><h2>已授权陪伴者申诉</h2></div><select id="companionAppealStatusFilter" aria-label="陪伴者申诉状态"><option value="pending">待独立复核</option><option value="reactivationRequired">撤销后待资格恢复复核</option><option value="upheld">维持处置</option><option value="overturned">全部撤销处置</option><option value="dismissed">已关闭</option></select></div>
+              <div class="section-callout"><strong>按当前归属读取附件</strong><span>供应运营只读取本人当前分配的完整申诉；管理员可路由全局队列，但只有当前独立处理人能取得附件标识与短期读取地址。</span></div>
               <div id="companionAppealList" class="compact-list"></div>
               <div id="companionAppealPagination" class="pagination"></div>
             </article>

@@ -66,6 +66,17 @@
           <view wx:if="{{item.appeal}}" class="appeal-result">
             <view class="request-copy">申诉状态：{{item.stateText}}</view>
             <view class="request-copy">我的说明：{{item.appeal.statement}}</view>
+            <view wx:if="{{!accountAppealTextOnly && item.appeal.evidenceAttachments.length}}" class="appeal-evidence-list">
+              <button
+                wx:for="{{item.appeal.evidenceAttachments}}"
+                wx:key="id"
+                wx:for-item="attachment"
+                class="text-button appeal-evidence-button"
+                data-action-id="{{item.id}}"
+                data-id="{{attachment.id}}"
+                bindtap="openAccountAppealEvidence"
+              >查看{{attachment.kind === 'image' ? '图片' : '音频'}}证据</button>
+            </view>
             <view wx:if="{{item.appeal.resolution}}" class="status-reason">复核结论：{{item.appeal.resolution}}</view>
             <view class="request-meta">复核目标时间：{{item.appealReviewDueText}}<text wx:if="{{item.appeal.overdue}}" class="overdue-text"> · 已超期</text><text wx:if="{{item.appeal.resolvedAt}}"> · 完成：{{item.appealResolvedText}}</text></view>
           </view>
@@ -73,6 +84,18 @@
           <view wx:if="{{accountAppealActionId === item.id}}" class="inline-form follow-up-form">
             <view class="form-title">就这次处置提交申诉</view>
             <textarea class="form-textarea" value="{{accountAppealStatement}}" maxlength="1000" placeholder="说明你认为处置有误的事实与理由（10–1000 字）；请勿填写密码、验证码或无关敏感信息" bindinput="setAccountAppealStatement"></textarea>
+            <view wx:if="{{accountAppealTextOnly}}" class="form-note">当前首发版本仅接收文字申诉；图片、音频证据尚未开放。</view>
+            <block wx:else>
+              <view class="evidence-toolbar">
+                <button class="text-button" disabled="{{accountAppealEvidenceUploading || accountAppealEvidenceDrafts.length >= 3}}" bindtap="addAccountAppealEvidenceImage">添加图片</button>
+                <button class="text-button" disabled="{{accountAppealEvidenceUploading || accountAppealEvidenceDrafts.length >= 3}}" bindtap="addAccountAppealEvidenceAudio">添加音频</button>
+                <button wx:if="{{accountAppealEvidenceDrafts.length}}" class="text-button" disabled="{{accountAppealEvidenceUploading}}" bindtap="refreshAccountAppealEvidence">刷新审核</button>
+              </view>
+              <view wx:for="{{accountAppealEvidenceDrafts}}" wx:key="assetId" class="evidence-draft">
+                <text>{{item.kind === 'image' ? '图片' : '音频'}} · {{item.statusText}}</text>
+                <button class="text-button" data-id="{{item.assetId}}" bindtap="removeAccountAppealEvidence">移除</button>
+              </view>
+            </block>
             <view class="form-note">提交成功仅表示进入独立复核队列，原处置在推翻前仍然有效。</view>
             <button class="primary-button full-button" loading="{{accountAppealSubmitting}}" disabled="{{accountAppealSubmitting}}" bindtap="submitAccountAppeal">确认提交申诉</button>
             <button class="text-button" disabled="{{accountAppealSubmitting}}" bindtap="closeAccountAppeal">取消</button>

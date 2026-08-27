@@ -164,6 +164,26 @@ describe("DataRetentionWorker bounded scale controls", () => {
     expect(sql).toContain('"expiryLeaseExpiresAt"');
   });
 
+  it("gates deletion-audit expiry on the forward-only controlled-v3 subject backfill", async () => {
+    const topLevelRaw = jest.fn().mockResolvedValue([{
+      processed: 17,
+      referencesTouched: 5,
+      completed: true
+    }]);
+    const { worker } = createWorker({ topLevelRaw });
+
+    await expect((worker as any).advanceAuditSubjectReferenceBackfill(
+      Date.now() + 5_000
+    )).resolves.toEqual({
+      processed: 17,
+      completed: true,
+      continuationRequired: false
+    });
+    const sql = Array.from(topLevelRaw.mock.calls[0][0] as string[]).join("?");
+    expect(sql).toContain('backfill_audit_subject_references_v3');
+    expect(sql).not.toContain('backfill_audit_subject_references_v2');
+  });
+
   it("commits one legacy-erasure batch and persists the same phase for crash-safe resume", async () => {
     const record = legacyRecord("identity_authentication_profile", "refresh_token");
     const { worker, tx } = createWorker();
@@ -358,5 +378,263 @@ describe("DataRetentionWorker bounded scale controls", () => {
     expect(sql.findIndex((value: string) => value.includes('FROM "User"'))).toBeLessThan(
       sql.findIndex((value: string) => value.includes('FROM "AccountDataRetentionRecord"'))
     );
+  });
+
+  it("implements every declared safety graph phase without an unsupported fallback", async () => {
+    const phases = [
+      "media_storage_schedule",
+      "media_storage_wait",
+      "controlled_evidence_attachment",
+      "media_asset_delete",
+      "order_support_fact",
+      "support_ticket",
+      "payment_dispute_attachment",
+      "payment_dispute_notification",
+      "payment_dispute_negotiation_event",
+      "payment_dispute_reply",
+      "payment_dispute",
+      "payment_dispute_order",
+      "attendance_statement",
+      "attendance_dispute",
+      "order_reschedule_request",
+      "order_timeline_event",
+      "order_experience_feedback",
+      "voice_attendance_event",
+      "voice_session",
+      "moderation_evidence",
+      "moderation_action_log",
+      "moderation_appeal",
+      "chat_restriction",
+      "moderation_case",
+      "crisis_intervention",
+      "companion_incident",
+      "message",
+      "conversation",
+      "companion_detach"
+    ];
+    for (const phase of phases) {
+      const { worker, tx } = createWorker();
+      await expect((worker as any).processRetainedPhaseBatch(
+        tx,
+        phase,
+        "deletion-safety",
+        "user-safety",
+        "companion-safety"
+      )).resolves.toEqual(expect.objectContaining({
+        affectedCount: expect.any(Number),
+        hasMore: expect.any(Boolean)
+      }));
+    }
+  });
+
+  it("schedules only purpose-scoped safety media in a bounded batch and never deletes storage first", async () => {
+    const { worker, tx } = createWorker();
+    tx.$queryRawUnsafe.mockImplementation(async (sql: string) => (
+      sql.includes("SELECT EXISTS")
+        ? [{ exists: false }]
+        : [{ count: 1, cursor: "(media,1)" }]
+    ));
+
+    await expect((worker as any).processRetainedPhaseBatch(
+      tx,
+      "media_storage_schedule",
+      "deletion-safety",
+      "user-safety",
+      "companion-safety"
+    )).resolves.toEqual({
+      affectedCount: 1,
+      hasMore: false,
+      cursor: "(media,1)"
+    });
+
+    const statements = tx.$queryRawUnsafe.mock.calls.map(([sql]: [string]) => sql);
+    expect(statements[0]).toContain('UPDATE "MediaAsset"');
+    expect(statements[0]).toContain("'chatMessage'");
+    expect(statements[0]).toContain("'orderSupportFact'");
+    expect(statements[0]).toContain("'attendanceDisputeStatement'");
+    expect(statements[0]).toContain("'companionIncidentReport'");
+    expect(statements[0]).not.toContain("'userAccountAppeal'");
+    expect(statements[0]).toContain('"storageDeletedAt" IS NULL');
+    expect(statements[0]).toContain('"expiresAt" = CURRENT_TIMESTAMP');
+    expect(statements.join("\n")).not.toContain('DELETE FROM "MediaAsset"');
+    expect(tx.$queryRawUnsafe.mock.calls[0].at(-1)).toBe(250);
+  });
+
+  it("waits for storageDeletedAt and persists a future retry without deleting any media row", async () => {
+    const { worker, tx } = createWorker();
+    tx.$queryRawUnsafe.mockResolvedValue([{ exists: true }]);
+
+    const result = await (worker as any).processRetainedPhaseBatch(
+      tx,
+      "media_storage_wait",
+      "deletion-safety",
+      "user-safety",
+      null
+    );
+    expect(result).toEqual({
+      affectedCount: 0,
+      hasMore: true,
+      cursor: null,
+      nextAttemptAt: expect.any(Date)
+    });
+    const sql = tx.$queryRawUnsafe.mock.calls.map(([statement]: [string]) => statement).join("\n");
+    expect(sql).toContain('"storageDeletedAt" IS NULL');
+    expect(sql).not.toContain('DELETE FROM "MediaAsset"');
+  });
+
+  it("keeps a legacy controlled-attachment phase parked until object storage confirms deletion", async () => {
+    const { worker, tx } = createWorker();
+    let existsQuery = 0;
+    tx.$queryRawUnsafe.mockImplementation(async (sql: string) => {
+      if (!sql.includes("SELECT EXISTS")) return [{ count: 0, cursor: null }];
+      existsQuery += 1;
+      return [{ exists: existsQuery >= 2 }];
+    });
+
+    await expect((worker as any).processRetainedPhaseBatch(
+      tx,
+      "controlled_evidence_attachment",
+      "deletion-safety",
+      "user-safety",
+      "companion-safety"
+    )).resolves.toEqual(expect.objectContaining({
+      affectedCount: 0,
+      hasMore: true,
+      nextAttemptAt: expect.any(Date)
+    }));
+    const sql = tx.$queryRawUnsafe.mock.calls.map(([statement]: [string]) => statement).join("\n");
+    expect(sql).not.toContain('DELETE FROM "ControlledCaseEvidenceAttachment"');
+    expect(sql).not.toContain('DELETE FROM "MediaAsset"');
+  });
+
+  it("isolates account-appeal evidence from the safety graph and gives it the same storage confirmation fence", async () => {
+    const { worker, tx } = createWorker();
+    tx.$queryRawUnsafe.mockImplementation(async (sql: string) => (
+      sql.includes("SELECT EXISTS")
+        ? [{ exists: false }]
+        : [{ count: 1, cursor: "(governance,1)" }]
+    ));
+
+    await expect((worker as any).processRetainedPhaseBatch(
+      tx,
+      "governance_media_storage_schedule",
+      "deletion-governance",
+      "user-governance",
+      "companion-governance"
+    )).resolves.toEqual({
+      affectedCount: 1,
+      hasMore: false,
+      cursor: "(governance,1)"
+    });
+    const sql = tx.$queryRawUnsafe.mock.calls.map(([statement]: [string]) => statement).join("\n");
+    expect(sql).toContain("'userAccountAppeal'");
+    expect(sql).toContain("'companionAccountAppeal'");
+    expect(sql).toContain('"userAccountActionId"');
+    expect(sql).toContain('"companionAccountActionId"');
+    expect(sql).not.toContain("'chatMessage'");
+    expect(sql).not.toContain("'orderSupportFact'");
+    expect(sql).not.toContain('DELETE FROM "MediaAsset"');
+  });
+
+  it("rechecks governance media before an old user-appeal phase can cascade its attachments", async () => {
+    const { worker, tx } = createWorker();
+    let existsQuery = 0;
+    tx.$queryRawUnsafe.mockImplementation(async (sql: string) => {
+      if (!sql.includes("SELECT EXISTS")) return [{ count: 0, cursor: null }];
+      existsQuery += 1;
+      return [{ exists: existsQuery >= 2 }];
+    });
+
+    await expect((worker as any).processRetainedPhaseBatch(
+      tx,
+      "user_account_appeal",
+      "deletion-governance",
+      "user-governance",
+      null
+    )).resolves.toEqual(expect.objectContaining({
+      affectedCount: 0,
+      hasMore: true,
+      nextAttemptAt: expect.any(Date)
+    }));
+    const sql = tx.$queryRawUnsafe.mock.calls.map(([statement]: [string]) => statement).join("\n");
+    expect(sql).not.toContain('DELETE FROM "UserAccountAppeal"');
+    expect(sql).not.toContain('DELETE FROM "ControlledCaseEvidenceAttachment"');
+  });
+
+  it("expires audit subjects from normalized references while preserving another subject on the same log", async () => {
+    const { worker, tx } = createWorker();
+    tx.$queryRawUnsafe.mockImplementation(async (sql: string) => {
+      if (sql.includes('SELECT reference."id", reference."auditLogId"')) {
+        return [{
+          id: "reference-target",
+          auditLogId: "audit-shared",
+          actorId: "user-other",
+          action: "attendance.case_created",
+          resourceId: "resource-other",
+          metadata: {
+            openedByUserId: "user-target",
+            counterpartyUserId: "user-other",
+            operationalCode: "keep-me"
+          }
+        }];
+      }
+      if (sql.includes('UPDATE "AuditLog" AS log')) return [{ id: "audit-shared" }];
+      if (sql.includes('DELETE FROM "AuditSubjectReference"')) return [{ count: 1 }];
+      if (sql.includes("SELECT EXISTS")) return [{ exists: false }];
+      throw new Error(`Unexpected SQL: ${sql}`);
+    });
+
+    await expect((worker as any).processRetainedPhaseBatch(
+      tx,
+      "audit_subject_reference",
+      "deletion-audit",
+      "user-target",
+      null
+    )).resolves.toEqual({
+      affectedCount: 1,
+      hasMore: false,
+      cursor: "reference-target"
+    });
+
+    const updateCall = tx.$queryRawUnsafe.mock.calls.find(
+      ([sql]: [string]) => sql.includes('UPDATE "AuditLog" AS log')
+    );
+    const patches = JSON.parse(updateCall[1]);
+    expect(patches).toEqual([{
+      id: "audit-shared",
+      actorId: "user-other",
+      resourceId: "resource-other",
+      metadata: {
+        counterpartyUserId: "user-other",
+        operationalCode: "keep-me",
+        retentionExpired: true
+      }
+    }]);
+    const deleteSql = tx.$queryRawUnsafe.mock.calls.find(
+      ([sql]: [string]) => sql.includes('DELETE FROM "AuditSubjectReference"')
+    )[0];
+    expect(deleteSql).toContain('reference."subjectUserId" = $2');
+  });
+
+  it("requires every normalized audit subject edge to be gone before final audit expiry", async () => {
+    const delegates = {
+      authIdentityTombstone: { count: jest.fn().mockResolvedValue(0) },
+      accountDeletionRequest: { count: jest.fn().mockResolvedValue(0) },
+      accountDeletionRatingRefreshJob: { count: jest.fn().mockResolvedValue(0) },
+      auditSubjectReference: { count: jest.fn().mockResolvedValue(1) }
+    };
+    const { worker, tx } = createWorker({ tx: delegates });
+    tx.$queryRaw.mockResolvedValue([{ count: 0 }]);
+
+    await expect((worker as any).verifyRetainedCategory(
+      tx,
+      "deletion-audit",
+      "user-target",
+      "deletion_audit_evidence",
+      null
+    )).rejects.toThrow("Deletion-audit retention postcondition failed");
+    expect(delegates.auditSubjectReference.count).toHaveBeenCalledWith({
+      where: { subjectUserId: "user-target" }
+    });
   });
 });

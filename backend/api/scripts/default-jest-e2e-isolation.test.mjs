@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -21,4 +22,13 @@ test("the ordinary Jest entrypoint never discovers destructive E2E specs", () =>
     false,
     "only test/jest-e2e.json may select destructive E2E specs"
   );
+});
+
+test("formal E2E suppresses request-log I/O without widening the global timeout", async () => {
+  const [manifest, config] = await Promise.all([
+    readFile(resolve(apiDirectory, "package.json"), "utf8").then(JSON.parse),
+    readFile(resolve(apiDirectory, "test/jest-e2e.json"), "utf8").then(JSON.parse)
+  ]);
+  assert.match(manifest.scripts["test:e2e"], /--runInBand --silent$/);
+  assert.equal(config.testTimeout, undefined);
 });

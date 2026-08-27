@@ -22,7 +22,9 @@ type ReserveInput = {
 type EvidenceTarget =
   | { purpose: "orderSupportFact"; orderSupportFactId: string }
   | { purpose: "attendanceDisputeStatement"; attendanceDisputeStatementId: string }
-  | { purpose: "companionIncidentReport"; companionIncidentReportId: string };
+  | { purpose: "companionIncidentReport"; companionIncidentReportId: string }
+  | { purpose: "userAccountAppeal"; userAccountAppealId: string }
+  | { purpose: "companionAccountAppeal"; companionAccountAppealId: string };
 
 @Injectable()
 export class ControlledCaseEvidenceService {
@@ -93,6 +95,62 @@ export class ControlledCaseEvidenceService {
     });
   }
 
+  async reserveForUserAccountAppeal(userId: string, actionId: string, input: ReserveInput) {
+    this.mediaAssets.assertCaseEvidenceMediaEnabled();
+    const action: any = await this.prisma.userAccountAction.findFirst({
+      where: { id: actionId, userId },
+      include: { appeal: { select: { id: true } } }
+    } as any);
+    this.assertAppealUploadAllowed(
+      action,
+      "USER_ACCOUNT_ACTION_NOT_FOUND",
+      "Account action not found",
+      "USER_ACCOUNT_APPEAL_EXISTS",
+      "An appeal already exists for this account action",
+      "USER_ACCOUNT_ACTION_REVOKED",
+      "A revoked account action no longer requires an appeal",
+      "USER_ACCOUNT_APPEAL_WINDOW_CLOSED",
+      "The appeal submission window has closed"
+    );
+    return this.mediaAssets.reserveControlled({
+      uploaderId: userId,
+      purpose: "userAccountAppeal",
+      scope: { userAccountActionId: action.id },
+      ...input
+    });
+  }
+
+  async reserveForCompanionAccountAppeal(userId: string, actionId: string, input: ReserveInput) {
+    this.mediaAssets.assertCaseEvidenceMediaEnabled();
+    const companion: any = await this.prisma.companionProfile.findFirst({
+      where: { ownerUserId: userId },
+      select: { id: true }
+    } as any);
+    const action: any = companion
+      ? await this.prisma.companionAccountAction.findFirst({
+          where: { id: actionId, companionId: companion.id },
+          include: { appeals: { select: { id: true }, take: 1 } }
+        } as any)
+      : null;
+    this.assertAppealUploadAllowed(
+      action ? { ...action, appeal: action.appeals?.[0] ?? null } : null,
+      "COMPANION_ACTION_NOT_FOUND",
+      "Account action not found",
+      "COMPANION_ACTION_APPEAL_EXISTS",
+      "An appeal already exists for this account action",
+      "COMPANION_ACTION_ALREADY_REVOKED",
+      "A revoked account action no longer requires an appeal",
+      "COMPANION_ACTION_APPEAL_WINDOW_CLOSED",
+      "The appeal submission window has closed"
+    );
+    return this.mediaAssets.reserveControlled({
+      uploaderId: userId,
+      purpose: "companionAccountAppeal",
+      scope: { companionAccountActionId: action.id },
+      ...input
+    });
+  }
+
   async complete(userId: string, assetId: string) {
     this.mediaAssets.assertCaseEvidenceMediaEnabled();
     const result = await this.mediaAssets.completeControlled(assetId, userId);
@@ -103,6 +161,40 @@ export class ControlledCaseEvidenceService {
   status(userId: string, assetId: string) {
     this.mediaAssets.assertCaseEvidenceMediaEnabled();
     return this.mediaAssets.controlledStatus(assetId, userId);
+  }
+
+  completeUserAccountAppeal(userId: string, actionId: string, assetId: string) {
+    return this.completeScoped(
+      userId,
+      assetId,
+      "userAccountAppeal",
+      { userAccountActionId: actionId }
+    );
+  }
+
+  statusUserAccountAppeal(userId: string, actionId: string, assetId: string) {
+    this.mediaAssets.assertCaseEvidenceMediaEnabled();
+    return this.mediaAssets.controlledStatus(assetId, userId, {
+      purpose: "userAccountAppeal",
+      scope: { userAccountActionId: actionId }
+    });
+  }
+
+  completeCompanionAccountAppeal(userId: string, actionId: string, assetId: string) {
+    return this.completeScoped(
+      userId,
+      assetId,
+      "companionAccountAppeal",
+      { companionAccountActionId: actionId }
+    );
+  }
+
+  statusCompanionAccountAppeal(userId: string, actionId: string, assetId: string) {
+    this.mediaAssets.assertCaseEvidenceMediaEnabled();
+    return this.mediaAssets.controlledStatus(assetId, userId, {
+      purpose: "companionAccountAppeal",
+      scope: { companionAccountActionId: actionId }
+    });
   }
 
   bindSupportFact(
@@ -159,6 +251,35 @@ export class ControlledCaseEvidenceService {
     });
   }
 
+  bindUserAccountAppeal(
+    db: any,
+    input: { assetIds?: string[]; userId: string; actionId: string; appealId: string }
+  ) {
+    return this.bindApproved(db, {
+      purpose: "userAccountAppeal",
+      scope: { userAccountActionId: input.actionId },
+      assetIds: input.assetIds,
+      userId: input.userId,
+      target: { purpose: "userAccountAppeal", userAccountAppealId: input.appealId }
+    });
+  }
+
+  bindCompanionAccountAppeal(
+    db: any,
+    input: { assetIds?: string[]; userId: string; actionId: string; appealId: string }
+  ) {
+    return this.bindApproved(db, {
+      purpose: "companionAccountAppeal",
+      scope: { companionAccountActionId: input.actionId },
+      assetIds: input.assetIds,
+      userId: input.userId,
+      target: {
+        purpose: "companionAccountAppeal",
+        companionAccountAppealId: input.appealId
+      }
+    });
+  }
+
   attachmentInclude() {
     return {
       evidenceAttachments: {
@@ -189,19 +310,47 @@ export class ControlledCaseEvidenceService {
         },
         companionIncidentReport: {
           include: { companion: { select: { ownerUserId: true } } }
+        },
+        userAccountAppeal: {
+          include: { action: { select: { createdById: true } } }
+        },
+        companionAccountAppeal: {
+          include: {
+            action: { select: { createdById: true } },
+            companion: { select: { ownerUserId: true } }
+          }
         }
       }
     } as any);
     if (!attachment || !this.canRead(user, attachment)) {
       throw new AppException("CASE_EVIDENCE_NOT_FOUND", "Evidence attachment was not found", HttpStatus.NOT_FOUND);
     }
-    const url = await this.mediaAssets.approvedReadUrl(attachment.mediaAsset);
-    return {
-      attachmentId: attachment.id,
-      kind: attachment.mediaAsset.kind,
-      url,
-      assetExpiresAt: attachment.mediaAsset.expiresAt.toISOString()
-    };
+    return this.readUrlResponse(attachment);
+  }
+
+  async createUserAccountAppealReadUrl(
+    user: AuthenticatedUser,
+    actionId: string,
+    attachmentId: string
+  ) {
+    this.mediaAssets.assertCaseEvidenceMediaEnabled();
+    const attachment: any = await this.prisma.controlledCaseEvidenceAttachment.findFirst({
+      where: {
+        id: attachmentId,
+        purpose: "userAccountAppeal",
+        userAccountAppeal: { is: { actionId, userId: user.id } }
+      },
+      include: {
+        mediaAsset: true,
+        userAccountAppeal: {
+          include: { action: { select: { createdById: true } } }
+        }
+      }
+    } as any);
+    if (!attachment || !this.canRead(user, attachment)) {
+      throw new AppException("CASE_EVIDENCE_NOT_FOUND", "Evidence attachment was not found", HttpStatus.NOT_FOUND);
+    }
+    return this.readUrlResponse(attachment);
   }
 
   private async bindApproved(
@@ -259,7 +408,11 @@ export class ControlledCaseEvidenceService {
             ? { orderSupportFactId: input.target.orderSupportFactId }
             : input.target.purpose === "attendanceDisputeStatement"
               ? { attendanceDisputeStatementId: input.target.attendanceDisputeStatementId }
-              : { companionIncidentReportId: input.target.companionIncidentReportId })
+              : input.target.purpose === "companionIncidentReport"
+                ? { companionIncidentReportId: input.target.companionIncidentReportId }
+                : input.target.purpose === "userAccountAppeal"
+                  ? { userAccountAppealId: input.target.userAccountAppealId }
+                  : { companionAccountAppealId: input.target.companionAccountAppealId })
         }
       });
     }
@@ -285,9 +438,77 @@ export class ControlledCaseEvidenceService {
     if (incident) {
       return incident.companion?.ownerUserId === user.id
         || user.role === "admin"
-        || user.role === "supply";
+        || (user.role === "supply" && incident.assignedToUserId === user.id);
+    }
+    const userAppeal = attachment.userAccountAppeal;
+    if (userAppeal) {
+      return userAppeal.userId === user.id
+        || (user.role === "admin"
+          && userAppeal.assignedToUserId === user.id
+          && userAppeal.action?.createdById !== user.id);
+    }
+    const companionAppeal = attachment.companionAccountAppeal;
+    if (companionAppeal) {
+      return companionAppeal.companion?.ownerUserId === user.id
+        || (["supply", "admin"].includes(user.role)
+          && companionAppeal.assignedToUserId === user.id
+          && companionAppeal.action?.createdById !== user.id);
     }
     return false;
+  }
+
+  private async completeScoped(
+    userId: string,
+    assetId: string,
+    purpose: "userAccountAppeal" | "companionAccountAppeal",
+    scope: { userAccountActionId: string } | { companionAccountActionId: string }
+  ) {
+    this.mediaAssets.assertCaseEvidenceMediaEnabled();
+    const result = await this.mediaAssets.completeControlled(assetId, userId, {
+      purpose,
+      scope
+    });
+    if (result.asset.status === "scanning") this.worker.enqueue(assetId);
+    return result;
+  }
+
+  private async readUrlResponse(attachment: any) {
+    const url = await this.mediaAssets.approvedReadUrl(attachment.mediaAsset);
+    return {
+      attachmentId: attachment.id,
+      kind: attachment.mediaAsset.kind,
+      url,
+      assetExpiresAt: attachment.mediaAsset.expiresAt.toISOString()
+    };
+  }
+
+  private assertAppealUploadAllowed(
+    action: any,
+    notFoundCode: string,
+    notFoundMessage: string,
+    existsCode: string,
+    existsMessage: string,
+    revokedCode: string,
+    revokedMessage: string,
+    windowCode: string,
+    windowMessage: string
+  ) {
+    if (!action) {
+      throw new AppException(notFoundCode, notFoundMessage, HttpStatus.NOT_FOUND);
+    }
+    if (action.revokedAt) {
+      throw new AppException(revokedCode, revokedMessage, HttpStatus.CONFLICT);
+    }
+    if (action.appeal) {
+      throw new AppException(existsCode, existsMessage, HttpStatus.CONFLICT, {
+        appealId: action.appeal.id
+      });
+    }
+    if (!action.appealDeadlineAt || action.appealDeadlineAt.getTime() <= Date.now()) {
+      throw new AppException(windowCode, windowMessage, HttpStatus.CONFLICT, {
+        appealDeadlineAt: action.appealDeadlineAt?.toISOString?.() ?? null
+      });
+    }
   }
 
   private assertAttendanceAcceptingEvidence(dispute: any, userId: string) {

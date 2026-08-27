@@ -3,7 +3,9 @@ import { HttpStatus } from "@nestjs/common";
 import { AppException } from "../common/errors/app.exception";
 
 /**
- * Shared hard gate for public community posts and real-time messaging.
+ * Shared hard gate for new paid text interactions, public community posts and
+ * real-time messaging. Orders and prepay use it because messaging is the only
+ * delivery channel in the first-release commercial surface.
  *
  * IDENTITY-R01/R02: the legacy `profile.isVerified` boolean has no independently
  * retrievable authority binding. Until a real identity authority and lifecycle are
@@ -11,6 +13,8 @@ import { AppException } from "../common/errors/app.exception";
  * introduce a KYC vendor, collection field, or substitute adult eligibility.
  */
 export const PUBLIC_INTERACTION_IDENTITY_REQUIRED = "PUBLIC_INTERACTION_IDENTITY_REQUIRED";
+/** No approved, revocable authority-backed grant model exists in this release. */
+export const PUBLIC_INTERACTION_IDENTITY_AUTHORITY_AVAILABLE = false;
 /** Mini Program recovery entry for identity hard-gate refusals (not a raw API path). */
 export const PUBLIC_INTERACTION_IDENTITY_RECOVERY_PATH = "/pages/profile/index";
 
@@ -58,7 +62,7 @@ export function assertPublicInteractionIdentity(
   if (verificationStatus === "verified") return;
   throw new AppException(
     PUBLIC_INTERACTION_IDENTITY_REQUIRED,
-    "Public posting and real-time messaging stay unavailable until identity verification has an approved authority",
+    "New paid text interactions, public posting and real-time messaging stay unavailable until identity verification has an approved authority",
     HttpStatus.FORBIDDEN,
     publicInteractionIdentityDetails(verificationStatus)
   );

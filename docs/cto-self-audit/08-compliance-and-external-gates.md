@@ -54,6 +54,6 @@
 - [互联网用户账号信息管理规定](https://www.cac.gov.cn/2022-06/26/c_1657868775042841.htm)
 - [具有舆论属性或社会动员能力的互联网信息服务安全评估规定](https://www.cac.gov.cn/2018-11/15/c_1123716072.htm)
 - [互联网信息服务算法推荐管理规定](https://www.cac.gov.cn/2022-01/04/c_1642894606364259.htm)
-- 当前仓库专项结论：[小程序商用复审](../miniprogram-release-readiness-report.md)、[生产检查清单](../production-checklist.md)
+- 当前仓库调查状态与专项结论：[2026-08-26 商用闭环状态](./runs/2026-08-26-commercial-closure/state.md)、[最新市场复审](../commercial-market-cross-audit-2026-08-25.md)、[生产检查清单](../production-checklist.md)。[2026-08-01 小程序报告](../miniprogram-release-readiness-report.md)仅为历史快照。
 
 最终判断以微信后台当前提示、工信部/属地通信管理局、网信和公安的实际回执为准。

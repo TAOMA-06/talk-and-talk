@@ -33,7 +33,7 @@ export function publicInteractionErrorUserMessage(
   if (status === "accountUnavailable") {
     return "当前账号暂时无法进行公开互动，请联系客服或稍后再试。";
   }
-  return "公开发帖或即时消息前需要完成身份核验。请先完成核验后再试。";
+  return "身份核验授权通道尚未开放；新预约、支付、公开发帖和即时消息暂不可用。可前往账号页查看说明与客服入口。";
 }
 
 export function publicInteractionRecoveryPath(

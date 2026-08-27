@@ -7,7 +7,7 @@
 > 中的独立记录授权；禁止使用浮动 tag、`--build` 或当前工作树。
 
 上线前在 **staging 验证通过** 后，对 production 逐项勾选。  
-本清单只检查配置与运维门禁，**不扩展产品功能**。正式交易模型、停机红线和外部签字责任见 [COMMERCIAL_RELEASE.md](./COMMERCIAL_RELEASE.md)；市场对标、正式发行边界和仓库红线见 [商用界面市场交叉审查（2026-08-02 复审）](./commercial-market-cross-audit-2026-08-02.md)（[2026-08-01 历史快照](./commercial-market-cross-audit-2026-08-01.md)）；已知未完成能力见 [NEXT_PHASE.md](../NEXT_PHASE.md)。
+本清单只检查配置与运维门禁，**不扩展产品功能**。正式交易模型、停机红线和外部签字责任见 [COMMERCIAL_RELEASE.md](./COMMERCIAL_RELEASE.md)；市场对标、正式发行边界和仓库红线见 [商用界面市场交叉审查（2026-08-25 冻结复审）](./commercial-market-cross-audit-2026-08-25.md)（[2026-08-02 报告](./commercial-market-cross-audit-2026-08-02.md)和[2026-08-01 报告](./commercial-market-cross-audit-2026-08-01.md)仅为历史快照）；已知未完成能力见 [NEXT_PHASE.md](../NEXT_PHASE.md)。
 
 ## 每项外部动作的必填记录
 
@@ -30,6 +30,7 @@
 - [x] 仓库：用户可查询本人注销申请的状态、截止时间和结果；后台处理更新能回显，接口不暴露内部备注或其他用户数据
 - [x] 仓库：用户可在小程序查看本人微信支付投诉的权威状态、SLA 和沟通摘要；接口失败显示未知/重试，不显示成“没有投诉”
 - [x] 仓库：陪伴者账号动作申诉由非原处置人复核；服务端拒绝同一人员处置后自审并保留审计
+- [x] 仓库：申诉撤销或临时暂停自然到期只生成持久恢复待办；恢复人不得是原处置人（申诉路径也不得是申诉复核人），只在当前实名、成年、商业资料、培训、注销和其它限制重新核验通过且暂停因果精确匹配时恢复商业状态；公开、在线与可用状态始终保持关闭，须另走显式发布
 - [x] 仓库：退款管理队列提供稳定分页与总量，运营能遍历全部待办，不再固定截断前 200 条
 - [x] 仓库：注销管理队列显示总量和当前页，可遍历后续待办；筛选变化回到第 1 页，加载失败不会清空成“无待办”
 - [x] 仓库：订单时间线、陪伴者服务单和客服案件加载失败分别显示失败与重试，不把失败后的空数组解释成没有记录
@@ -39,6 +40,7 @@
 
 - [ ] `COMMERCIAL_RELEASE_MODE=commercial`；`REFUND_POLICY_VERSION`、`REFUND_REQUEST_WINDOW_HOURS` 与已批准规则一致，取得非秘密 `REFUND_POLICY_APPROVAL_REFERENCE` 后才设置 `REFUND_POLICY_APPROVED=true`；`COMPANION_SETTLEMENT_HOLD_HOURS` 至少晚于退款窗口 24 小时。生产示例默认未批准并保持 No-Go
 - [ ] **首发产品范围（text-only）**：`MEDIA_PROVIDER=disabled`、`MEDIA_FEATURE_ENABLED=false`、`TRTC_ENABLED=false`；小程序客户端隐藏聊天附件与实时语音入口。MEDIA/TRTC 能力保留在仓库内，但未取得生产运行证据前不得对用户开放
+- [ ] 已接入真实、可追溯且可撤销的身份 authority，普通用户与陪伴者均有当前授权、独立复核、撤销/到期和重新核验记录；在此之前正式版必须隐藏新预约/支付/发布/聊天写入，`POST /orders` 与 prepay 返回 `PUBLIC_INTERACTION_IDENTITY_REQUIRED` 且订单、支付、通知、审计业务写均为 0
 - [ ] 账号注销后的分类保留期限已经外部法律/合规批准；仅在取得可追溯、非秘密的批准引用后，将 `ACCOUNT_DELETION_RETENTION_POLICY_APPROVED=true` 并填写 `ACCOUNT_DELETION_RETENTION_POLICY_APPROVAL_REFERENCE`，否则保持 No-Go
 - [ ] `COMPANION_VOICE_EVIDENCE_VIEWER_URL` 指向无凭据、无 query/fragment 的外部 HTTPS 受控查看器；签名密钥为独立 32+ 位随机值，TTL 在 60–900 秒。管理员实测短期地址过期、换人或换版本后不可复用；查看器缺失时语音批准返回 503 且后台明确 No-Go
 - [ ] 用正式小程序重放一次创建订单：缺少 `clientRequestId`、`serviceOfferingId` 或 `availabilityWindowId` 均返回 422；相同幂等键和相同业务输入只返回原订单及原退款规则版本/小时快照，即使当前配置已经换版也不产生第二笔订单或支付意图
@@ -46,7 +48,7 @@
 - [ ] `ORDER_INTAKE_ENABLED`、总量/单用户/单陪伴者容量与 `ORDER_MAX_SCHEDULE_DAYS` 已按排班和值班能力设置；事故演练能暂停新单但仍允许同幂等键找回原订单
 - [ ] `ORDER_RESCHEDULE_RESPONSE_WINDOW_MINUTES`、`ORDER_RESCHEDULE_EXPIRY_*`、`rescheduleRequested`、`rescheduleAccepted`、`rescheduleRejected`、`rescheduleExpired` 与 `rescheduleCancelled` 订阅消息模板已按值班能力配置；小程序真机已验证用户主动开启提醒时会按单次最多 3 项分批请求并记录授权；改期请求只在双方确认后、并通过第二次容量校验时才可替换原预约，拒绝、超时、订单取消、退款或履约开始/完成都不会改写原预约
 - [ ] `ORDER_CHAT_PRE_SERVICE_WINDOW_MINUTES` 与 `ORDER_CHAT_POST_SERVICE_WINDOW_MINUTES` 已按服务与客服能力明确设置；两名真实测试用户验证服务窗口内可发消息，完成订单仅可查看历史而不能新建文字/媒体，举报、售后和客服仍可用
-- [ ] `/admin/commercial/readiness` 返回 `clear`，并由值班人员核对退款政策已批准、`refundPolicySnapshotGaps=0`、最新可用微信账期四类账单全部完成且开放差异为 0、账号注销保留政策已批准、失败/超时退款、超时工单、超时账号注销、普通用户账号申诉复核超时、陪伴者账号申诉复核超时、支付投诉超时/同步失败、失败推送、过期推送租约、待复核商业档案、未结追偿、超时结算、严重/超时人工审核、媒体审核或删除失败、过期支付、预约响应/支付保留超时、已过履约窗口待退款、超时服务订单和语音关房积压均为 0；若启用语音，`voiceEmergencyStopActive=0` 且 `voice.roomControlEnabled=true`
+- [ ] `/admin/commercial/readiness` 返回 `clear`，并由值班人员核对 `publicInteractionIdentityAuthorityUnavailable=0`、退款政策已批准、`refundPolicySnapshotGaps=0`、最新可用微信账期四类账单全部完成且开放差异为 0、账号注销保留政策已批准、失败/超时退款、超时工单、超时账号注销、普通用户账号申诉复核超时、陪伴者账号申诉复核超时、`expiredCompanionSuspensionReactivationPending=0`、支付投诉超时/同步失败、失败推送、过期推送租约、待复核商业档案、未结追偿、超时结算、严重/超时人工审核、媒体审核或删除失败、过期支付、预约响应/支付保留超时、已过履约窗口待退款、超时服务订单和语音关房积压均为 0；若启用语音，`voiceEmergencyStopActive=0` 且 `voice.roomControlEnabled=true`
 - [ ] 单独核对 `notificationDelivery`：worker 关闭但存在 pending、到期/超过 SLA 的 pending、过期 processing 租约和未被站内已读兜底的失败投递均为 0；在多副本演练中每条 due delivery 只被一个 claimant 处理，provider 超时不会让数据库事务长期占锁
 - [ ] 单独核对可约提醒 readiness：fanout、准备、授权预留、投递 claim 均无失败、过期租约、超过 5 分钟的到期积压或“runner 关闭但有到期任务”；`failedBeforeSend`、`rejected`、`uncertain` 只允许有权限人员记录受审计的人工核查，渠道事实不变、绝不自动补发，只有未核查终态阻断放行
 - [ ] 单独核对账号注销执行与保留到期队列：双人批准后任务按持久 phase/cursor 有界推进，多副本只有一个有效租约；中断可恢复，达到自动重试上限后显示失败并支持带理由的受审计重试。最终后置条件、保留台账和评分重算任务未完成前，不得把请求标为完成或把账号写成已彻底删除

@@ -91,6 +91,19 @@ export const LEGAL_CONSENT_VERSION = "2.2-2026-08-01";
  */
 const COMMERCIAL_TEXT_ONLY_DEFAULT = true;
 
+/**
+ * IDENTITY-R01/R02: no independently revocable identity authority is wired for
+ * the first release. Keep every write UI that depends on public interaction
+ * closed. A Developer Tools-only override exists solely so local smoke tests can
+ * still exercise downstream flows; trial and release ignore it.
+ */
+export function clientPublicInteractionIdentityGrantsAvailable(): boolean {
+  if (!isExplicitDevelopmentEnvironment()) return false;
+  return (globalThis as {
+    __TALK_AND_TALK_PUBLIC_INTERACTION_IDENTITY_AVAILABLE__?: boolean;
+  }).__TALK_AND_TALK_PUBLIC_INTERACTION_IDENTITY_AVAILABLE__ === true;
+}
+
 export function isCommercialTextOnly(): boolean {
   // `trial` is an externally consumable experience build and `release` is the
   // production build. They must fail closed even when developer tooling or a
