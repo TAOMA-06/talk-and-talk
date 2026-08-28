@@ -1,0 +1,575 @@
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [NestFactory] Starting Nest application...
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [InstanceLoader] PassportModule dependencies initialized +11ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [InstanceLoader] ConfigHostModule dependencies initialized +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [InstanceLoader] JwtModule dependencies initialized +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [InstanceLoader] JwtModule dependencies initialized +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [InstanceLoader] ConfigModule dependencies initialized +18ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [InstanceLoader] ConfigModule dependencies initialized +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [InstanceLoader] AppModule dependencies initialized +1ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [InstanceLoader] DatabaseModule dependencies initialized +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [InstanceLoader] SmsModule dependencies initialized +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [InstanceLoader] MetricsModule dependencies initialized +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [InstanceLoader] AuditModule dependencies initialized +1ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [InstanceLoader] HealthModule dependencies initialized +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [InstanceLoader] VoiceModule dependencies initialized +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [InstanceLoader] CrisisInterventionModule dependencies initialized +2ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [InstanceLoader] LegalModule dependencies initialized +4ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [InstanceLoader] NotificationsModule dependencies initialized +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [InstanceLoader] AuthModule dependencies initialized +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [InstanceLoader] ReviewModule dependencies initialized +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [InstanceLoader] CommunityModule dependencies initialized +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [InstanceLoader] ReviewsModule dependencies initialized +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [InstanceLoader] FavoritesModule dependencies initialized +1ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [InstanceLoader] CompanionsModule dependencies initialized +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [InstanceLoader] UsersModule dependencies initialized +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [InstanceLoader] ModerationModule dependencies initialized +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [InstanceLoader] AdminModule dependencies initialized +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [InstanceLoader] RecommendationsModule dependencies initialized +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [InstanceLoader] AccountGovernanceModule dependencies initialized +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [InstanceLoader] ConversationsModule dependencies initialized +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [InstanceLoader] AttendanceDisputesModule dependencies initialized +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [InstanceLoader] SupportModule dependencies initialized +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [InstanceLoader] PaymentsModule dependencies initialized +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [InstanceLoader] CommercialModule dependencies initialized +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [InstanceLoader] OrdersModule dependencies initialized +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RoutesResolver] AuthController {/api/v1/auth}: +4ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/auth/sms/send-code, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/auth/phone/login, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/auth/staff/login, POST} route +1ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/auth/apple, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/auth/wechat/mini-program, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/auth/wechat/mini-program/status, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/auth/refresh, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/auth/logout, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RoutesResolver] AccountGovernanceController {/api/v1/me}: +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/me/account-actions, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/me/account-actions/:id/appeals, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/me/account-actions/:id/appeal-evidence-uploads, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/me/account-actions/:id/appeal-evidence-uploads/:assetId/complete, POST} route +1ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/me/account-actions/:id/appeal-evidence-uploads/:assetId, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/me/account-actions/:id/appeal-evidence-attachments/:attachmentId/read-url, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/me/sessions, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/me/sessions, DELETE} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/me/sessions/:id, DELETE} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/me/data-rights, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/me/data-rights, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/me/data-rights/:id/follow-ups, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/me/invoice-requests, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/me/invoice-requests/eligible-orders, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/me/invoice-requests, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/me/invoice-requests/:id/cancel, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RoutesResolver] AccountGovernanceAdminController {/api/v1/admin/account-governance}: +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/account-governance/account-appeals, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/account-governance/account-appeals/:id/claim, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/account-governance/account-appeals/:id/assign, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/account-governance/account-appeals/:id/resolve, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/account-governance/data-rights, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/account-governance/data-rights/claimable, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/account-governance/data-rights/:id/claim, PATCH} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/account-governance/data-rights/:id/status, PATCH} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/account-governance/invoice-requests, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/account-governance/invoice-requests/:id/status, PATCH} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RoutesResolver] DataExportDeliveryController {/api/v1/me/data-rights}: +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/me/data-rights/:id/export, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RoutesResolver] ModerationController {/api/v1/moderation}: +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/moderation/status, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/moderation/check, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/moderation/reports, POST} route +1ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/moderation/reports/me, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/moderation/reports/:id, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/moderation/reports/:id/follow-ups, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/moderation/appeals, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/moderation/appeals/me, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/moderation/appeals/eligible, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/moderation/cases, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RoutesResolver] ControlledCaseEvidenceController {/api/v1}: +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/support/tickets/:id/evidence-uploads, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/attendance-disputes/:id/evidence-uploads, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/commercial/companion/incident-evidence-uploads, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/case-evidence/uploads/:assetId/complete, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/case-evidence/uploads/:assetId, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/case-evidence/attachments/:attachmentId/read-url, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RoutesResolver] CrisisInterventionController {/api/v1/crisis}: +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/crisis/resources, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/crisis/readiness, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/crisis/interventions, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/crisis/interventions/active, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/crisis/interventions/:id, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/crisis/interventions/:id/resource-view-completions, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RoutesResolver] NotificationsController {/api/v1/notifications}: +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/notifications/status, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/notifications, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/notifications/unread-count, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/notifications/subscription-templates, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/notifications/channels/availability-reminder, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/notifications/subscription-grants, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/notifications/read-all, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/notifications/:id/read, POST} route +1ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RoutesResolver] AttendanceDisputesController {/api/v1}: +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/attendance-disputes/policy, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/callbacks/trtc/room-events, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/orders/:orderId/attendance-events, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/orders/:orderId/attendance-disputes, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/orders/:orderId/attendance-disputes/me, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/attendance-disputes/mine, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/attendance-disputes/:id, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/attendance-disputes/:id/evidence-completion, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/attendance-disputes/:id/statements, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/attendance-disputes/:id/appeals, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RoutesResolver] AdminAttendanceDisputesController {/api/v1/admin/commercial/attendance-disputes}: +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/attendance-disputes, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/attendance-disputes/claimable, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/attendance-disputes/:id, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/attendance-disputes/:id/claims, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/attendance-disputes/:id/decisions, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/attendance-disputes/:id/appeal-claims, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/attendance-disputes/:id/finalizations, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RoutesResolver] CommercialController {/api/v1/commercial}: +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/commercial/earnings/me, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RoutesResolver] CompanionLifecycleController {/api/v1/commercial/companion}: +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/commercial/companion/overview, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/commercial/companion/profile, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/commercial/companion/profile/submissions, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/commercial/companion/training, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/commercial/companion/training/attempts, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/commercial/companion/quality, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/commercial/companion/actions, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/commercial/companion/actions/:id/appeals, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/commercial/companion/actions/:id/appeal-evidence-uploads, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/commercial/companion/actions/:id/appeal-evidence-uploads/:assetId/complete, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/commercial/companion/actions/:id/appeal-evidence-uploads/:assetId, GET} route +1ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/commercial/companion/incidents, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/commercial/companion/incidents, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/commercial/companion/withdrawals, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/commercial/companion/withdrawals, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/commercial/companion/withdrawals/:id/cancel, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RoutesResolver] CompanionLifecycleAdminController {/api/v1/admin/commercial/companion-lifecycle}: +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/actions, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/actions/:id/reactivation, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/appeals/:id/resolution, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/appeals/claimable, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/appeals/:id/claims, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/appeals/:id/assignments, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/appeals/:id/reactivation, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/appeals, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/voice-intros, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/companions/:id/voice-intro-read, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/companions/:id/voice-intro-review, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/training, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/review-due, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/actions, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/incidents, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/incidents/claimable, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/incidents/:id, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/incidents/:id/claims, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/incidents/:id/assignments, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/incidents/:id/status, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/withdrawals, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/withdrawals/:id/status, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RoutesResolver] AvailabilityReminderOperationsController {/api/v1/admin/commercial/availability-reminders}: +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/availability-reminders/readiness, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/availability-reminders/fanout-jobs/:id/retry, POST} route +1ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/availability-reminders/preparation-candidates/:id/retry, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/availability-reminders/reservation-handoffs/:id/retry, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/availability-reminders/delivery-attempts/:id/retry, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/availability-reminders/terminal-attempts/:id/resolve, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RoutesResolver] FavoritesController {/api/v1/favorites/companions}: +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/favorites/companions, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/favorites/companions/:id/status, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/favorites/companions/:id, PUT} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/favorites/companions/:id/availability-reminder, PUT} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/favorites/companions/:id, DELETE} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RoutesResolver] RecentlyViewedCompanionsController {/api/v1/recently-viewed/companions}: +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/recently-viewed/companions, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/recently-viewed/companions/:id, PUT} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/recently-viewed/companions, DELETE} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RoutesResolver] PaymentsController {/api/v1/payments}: +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/payments/status, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/payments/wechat/notify, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/payments/wechat/refund-notify, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/payments/refunds/:id/approve, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/payments/refunds/review-queue, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/payments/refunds/:id/claim, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/payments/refunds/:id/reject, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/payments/refunds/:id/retry, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/payments/refunds/:id/sync, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/payments/wechat/mock-notify, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RoutesResolver] PaymentDisputesController {/api/v1/payments}: +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/payments/wechat/complaint-notify, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/payments/disputes/me, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/payments/disputes/by-order/:orderId, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/payments/disputes/:id, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RoutesResolver] AdminPaymentDisputesController {/api/v1/admin/commercial/payment-disputes}: +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-disputes, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-disputes/:id, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-disputes/:id/evidence/:resource, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-disputes/:id/claims, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-disputes/:id/assignments, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-disputes/:id/replies, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-disputes/:id/completions, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-disputes/:id/sync, POST} route +1ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RoutesResolver] OrdersController {/api/v1/orders}: +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/orders/status, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/orders, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/orders, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/orders/service, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/orders/service/today, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/orders/:id/timeline, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/orders/:id/voice-room/access, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/orders/:id/reschedule-requests, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/orders/:id/reschedule-requests/:requestId/accept, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/orders/:id/reschedule-requests/:requestId/reject, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/orders/service/:id/start, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/orders/service/:id/confirm, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/orders/service/:id/reject, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/orders/service/:id/complete, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/orders/:id, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/orders/:id/cancel, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/orders/:id/completion-confirmations, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/orders/:id/service-guidelines-confirmations, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/orders/:id/experience-feedback, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/orders/:id/prepay, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/orders/:id/payment/sync, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/orders/:id/refund, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/orders/:id/refund/sync, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RoutesResolver] RecommendationsController {/api/v1/recommendations}: +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/recommendations/topics, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/recommendations/me/preferences, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/recommendations/me/preferences, PATCH} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/recommendations/me/tags/:id, DELETE} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/recommendations/me/companion-exclusions, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/recommendations/me/companion-exclusions/:id, PUT} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/recommendations/me/companion-exclusions/:id, DELETE} route +1ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/recommendations/companions, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/recommendations/events, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RoutesResolver] AdminRecommendationsController {/api/v1/admin/recommendations}: +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/recommendations/metrics, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/recommendations/companions/:id/policies/:placement, PATCH} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RoutesResolver] CompanionsController {/api/v1/companions}: +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/companions/status, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/companions, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/companions/me/profile, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/companions/me/application, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/companions/me/profile, PATCH} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/companions/me/service-offerings, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/companions/me/service-offerings, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/companions/me/service-offerings/:id, PATCH} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/companions/me/availability-windows, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/companions/me/availability-windows, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/companions/me/availability-windows/:id, PATCH} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/companions/me/availability-schedule/rules, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/companions/me/availability-schedule/rules, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/companions/me/availability-schedule/rules/:id/deactivate, PATCH} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/companions/me/availability-schedule/blackouts, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/companions/me/availability-schedule/blackouts, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/companions/me/availability-schedule/blackouts/:id/deactivate, PATCH} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/companions/me/availability-schedule/drafts, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/companions/me/availability-schedule/drafts/materialize, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/companions/me/availability-schedule/drafts/:id/activate, PATCH} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/companions/:id/service-offerings, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/companions/:id/availability, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/companions/:id, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RoutesResolver] UsersController {/api/v1/users}: +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/users/me, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/users/me/legal-consents, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/users/me/legal-consents, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/users/me/legal-consents/current, DELETE} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RoutesResolver] MeController {/api/v1}: +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/me, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/me, PATCH} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/me/adult-eligibility, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/me/adult-eligibility/submissions, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/me/deletion-request, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/me/deletion-request, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/me/deletion-request/cancel, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RoutesResolver] LegalController {/api/v1/legal}: +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/legal/terms, GET} route +1ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/legal/privacy, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/legal/platform-rules, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/legal/:document/versions/:version, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RoutesResolver] DataRetentionLegalHoldController {/api/v1/admin/data-retention}: +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/data-retention/legal-hold-policy, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/data-retention/records, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/data-retention/records/:retentionRecordId/legal-holds, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/data-retention/records/:retentionRecordId/legal-hold-placement-requests, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/data-retention/legal-holds/:legalHoldId/release-requests, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/data-retention/legal-hold-actions/:actionId/approvals, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/data-retention/legal-hold-actions/:actionId/rejections, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RoutesResolver] CommunityController {/api/v1/community/posts}: +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/community/posts, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/community/posts, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/community/posts/:id/report, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/community/posts/:id/like, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RoutesResolver] CommunityReportsController {/api/v1/community/reports}: +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/community/reports/mine, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RoutesResolver] ConversationsController {/api/v1/conversations}: +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/conversations/status, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/conversations/:id/status, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/conversations, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/conversations/summary, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/conversations/:id/notification-preference, PUT} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/conversations/:id/block, PUT} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/conversations/:id/future-booking-boundary, PUT} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/conversations/:id/messages, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/conversations/:id/messages, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/conversations/:id/media-uploads, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/conversations/:id/media-uploads/:assetId/complete, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RoutesResolver] ReviewsController {/api/v1/reviews}: +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/reviews/companion/:id, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/reviews/orders/:orderId/me, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/reviews, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RoutesResolver] PublicSupportController {/api/v1/support}: +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/support/public-info, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RoutesResolver] SupportController {/api/v1/support}: +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/support/tickets, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/support/tickets/:id/order-facts, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/support/tickets/me, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/support/orders/:orderId/tickets, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/support/tickets/:id, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RoutesResolver] AdminController {/api/v1/admin}: +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/status, GET} route +1ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/account-deletions, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/account-deletions/:id/settlement, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/account-deletions/:id/start, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/account-deletions/:id/complete, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/account-deletions/:id/retry, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/account-deletions/:id/orders/:orderId/payment/sync, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/account-deletions/:id/orders/:orderId/refund/sync, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/account-deletions/:id/orders/:orderId/refund/initiate, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/users/:id/account-status, PATCH} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/users/:id/verification, PATCH} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/identity-verification-requests, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/identity-verification-requests/:id/approve, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/identity-verification-requests/:id/reject, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/customer-adult-eligibility, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/customer-adult-eligibility/:id/adult, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/customer-adult-eligibility/:id/ineligible, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/companions, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/companions, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/companions/:id, PATCH} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/companions/:id/publish, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/companions/:id/unpublish, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RoutesResolver] AdminCommercialController {/api/v1/admin/commercial}: +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/readiness, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/funnel, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/earnings, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companions, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companions/:id/profile-submissions, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companions/:id/profile-verifications, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companions/:id/profile-suspensions, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/earnings/:id/payout-claims, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/earnings/:id/payout-submissions, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/earnings/:id/payout-cancellations, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/earnings/:id/payout-verifications, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/recoveries, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/recoveries/:id/evidence, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/recoveries/:id/verify, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/support/tickets, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/support/tickets/:id, GET} route +1ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/support/claimable, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/support/tickets/:id/claim, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/support/tickets/:id/assign, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/support/tickets/:id/resolve, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/support/tickets/:id/refunds, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RoutesResolver] AdminPaymentReconciliationController {/api/v1/admin/commercial/payment-reconciliation}: +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-reconciliation/readiness, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-reconciliation/merchant-imports, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-reconciliation/merchant-imports, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-reconciliation/merchant-imports/text, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-reconciliation/merchant-imports/:id/reviews, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-reconciliation/cash-ledger, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-reconciliation/cash-ledger/:id/classifications, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-reconciliation/cash-ledger/classifications/:id/reviews, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-reconciliation/runs, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-reconciliation/runs, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-reconciliation/runs/:id/retry, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-reconciliation/issues, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-reconciliation/issues/:id/claims, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-reconciliation/issues/:id/resolutions, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-reconciliation/issues/:id/resolution-reviews, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RoutesResolver] AdminOperationsController {/api/v1/admin/operations}: +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/operations/context, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/operations/orders, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/operations/support/orders, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/operations/users, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/operations/support-assignees, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/operations/audit-logs, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RoutesResolver] AdminStaffController {/api/v1/admin/staff}: +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/staff, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/staff/eligible-successors, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/admin/staff/:userId/suspensions, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RoutesResolver] ReviewAuthController {/api/v1/review/auth}: +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/review/auth/login, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/review/auth/refresh, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/review/auth/logout, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/review/auth/me, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RoutesResolver] ReviewModerationController {/api/v1/review}: +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/review/overview, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/review/cases, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/review/cases/:id, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/review/cases/:id/conversation, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/review/cases/:id/claim, POST} route +1ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/review/cases/:id/assignment, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/review/staff, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/review/staff/offboarding, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/review/staff/:id/suspension, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/review/cases/:id/actions, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/review/labels, POST} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/review/labels/export, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RoutesResolver] MetricsController {/api/v1/metrics}: +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/metrics, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RoutesResolver] HealthController {/api/v1/health}: +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/health, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [RouterExplorer] Mapped {/api/v1/health/ready, GET} route +0ms
+[Nest] 98767  - 08/28/2026, 1:15:08 AM     LOG [NestApplication] Nest application successfully started +101ms
+{"level":"info","type":"http_request","requestId":"c52be41c-e21d-4f55-b8a9-1639fbdb1c67","method":"GET","path":"/api/v1/health","statusCode":200,"durationMs":11}
+[Nest] 98767  - 08/28/2026, 1:15:34 AM     LOG [MockSmsProvider] [MOCK SMS] 139****8280 → ******
+{"level":"info","type":"http_request","requestId":"641a75dc-f08f-4d54-87ac-c21aa223e8fb","method":"POST","path":"/api/v1/auth/sms/send-code","statusCode":201,"durationMs":65}
+{"level":"info","type":"http_request","requestId":"31b3142e-d05f-4c60-b55b-886e6b765220","method":"POST","path":"/api/v1/auth/phone/login","statusCode":201,"durationMs":83}
+{"level":"info","type":"http_request","requestId":"75ffd4ce-e631-475d-95f4-3c9c8d4c4216","method":"POST","path":"/api/v1/users/me/legal-consents","statusCode":201,"durationMs":21}
+{"level":"info","type":"http_request","requestId":"dd4b8a5d-c4ac-49c9-b411-b8a93f880c90","method":"GET","path":"/api/v1/health","statusCode":200,"durationMs":2}
+{"level":"info","type":"http_request","requestId":"812e9c49-b4b8-4e15-81f5-a7719e15fd1a","method":"GET","path":"/api/v1/me","statusCode":200,"durationMs":11}
+{"level":"info","type":"http_request","requestId":"228ddb42-3a22-4569-a279-23fa9e5565a4","method":"GET","path":"/api/v1/companions?page=1&pageSize=50","statusCode":200,"durationMs":23}
+{"level":"info","type":"http_request","requestId":"22b6a06e-cbe7-4d93-9d8f-bbb9f0f7d01b","method":"GET","path":"/api/v1/support/tickets/me?page=1&pageSize=20","statusCode":200,"durationMs":16}
+[Nest] 98767  - 08/28/2026, 1:53:12 AM     LOG [MockSmsProvider] [MOCK SMS] 139****8281 → ******
+{"level":"info","type":"http_request","requestId":"1fadcbf6-7d63-47c4-9b3b-b6c28b16b843","method":"POST","path":"/api/v1/auth/sms/send-code","statusCode":201,"durationMs":57}
+{"level":"info","type":"http_request","requestId":"40a24dc7-2ad0-4f38-ab29-adb4ff74f789","method":"POST","path":"/api/v1/auth/phone/login","statusCode":201,"durationMs":72}
+{"level":"info","type":"http_request","requestId":"dfd2aabe-792e-4a4e-a222-bfcb6be1fa7c","method":"POST","path":"/api/v1/users/me/legal-consents","statusCode":201,"durationMs":7}
+[Nest] 98767  - 08/28/2026, 1:53:27 AM     LOG [MockSmsProvider] [MOCK SMS] 138****0101 → ******
+{"level":"info","type":"http_request","requestId":"1b36b321-09fd-4bb0-b499-a87ea6379fc2","method":"POST","path":"/api/v1/auth/sms/send-code","statusCode":201,"durationMs":50}
+{"level":"info","type":"http_request","requestId":"c7775482-afe8-47b8-be17-35c373140d1e","method":"POST","path":"/api/v1/auth/phone/login","statusCode":201,"durationMs":54}
+{"level":"info","type":"http_request","requestId":"4f200b44-096b-40a2-adf3-b889b137c0d6","method":"POST","path":"/api/v1/users/me/legal-consents","statusCode":201,"durationMs":4}
+[Nest] 98767  - 08/28/2026, 1:53:44 AM     LOG [MockSmsProvider] [MOCK SMS] 139****8282 → ******
+{"level":"info","type":"http_request","requestId":"3c0cbef5-c6b5-4596-b38d-e680a37b1e0b","method":"POST","path":"/api/v1/auth/sms/send-code","statusCode":201,"durationMs":50}
+{"level":"info","type":"http_request","requestId":"121d8153-ec14-4664-b985-0167f9e2d6ee","method":"POST","path":"/api/v1/auth/phone/login","statusCode":201,"durationMs":54}
+{"level":"info","type":"http_request","requestId":"335ad054-b613-4ebd-a35d-0665e2f88bff","method":"POST","path":"/api/v1/users/me/legal-consents","statusCode":201,"durationMs":4}
+{"level":"warn","type":"http_request","requestId":"b258f57b-1565-45c7-9c8c-cb171155969f","method":"GET","path":"/api/v1/conversations?page=1&pageSize=20","statusCode":401,"durationMs":1}
+{"level":"warn","type":"http_request","requestId":"98c3e4ee-f522-4c6b-957e-3d2adc1544a5","method":"GET","path":"/api/v1/support/tickets/me?page=1&pageSize=20","statusCode":401,"durationMs":1}
+{"level":"warn","type":"http_request","requestId":"4b7f89ee-c1ba-4072-8249-822d883f7781","method":"GET","path":"/api/v1/notifications?page=1&pageSize=20","statusCode":401,"durationMs":1}
+{"level":"warn","type":"http_request","requestId":"4cc600b6-c4a8-4046-94a7-0e2765093300","method":"GET","path":"/api/v1/orders?page=1&pageSize=20","statusCode":401,"durationMs":2}
+{"level":"warn","type":"http_request","requestId":"ac38a073-45fc-4d83-a5c3-be462202abbd","method":"GET","path":"/api/v1/conversations?page=1&pageSize=20","statusCode":401,"durationMs":1}
+{"level":"warn","type":"http_request","requestId":"b939edc6-15ba-4d37-b883-68c6ce89414e","method":"GET","path":"/api/v1/support/tickets/me?page=1&pageSize=20","statusCode":401,"durationMs":1}
+{"level":"warn","type":"http_request","requestId":"bfd79dd7-18d3-4a7d-9e5f-51aa00ebea88","method":"GET","path":"/api/v1/notifications?page=1&pageSize=20","statusCode":401,"durationMs":1}
+{"level":"warn","type":"http_request","requestId":"101d8674-30f7-4a6d-8e81-d8fc43182397","method":"GET","path":"/api/v1/orders?page=1&pageSize=20","statusCode":401,"durationMs":0}
+{"level":"warn","type":"http_request","requestId":"5a932312-a6d4-409c-84e8-56375bae0110","method":"GET","path":"/api/v1/companions/me/profile","statusCode":401,"durationMs":0}
+{"level":"warn","type":"http_request","requestId":"abd6af37-73b8-4630-a5de-534f777f45f2","method":"GET","path":"/api/v1/orders/service?page=1&pageSize=20","statusCode":401,"durationMs":1}
+{"level":"warn","type":"http_request","requestId":"6c1820ad-fe9e-4664-bfdd-1ad6468c6ee1","method":"GET","path":"/api/v1/commercial/companion/overview","statusCode":401,"durationMs":1}
+{"level":"warn","type":"http_request","requestId":"27a15512-ce66-4d21-a95c-55ef172f0473","method":"GET","path":"/api/v1/me/account-actions?page=1&pageSize=20","statusCode":401,"durationMs":0}
+{"level":"warn","type":"http_request","requestId":"79c9041c-6455-4954-9400-5acd6a258f84","method":"POST","path":"/api/v1/support/tickets","statusCode":401,"durationMs":0}
+{"level":"info","type":"http_request","requestId":"a47b07a7-c05f-467f-b51d-bfd2e0f0d68a","method":"POST","path":"/api/v1/auth/refresh","statusCode":201,"durationMs":9}
+{"level":"info","type":"http_request","requestId":"7bc6d8a0-db41-4a36-bc5c-df31c6e22a38","method":"POST","path":"/api/v1/auth/refresh","statusCode":201,"durationMs":3}
+{"level":"info","type":"http_request","requestId":"18708888-5863-41bc-8208-79dbed0e0dfa","method":"POST","path":"/api/v1/auth/refresh","statusCode":201,"durationMs":4}
+{"level":"info","type":"http_request","requestId":"3cd3fb59-beb0-4ada-8e64-8cbb1b016765","method":"POST","path":"/api/v1/auth/refresh","statusCode":201,"durationMs":3}
+{"level":"info","type":"http_request","requestId":"0c9b362c-8148-4016-bf7b-04c116c70d4c","method":"GET","path":"/api/v1/notifications?page=1&pageSize=20","statusCode":200,"durationMs":16}
+{"level":"info","type":"http_request","requestId":"70bf2665-c691-4d4e-9a45-412dc98a620e","method":"GET","path":"/api/v1/support/tickets/me?page=1&pageSize=20","statusCode":200,"durationMs":20}
+{"level":"info","type":"http_request","requestId":"788d8b4c-d309-4e5d-9ee3-eb4c51b300ec","method":"GET","path":"/api/v1/orders?page=1&pageSize=20","statusCode":200,"durationMs":21}
+{"level":"info","type":"http_request","requestId":"cd83c8ec-c119-4f4d-8833-08e00b482719","method":"GET","path":"/api/v1/conversations?page=1&pageSize=20","statusCode":200,"durationMs":22}
+{"level":"info","type":"http_request","requestId":"a389cda1-f8e5-4b5b-8ec9-778d3817d6e7","method":"GET","path":"/api/v1/notifications?page=1&pageSize=20","statusCode":200,"durationMs":6}
+{"level":"info","type":"http_request","requestId":"1fa76b7e-43a7-47f3-9de2-a020f51f2cc3","method":"GET","path":"/api/v1/orders?page=1&pageSize=20","statusCode":200,"durationMs":12}
+{"level":"info","type":"http_request","requestId":"9a0d0414-5744-4518-b428-3d4e64f0e270","method":"GET","path":"/api/v1/support/tickets/me?page=1&pageSize=20","statusCode":200,"durationMs":12}
+{"level":"info","type":"http_request","requestId":"78b162f5-d53c-4817-8bcf-ce6823c40bd5","method":"GET","path":"/api/v1/conversations?page=1&pageSize=20","statusCode":200,"durationMs":15}
+{"level":"info","type":"http_request","requestId":"522751fe-e3d0-4827-9ddc-f5867f3bcb2f","method":"GET","path":"/api/v1/companions/me/profile","statusCode":200,"durationMs":12}
+{"level":"info","type":"http_request","requestId":"4acdcba6-619d-4338-ba77-b141bc48ca3f","method":"GET","path":"/api/v1/commercial/companion/overview","statusCode":200,"durationMs":14}
+{"level":"info","type":"http_request","requestId":"31f8f477-639a-468e-b656-f2030f0985bb","method":"GET","path":"/api/v1/orders/service?page=1&pageSize=20","statusCode":200,"durationMs":14}
+{"level":"info","type":"http_request","requestId":"f7eb76aa-8c4f-42f2-ba2b-b38093da45b2","method":"GET","path":"/api/v1/me/account-actions?page=1&pageSize=20","statusCode":200,"durationMs":8}
+{"level":"warn","type":"http_request","requestId":"cebec3fd-104c-4dfb-9f72-3d0659980fd8","method":"POST","path":"/api/v1/support/tickets","statusCode":403,"durationMs":2}
+{"level":"info","type":"http_request","requestId":"e2aaff26-232b-4038-8cc3-c37659f95ccc","method":"GET","path":"/api/v1/health","statusCode":200,"durationMs":1}
+[Nest] 98767  - 08/28/2026, 3:38:12 AM     LOG [PaymentsReconciliationWorker] Reconciled 0 expired request(s), 0 expired reservation(s), 0 refund submission(s), 0 refund query(s), 0 recovered payment(s), 0 closed prepay(s), and 1 overdue service refund(s).
+[Nest] 98767  - 08/28/2026, 4:08:05 AM     LOG [PaymentsReconciliationWorker] Reconciled 1 expired request(s), 0 expired reservation(s), 0 refund submission(s), 0 refund query(s), 0 recovered payment(s), 0 closed prepay(s), and 0 overdue service refund(s).
+{"level":"info","type":"http_request","requestId":"fbef5212-1f0e-4998-8ed7-9a4a16b5a75d","method":"GET","path":"/api/v1/health","statusCode":200,"durationMs":1}
+{"level":"info","type":"http_request","requestId":"09656a3a-d03b-45b9-b1c5-4404fa4e7429","method":"POST","path":"/api/v1/auth/refresh","statusCode":201,"durationMs":12}
+{"level":"info","type":"http_request","requestId":"f6f02bcd-e9ef-47ef-b21b-b439f60e4ca7","method":"POST","path":"/api/v1/auth/refresh","statusCode":201,"durationMs":4}
+{"level":"info","type":"http_request","requestId":"d5405495-f6b7-432c-b0b5-b5d2648e4639","method":"POST","path":"/api/v1/auth/refresh","statusCode":201,"durationMs":3}
+{"level":"info","type":"http_request","requestId":"bd25152d-3614-468a-8d4f-a815b20c1283","method":"POST","path":"/api/v1/auth/refresh","statusCode":201,"durationMs":4}
+{"level":"error","type":"http_request","requestId":"47ec9025-444d-4725-8f06-1c0b2e46bb52","method":"POST","path":"/api/v1/auth/wechat/mini-program","statusCode":503,"durationMs":1}
+{"level":"error","type":"http_request","requestId":"b897a4ce-685d-4de7-bcce-ca7dcf1d12bd","method":"POST","path":"/api/v1/auth/wechat/mini-program","statusCode":503,"durationMs":2}
+{"level":"error","type":"http_request","requestId":"5a26de00-6493-4ad0-9f07-15ea876334ee","method":"POST","path":"/api/v1/auth/wechat/mini-program","statusCode":503,"durationMs":1}
+{"level":"info","type":"http_request","requestId":"8d1b88d6-6d65-436c-9a59-921c7695fbb5","method":"GET","path":"/api/v1/legal/terms","statusCode":200,"durationMs":6}
+{"level":"info","type":"http_request","requestId":"d70c339c-50c5-4113-96d0-8bf11d1ea57c","method":"GET","path":"/api/v1/legal/privacy","statusCode":200,"durationMs":2}
+{"level":"info","type":"http_request","requestId":"5f4a9ce5-a5ce-473b-9f7e-f638cc59f967","method":"POST","path":"/api/v1/auth/refresh","statusCode":201,"durationMs":21}
+{"level":"info","type":"http_request","requestId":"2715fa92-5347-48ec-a3fb-43f8eaeb02bc","method":"POST","path":"/api/v1/auth/refresh","statusCode":201,"durationMs":4}
+{"level":"info","type":"http_request","requestId":"8447afc3-0795-4286-83d8-15e08d02675a","method":"POST","path":"/api/v1/auth/refresh","statusCode":201,"durationMs":4}
+{"level":"info","type":"http_request","requestId":"0b5186ff-8318-4165-9842-16c61aec36de","method":"POST","path":"/api/v1/auth/refresh","statusCode":201,"durationMs":3}
+{"level":"info","type":"http_request","requestId":"93eaad6f-28a0-4ea8-8f85-98d8011d02a2","method":"GET","path":"/api/v1/users/me/legal-consents?version=2.2-2026-08-01","statusCode":200,"durationMs":7}
+{"level":"info","type":"http_request","requestId":"b0953775-13b1-43b1-9dc5-b71ae8cd9c7b","method":"GET","path":"/api/v1/recommendations/companions?placement=discoverHome&pageSize=4","statusCode":200,"durationMs":54}
+{"level":"info","type":"http_request","requestId":"2bb8e605-9c15-4dce-a6c3-ec5d8d6a53b6","method":"GET","path":"/api/v1/crisis/interventions/active","statusCode":200,"durationMs":10}
+{"level":"info","type":"http_request","requestId":"0c0180ab-f747-4603-bea1-0ec21fa3cb98","method":"GET","path":"/api/v1/crisis/interventions/active","statusCode":200,"durationMs":5}
+{"level":"info","type":"http_request","requestId":"cea22770-1a78-47f7-8d42-f8c491f73f48","method":"GET","path":"/api/v1/recommendations/topics","statusCode":200,"durationMs":12}
+{"level":"info","type":"http_request","requestId":"63c962d3-203f-4834-85dd-8982c3bd5663","method":"GET","path":"/api/v1/companions?sortBy=soonestAvailable&topicId=t2&availableWithinDays=3","statusCode":200,"durationMs":26}
+{"level":"info","type":"http_request","requestId":"bede0f40-3637-4087-a07f-e24f218360a5","method":"GET","path":"/api/v1/recommendations/topics","statusCode":200,"durationMs":15}
+{"level":"info","type":"http_request","requestId":"83f98885-abe1-4142-8a57-93bfd71f7053","method":"GET","path":"/api/v1/companions?sortBy=soonestAvailable&topicId=t2&maxServicePriceCents=5000&availableWithinDays=3","statusCode":200,"durationMs":30}
+{"level":"info","type":"http_request","requestId":"2fe4f6c9-c5ca-4a16-a37c-5602f45f79e4","method":"GET","path":"/api/v1/crisis/interventions/active","statusCode":200,"durationMs":6}
+{"level":"info","type":"http_request","requestId":"d75c007b-1f71-4aac-89ce-41999c0ec505","method":"GET","path":"/api/v1/crisis/interventions/active","statusCode":200,"durationMs":9}
+{"level":"info","type":"http_request","requestId":"1214eaa8-785c-4690-9cf2-c18628e2be0f","method":"GET","path":"/api/v1/reviews/companion/c2?page=1&pageSize=20","statusCode":200,"durationMs":12}
+{"level":"info","type":"http_request","requestId":"37bf8425-b11f-494f-9f8f-cc3aa8e29e7a","method":"GET","path":"/api/v1/companions/c2","statusCode":200,"durationMs":16}
+{"level":"info","type":"http_request","requestId":"a73f2e8c-d1ea-474f-a181-0a8a3a076b0f","method":"GET","path":"/api/v1/me","statusCode":200,"durationMs":14}
+{"level":"info","type":"http_request","requestId":"5fcfe87a-848f-4dd1-9f91-82ac29ae2c52","method":"GET","path":"/api/v1/favorites/companions/c2/status","statusCode":200,"durationMs":9}
+{"level":"info","type":"http_request","requestId":"f0b7abcd-5ba8-491f-ac01-c3a8723681a1","method":"GET","path":"/api/v1/recommendations/me/companion-exclusions","statusCode":200,"durationMs":9}
+{"level":"info","type":"http_request","requestId":"c6283e5a-f6e3-463b-b910-62d89888cc10","method":"GET","path":"/api/v1/companions/c2/service-offerings?page=1&pageSize=20","statusCode":200,"durationMs":5}
+{"level":"info","type":"http_request","requestId":"951838c6-f62c-41f7-9edf-0a572acc120c","method":"PUT","path":"/api/v1/recently-viewed/companions/c2","statusCode":200,"durationMs":14}
+{"level":"info","type":"http_request","requestId":"1cc59ff0-3178-4bf5-8a0f-21662e4cab78","method":"GET","path":"/api/v1/companions/c2/availability?serviceOfferingId=0470daa0-6f92-4e4f-aca3-543538ccdeec&days=7","statusCode":200,"durationMs":7}
+{"level":"info","type":"http_request","requestId":"46e50b52-238b-42ef-8cae-ba014b0f9bd8","method":"PUT","path":"/api/v1/favorites/companions/c2","statusCode":200,"durationMs":33}
+{"level":"info","type":"http_request","requestId":"ba90462c-5fde-45ac-af6b-be65339b1ebf","method":"PUT","path":"/api/v1/recommendations/me/companion-exclusions/c2","statusCode":200,"durationMs":35}
+{"level":"info","type":"http_request","requestId":"814a794f-3185-4bbf-ac60-a0392422b374","method":"GET","path":"/api/v1/orders/service?page=1&pageSize=10&view=active","statusCode":200,"durationMs":20}
+{"level":"info","type":"http_request","requestId":"8a88d846-2862-4879-81f7-051e2a3ad40f","method":"GET","path":"/api/v1/orders?page=1&pageSize=10&view=active","statusCode":200,"durationMs":24}
+{"level":"info","type":"http_request","requestId":"dd0d1581-a9d9-47a2-9318-40b379a95a2f","method":"GET","path":"/api/v1/support/tickets/me?page=1&pageSize=10","statusCode":200,"durationMs":22}
+{"level":"info","type":"http_request","requestId":"f46be78c-d79d-4c9e-842e-686a114dfca5","method":"GET","path":"/api/v1/conversations/summary","statusCode":200,"durationMs":15}
+{"level":"info","type":"http_request","requestId":"2f90f300-d8ad-43dc-a599-6c9d657f232e","method":"GET","path":"/api/v1/notifications/unread-count","statusCode":200,"durationMs":18}
+{"level":"info","type":"http_request","requestId":"53d64d87-4911-441a-b01c-af849c51fb5c","method":"GET","path":"/api/v1/conversations?page=1&pageSize=20","statusCode":200,"durationMs":21}
+{"level":"info","type":"http_request","requestId":"24986e8e-1d4b-4566-a830-d4a98491f9f8","method":"GET","path":"/api/v1/notifications?page=1&pageSize=20","statusCode":200,"durationMs":10}
+{"level":"info","type":"http_request","requestId":"b31d142f-c22a-4e56-97ca-8b9120374844","method":"GET","path":"/api/v1/notifications/unread-count","statusCode":200,"durationMs":9}
+{"level":"info","type":"http_request","requestId":"da2e9b8d-db4c-4313-b472-39d45045fe13","method":"GET","path":"/api/v1/support/public-info","statusCode":200,"durationMs":1}
+{"level":"info","type":"http_request","requestId":"13a6159c-a5a2-474b-bbd2-1a72cf3ee37e","method":"GET","path":"/api/v1/moderation/reports/me?page=1&pageSize=20","statusCode":200,"durationMs":20}
+{"level":"info","type":"http_request","requestId":"d8a97146-4661-4073-8610-bf2ec939ab84","method":"GET","path":"/api/v1/support/tickets/me?page=1&pageSize=20","statusCode":200,"durationMs":25}
+{"level":"info","type":"http_request","requestId":"fde1bfd1-0c48-4f19-9e05-62a3586b1bdb","method":"GET","path":"/api/v1/community/reports/mine?page=1&pageSize=20","statusCode":200,"durationMs":22}
+{"level":"info","type":"http_request","requestId":"29787f84-4d69-43c6-83b3-b23a8670e1a6","method":"GET","path":"/api/v1/payments/disputes/me?page=1&pageSize=20","statusCode":200,"durationMs":24}
+{"level":"info","type":"http_request","requestId":"a79d9ffa-3cc1-4b19-baed-0092c28d75e0","method":"GET","path":"/api/v1/crisis/resources?region=CN","statusCode":200,"durationMs":1}
+{"level":"info","type":"http_request","requestId":"8e66e9e3-43b5-447e-b8e5-d78cdec34f3d","method":"POST","path":"/api/v1/crisis/interventions","statusCode":201,"durationMs":10}
+{"level":"info","type":"http_request","requestId":"e37bea51-e2f5-43e0-9316-24e734e6ec1b","method":"POST","path":"/api/v1/auth/refresh","statusCode":201,"durationMs":17}
+{"level":"info","type":"http_request","requestId":"0b610bf5-49a6-4f60-a18b-983c3c9d5554","method":"GET","path":"/api/v1/users/me/legal-consents?version=2.2-2026-08-01","statusCode":200,"durationMs":5}
+{"level":"info","type":"http_request","requestId":"12a0c7ec-710b-4336-9b0d-8a9367904a01","method":"GET","path":"/api/v1/orders/service?page=1&pageSize=10&view=active","statusCode":200,"durationMs":13}
+{"level":"info","type":"http_request","requestId":"8a66768c-bb64-43ff-b4ab-34cce5d04502","method":"GET","path":"/api/v1/orders?page=1&pageSize=10&view=active","statusCode":200,"durationMs":16}
+{"level":"info","type":"http_request","requestId":"683eea90-43c6-49cd-829f-7bdebd37b49a","method":"GET","path":"/api/v1/support/tickets/me?page=1&pageSize=10","statusCode":200,"durationMs":15}
+{"level":"info","type":"http_request","requestId":"167c3c8c-a42e-4006-ae36-0e78e5b2d30e","method":"GET","path":"/api/v1/orders?page=1&pageSize=10&view=history","statusCode":200,"durationMs":19}
+{"level":"info","type":"http_request","requestId":"1f4285dd-516a-4e68-994a-71e83f5d6186","method":"GET","path":"/api/v1/orders/demo-20260828-u1-order-refunded","statusCode":200,"durationMs":16}
+{"level":"info","type":"http_request","requestId":"16a04fdd-4806-4553-85b1-0df197f828d5","method":"GET","path":"/api/v1/orders/demo-20260828-u1-order-refunded/timeline?page=1&pageSize=20","statusCode":200,"durationMs":15}
+{"level":"info","type":"http_request","requestId":"98c804e1-bf4d-431e-8603-72858c556ee1","method":"GET","path":"/api/v1/payments/disputes/by-order/demo-20260828-u1-order-refunded","statusCode":200,"durationMs":14}
+{"level":"info","type":"http_request","requestId":"2323f4c9-8fed-472f-a7c1-aee311b50e90","method":"GET","path":"/api/v1/orders/demo-20260828-u1-order-refunded","statusCode":200,"durationMs":18}
+{"level":"info","type":"http_request","requestId":"280bfb17-b68d-4ecb-ae7a-409f49e57608","method":"GET","path":"/api/v1/reviews/orders/demo-20260828-u1-order-refunded/me","statusCode":200,"durationMs":14}
+{"level":"info","type":"http_request","requestId":"571f1527-0102-4a29-a33e-e060b83fc643","method":"GET","path":"/api/v1/notifications/unread-count","statusCode":200,"durationMs":17}
+{"level":"info","type":"http_request","requestId":"be87fcf7-bbe6-47fc-87d4-8e3b68e70684","method":"GET","path":"/api/v1/conversations/summary","statusCode":200,"durationMs":15}
+{"level":"info","type":"http_request","requestId":"87c19e1e-7edd-4fc5-b2a5-1f556f912ccb","method":"GET","path":"/api/v1/conversations?page=1&pageSize=20","statusCode":200,"durationMs":23}
+{"level":"info","type":"http_request","requestId":"1c294ebe-bb69-4804-8159-9b13d20d4c16","method":"GET","path":"/api/v1/notifications/unread-count","statusCode":200,"durationMs":89}
+{"level":"info","type":"http_request","requestId":"1e88c745-d408-486d-bb6c-a7d45185fc04","method":"GET","path":"/api/v1/notifications?page=1&pageSize=20","statusCode":200,"durationMs":105}
+{"level":"info","type":"http_request","requestId":"763e5a81-8dbd-48be-9109-7b5e99f0d270","method":"GET","path":"/api/v1/notifications?page=1&pageSize=20","statusCode":200,"durationMs":8}
+{"level":"info","type":"http_request","requestId":"dfc0e0ac-cd2d-40eb-a318-c3784b9a3633","method":"GET","path":"/api/v1/notifications/unread-count","statusCode":200,"durationMs":12}
+{"level":"info","type":"http_request","requestId":"6af1aef3-a097-4dfa-b771-c44f8e23a5a0","method":"GET","path":"/api/v1/community/reports/mine?page=1&pageSize=20","statusCode":200,"durationMs":27}
+{"level":"info","type":"http_request","requestId":"72b5fcc8-2533-44cb-828c-cd5eca640d58","method":"GET","path":"/api/v1/community/posts?page=1&pageSize=20","statusCode":200,"durationMs":33}
+{"level":"info","type":"http_request","requestId":"6a93a27e-16ee-4b73-a925-6b7d6b80bfe7","method":"GET","path":"/api/v1/recommendations/companions?placement=communityRelated&pageSize=6","statusCode":200,"durationMs":58}
+{"level":"info","type":"http_request","requestId":"16528a83-14ac-4f84-b075-a69119498572","method":"POST","path":"/api/v1/recommendations/events","statusCode":201,"durationMs":12}
+{"level":"info","type":"http_request","requestId":"4e9635bb-8146-455b-89d0-4d754838ce4f","method":"GET","path":"/api/v1/support/public-info","statusCode":200,"durationMs":1}
+{"level":"info","type":"http_request","requestId":"719f4312-78f3-4c97-94e8-6bc04d07f3ba","method":"GET","path":"/api/v1/community/reports/mine?page=1&pageSize=20","statusCode":200,"durationMs":15}
+{"level":"info","type":"http_request","requestId":"453b6705-88c8-4f23-93e7-f1e3ea9babae","method":"GET","path":"/api/v1/support/tickets/me?page=1&pageSize=20","statusCode":200,"durationMs":22}
+{"level":"info","type":"http_request","requestId":"89fdf6c4-70a8-4707-b44a-957c95192316","method":"GET","path":"/api/v1/moderation/reports/me?page=1&pageSize=20","statusCode":200,"durationMs":21}
+{"level":"info","type":"http_request","requestId":"90e47ddd-b087-405a-aee0-8014e0b1ab42","method":"GET","path":"/api/v1/payments/disputes/me?page=1&pageSize=20","statusCode":200,"durationMs":23}
+{"level":"info","type":"http_request","requestId":"cfbecc7c-0966-4105-a407-09fe844cd0b5","method":"POST","path":"/api/v1/auth/refresh","statusCode":201,"durationMs":15}
+{"level":"info","type":"http_request","requestId":"10762775-c43d-4c2f-9489-e3df29052388","method":"GET","path":"/api/v1/users/me/legal-consents?version=2.2-2026-08-01","statusCode":200,"durationMs":6}
+{"level":"info","type":"http_request","requestId":"2c1f8d6b-0807-42d9-9a4c-3667884c761a","method":"GET","path":"/api/v1/recommendations/companions?placement=discoverHome&pageSize=4","statusCode":200,"durationMs":60}
+{"level":"info","type":"http_request","requestId":"a703d735-7979-45d5-a9f0-1e4b6f0e39fd","method":"GET","path":"/api/v1/me","statusCode":200,"durationMs":11}
+{"level":"info","type":"http_request","requestId":"e2689937-5e86-4eef-b815-670d8de9ae7c","method":"GET","path":"/api/v1/notifications","statusCode":200,"durationMs":12}
+{"level":"info","type":"http_request","requestId":"56896064-11ef-4834-b84e-167a28cf9dfb","method":"GET","path":"/api/v1/notifications/unread-count","statusCode":200,"durationMs":12}
+{"level":"info","type":"http_request","requestId":"ddfb44ef-498c-430c-9661-cd2a09a8094a","method":"GET","path":"/api/v1/recommendations/me/preferences","statusCode":200,"durationMs":12}
+{"level":"info","type":"http_request","requestId":"6b60455b-99ef-4672-81ab-a47af10cc3d9","method":"GET","path":"/api/v1/recommendations/topics","statusCode":200,"durationMs":10}
+{"level":"info","type":"http_request","requestId":"c2afb8bc-3d9e-4c56-993b-a761da4d284e","method":"GET","path":"/api/v1/notifications/channels/availability-reminder","statusCode":200,"durationMs":16}
+{"level":"info","type":"http_request","requestId":"0941abbe-5080-4b6b-9386-73362df44169","method":"GET","path":"/api/v1/favorites/companions?page=1&pageSize=10","statusCode":200,"durationMs":18}
+{"level":"info","type":"http_request","requestId":"80f763d9-f917-4599-80d8-26908a67b660","method":"GET","path":"/api/v1/recommendations/me/companion-exclusions?page=1&pageSize=10","statusCode":200,"durationMs":9}
+{"level":"info","type":"http_request","requestId":"5204505d-7299-4efa-8ab9-0cf71025c556","method":"GET","path":"/api/v1/recently-viewed/companions","statusCode":200,"durationMs":10}
+{"level":"info","type":"http_request","requestId":"db2adf5c-07fa-4ed6-8504-aaedbdd7fbb1","method":"GET","path":"/api/v1/me/account-actions?page=1&pageSize=20","statusCode":200,"durationMs":19}
+{"level":"info","type":"http_request","requestId":"5d85256f-4ad3-4eab-a454-6ba25ea0d867","method":"GET","path":"/api/v1/me","statusCode":200,"durationMs":51}
+{"level":"info","type":"http_request","requestId":"43e9a46a-7f92-464b-91c0-f76f44e9306f","method":"GET","path":"/api/v1/orders?page=1&pageSize=20&view=all","statusCode":200,"durationMs":54}
+{"level":"info","type":"http_request","requestId":"00875170-c30e-4ecc-8ce0-a68a0cb3050c","method":"GET","path":"/api/v1/conversations?page=1&pageSize=20&blockedByYou=true","statusCode":200,"durationMs":57}
+{"level":"info","type":"http_request","requestId":"6f01cec5-c96c-4c5c-8d9d-385a2ac97adc","method":"GET","path":"/api/v1/me/invoice-requests/eligible-orders?page=1&pageSize=20","statusCode":200,"durationMs":59}
+{"level":"info","type":"http_request","requestId":"e1c4d75d-802f-45f2-bf9b-c3737ff07711","method":"GET","path":"/api/v1/me/deletion-request","statusCode":200,"durationMs":4}
+{"level":"info","type":"http_request","requestId":"375c00d1-566a-4647-8ac8-21051ff2976e","method":"GET","path":"/api/v1/me/sessions?page=1&pageSize=20","statusCode":200,"durationMs":5}
+{"level":"info","type":"http_request","requestId":"7e4cf4f6-c60c-4250-96d0-20ef0e2da3aa","method":"GET","path":"/api/v1/me/data-rights?page=1&pageSize=20","statusCode":200,"durationMs":10}
+{"level":"info","type":"http_request","requestId":"a93797ed-a7e3-4c2f-afde-84ebc25df1e5","method":"GET","path":"/api/v1/me/invoice-requests?page=1&pageSize=20","statusCode":200,"durationMs":9}

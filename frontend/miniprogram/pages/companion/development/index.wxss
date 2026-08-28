@@ -41,3 +41,26 @@
 .textarea.compact { min-height: 150rpx; }
 .empty-title { margin-bottom: 14rpx; color: #4b353a; font-size: 34rpx; font-weight: 700; }
 .retry { margin-top: 28rpx; }
+
+/* Restrained redesign */
+.primary-button { min-height: 88rpx; }
+.hero { padding: 32rpx; border: 1rpx solid #E4E6E8; background: #F6ECEF; box-shadow: none; }
+.eyebrow { color: #9B405B; }
+.hero-title, .section-title, .module-title, .action-title, .question-title, .quality-value, .empty-title, .modal-title { color: #202124; font-weight: 700; }
+.hero-copy, .module-summary, .action-message, .quality-detail, .modal-copy { color: #646970; }
+.module-meta, .module-score, .action-time, .action-code, .quality-label, .quality-note, .limitation, .empty-card { color: #8A9098; }
+.restriction { border: 1rpx solid #ECDDBD; background: #FAF4E8; color: #8A6426; }
+.inline-error { border: 1rpx solid #E8C9CD; background: #FAEEEE; color: #A33D45; }
+.module-card, .quality-card { border: 1rpx solid #E4E6E8; border-radius: 20rpx; background: #FFFFFF; box-shadow: none; }
+.module-status, .action-state { background: #F1F2F3; color: #646970; }
+.status-passed { background: #EDF6F1; color: #2F6B55; }
+.status-expired, .action-state.active { background: #FAEEEE; color: #A33D45; }
+.questions { border-color: #E4E6E8; }
+.option { color: #202124; }
+.appeal-result, .evidence-draft { background: #F1F2F3; color: #646970; }
+.secondary-button { min-height: 80rpx; border: 1rpx solid #D7BEC6; border-radius: 14rpx; background: #FFFFFF; color: #9B405B; }
+.modal-mask { background: rgba(32, 33, 36, 0.48); }
+.modal { max-height: 88vh; padding: 32rpx 32rpx calc(48rpx + env(safe-area-inset-bottom)); border-radius: 28rpx 28rpx 0 0; background: #FFFFFF; }
+.textarea { border: 1rpx solid #E4E6E8; border-radius: 14rpx; background: #FFFFFF; color: #202124; }
+.primary-button.button-hover { background: #7F3248; }
+.primary-button[disabled], .secondary-button[disabled] { opacity: 0.52; }

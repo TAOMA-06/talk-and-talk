@@ -42,3 +42,23 @@
 .empty-actions .schedule-action { flex: 1; margin-top: 0; }
 .workbench-tip { margin: 24rpx 8rpx 10rpx; color: #a9878e; font-size: 22rpx; line-height: 1.55; }
 .card-hover { opacity: 0.8; }
+
+/* Restrained redesign */
+.primary-button { min-height: 88rpx; }
+.hero-card { padding: 32rpx; border: 1rpx solid #E4E6E8; background: #F6ECEF; box-shadow: none; }
+.eyebrow, .earnings-value, .lifecycle-link, .schedule-link { color: #9B405B; }
+.hero-title, .access-title, .section-heading, .overview-value, .lifecycle-title, .schedule-title, .schedule-time { color: #202124; font-weight: 700; }
+.hero-copy, .overview-label, .overview-unit, .overview-unavailable, .lifecycle-state, .schedule-meta { color: #646970; }
+.updated-at, .overview-note, .workbench-tip { color: #8A9098; }
+.attention-card { border: 1rpx solid #ECDDBD; border-radius: 20rpx; background: #FAF4E8; color: #8A6426; }
+.attention-icon { background: #8A6426; color: #FFFFFF; }
+.attention-link { color: #8A6426; }
+.overview-card, .lifecycle-card { border: 1rpx solid #E4E6E8; border-radius: 20rpx; background: #FFFFFF; box-shadow: none; }
+.overview-card.earnings-card { background: #FFFFFF; }
+.status-chip { background: #F6ECEF; color: #9B405B; }
+.schedule-card { border: 1rpx solid #E4E6E8; background: #FFFFFF; }
+.plain-button { min-height: 72rpx; border: 1rpx solid #D7BEC6; border-radius: 14rpx; background: #FFFFFF; color: #9B405B; }
+.retry-button.primary-button { min-height: 88rpx; }
+.plain-button.button-hover { background: #F6ECEF; }
+.primary-button.button-hover { background: #7F3248; }
+.card-hover { opacity: 0.72; }

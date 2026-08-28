@@ -78,3 +78,16 @@
 .secondary-button::after {
   border: 0;
 }
+
+/* Restrained redesign */
+.unavailable-page { padding: 112rpx 32rpx calc(56rpx + env(safe-area-inset-bottom)); background: #F7F7F5; color: #202124; }
+.status-mark { margin-bottom: 32rpx; border: 1rpx solid #E4E6E8; border-radius: 999rpx; background: #F6ECEF; color: #9B405B; }
+.title { color: #202124; font-weight: 700; }
+.message, .privacy-copy { color: #646970; }
+.privacy-card { margin: 48rpx 0 40rpx; border-color: #E4E6E8; border-radius: 20rpx; background: #FFFFFF; }
+.privacy-title { color: #202124; font-weight: 700; }
+.primary-button, .secondary-button { min-height: 88rpx; height: auto; padding: 20rpx 24rpx; border-radius: 14rpx; line-height: 1.35; }
+.primary-button { background: #9B405B; color: #FFFFFF; }
+.secondary-button { border-color: #E4E6E8; background: #FFFFFF; color: #202124; }
+.primary-button.button-hover { background: #7F3248; }
+.secondary-button.button-hover { background: #F1F2F3; }

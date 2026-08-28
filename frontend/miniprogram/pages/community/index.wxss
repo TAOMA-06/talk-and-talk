@@ -1,27 +1,35 @@
-.compose input, .compose textarea { box-sizing: border-box; width: 100%; margin-top: 18rpx; padding: 16rpx; border-radius: 12rpx; background: #fff5f6; font-size: 28rpx; }
-.compose textarea { min-height: 150rpx; }
-.identity-unavailable { border-color: #dfd3c5; background: #fffaf1; }
-.identity-unavailable .muted { margin-top: 10rpx; color: #70583c; line-height: 1.6; }
-.kind { display: inline-block; margin: 16rpx 0 0; padding: 0; background: transparent; color: #b94a68; font-size: 25rpx; }
-.row { display: flex; justify-content: space-between; }
-.author { font-weight: 700; }
-.topic { margin-top: 18rpx; color: #b94a68; font-weight: 600; }
-.content { margin: 12rpx 0 18rpx; line-height: 1.65; }
-.post-actions { display: flex; align-items: center; justify-content: space-between; gap: 20rpx; }
-.like, .report { margin: 0; padding: 0; background: transparent; color: #8d6e73; font-size: 25rpx; }
-.liked { color: #b94a68; }
-.report { color: #9a6571; }
-.report-receipts { border-color: #eadfe1; }
-.report-receipts-copy, .report-receipts-empty { margin-top: 12rpx; color: #80686e; font-size: 23rpx; line-height: 1.6; }
-.report-receipt-list { margin-top: 14rpx; border-top: 1rpx solid #f0e6e8; }
-.report-receipt-item { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; padding: 16rpx 0; border-bottom: 1rpx solid #f0e6e8; }
-.report-receipt-status { color: #8e5362; font-size: 24rpx; font-weight: 700; }
-.report-receipt-time { color: #80686e; font-size: 23rpx; }
-.related-section { margin: 28rpx 0; }
-.section-title { margin: 0 4rpx 16rpx; font-size: 34rpx; font-weight: 700; }
-.recommendation-card { margin-bottom: 14rpx; }
+.page > .card { border: 1rpx solid #e4e6e8; background: #ffffff; box-shadow: none; }
+.compose input, .compose textarea { box-sizing: border-box; width: 100%; margin-top: 16rpx; padding: 20rpx; border: 1rpx solid #e4e6e8; border-radius: 14rpx; background: #f7f7f5; color: #202124; font-size: 28rpx; line-height: 1.6; }
+.compose input { min-height: 88rpx; }
+.compose textarea { min-height: 200rpx; }
+.compose input:focus, .compose textarea:focus { border-color: #9b405b; background: #ffffff; }
+.compose .primary-button { width: 100%; margin-top: 20rpx; }
+.identity-unavailable { border-color: #eadfca !important; border-left: 6rpx solid #8a6426 !important; background: #faf4e8 !important; }
+.identity-unavailable .muted { margin-top: 12rpx; color: #72551f; font-size: 25rpx; line-height: 1.65; }
+.kind { display: inline-flex; min-height: 64rpx; margin: 16rpx 0 0; padding: 0 16rpx; align-items: center; border: 1rpx solid #e3cbd2; border-radius: 999rpx; background: #f6ecef; color: #9b405b; font-size: 25rpx; font-weight: 600; line-height: 64rpx; }
+.kind::after, .like::after, .report::after { border: 0; }
+.row { display: flex; align-items: flex-start; justify-content: space-between; gap: 20rpx; }
+.author { min-width: 0; color: #202124; font-size: 28rpx; font-weight: 700; overflow-wrap: anywhere; }
+.topic { display: inline-block; margin-top: 18rpx; padding: 6rpx 12rpx; border-radius: 999rpx; background: #f6ecef; color: #9b405b; font-size: 24rpx; font-weight: 600; overflow-wrap: anywhere; }
+.content { margin: 16rpx 0 20rpx; color: #3f4247; font-size: 27rpx; line-height: 1.7; overflow-wrap: anywhere; white-space: pre-wrap; }
+.post-actions { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; padding-top: 16rpx; border-top: 1rpx solid #e4e6e8; }
+.like, .report { min-width: 136rpx; min-height: 72rpx; margin: 0; padding: 0 18rpx; border: 1rpx solid #e4e6e8; border-radius: 14rpx; background: #ffffff; color: #646970; font-size: 24rpx; line-height: 72rpx; }
+.liked { border-color: #d8b7c1; background: #f6ecef; color: #9b405b; font-weight: 700; }
+.report { color: #8a4b57; }
+.like[disabled], .report[disabled] { border-color: #e4e6e8; background: #f1f2f3; color: #9ca1a8; }
+.report-receipts { border-color: #e4e6e8 !important; }
+.report-receipts-copy, .report-receipts-empty { margin-top: 12rpx; color: #646970; font-size: 25rpx; line-height: 1.65; }
+.report-receipt-list { margin-top: 16rpx; border-top: 1rpx solid #e4e6e8; }
+.report-receipt-item { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; padding: 18rpx 0; border-bottom: 1rpx solid #e4e6e8; }
+.report-receipt-status { color: #2f6b55; font-size: 24rpx; font-weight: 700; }
+.report-receipt-time { color: #8a9098; font-size: 23rpx; text-align: right; }
+.related-section { margin: 32rpx 0; }
+.section-title { margin: 0 4rpx 16rpx; color: #202124; font-size: 32rpx; font-weight: 700; }
+.recommendation-card { margin-bottom: 16rpx; border: 1rpx solid #e4e6e8 !important; background: #ffffff; box-shadow: none; }
 .recommendation-row { display: flex; align-items: center; justify-content: space-between; gap: 20rpx; }
-.recommendation-reason { margin-top: 10rpx; color: #a36519; font-size: 23rpx; }
-.go { color: #b94a68; font-size: 26rpx; }
-.state-retry { width: 100%; margin: 14rpx 0 0; border: 1rpx solid #d8c2c9; background: #fff; color: #93435a; font-size: 24rpx; }
+.recommendation-row > view { min-width: 0; flex: 1; }
+.recommendation-reason { margin-top: 12rpx; padding-top: 12rpx; border-top: 1rpx solid #e4e6e8; color: #72551f; font-size: 24rpx; line-height: 1.55; }
+.go { flex: 0 0 auto; color: #9b405b; font-size: 25rpx; font-weight: 700; }
+.state-retry { width: 100%; min-height: 80rpx; margin: 16rpx 0 0; border: 1rpx solid #d8b7c1; border-radius: 14rpx; background: #ffffff; color: #9b405b; font-size: 25rpx; line-height: 1.5; }
+.state-retry[disabled] { border-color: #e4e6e8; background: #f1f2f3; color: #9ca1a8; }
 .state-retry::after { border: 0; }

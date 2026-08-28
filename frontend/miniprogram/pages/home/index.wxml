@@ -62,15 +62,17 @@
     <button class="retry-button" bindtap="retryRecommendations" aria-label="重新读取首页推荐">重新读取推荐</button>
   </view>
   <view wx:elif="{{recommendationsState === 'empty'}}" class="empty compact">当前没有可展示的推荐，仍可进入发现页筛选。</view>
-  <view wx:elif="{{recommendationsState === 'available'}}" class="recommendation-card" wx:for="{{recommendations}}" wx:key="impressionId" bindtap="openCompanion" data-id="{{item.id}}" data-impression-id="{{item.impressionId}}" data-theme-id="{{item.topicIds[0]}}" aria-role="button" aria-label="查看推荐陪伴者：{{item.name}}" tabindex="0">
-    <view class="avatar">{{item.initials}}</view>
-    <view class="recommendation-copy">
-      <view class="recommendation-title-row"><text class="recommendation-name">{{item.name}}</text><text class="verified">{{item.isVerified ? '当前可展示' : '暂不可约'}}</text></view>
-      <view class="recommendation-role">{{item.role}} · ★ {{item.rating}}</view>
-      <view class="recommendation-reason">{{item.reasonText || '基于当前服务状态展示'}}</view>
-      <view class="recommendation-meta">{{item.catalogPriceText}} · {{item.nextAvailableText}}</view>
+  <block wx:elif="{{recommendationsState === 'available'}}">
+    <view class="recommendation-card" wx:for="{{recommendations}}" wx:key="impressionId" bindtap="openCompanion" data-id="{{item.id}}" data-impression-id="{{item.impressionId}}" data-theme-id="{{item.topicIds[0]}}" aria-role="button" aria-label="查看推荐陪伴者：{{item.name}}" tabindex="0">
+      <view class="avatar">{{item.initials}}</view>
+      <view class="recommendation-copy">
+        <view class="recommendation-title-row"><text class="recommendation-name">{{item.name}}</text><text class="verified">{{item.isVerified ? '当前可展示' : '暂不可约'}}</text></view>
+        <view class="recommendation-role">{{item.role}} · ★ {{item.rating}}</view>
+        <view class="recommendation-reason">{{item.reasonText || '基于当前服务状态展示'}}</view>
+        <view class="recommendation-meta">{{item.catalogPriceText}} · {{item.nextAvailableText}}</view>
+      </view>
     </view>
-  </view>
+  </block>
 
   <view class="community-entry" bindtap="openSafetyCenter" aria-role="button" aria-label="打开安全与支持中心" tabindex="0">
     <view>

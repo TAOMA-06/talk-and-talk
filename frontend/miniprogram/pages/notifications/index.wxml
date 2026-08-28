@@ -22,12 +22,14 @@
     <button class="retry-button" bindtap="load">重新加载通知</button>
   </view>
   <view wx:elif="{{!notifications.length}}" class="empty">暂无通知。订单状态和客服进度仍可在对应页面主动查看。</view>
-  <view wx:else class="notification-card {{item.readAt ? '' : 'unread'}}" wx:for="{{notifications}}" wx:key="id" bindtap="openNotification" data-id="{{item.id}}" aria-role="button" aria-label="{{item.readAt ? '已读通知' : '未读通知'}}：{{item.title}}" tabindex="0">
-    <view class="notification-top"><text class="type">{{item.typeText}}</text><text class="time">{{item.timeText}}</text></view>
-    <view class="notification-title">{{item.title}}</view>
-    <view class="notification-body">{{item.body}}</view>
-    <view class="notification-footer"><text wx:if="{{!item.readAt}}" class="unread-marker">未读</text><text class="open-hint">查看关联内容 ›</text></view>
-  </view>
+  <block wx:else>
+    <view class="notification-card {{item.readAt ? '' : 'unread'}}" wx:for="{{notifications}}" wx:key="id" bindtap="openNotification" data-id="{{item.id}}" aria-role="button" aria-label="{{item.readAt ? '已读通知' : '未读通知'}}：{{item.title}}" tabindex="0">
+      <view class="notification-top"><text class="type">{{item.typeText}}</text><text class="time">{{item.timeText}}</text></view>
+      <view class="notification-title">{{item.title}}</view>
+      <view class="notification-body">{{item.body}}</view>
+      <view class="notification-footer"><text wx:if="{{!item.readAt}}" class="unread-marker">未读</text><text class="open-hint">查看关联内容 ›</text></view>
+    </view>
+  </block>
   <view wx:if="{{notifications.length}}" class="pagination-note">已加载 {{notifications.length}} / {{total}} 条 · 第 {{page}} / {{totalPages}} 页</view>
   <button wx:if="{{page < totalPages}}" class="retry-button" loading="{{loadingMore}}" disabled="{{loadingMore}}" bindtap="loadMore">加载更多通知</button>
 </view>

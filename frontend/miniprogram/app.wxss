@@ -1,48 +1,148 @@
 page {
   min-height: 100%;
-  background: #fff8f8;
-  color: #2d2023;
-  font-size: 30rpx;
+  background: #f7f7f5;
+  color: #202124;
+  font-size: 28rpx;
+  line-height: 1.55;
 }
 
 button {
-  border-radius: 16rpx;
+  box-sizing: border-box;
+  min-height: 88rpx;
+  padding: 18rpx 24rpx;
+  border: 1rpx solid #e4e6e8;
+  border-radius: 14rpx;
+  background: #f1f2f3;
+  color: #202124;
+  font-size: 27rpx;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 button::after {
   border: 0;
 }
 
+button.button-hover,
+button:active {
+  opacity: 0.82;
+}
+
+button[loading] {
+  opacity: 0.72;
+}
+
+button[disabled] {
+  border-color: #e4e6e8;
+  background: #f1f2f3;
+  color: #8a9098;
+  opacity: 1;
+}
+
+input,
+textarea {
+  box-sizing: border-box;
+  border: 1rpx solid #e4e6e8;
+  border-radius: 14rpx;
+  background: #ffffff;
+  color: #202124;
+}
+
 .page {
-  padding: 28rpx 28rpx 48rpx;
+  box-sizing: border-box;
+  min-height: 100vh;
+  padding: 24rpx 32rpx 48rpx;
 }
 
 .card {
   box-sizing: border-box;
-  margin-bottom: 20rpx;
-  padding: 28rpx;
-  border-radius: 24rpx;
+  margin-bottom: 16rpx;
+  padding: 24rpx;
+  border: 1rpx solid #e4e6e8;
+  border-radius: 20rpx;
   background: #ffffff;
-  box-shadow: 0 8rpx 24rpx rgba(96, 50, 60, 0.07);
+  overflow-wrap: anywhere;
 }
 
 .title {
   font-size: 38rpx;
   font-weight: 700;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
 .muted {
-  color: #8d6e73;
-  font-size: 26rpx;
+  color: #646970;
+  font-size: 25rpx;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
 }
 
 .primary-button {
-  background: #b94a68;
-  color: #fff;
+  min-height: 88rpx;
+  border-color: #9b405b;
+  background: #9b405b;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.primary-button.button-hover,
+.primary-button:active {
+  border-color: #7f3248;
+  background: #7f3248;
+  opacity: 1;
+}
+
+.secondary-button {
+  min-height: 88rpx;
+  border: 1rpx solid #e4e6e8;
+  background: #ffffff;
+  color: #9b405b;
+}
+
+.full-button {
+  width: 100%;
+}
+
+.section-title {
+  color: #202124;
+  font-size: 32rpx;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.section-copy {
+  color: #646970;
+  font-size: 24rpx;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.retry-button,
+.resource-retry {
+  min-height: 88rpx;
+  border: 1rpx solid #e4e6e8;
+  background: #ffffff;
+  color: #9b405b;
+  font-weight: 600;
+}
+
+.secondary-button.button-hover,
+.secondary-button:active,
+.retry-button.button-hover,
+.retry-button:active,
+.resource-retry.button-hover,
+.resource-retry:active {
+  border-color: #9b405b;
+  background: #f6ecef;
+  opacity: 1;
 }
 
 .empty {
-  padding: 100rpx 20rpx;
+  padding: 80rpx 20rpx;
+  color: #646970;
+  font-size: 25rpx;
+  line-height: 1.65;
   text-align: center;
-  color: #8d6e73;
+  overflow-wrap: anywhere;
 }

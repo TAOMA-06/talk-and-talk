@@ -20,3 +20,22 @@
 .completion-error { margin-top: 18rpx; color: #a43f4f; font-size: 23rpx; text-align: center; }
 .complete-button { margin-top: 24rpx; border-radius: 18rpx; background: #51393f; color: #fff; font-size: 27rpx; font-weight: 750; }
 .call-button::after, .source-button::after, .complete-button::after { border: 0; }
+
+/* Restrained redesign: emergency action stays visually dominant. */
+.crisis-hero { padding: 32rpx; border-color: #DFAEB3; background: #FAEEEE; }
+.crisis-kicker, .crisis-copy.strong { color: #A33D45; }
+.crisis-title { color: #202124; font-weight: 700; }
+.crisis-copy, .resource-copy { color: #646970; }
+.coverage-card { border: 1rpx solid #ECDDBD; border-radius: 20rpx; background: #FAF4E8; }
+.coverage-label { color: #202124; }
+.coverage-copy, .load-notice { color: #8A6426; }
+.resource-card { border: 1rpx solid #E4E6E8; border-radius: 20rpx; background: #FFFFFF; box-shadow: none; }
+.resource-name { color: #202124; }
+.resource-phone, .completion-error { color: #A33D45; }
+.call-button { min-height: 88rpx; border-radius: 14rpx; background: #A33D45; color: #FFFFFF; font-weight: 700; }
+.source-box { background: #F1F2F3; color: #646970; }
+.source-button { color: #3F647A; }
+.safety-note { border-left-color: #8A6426; background: #FAF4E8; color: #8A6426; }
+.complete-button { min-height: 88rpx; border-radius: 14rpx; background: #9B405B; color: #FFFFFF; }
+.call-button.button-hover, .complete-button.button-hover { background: #7F3248; }
+.call-button[disabled], .complete-button[disabled] { opacity: 0.52; }

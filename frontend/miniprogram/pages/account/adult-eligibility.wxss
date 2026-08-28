@@ -32,3 +32,24 @@
 .text-button { margin: 11rpx auto 0; background: transparent; color: #846b73; font-size: 22rpx; }
 .rights-card { border: 1rpx solid #e5d8dc; }
 .primary-button::after, .secondary-button::after, .text-button::after { border: 0; }
+
+/* Restrained redesign */
+.hero { padding: 32rpx; border: 1rpx solid #E4E6E8; background: #F6ECEF; }
+.eyebrow { color: #9B405B; }
+.hero-title, .section-title { color: #202124; font-weight: 700; }
+.hero-copy, .section-copy, .state-card, .fact-row, .boundary-list, .confirmation-row { color: #646970; }
+.card { padding: 28rpx; border: 1rpx solid #E4E6E8; border-radius: 20rpx; background: #FFFFFF; box-shadow: none; }
+.error-card, .status-warning { border-color: #E8C9CD; background: #FAEEEE; color: #A33D45; }
+.status-success { border-color: #BFD9CD; background: #EDF6F1; color: #2F6B55; }
+.status-pending { border-color: #ECDDBD; background: #FAF4E8; color: #8A6426; }
+.status-pill { border-radius: 999rpx; background: #F1F2F3; color: #646970; }
+.fact-row text:first-child, .method-help { color: #8A9098; }
+.review-reason, .boundary-note { border: 1rpx solid #E4E6E8; background: #FFFFFF; color: #646970; }
+.warning-note { color: #A33D45; }
+.picker-field, .form-input { border-color: #E4E6E8; border-radius: 14rpx; background: #FFFFFF; color: #202124; }
+.full-button { min-height: 88rpx; padding: 20rpx 24rpx; border-radius: 14rpx; line-height: 1.35; }
+.primary-button { background: #9B405B; color: #FFFFFF; }
+.secondary-button { border: 1rpx solid #D7BEC6; background: #FFFFFF; color: #9B405B; }
+.text-button { color: #9B405B; }
+.primary-button.button-hover { background: #7F3248; }
+.primary-button[disabled], .secondary-button[disabled] { opacity: 0.52; }

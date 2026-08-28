@@ -20,3 +20,29 @@
 .unread-error { margin: 0 0 18rpx; padding: 15rpx; border-left: 5rpx solid #b65a6e; background: #fff6f7; color: #8d4858; font-size: 23rpx; line-height: 1.6; }
 .unread-retry { width: 100%; margin: 12rpx 0 0; border: 1rpx solid #d6b9c1; background: #fff; color: #8c4056; font-size: 23rpx; }
 .unread-retry::after { border: 0; }
+
+/* Transaction inbox hierarchy */
+.notifications-page { padding-bottom: calc(64rpx + env(safe-area-inset-bottom)); }
+.notification-hero { padding: 28rpx; border: 1rpx solid #e3cbd2; border-left: 8rpx solid #9b405b; border-radius: 28rpx; background: #f6ecef; }
+.notification-hero > view:first-child { min-width: 0; flex: 1; }
+.hero-title { color: #202124; font-weight: 700; overflow-wrap: anywhere; }
+.hero-copy { color: #646970; overflow-wrap: anywhere; }
+.unread-count { border: 1rpx solid #9b405b; background: #9b405b; color: #ffffff; font-weight: 700; }
+.unread-count-unknown { border-color: #eadfca; background: #faf4e8; color: #8a6426; }
+.toolbar { margin: 20rpx 0; }
+.toolbar-button { min-height: 88rpx; border-color: #d8b7c1; border-radius: 14rpx; background: #ffffff; color: #9b405b; line-height: 1.4; }
+.toolbar-button:first-child { border-color: #9b405b; background: #9b405b; color: #ffffff; }
+.toolbar-button[disabled] { border-color: #e4e6e8; background: #f1f2f3; color: #8a9098; opacity: 1; }
+.notification-card { margin-bottom: 16rpx; padding: 24rpx; border: 1rpx solid #e4e6e8; border-left: 7rpx solid #8a9098; border-radius: 20rpx; background: #ffffff; box-shadow: none; }
+.notification-card.unread { border-color: #e3cbd2; border-left-color: #9b405b; background: #f6ecef; }
+.type { color: #646970; font-weight: 700; }
+.unread .type { color: #9b405b; }
+.time { color: #8a9098; text-align: right; }
+.notification-title { color: #202124; font-weight: 700; overflow-wrap: anywhere; }
+.notification-body { color: #646970; overflow-wrap: anywhere; white-space: pre-wrap; }
+.notification-footer { color: #8a9098; }
+.unread-marker { color: #9b405b; font-weight: 700; }
+.open-hint { color: #9b405b; font-weight: 600; }
+.pagination-note { color: #8a9098; font-size: 22rpx; line-height: 1.55; text-align: center; }
+.retry-button, .unread-retry { min-height: 88rpx; border-color: #d8b7c1; border-radius: 14rpx; background: #ffffff; color: #9b405b; }
+.unread-error { border: 1rpx solid #efcdd0; border-left: 5rpx solid #a33d45; background: #faeeee; color: #a33d45; overflow-wrap: anywhere; }

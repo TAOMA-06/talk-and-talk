@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "chapters": [
+    { "id": "start", "label": "开始与环境边界", "seconds": 2.0 },
+    { "id": "login", "label": "登录后首页", "seconds": 12.0 },
+    { "id": "ticket", "label": "创建客服工单", "seconds": 30.0 },
+    { "id": "status", "label": "查看处理状态", "seconds": 50.0 },
+    { "id": "boundary", "label": "结束与未验证边界", "seconds": 70.0 }
+  ]
+}

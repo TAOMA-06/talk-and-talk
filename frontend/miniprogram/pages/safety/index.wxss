@@ -37,3 +37,28 @@
 .text-button { margin: 0; padding: 0; background: transparent; color: #a43f5c; font-size: 25rpx; line-height: 1.5; }
 .leave-button::after, .primary-action::after, .secondary-button::after, .text-button::after, .retry-button::after, .appeal-submit::after { border: 0; }
 .safety-footer { padding: 8rpx 16rpx; color: #90787d; font-size: 22rpx; line-height: 1.65; text-align: center; }
+
+/* Restrained redesign */
+.safety-hero { padding: 32rpx; border: 1rpx solid #E4E6E8; background: #F6ECEF; }
+.safety-eyebrow { color: #9B405B; }
+.safety-title, .section-title, .appeal-subtitle { color: #202124; font-weight: 700; }
+.safety-copy, .section-copy { color: #646970; }
+.section-note, .action-note, .appeal-meta, .appeal-id, .safety-footer { color: #8A9098; }
+.urgent-card { border-color: #E8C9CD; background: #FAEEEE; }
+.leave-button, .primary-action, .appeal-submit { min-height: 88rpx; border-radius: 14rpx; background: #9B405B; color: #FFFFFF; }
+.leave-button { background: #A33D45; font-weight: 700; }
+.secondary-button { min-height: 80rpx; border-color: #D7BEC6; background: #FFFFFF; color: #9B405B; }
+.action-card, .appeal-card, .appeal-item { border-color: #E4E6E8; background: #FFFFFF; }
+.history-subtitle { border-color: #E4E6E8; }
+.appeal-state, .appeal-preview { background: #F1F2F3; color: #646970; }
+.appeal-error, .appeal-overdue { border-color: #E8C9CD; background: #FAEEEE; color: #A33D45; }
+.appeal-status { background: #F1F2F3; color: #646970; }
+.status-pending { background: #FAF4E8; color: #8A6426; }
+.status-overturned { background: #EDF6F1; color: #2F6B55; }
+.status-upheld { background: #FAEEEE; color: #A33D45; }
+.appeal-reason { color: #202124; }
+.appeal-deadline, .retry-button, .text-button { color: #9B405B; }
+.rules-card { border: 1rpx solid #E4E6E8; background: #FFFFFF; }
+.leave-button.button-hover { background: #7F3248; }
+.primary-action.button-hover, .appeal-submit.button-hover { background: #7F3248; }
+.leave-button[disabled], .primary-action[disabled], .appeal-submit[disabled] { opacity: 0.52; }

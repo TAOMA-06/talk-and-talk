@@ -47,7 +47,7 @@
         <input class="form-input" maxlength="160" value="{{evidenceReference}}" placeholder="受控引用，例如 provider:opaque-token" bindinput="setEvidenceReference" />
         <checkbox-group bindchange="setEvidenceConfirmation">
           <label class="confirmation-row">
-            <checkbox value="confirmed" checked="{{evidenceProcessingConfirmed}}" color="#a3435d" />
+            <checkbox value="confirmed" checked="{{evidenceProcessingConfirmed}}" color="#9B405B" />
             <text>我确认这里只填写受控流程签发的不透明引用，不包含证件号、图片、姓名、手机号或其他原始身份资料。</text>
           </label>
         </checkbox-group>

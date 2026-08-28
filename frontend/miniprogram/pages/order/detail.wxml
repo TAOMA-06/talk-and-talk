@@ -115,13 +115,15 @@
         <button class="resource-retry" bindtap="retryTimeline" aria-label="重新读取订单进度">重新读取订单进度</button>
       </view>
       <view wx:elif="{{timelineState === 'empty'}}" class="snapshot-note" aria-live="polite">服务端暂未记录更多进度节点；这是真实空状态，当前状态仍以顶部订单说明为准。</view>
-      <view wx:elif="{{timelineState === 'available'}}" class="timeline-item" wx:for="{{timeline}}" wx:key="id">
-        <view class="timeline-dot"></view>
-        <view class="timeline-copy">
-          <view class="timeline-heading"><text>{{item.title}}</text><text>{{item.timeText}}</text></view>
-          <view class="timeline-description">{{item.description}}</view>
+      <block wx:elif="{{timelineState === 'available'}}">
+        <view class="timeline-item" wx:for="{{timeline}}" wx:key="id">
+          <view class="timeline-dot"></view>
+          <view class="timeline-copy">
+            <view class="timeline-heading"><text>{{item.title}}</text><text>{{item.timeText}}</text></view>
+            <view class="timeline-description">{{item.description}}</view>
+          </view>
         </view>
-      </view>
+      </block>
       <view wx:if="{{timelineState === 'available'}}" class="snapshot-note">已显示 {{timeline.length}} / {{timelineTotal}} 条进度</view>
       <view wx:if="{{timelineLoadMoreError}}" class="timeline-resource-state timeline-resource-error" aria-live="polite">
         <view>{{timelineLoadMoreError}}</view>

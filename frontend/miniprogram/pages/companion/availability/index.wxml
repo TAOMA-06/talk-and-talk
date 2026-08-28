@@ -91,7 +91,7 @@
 
       <view wx:if="{{!editingWindowId}}" class="publish-row">
         <view><view class="field-label compact-label">立即开放给客户</view><view class="field-hint">关闭则保存为草稿，不会生成客户可选时段。</view></view>
-        <switch checked="{{formActive}}" color="#B94A68" bindchange="setFormActive" aria-label="{{formActive ? '停用' : '启用'}}当前可约时段" />
+        <switch checked="{{formActive}}" color="#9B405B" bindchange="setFormActive" aria-label="{{formActive ? '停用' : '启用'}}当前可约时段" />
       </view>
       <view wx:else class="publish-row">
         <view><view class="field-label compact-label">保持当前开放状态</view><view class="field-hint">编辑仅修改时间和容量。若要暂停，请关闭此表单后使用时段卡片上的“暂停可约”。</view></view>

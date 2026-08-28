@@ -40,3 +40,41 @@
 .secondary { border: 1rpx solid #e3c5cc; background: #fff7f8; color: #914158; }
 .danger { background: #a84458; color: #fff; }
 .primary::after, .secondary::after, .danger::after, .preflight-check::after, .safety-report::after, .support-link::after, .disclosure-link::after { border: 0; }
+
+/* Audio-only RTC shell; native nodes remain mounted off-screen */
+.voice-page { min-height: 100vh; padding: 32rpx 32rpx calc(48rpx + env(safe-area-inset-bottom)); background: #f7f7f5; }
+.voice-native-node { position: fixed; top: -200rpx; left: -200rpx; width: 1rpx; height: 1rpx; opacity: 0; pointer-events: none; }
+.preflight-card, .voice-card { border: 1rpx solid #e4e6e8; border-radius: 28rpx; background: #ffffff; box-shadow: none; }
+.preflight-card { padding: 32rpx; }
+.preflight-title { color: #202124; font-weight: 700; overflow-wrap: anywhere; }
+.preflight-copy { color: #646970; overflow-wrap: anywhere; }
+.device-status { border: 1rpx solid #e4e6e8; border-radius: 14rpx; background: #f1f2f3; }
+.device-status-row { border-bottom-color: #e4e6e8; color: #646970; }
+.device-status-row text:last-child { min-width: 0; color: #202124; overflow-wrap: anywhere; }
+.preflight-check { min-height: 88rpx; border-color: #e4e6e8; border-radius: 14rpx; background: #ffffff; color: #646970; overflow-wrap: anywhere; }
+.preflight-check.checked { border-color: #9b405b; background: #f6ecef; color: #7f3248; font-weight: 600; }
+.trtc-boundary { border: 1rpx solid #d7e2e8; background: #eef3f6; color: #3f647a; overflow-wrap: anywhere; }
+.disclosure-link { min-height: 72rpx; color: #9b405b; }
+.enter-button, .preflight-back { min-height: 88rpx; }
+.voice-card { min-height: 760rpx; padding: 48rpx 32rpx; }
+.eyebrow { color: #9b405b; font-weight: 700; letter-spacing: 2rpx; }
+.participant-avatar { background: #f6ecef; color: #9b405b; }
+.participant-name { color: #202124; font-weight: 700; overflow-wrap: anywhere; }
+.participant-role, .service-end { color: #646970; overflow-wrap: anywhere; }
+.state { border: 1rpx solid #d7e2e8; background: #eef3f6; color: #3f647a; overflow-wrap: anywhere; }
+.state-connected { border-color: #cee3d7; background: #edf6f1; color: #2f6b55; }
+.state-error { border-color: #efcdd0; background: #faeeee; color: #a33d45; }
+.state-ended { border-color: #e4e6e8; background: #f1f2f3; color: #646970; }
+.remaining-time, .network-status { border: 1rpx solid #e4e6e8; background: #f7f7f5; color: #646970; }
+.remaining-time text:last-child { color: #9b405b; }
+.network-good { color: #2f6b55 !important; }
+.network-warning { color: #8a6426 !important; }
+.network-error { color: #a33d45 !important; }
+.boundary { border-top-color: #e4e6e8; color: #646970; overflow-wrap: anywhere; }
+.primary, .secondary, .danger { min-height: 88rpx; border-radius: 14rpx; line-height: 1.4; }
+.primary { border-color: #9b405b; background: #9b405b; color: #ffffff; }
+.secondary { border-color: #d8b7c1; background: #ffffff; color: #9b405b; }
+.danger { border-color: #a33d45; background: #a33d45; color: #ffffff; }
+.safety-report, .support-link { min-height: 80rpx; line-height: 1.4; }
+.safety-report { border-color: #a33d45; background: #a33d45; color: #ffffff; }
+.support-link { border-color: #d8b7c1; background: #ffffff; color: #9b405b; }

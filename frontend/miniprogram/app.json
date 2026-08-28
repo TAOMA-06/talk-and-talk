@@ -33,17 +33,17 @@
     "pages/legal/index"
   ],
   "window": {
-    "navigationBarBackgroundColor": "#FFF8F8",
+    "navigationBarBackgroundColor": "#F7F7F5",
     "navigationBarTextStyle": "black",
     "navigationBarTitleText": "Talk&Talk",
-    "backgroundColor": "#FFF8F8",
-    "backgroundTextStyle": "light"
+    "backgroundColor": "#F7F7F5",
+    "backgroundTextStyle": "dark"
   },
   "tabBar": {
-    "color": "#8D6E73",
-    "selectedColor": "#B94A68",
+    "color": "#646970",
+    "selectedColor": "#9B405B",
     "backgroundColor": "#FFFFFF",
-    "borderStyle": "white",
+    "borderStyle": "black",
     "list": [
       { "pagePath": "pages/home/index", "text": "首页" },
       { "pagePath": "pages/discover/index", "text": "发现" },

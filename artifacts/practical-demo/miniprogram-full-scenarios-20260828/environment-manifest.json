@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-28T02:00:00+08:00",
+  "source": {
+    "branch": "codex/g1-text-only-release-candidate",
+    "sha": "ea11230f19b169863e5579b5992796228d0ac222",
+    "preexistingWorktreeState": ["untracked artifacts/ directory"],
+    "productSourceModified": false
+  },
+  "runtime": {
+    "api": {
+      "pid": 98767,
+      "origin": "http://127.0.0.1:32028",
+      "apiBase": "http://127.0.0.1:32028/api/v1",
+      "health": "ok",
+      "leaveRunning": true
+    },
+    "postgres": {
+      "database": "talk_and_talk_miniprogram_full_20260828_ea11230f_01",
+      "host": "127.0.0.1",
+      "isolated": true,
+      "migrationsApplied": 117
+    },
+    "redis": {
+      "host": "127.0.0.1",
+      "port": 6379,
+      "database": 11,
+      "isolated": true,
+      "keysAfterSessionSetup": 2
+    },
+    "miniProgramProject": {
+      "path": "/var/folders/pz/sz1jvfhx5m3fsqc7j3f63rwm0000gn/T/talktalk-miniprogram-full-20260828-ea11230f-project",
+      "projectname": "talk-and-talk-local-do-not-upload",
+      "apiBase": "http://127.0.0.1:32028/api/v1",
+      "appidPresent": false,
+      "uploadAuthorized": false
+    }
+  },
+  "seed": {
+    "currentSeedCommand": "npm run prisma:seed",
+    "companions": 5,
+    "publishedCompanions": 4,
+    "companionOwner": { "profileId": "c1", "userId": "seed-owner-c1" }
+  },
+  "scenarioMapping": {
+    "U0": "fresh normal customer empty states",
+    "U1": "normal customer with order_pending, order_paid, order_refunded, conversation, successful refund, open support and notification fixtures",
+    "P1": "seeded c1 companion owner workbench with U1 service orders",
+    "R1": "restricted customer with visible restriction and read-only/minimal account-rights mode"
+  },
+  "profilePayloads": {
+    "U0": "/private/tmp/talktalk-miniprogram-full-20260828-ea11230f/runtime/devtools-storage-payload.json",
+    "U1": "/private/tmp/talktalk-miniprogram-full-20260828-ea11230f/runtime/u1/devtools-storage-payload.json",
+    "P1": "/private/tmp/talktalk-miniprogram-full-20260828-ea11230f/runtime/p1/devtools-storage-payload.json",
+    "R1": "/private/tmp/talktalk-miniprogram-full-20260828-ea11230f/runtime/r1/devtools-storage-payload.json"
+  },
+  "sessionBoundary": {
+    "storageKeys": [
+      "talkandtalk.accessToken",
+      "talkandtalk.refreshToken",
+      "talkandtalk.user",
+      "talkandtalk.legalConsent"
+    ],
+    "runtimeFileMode": "0600",
+    "secretsPersistedInArtifact": false,
+    "developmentPhoneLoginOnly": true,
+    "realWechatLoginValidated": false
+  },
+  "verification": {
+    "baseEnvironment": { "outcome": "pass", "assertions": 11 },
+    "scenarioSnapshots": { "outcome": "pass", "assertions": 13 },
+    "fixtureTransactionRollbackOnRejectedAttempts": true
+  },
+  "fixtureBoundaries": {
+    "providerCallsMade": false,
+    "realPaymentOrRefundClaimed": false,
+    "R1BannedPrepared": false,
+    "R1BannedReason": "Current banned-session guard rejects bearer routes; restricted is the safe visible minimal-rights snapshot.",
+    "directDevOrPreviousDemoDatabaseTouched": false
+  },
+  "gui": {
+    "developerToolsOperated": false,
+    "recordingStarted": false,
+    "macLockedAtHandoff": true
+  },
+  "cleanupScript": "artifacts/practical-demo/miniprogram-full-scenarios-20260828/cleanup.sh"
+}

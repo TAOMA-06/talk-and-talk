@@ -1,0 +1,116 @@
+{
+  "schemaVersion": 1,
+  "video": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 30,
+    "codec": "h264",
+    "averageBitRate": 10000000
+  },
+  "timing": {
+    "titleSeconds": 4.0,
+    "boundarySeconds": 6.0,
+    "resultSeconds": 6.0,
+    "crossfadeSeconds": 0.6
+  },
+  "cards": {
+    "title": {
+      "kicker": "本地隔离实用测试",
+      "title": "Talk&Talk 客服工单处理链路",
+      "subtitle": "真实截图与真实 API / PostgreSQL 证据编排；结论按已通过、未完成和未运行分别呈现。",
+      "meta": [
+        "API / DB 21 / 21",
+        "Admin UI 部分完成",
+        "非生产证据"
+      ]
+    },
+    "boundary": {
+      "title": "这段演示有明确的证据边界",
+      "subtitle": "画面与断言来自同一次本地隔离工单测试，不能外推为生产或真实微信验证。",
+      "items": [
+        "真实 API 与隔离 PostgreSQL：21 / 21 断言通过",
+        "Admin UI：已显示登录、匿名队列和受控认领弹窗",
+        "UI 认领提交未发出 POST；后续 UI 详情与结案未完成",
+        "同一工单随后由真实 API 完成认领 201 与结案 200",
+        "Mini Program UI 被阻断，没有真实截图",
+        "不是 staging、生产、真机或真实微信送达证明"
+      ]
+    },
+    "result": {
+      "status": "blocked",
+      "headline": "API / DB 已闭环；端到端 UI 与真实微信仍未闭环",
+      "details": [
+        "API / PostgreSQL：21 / 21 断言通过",
+        "Admin UI：可见至认领弹窗",
+        "UI 认领提交：阻断，未重试",
+        "API 认领 / 结案：201 / 200",
+        "Mini Program UI：阻断，未完成",
+        "外部微信送达：未运行"
+      ],
+      "evidenceRefs": [
+        "verification/media-api-preclaim-assertions.json",
+        "verification/media-api-final-assertions.json",
+        "verification/media-ui-flow.json",
+        "verification/ui-capture.json"
+      ]
+    }
+  },
+  "shots": [
+    {
+      "id": "admin-login",
+      "image": "/Users/taoma/Documents/talk and talk/artifacts/practical-demo/support-ticket-20260827/screenshots/01-admin-login.png",
+      "sourceKind": "evidence",
+      "evidenceRef": "verification/media-ui-flow.json#steps[0]",
+      "label": "01 · Admin 登录入口",
+      "caption": "真实 Admin 静态资源由 artifact-local 同源代理呈现；截图时账号、密码与动态口令均为空。",
+      "durationSeconds": 4.0,
+      "fit": "contain",
+      "motion": "zoomIn"
+    },
+    {
+      "id": "anonymous-queue",
+      "image": "/Users/taoma/Documents/talk and talk/artifacts/practical-demo/support-ticket-20260827/screenshots/02-admin-anonymous-queue.png",
+      "sourceKind": "evidence",
+      "evidenceRef": "verification/media-ui-flow.json#steps[2]",
+      "label": "02 · 匿名待认领队列",
+      "caption": "真实 claimable API 返回五字段摘要；正文、请求人、订单身份、分配与处理结果均未展示。",
+      "durationSeconds": 5.0,
+      "fit": "contain",
+      "motion": "panLeft"
+    },
+    {
+      "id": "claim-dialog",
+      "image": "/Users/taoma/Documents/talk and talk/artifacts/practical-demo/support-ticket-20260827/screenshots/03-admin-claim-dialog.png",
+      "sourceKind": "evidence",
+      "evidenceRef": "verification/media-ui-flow.json#steps[3-4]",
+      "label": "03 · 受控认领弹窗",
+      "caption": "Admin UI 已显示至认领弹窗；本次 UI 提交未发出 claim POST，后续画面没有伪造成成功状态。",
+      "durationSeconds": 5.0,
+      "fit": "contain",
+      "motion": "zoomIn"
+    },
+    {
+      "id": "run-summary",
+      "image": "/Users/taoma/Documents/talk and talk/artifacts/practical-demo/support-ticket-20260827/screenshots/08-evidence-run-summary.png",
+      "sourceKind": "evidence",
+      "evidenceRef": "verification/media-api-final-assertions.json#overall",
+      "label": "04 · 真实断言证据卡",
+      "caption": "证据卡不是应用界面：同一工单随后由真实 API 完成认领 201、结案 200，累计 21 / 21 断言通过。",
+      "durationSeconds": 6.0,
+      "fit": "contain",
+      "motion": "panRight"
+    },
+    {
+      "id": "audit-notification",
+      "image": "/Users/taoma/Documents/talk and talk/artifacts/practical-demo/support-ticket-20260827/screenshots/09-evidence-audit-notification.png",
+      "sourceKind": "evidence",
+      "evidenceRef": "verification/media-api-final-assertions.json#auditActions",
+      "label": "05 · 审计与通知证据卡",
+      "caption": "三段审计、站内未读通知与投递意图已持久化；pending 不等于微信送达，Mini UI 仍为阻断。",
+      "durationSeconds": 6.0,
+      "fit": "contain",
+      "motion": "zoomIn"
+    }
+  ],
+  "footer": "Talk&Talk · 本地隔离客服工单实用测试 · SHA ea11230f19b1 · 非生产 / 非真实微信证明"
+}

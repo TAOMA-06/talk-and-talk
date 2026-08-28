@@ -24,3 +24,33 @@
 .support-button { border: 1rpx solid #ddc8ce; background: #fff; color: #8a4358; }
 .authority-note { margin-top: 28rpx; padding: 0 16rpx; color: #947e85; font-size: 21rpx; line-height: 1.65; text-align: center; }
 .terms-check::after, .support-button::after, .policy-link::after { border: 0; }
+
+/* Payment state and next-action hierarchy */
+.payment-page { padding-bottom: calc(64rpx + env(safe-area-inset-bottom)); }
+.payment-state { padding: 40rpx 30rpx; border: 1rpx solid #e3cbd2; border-left: 8rpx solid #9b405b; background: #f6ecef; text-align: left; }
+.state-success { border-color: #cee3d7; border-left-color: #2f6b55; background: #edf6f1; }
+.state-error, .state-cancelled { border-color: #efcdd0; border-left-color: #a33d45; background: #faeeee; }
+.state-pending, .state-processing { border-color: #eadfca; border-left-color: #8a6426; background: #faf4e8; }
+.state-unavailable { border-color: #d7e2e8; border-left-color: #3f647a; background: #eef3f6; }
+.state-symbol { width: 72rpx; height: 72rpx; margin: 0; border: 1rpx solid #e3cbd2; background: #ffffff; color: #9b405b; font-weight: 700; box-shadow: none; }
+.state-success .state-symbol { border-color: #cee3d7; color: #2f6b55; }
+.state-error .state-symbol, .state-cancelled .state-symbol { border-color: #efcdd0; color: #a33d45; }
+.state-pending .state-symbol, .state-processing .state-symbol { border-color: #eadfca; color: #8a6426; }
+.state-title { color: #202124; font-weight: 700; overflow-wrap: anywhere; }
+.state-message { color: #3f4247; overflow-wrap: anywhere; }
+.order-summary { margin-top: 24rpx; border-color: #e4e6e8; }
+.summary-title, .rules-title { color: #202124; font-weight: 700; overflow-wrap: anywhere; }
+.summary-row { border-bottom-color: #e4e6e8; color: #3f4247; }
+.summary-row text:first-child { color: #646970; }
+.summary-row text:last-child { min-width: 0; color: #202124; overflow-wrap: anywhere; }
+.summary-row.total text:last-child { color: #9b405b; font-weight: 700; }
+.rules-card { border-color: #e3cbd2; border-left: 6rpx solid #9b405b; }
+.rule { color: #646970; overflow-wrap: anywhere; }
+.policy-rule { color: #202124; }
+.policy-version { border: 1rpx solid #d7e2e8; background: #eef3f6; color: #3f647a; overflow-wrap: anywhere; }
+.policy-link { min-height: 88rpx; border-color: #d8b7c1; color: #9b405b; }
+.terms-check { min-height: 88rpx; border-color: #e4e6e8; color: #646970; line-height: 1.55; }
+.terms-check.checked { border-color: #9b405b; background: #f6ecef; color: #7f3248; font-weight: 600; }
+.pay-button, .full-button { min-height: 88rpx; margin-top: 18rpx; }
+.support-button { border-color: #d8b7c1; background: #ffffff; color: #9b405b; }
+.authority-note { margin-top: 28rpx; padding: 16rpx 18rpx; border: 1rpx solid #d7e2e8; border-radius: 14rpx; background: #eef3f6; color: #3f647a; text-align: left; overflow-wrap: anywhere; }

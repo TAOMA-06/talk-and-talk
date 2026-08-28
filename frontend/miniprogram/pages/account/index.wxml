@@ -213,10 +213,12 @@
         <view><view class="section-title">支付记录与发票</view><view class="section-copy">订单记录来自服务端；发票申请状态与微信账单分开显示。</view></view>
         <view class="capability {{invoiceState === 'error' ? 'unavailable' : 'available'}}">{{invoiceState === 'error' ? '读取失败' : '自助申请'}}</view>
       </view>
-      <view wx:if="{{bills.length}}" class="bill-item" wx:for="{{bills}}" wx:key="id" bindtap="openBill" data-id="{{item.id}}" aria-role="button" aria-label="查看账单：{{item.serviceName}}，{{item.amountText}}，{{item.statusText}}" tabindex="0">
-        <view class="bill-main"><view class="bill-name">{{item.serviceName}}</view><view class="bill-amount {{item.refunded ? 'refunded' : ''}}">{{item.amountText}}</view></view>
-        <view class="bill-meta"><text>{{item.statusText}}</text><text>{{item.timeText}}</text></view>
-      </view>
+      <block wx:if="{{bills.length}}">
+        <view class="bill-item" wx:for="{{bills}}" wx:key="id" bindtap="openBill" data-id="{{item.id}}" aria-role="button" aria-label="查看账单：{{item.serviceName}}，{{item.amountText}}，{{item.statusText}}" tabindex="0">
+          <view class="bill-main"><view class="bill-name">{{item.serviceName}}</view><view class="bill-amount {{item.refunded ? 'refunded' : ''}}">{{item.amountText}}</view></view>
+          <view class="bill-meta"><text>{{item.statusText}}</text><text>{{item.timeText}}</text></view>
+        </view>
+      </block>
       <view wx:else class="empty compact">暂无订单支付记录</view>
       <view wx:if="{{bills.length}}" class="account-load-more">
         <view>已显示 {{bills.length}} / {{billTotal}} 笔订单记录</view>
@@ -271,9 +273,11 @@
     <view wx:if="{{!limitedAccountMode}}" class="card">
       <view class="section-title">我已拉黑的会话</view>
       <view class="section-copy">拉黑只影响会话收发，不会取消订单、退款、举报或客服案件。</view>
-      <view wx:if="{{blockedConversations.length}}" class="blocked-item" wx:for="{{blockedConversations}}" wx:key="id" bindtap="openBlockedConversation" data-id="{{item.id}}" aria-role="button" aria-label="管理已拉黑会话：{{item.name}}" tabindex="0">
-        <text>{{item.name}}</text><text>管理或解除 ›</text>
-      </view>
+      <block wx:if="{{blockedConversations.length}}">
+        <view class="blocked-item" wx:for="{{blockedConversations}}" wx:key="id" bindtap="openBlockedConversation" data-id="{{item.id}}" aria-role="button" aria-label="管理已拉黑会话：{{item.name}}" tabindex="0">
+          <text>{{item.name}}</text><text>管理或解除 ›</text>
+        </view>
+      </block>
       <view wx:else class="empty compact">当前没有由你拉黑的会话</view>
       <view wx:if="{{blockedConversations.length}}" class="account-load-more">
         <view>已显示 {{blockedConversations.length}} / {{blockedConversationTotal}} 个已拉黑会话</view>

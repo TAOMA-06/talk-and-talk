@@ -51,3 +51,48 @@
 .send { background: #b94a68; color: #fff; }
 .media { padding: 0 14rpx; background: #f7e7ed; color: #93445d; }
 .recording { background: #d9536f; color: #fff; }
+
+/* Conversation, safety and delivery-state hierarchy */
+.chat-page { padding-bottom: calc(164rpx + env(safe-area-inset-bottom)); }
+.notice, .restriction-notice, .appeal-notice, .safety-exit, .identity-unavailable-notice { margin-bottom: 16rpx; border: 1rpx solid #e4e6e8; border-left-width: 6rpx; border-radius: 14rpx; background: #ffffff; color: #646970; overflow-wrap: anywhere; }
+.notice { border-color: #e3cbd2; border-left-color: #9b405b; background: #f6ecef; color: #7f3248; }
+.identity-unavailable-notice, .restriction-notice { border-color: #eadfca; border-left-color: #8a6426; background: #faf4e8; color: #72551f; }
+.message-notification-setting, .future-booking-setting { margin-bottom: 16rpx; padding: 18rpx; border: 1rpx solid #e4e6e8; border-radius: 14rpx; background: #ffffff; }
+.message-notification-title, .future-booking-title { color: #202124; font-weight: 700; }
+.message-notification-description, .future-booking-description { color: #646970; overflow-wrap: anywhere; }
+.message-notification-action, .future-booking-action { min-height: 72rpx; padding: 0 16rpx; border-color: #d8b7c1; border-radius: 14rpx; background: #ffffff; color: #9b405b; line-height: 1.4; }
+.future-booking-setting { border-color: #eadfca; border-left: 6rpx solid #8a6426; background: #faf4e8; }
+.future-booking-action { border-color: #d9c69f; color: #8a6426; }
+.safety-exit { border-color: #efcdd0; border-left-color: #a33d45; background: #faeeee; }
+.safety-exit-title { color: #a33d45; font-weight: 700; }
+.safety-exit-copy { color: #646970; overflow-wrap: anywhere; }
+.safety-exit-action { min-height: 72rpx; border-color: #d8b7c1; border-radius: 14rpx; color: #9b405b; line-height: 1.4; }
+.safety-exit-report { border-color: #efcdd0; color: #a33d45; }
+.safety-exit-emergency { border-color: #a33d45; background: #a33d45; color: #ffffff; }
+.safety-exit-block { border-color: #d9c69f; color: #8a6426; }
+.appeal-notice { border-color: #d7e2e8; border-left-color: #3f647a; background: #eef3f6; color: #3f647a; }
+.appeal-notice button { min-height: 64rpx; border: 1rpx solid #bdd0da; background: #ffffff; color: #3f647a; }
+.initial-load-error button { min-height: 72rpx; margin-top: 16rpx; border-color: #d8b7c1; background: #ffffff; color: #9b405b; }
+.conversation-boundary { margin-bottom: 16rpx; padding: 20rpx; border-color: #eadfca; border-left: 6rpx solid #8a6426; background: #faf4e8; }
+.conversation-read-only { border-color: #d7e2e8; border-left-color: #3f647a; background: #eef3f6; }
+.conversation-boundary-title { color: #202124; font-weight: 700; }
+.conversation-boundary-copy { color: #646970; overflow-wrap: anywhere; }
+.history-status, .sync-status { color: #8a9098; }
+.sync-status { color: #3f647a; }
+.sender { color: #646970; overflow-wrap: anywhere; }
+.bubble { border: 1rpx solid #e4e6e8; background: #ffffff; color: #202124; box-shadow: none; overflow-wrap: anywhere; }
+.message-content { overflow-wrap: anywhere; word-break: break-word; }
+.system .bubble { border-color: #e3cbd2; background: #f6ecef; color: #7f3248; }
+.held .bubble { border-color: #eadfca; background: #faf4e8; color: #72551f; }
+.message-emergency-help { min-height: 72rpx; border-color: #efcdd0; color: #a33d45; line-height: 1.4; }
+.delivery-status { color: #8a6426; font-weight: 600; }
+.delivery-status.blocked { color: #a33d45; }
+.attachment-image { border: 1rpx solid #e4e6e8; border-radius: 14rpx; }
+.attachment-placeholder { border: 1rpx solid #e4e6e8; background: #f1f2f3; color: #646970; overflow-wrap: anywhere; }
+.audio-play { min-height: 72rpx; border-color: #d8b7c1; background: #f6ecef; color: #9b405b; }
+.composer { z-index: 20; align-items: center; gap: 10rpx; padding: 12rpx 24rpx calc(12rpx + env(safe-area-inset-bottom)); border-top: 1rpx solid #e4e6e8; background: #ffffff; box-shadow: none; }
+.composer input { min-height: 80rpx; padding: 16rpx 18rpx; border: 1rpx solid #e4e6e8; border-radius: 14rpx; background: #f7f7f5; color: #202124; }
+.send, .media { min-height: 80rpx; padding: 0 18rpx; border-radius: 14rpx; }
+.send { border-color: #9b405b; background: #9b405b; color: #ffffff; }
+.media { border-color: #d8b7c1; background: #ffffff; color: #9b405b; }
+.recording { border-color: #a33d45; background: #a33d45; color: #ffffff; }

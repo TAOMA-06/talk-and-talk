@@ -1,0 +1,6 @@
+checked_at=2026-08-27T10:24:05Z
+request=GET http://127.0.0.1:3000/admin/
+chrome_result=ERR_TOO_MANY_REDIRECTS
+direct_response_status=302
+location=/admin/
+conclusion=The route redirected to itself; no genuine admin UI screenshot was captured.

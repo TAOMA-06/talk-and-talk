@@ -29,7 +29,7 @@
       <button class="resource-retry" bindtap="load" aria-label="重新读取个性化推荐设置">重新读取推荐设置</button>
     </view>
     <view class="card" wx:elif="{{recommendationSettingsState === 'available' && recommendationPreferences}}">
-      <view class="recommendation-header"><view><view class="title small">个性化推荐</view><view class="muted">首发阶段未启用个性化排序；历史开关已按关闭处理。你仍可手动搜索和浏览当前可用服务。</view></view><switch checked="{{false}}" disabled color="#B94A68" bindchange="setPersonalization" aria-label="个性化推荐首发阶段未启用" /></view>
+      <view class="recommendation-header"><view><view class="title small">个性化推荐</view><view class="muted">首发阶段未启用个性化排序；历史开关已按关闭处理。你仍可手动搜索和浏览当前可用服务。</view></view><switch checked="{{false}}" disabled color="#9B405B" bindchange="setPersonalization" aria-label="个性化推荐首发阶段未启用" /></view>
       <view wx:if="{{recommendationPreferences.personalizationEnabled}}">
         <view class="recommendation-label">感兴趣的主题</view>
         <view class="choices"><view wx:for="{{recommendationTopics}}" wx:key="id" class="choice {{item.selected ? 'selected' : ''}}" bindtap="toggleRecommendationTopic" data-id="{{item.id}}" aria-role="checkbox" aria-checked="{{item.selected}}" aria-label="推荐主题：{{item.name}}" tabindex="0">{{item.selected ? '✓ ' : ''}}{{item.name}}</view></view>
@@ -80,7 +80,7 @@
           <view class="favorite-item-meta">私人书签，不代表当前在售 · 进入资料页查看当前商品与可约时间</view>
           <view class="favorite-reminder" catchtap="stopFavoriteReminderTap" aria-role="group" aria-label="{{item.name}}的可约提醒设置">
             <view class="favorite-reminder-copy"><view class="favorite-reminder-title">可约提醒 <text class="favorite-reminder-state">{{item.availabilityReminderEnabled ? '已开启' : availabilityReminderChannel.available ? '未开启' : '暂不可用'}}</text></view><view class="favorite-reminder-description">{{item.availabilityReminderEnabled ? '已记录你的提醒意愿；不会立即发送提醒，实际可约仍以资料页为准。' : availabilityReminderChannel.available ? '开启时会请求一次微信订阅授权；不会通知陪伴者或改变订单。' : '平台提醒通道尚未正式启用；收藏和手动查看不受影响。'}}</view><view class="favorite-reminder-limit">同一对象最多每 {{item.availabilityReminderMinimumIntervalHours}} 小时一次</view></view>
-            <switch data-id="{{item.id}}" checked="{{item.availabilityReminderEnabled}}" disabled="{{favoriteReminderSavingId !== '' || (!item.availabilityReminderEnabled && !availabilityReminderChannel.available)}}" color="#55748F" catchchange="setFavoriteAvailabilityReminder" aria-label="{{item.availabilityReminderEnabled ? '关闭' : '开启'}}{{item.name}}的可约提醒" />
+            <switch data-id="{{item.id}}" checked="{{item.availabilityReminderEnabled}}" disabled="{{favoriteReminderSavingId !== '' || (!item.availabilityReminderEnabled && !availabilityReminderChannel.available)}}" color="#3F647A" catchchange="setFavoriteAvailabilityReminder" aria-label="{{item.availabilityReminderEnabled ? '关闭' : '开启'}}{{item.name}}的可约提醒" />
           </view>
         </view>
         <view class="favorite-pagination">
@@ -140,7 +140,9 @@
       <button class="resource-retry" bindtap="load" aria-label="重新读取最近通知">重新读取通知</button>
     </view>
     <view wx:elif="{{notificationState === 'empty'}}" class="empty compact">暂无新通知</view>
-    <view wx:elif="{{notificationState === 'available'}}" wx:for="{{notifications}}" wx:key="id" class="card notification {{!item.readAt ? 'unread' : ''}}" bindtap="openNotification" data-id="{{item.id}}" aria-role="button" aria-label="{{item.readAt ? '已读通知' : '未读通知'}}：{{item.title}}" tabindex="0"><view class="name">{{item.title}}</view><view class="muted">{{item.body}}</view><view wx:if="{{!item.readAt}}" class="unread-marker">未读</view></view>
+    <block wx:elif="{{notificationState === 'available'}}">
+      <view wx:for="{{notifications}}" wx:key="id" class="card notification {{!item.readAt ? 'unread' : ''}}" bindtap="openNotification" data-id="{{item.id}}" aria-role="button" aria-label="{{item.readAt ? '已读通知' : '未读通知'}}：{{item.title}}" tabindex="0"><view class="name">{{item.title}}</view><view class="muted">{{item.body}}</view><view wx:if="{{!item.readAt}}" class="unread-marker">未读</view></view>
+    </block>
     <button class="notification-center-entry" bindtap="openNotificationCenter">查看全部通知与关联页面</button>
     <view class="legal-links">
       <button class="legal" bindtap="openTerms">用户协议</button>

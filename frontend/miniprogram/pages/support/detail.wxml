@@ -25,10 +25,12 @@
     </view>
     <view class="card">
       <view class="section-title">你补充的信息</view>
-      <view wx:if="{{safetyCase.followUps.length}}" class="follow-up" wx:for="{{safetyCase.followUps}}" wx:key="id">
-        <view class="follow-up-text">{{item.statement}}</view>
-        <view class="follow-up-time">{{item.createdAt}}</view>
-      </view>
+      <block wx:if="{{safetyCase.followUps.length}}">
+        <view class="follow-up" wx:for="{{safetyCase.followUps}}" wx:key="id">
+          <view class="follow-up-text">{{item.statement}}</view>
+          <view class="follow-up-time">{{item.createdAt}}</view>
+        </view>
+      </block>
       <view wx:else class="empty compact">暂未补充更多信息</view>
       <view wx:if="{{canAdd}}">
         <textarea class="follow-up-input" value="{{followUp}}" maxlength="500" placeholder="补充与安全判断直接相关的事实（5–500 字）" bindinput="setFollowUp"></textarea>
@@ -58,13 +60,15 @@
     </view>
     <view class="card">
       <view class="section-title">你补充的订单事实</view>
-      <view wx:if="{{ticket.orderFacts.length}}" class="follow-up" wx:for="{{ticket.orderFacts}}" wx:key="id">
-        <view class="follow-up-text">{{item.statement}}</view>
-        <view wx:if="{{!textOnly && item.evidenceAttachments.length}}" class="evidence-list">
-          <button wx:for="{{item.evidenceAttachments}}" wx:for-item="attachment" wx:key="id" class="evidence-chip" size="mini" data-id="{{attachment.id}}" bindtap="openBoundEvidence">{{attachment.kind === 'image' ? '查看图片证据' : '播放音频证据'}}</button>
+      <block wx:if="{{ticket.orderFacts.length}}">
+        <view class="follow-up" wx:for="{{ticket.orderFacts}}" wx:key="id">
+          <view class="follow-up-text">{{item.statement}}</view>
+          <view wx:if="{{!textOnly && item.evidenceAttachments.length}}" class="evidence-list">
+            <button wx:for="{{item.evidenceAttachments}}" wx:for-item="attachment" wx:key="id" class="evidence-chip" size="mini" data-id="{{attachment.id}}" bindtap="openBoundEvidence">{{attachment.kind === 'image' ? '查看图片证据' : '播放音频证据'}}</button>
+          </view>
+          <view class="follow-up-time">{{item.createdAt}}</view>
         </view>
-        <view class="follow-up-time">{{item.createdAt}}</view>
-      </view>
+      </block>
       <view wx:else class="empty compact">暂未补充订单事实</view>
       <view wx:if="{{canAdd}}">
         <textarea class="follow-up-input" value="{{followUp}}" maxlength="1200" placeholder="只写你亲历的时间、履约或支付事实；不要填写证件、联系方式、银行卡或健康材料" bindinput="setFollowUp"></textarea>

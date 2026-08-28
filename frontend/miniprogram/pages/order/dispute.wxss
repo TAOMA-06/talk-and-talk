@@ -37,3 +37,40 @@
 .evidence-toolbar button, .evidence-list button, .evidence-draft button { margin: 0; }
 .evidence-draft { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; margin-top: 12rpx; font-size: 24rpx; }
 .evidence-list { margin-top: 12rpx; }
+
+/* Case status, evidence and decision hierarchy */
+.dispute-page { padding-bottom: calc(72rpx + env(safe-area-inset-bottom)); }
+.policy-card, .card { margin-bottom: 16rpx; padding: 24rpx; border: 1rpx solid #e4e6e8; border-radius: 20rpx; background: #ffffff; box-shadow: none; }
+.policy-card { border-color: #e3cbd2; border-left: 8rpx solid #9b405b; background: #f6ecef; }
+.eyebrow { color: #9b405b; font-weight: 700; }
+.policy-title, .section-title { color: #202124; font-weight: 700; overflow-wrap: anywhere; }
+.policy-copy, .hint { color: #646970; overflow-wrap: anywhere; }
+.policy-error { border-left-color: #a33d45; background: #faeeee; color: #a33d45; }
+.issue { border-bottom-color: #e4e6e8; }
+.issue-label { color: #202124; font-weight: 700; overflow-wrap: anywhere; }
+.issue-help { color: #646970; overflow-wrap: anywhere; }
+.statement { min-height: 200rpx; border-color: #e4e6e8; border-radius: 14rpx; background: #f7f7f5; color: #202124; overflow-wrap: anywhere; }
+.primary, .secondary, .retry { min-height: 88rpx; border-radius: 14rpx; }
+.primary { border-color: #9b405b; background: #9b405b; color: #ffffff; }
+.secondary, .retry { border-color: #d8b7c1; background: #ffffff; color: #9b405b; }
+.status-card { border-left-color: #9b405b; background: #ffffff; }
+.status-row { color: #646970; }
+.status { color: #9b405b; font-weight: 700; overflow-wrap: anywhere; }
+.deadline { border-bottom-color: #e4e6e8; color: #646970; }
+.deadline text:last-child { min-width: 0; color: #202124; font-weight: 600; text-align: right; overflow-wrap: anywhere; }
+.trusted, .warning { border: 1rpx solid; }
+.trusted { border-color: #cee3d7; background: #edf6f1; color: #2f6b55; }
+.warning { border-color: #eadfca; background: #faf4e8; color: #8a6426; }
+.participant-grid { display: flex; flex-wrap: wrap; gap: 14rpx; }
+.participant { min-width: 0; flex: 1 1 260rpx; border: 1rpx solid #e4e6e8; background: #f7f7f5; color: #646970; overflow-wrap: anywhere; }
+.participant-title { color: #202124; font-weight: 700; }
+.statement-item { border: 1rpx solid #e4e6e8; background: #f7f7f5; }
+.statement-meta { color: #8a9098; }
+.statement-meta text:first-child { min-width: 0; overflow-wrap: anywhere; }
+.statement-meta text:last-child { flex: 0 0 auto; text-align: right; }
+.statement-copy, .decision { color: #3f4247; overflow-wrap: anywhere; }
+.decision-card { border-left-color: #3f647a; background: #eef3f6; }
+.refund-state { color: #3f647a; }
+.evidence-panel { border: 1rpx solid #e4e6e8; background: #f1f2f3; }
+.evidence-toolbar button, .evidence-list button, .evidence-draft button { min-height: 64rpx; border-color: #d8b7c1; background: #ffffff; color: #9b405b; }
+.evidence-draft { color: #3f4247; overflow-wrap: anywhere; }

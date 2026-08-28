@@ -16,18 +16,20 @@
     <button class="retry-button" bindtap="load">重新加载消息</button>
   </view>
   <view wx:elif="{{!conversations.length}}" class="empty">支付订单后，会话会出现在这里。</view>
-  <view wx:else class="card conversation" wx:for="{{conversations}}" wx:key="id" bindtap="openChat" data-id="{{item.id}}" aria-role="button" aria-label="打开与 {{item.name}} 的会话，{{item.unreadCount}} 条未读" tabindex="0">
-    <view class="row">
-      <view class="conversation-name"><text class="name">{{item.name}}</text><text wx:if="{{item.conversationBlockedByYou}}" class="conversation-blocked">已拉黑</text><text wx:elif="{{!item.messageInteractionAvailable && item.messageHistoryAvailable}}" class="conversation-unavailable">只读</text><text wx:elif="{{!item.messageInteractionAvailable}}" class="conversation-unavailable">无法收发</text><text wx:elif="{{item.messageNotificationsMuted}}" class="notification-muted">已静音</text></view>
-      <text class="muted">{{item.updatedAtText}}</text>
+  <block wx:else>
+    <view class="card conversation" wx:for="{{conversations}}" wx:key="id" bindtap="openChat" data-id="{{item.id}}" aria-role="button" aria-label="打开与 {{item.name}} 的会话，{{item.unreadCount}} 条未读" tabindex="0">
+      <view class="row">
+        <view class="conversation-name"><text class="name">{{item.name}}</text><text wx:if="{{item.conversationBlockedByYou}}" class="conversation-blocked">已拉黑</text><text wx:elif="{{!item.messageInteractionAvailable && item.messageHistoryAvailable}}" class="conversation-unavailable">只读</text><text wx:elif="{{!item.messageInteractionAvailable}}" class="conversation-unavailable">无法收发</text><text wx:elif="{{item.messageNotificationsMuted}}" class="notification-muted">已静音</text></view>
+        <text class="muted">{{item.updatedAtText}}</text>
+      </view>
+      <view class="preview">{{item.preview}}</view>
+      <view class="conversation-footer">
+        <text wx:if="{{item.unreadCount}}" class="unread-badge">{{item.unreadCount}} 条未读</text>
+        <text wx:else class="read-state">已读</text>
+        <text class="open-chat">{{item.conversationBlockedByYou ? '管理会话边界' : '进入会话'}} ›</text>
+      </view>
     </view>
-    <view class="preview">{{item.preview}}</view>
-    <view class="conversation-footer">
-      <text wx:if="{{item.unreadCount}}" class="unread-badge">{{item.unreadCount}} 条未读</text>
-      <text wx:else class="read-state">已读</text>
-      <text class="open-chat">{{item.conversationBlockedByYou ? '管理会话边界' : '进入会话'}} ›</text>
-    </view>
-  </view>
+  </block>
   <view wx:if="{{!loading && !error && conversations.length}}" class="conversation-pagination">
     <view class="muted">已显示 {{conversations.length}} / {{conversationTotal}} 个会话</view>
     <view wx:if="{{loadMoreError}}" class="load-more-error">{{loadMoreError}}</view>

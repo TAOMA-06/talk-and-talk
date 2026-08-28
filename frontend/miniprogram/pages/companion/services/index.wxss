@@ -50,3 +50,29 @@ textarea { min-height: 172rpx; line-height: 1.55; }
 .topic-state-error { margin-top: 10rpx; padding: 14rpx; border-left: 5rpx solid #b65a6e; background: #fff5f6; color: #8d4858; font-size: 23rpx; line-height: 1.6; }
 .topic-retry { width: 100%; margin: 12rpx 0 0; border: 1rpx solid #d6b9c1; background: #fff; color: #8c4056; font-size: 23rpx; }
 .topic-retry::after { border: 0; }
+
+/* Restrained redesign */
+.primary-button { min-height: 88rpx; }
+.intro-card { padding: 32rpx; border: 1rpx solid #E4E6E8; border-radius: 28rpx; background: #F6ECEF; box-shadow: none; }
+.access-title, .offering-title, .field-label, .small { color: #202124; font-weight: 700; }
+.offering-card { border: 1rpx solid #E4E6E8; background: #FFFFFF; }
+.status-chip { border-radius: 999rpx; }
+.status-chip.active { background: #EDF6F1; color: #2F6B55; }
+.status-chip.paused { background: #F1F2F3; color: #646970; }
+.description { color: #202124; }
+.topic-line, .catalog-pagination, .field-hint, .close-button { color: #8A9098; }
+.plain-button, .availability-button, .topic-retry { min-height: 72rpx; border: 1rpx solid #D7BEC6; border-radius: 14rpx; background: #FFFFFF; color: #9B405B; }
+.plain-button[disabled] { border-color: #E4E6E8; background: #F1F2F3; color: #8A9098; }
+.catalog-pagination-error, .form-error, .topic-state-error { border-color: #E8C9CD; background: #FAEEEE; color: #A33D45; }
+.load-more-button, .create-button { min-height: 88rpx; }
+.editor-mask { background: rgba(32, 33, 36, 0.48); }
+.editor-sheet { max-height: 90vh; padding: 32rpx 32rpx calc(40rpx + env(safe-area-inset-bottom)); border-radius: 28rpx 28rpx 0 0; background: #FFFFFF; }
+.editor-tip { background: #FAF4E8; color: #8A6426; }
+input, textarea, .picker { border-color: #E4E6E8; background: #FFFFFF; color: #202124; }
+.mode-button { min-height: 80rpx; border-color: #E4E6E8; background: #FFFFFF; color: #646970; }
+.mode-button.selected, .topic-choice.selected { border-color: #9B405B; background: #F6ECEF; color: #9B405B; }
+.topic-choice { border-color: #E4E6E8; color: #646970; }
+.publish-row { border-color: #E4E6E8; }
+.cancel-button, .save-button { min-height: 88rpx; border-radius: 14rpx; }
+.save-button.button-hover, .primary-button.button-hover { background: #7F3248; }
+.save-button[disabled], .primary-button[disabled], .plain-button[disabled] { opacity: 0.52; }

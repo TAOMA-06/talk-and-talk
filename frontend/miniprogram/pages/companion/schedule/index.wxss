@@ -19,3 +19,20 @@
 .secondary-button { margin-top: 18rpx; background: #edf5fa; color: #3f759b; }
 .empty-title { margin-bottom: 14rpx; color: #4b353a; font-size: 34rpx; font-weight: 700; }
 .retry { margin-top: 28rpx; }
+
+/* Restrained redesign */
+.primary-button { min-height: 88rpx; }
+.hero { padding: 32rpx; border: 1rpx solid #E4E6E8; background: #F6ECEF; box-shadow: none; }
+.eyebrow { color: #9B405B; }
+.hero-title, .section-title, .row-title, .empty-title { color: #202124; font-weight: 700; }
+.hero-copy { color: #646970; }
+.row-note, .empty-card { color: #8A9098; }
+.suspended { border: 1rpx solid #ECDDBD; background: #FAF4E8; color: #8A6426; }
+.inline-error { border: 1rpx solid #E8C9CD; background: #FAEEEE; color: #A33D45; }
+.form-card, .row-card, .draft-control { border: 1rpx solid #E4E6E8; background: #FFFFFF; }
+.picker-field { border: 1rpx solid #E4E6E8; border-radius: 14rpx; background: #FFFFFF; color: #202124; }
+.small-button { min-height: 64rpx; border: 1rpx solid #D7BEC6; border-radius: 14rpx; background: #FFFFFF; color: #9B405B; }
+.small-button.approve { border-color: #BFD9CD; background: #EDF6F1; color: #2F6B55; }
+.secondary-button { min-height: 80rpx; border: 1rpx solid #D7BEC6; border-radius: 14rpx; background: #FFFFFF; color: #9B405B; }
+.primary-button.button-hover { background: #7F3248; }
+.primary-button[disabled], .secondary-button[disabled], .small-button[disabled] { opacity: 0.52; }

@@ -67,3 +67,37 @@
 .community-button { width: 100%; margin-top: 16rpx; border: 1rpx solid #ddc8ce; background: #fff; color: #8a4358; font-size: 24rpx; }
 .retry-button { width: 100%; margin-top: 16rpx; border: 1rpx solid #ddc8ce; background: #fff; color: #8a4358; font-size: 23rpx; }
 .hero-button::after, .hero-link::after, .community-button::after, .retry-button::after, .public-action::after, .wechat-complaint-retry::after, .wechat-complaint-order-link::after { border: 0; }
+
+/* Restrained redesign */
+.support-hero { padding: 32rpx; border: 1rpx solid #E4E6E8; background: #F6ECEF; }
+.hero-kicker { color: #9B405B; }
+.hero-title, .section-title, .public-operator, .wechat-complaint-heading, .case-title { color: #202124; font-weight: 700; }
+.hero-copy, .public-support-copy, .public-meta, .wechat-complaint-copy, .wechat-complaint-state, .case-summary { color: #646970; }
+.hero-button, .hero-link { min-height: 88rpx; border-radius: 14rpx; }
+.hero-button { background: #9B405B; color: #FFFFFF; }
+.hero-link { border-color: #D7BEC6; background: #FFFFFF; color: #9B405B; }
+.public-support-card, .wechat-complaint-card, .form-card { border: 1rpx solid #E4E6E8; background: #FFFFFF; }
+.public-badge, .wechat-complaint-heading text:last-child { border-radius: 999rpx; background: #EDF6F1; color: #2F6B55; }
+.public-action { min-height: 80rpx; border-color: #C8D8E1; border-radius: 14rpx; background: #EEF3F6; color: #3F647A; }
+.emergency-boundary { background: #FAEEEE; color: #A33D45; }
+.public-support-error, .wechat-complaint-error, .catalog-pagination-error { color: #A33D45; }
+.wechat-complaint-boundary, .order-link, .receipt-note { background: #F1F2F3; color: #646970; }
+.wechat-complaint-retry, .wechat-complaint-order-link { min-height: 80rpx; border-color: #C8D8E1; border-radius: 14rpx; background: #EEF3F6; color: #3F647A; }
+.wechat-complaint-item { border-color: #E4E6E8; background: #FFFFFF; }
+.wechat-complaint-status { background: #F1F2F3; color: #646970; }
+.wechat-complaint-waiting { background: #FAF4E8; color: #8A6426; }
+.wechat-complaint-active { background: #EEF3F6; color: #3F647A; }
+.wechat-complaint-resolved { background: #EDF6F1; color: #2F6B55; }
+.wechat-complaint-attention { background: #FAEEEE; color: #A33D45; }
+.wechat-complaint-order, .wechat-complaint-meta, .case-kind, .case-meta, .section-hint { color: #8A9098; }
+.picker, .form-input, .form-textarea { border-color: #E4E6E8; background: #FFFFFF; color: #202124; }
+.submit-button { min-height: 88rpx; border-radius: 14rpx; }
+.partial-warning { border-left-color: #8A6426; background: #FAF4E8; color: #8A6426; }
+.case-card { border: 1rpx solid #E4E6E8; border-left: 6rpx solid #3F647A; background: #FFFFFF; box-shadow: none; }
+.case-resolved { border-left-color: #2F6B55; }
+.case-attention { border-left-color: #A33D45; }
+.case-status, .pagination-row button, .community-button, .retry-button { color: #9B405B; }
+.pagination-row, .receipt-row { color: #646970; }
+.pagination-row button, .community-button, .retry-button { min-height: 80rpx; border-color: #D7BEC6; border-radius: 14rpx; background: #FFFFFF; }
+.hero-button.button-hover { background: #7F3248; }
+.hero-button[disabled], .submit-button[disabled], .public-action[disabled] { opacity: 0.52; }

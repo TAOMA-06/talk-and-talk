@@ -94,7 +94,7 @@
 
       <view class="publish-row">
         <view><view class="field-label compact-label">立即上架</view><view class="field-hint">关闭则保存为草稿，客户不可见。</view></view>
-        <switch checked="{{formActive}}" color="#B94A68" bindchange="setFormActive" aria-label="{{formActive ? '停用' : '启用'}}当前服务商品" />
+        <switch checked="{{formActive}}" color="#9B405B" bindchange="setFormActive" aria-label="{{formActive ? '停用' : '启用'}}当前服务商品" />
       </view>
 
       <view wx:if="{{formError}}" class="form-error">{{formError}}</view>

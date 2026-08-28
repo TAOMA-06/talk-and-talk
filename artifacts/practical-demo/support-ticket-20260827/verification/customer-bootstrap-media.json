@@ -1,0 +1,15 @@
+{
+  "generatedAt": "2026-08-27T10:32:06.089Z",
+  "authBridge": "development phone login injected into the local WeChat DevTools runtime",
+  "user": {
+    "id": "4ece3e02-0d97-4bf7-a8d4-335c1015939a",
+    "role": "user"
+  },
+  "legalConsent": {
+    "receiptId": "13818dc3-f040-40ab-92ea-e6976f3b0ae7",
+    "version": "2.2-2026-08-01",
+    "recorded": true
+  },
+  "secretsPersistedInArtifact": false,
+  "runtimeSessionPath": "outside artifact under /private/tmp (removed during cleanup)"
+}

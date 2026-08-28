@@ -56,3 +56,56 @@
 .order-meta { color: #9c858c; font-size: 21rpx; text-align: center; }
 .retry-button { margin-top: 24rpx; background: #b94a68; color: #fff; font-size: 25rpx; }
 .secondary-button::after, .danger-button::after, .safety-button::after, .retry-button::after, .payment-dispute-guide::after, .resource-retry::after, .refund-policy-link::after { border: 0; }
+
+/* Shared transaction hierarchy */
+.order-detail-page { padding-bottom: calc(64rpx + env(safe-area-inset-bottom)); }
+.status-hero { margin-bottom: 24rpx; padding: 32rpx; border: 1rpx solid #e3cbd2; border-left: 8rpx solid #9b405b; border-radius: 28rpx; background: #f6ecef; }
+.status-pending { border-color: #eadfca; border-left-color: #8a6426; background: #faf4e8; }
+.status-paid, .status-inService, .status-completed { border-color: #cee3d7; border-left-color: #2f6b55; background: #edf6f1; }
+.status-cancelled, .status-refunded { border-color: #e4e6e8; border-left-color: #646970; background: #f1f2f3; }
+.status-kicker { color: #646970; font-size: 22rpx; line-height: 1.55; word-break: break-all; }
+.status-title { margin-top: 10rpx; color: #202124; font-size: 42rpx; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
+.status-copy { margin-top: 14rpx; color: #3f4247; font-size: 25rpx; line-height: 1.7; overflow-wrap: anywhere; }
+.section-title { margin-bottom: 16rpx; color: #202124; font-size: 30rpx; font-weight: 700; }
+.detail-row { color: #3f4247; border-bottom-color: #e4e6e8; }
+.detail-row text:first-child { color: #646970; }
+.detail-row text:last-child { min-width: 0; color: #202124; overflow-wrap: anywhere; }
+.detail-row.total text:last-child { color: #9b405b; font-weight: 700; }
+.snapshot-note { color: #646970; font-size: 23rpx; overflow-wrap: anywhere; }
+.refund-policy-card { border-color: #e3cbd2; border-left: 6rpx solid #9b405b; background: #ffffff; }
+.refund-policy-copy, .refund-copy { color: #3f4247; overflow-wrap: anywhere; }
+.refund-policy-error, .payment-dispute-error, .timeline-resource-error { border-left-color: #a33d45; background: #faeeee; color: #a33d45; }
+.refund-policy-link, .resource-retry { min-height: 88rpx; border-color: #d8b7c1; background: #ffffff; color: #9b405b; }
+.refund-card { border-left-color: #8a6426; background: #faf4e8; }
+.payment-dispute-card { border-color: #d7e2e8; border-left: 6rpx solid #3f647a; background: #ffffff; }
+.payment-dispute-heading > view:first-child, .attendance-dispute-heading > view:first-child { min-width: 0; flex: 1; }
+.payment-dispute-kicker { color: #646970; font-size: 21rpx; }
+.payment-dispute-badge { border: 1rpx solid #e4e6e8; background: #f1f2f3; color: #3f4247; font-weight: 700; overflow-wrap: anywhere; }
+.payment-dispute-waiting { border-color: #eadfca; background: #faf4e8; color: #8a6426; }
+.payment-dispute-active { border-color: #d7e2e8; background: #eef3f6; color: #3f647a; }
+.payment-dispute-resolved { border-color: #cee3d7; background: #edf6f1; color: #2f6b55; }
+.payment-dispute-attention { border-color: #efcdd0; background: #faeeee; color: #a33d45; }
+.payment-dispute-copy, .payment-dispute-summary { color: #3f4247; overflow-wrap: anywhere; }
+.timeline-resource-state { color: #646970; }
+.payment-dispute-boundary { border: 1rpx solid #d7e2e8; background: #eef3f6; color: #3f647a; }
+.payment-dispute-guide { min-height: 88rpx; border-color: #bdd0da; background: #ffffff; color: #3f647a; }
+.attendance-dispute-card { border-color: #eadfca; border-left: 6rpx solid #8a6426; background: #ffffff; }
+.attendance-dispute-copy { color: #646970; overflow-wrap: anywhere; }
+.attendance-dispute-badge { border: 1rpx solid #eadfca; background: #faf4e8; color: #8a6426; font-weight: 700; }
+.action-card { border-color: #e3cbd2; background: #ffffff; }
+.replacement-notice { border: 1rpx solid #d7e2e8; border-left: 6rpx solid #3f647a; border-radius: 14rpx; background: #eef3f6; }
+.replacement-title { color: #202124; font-weight: 700; }
+.replacement-copy { color: #646970; overflow-wrap: anywhere; }
+.replacement-action { min-height: 88rpx; border-color: #bdd0da; color: #3f647a; }
+.action-button { min-height: 88rpx; margin-top: 16rpx; }
+.service-action-notice { border: 1rpx solid #e4e6e8; background: #f1f2f3; color: #646970; overflow-wrap: anywhere; }
+.secondary-button { border-color: #d8b7c1; color: #9b405b; }
+.danger-button { border-color: #efcdd0; background: #faeeee; color: #a33d45; }
+.safety-button { border-color: #a33d45; background: #a33d45; color: #ffffff; }
+.timeline-dot { border-color: #f6ecef; background: #9b405b; }
+.timeline-copy { border-bottom-color: #e4e6e8; }
+.timeline-heading { color: #202124; }
+.timeline-heading text:last-child { color: #8a9098; }
+.timeline-description { color: #646970; overflow-wrap: anywhere; }
+.order-meta { color: #8a9098; }
+.retry-button { min-height: 88rpx; border-color: #9b405b; background: #9b405b; color: #ffffff; }

@@ -28,3 +28,26 @@
 .secondary-button { margin-top: 18rpx; background: #eef5f0; color: #3b7650; }
 .empty-title { margin-bottom: 14rpx; color: #4b353a; font-size: 34rpx; font-weight: 700; }
 .retry { margin-top: 28rpx; }
+
+/* Restrained redesign */
+.page { padding-bottom: 48rpx; padding-bottom: calc(48rpx + constant(safe-area-inset-bottom)); padding-bottom: calc(48rpx + env(safe-area-inset-bottom)); }
+.primary-button { min-height: 88rpx; }
+.hero { padding: 32rpx; border: 1rpx solid #E4E6E8; background: #F6ECEF; box-shadow: none; }
+.eyebrow, .link { color: #9B405B; }
+.hero-title, .section-title, .amount, .selection-value, .empty-title { color: #202124; font-weight: 700; }
+.hero-copy, .meta, .fee, .recipient, .selection-label, .empty-card { color: #646970; }
+.source { color: #8A9098; }
+.blocked, .hold { border: 1rpx solid #ECDDBD; background: #FAF4E8; color: #8A6426; }
+.inline-error, .rejection { border: 1rpx solid #E8C9CD; background: #FAEEEE; color: #A33D45; }
+.earning-card, .withdrawal-card { border: 1rpx solid #E4E6E8; background: #FFFFFF; }
+.earning-card.selected { border-color: #9B405B; background: #F6ECEF; }
+.check { color: #9B405B; }
+.status { background: #F1F2F3; color: #646970; }
+.status-held, .status-card-rejected .status { background: #FAEEEE; color: #A33D45; }
+.status-paid, .status-card-paid .status { background: #EDF6F1; color: #2F6B55; }
+.selection-bar { position: static; z-index: auto; bottom: auto; border: 1rpx solid #E4E6E8; border-radius: 20rpx; background: #FFFFFF; box-shadow: none; }
+.request-button { min-height: 88rpx; }
+.next-step { background: #EEF3F6; color: #3F647A; }
+.secondary-button { min-height: 80rpx; border: 1rpx solid #D7BEC6; border-radius: 14rpx; background: #FFFFFF; color: #9B405B; }
+.primary-button.button-hover { background: #7F3248; }
+.primary-button[disabled], .secondary-button[disabled] { opacity: 0.52; }

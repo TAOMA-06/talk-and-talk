@@ -28,3 +28,23 @@
 .evidence-action, .evidence-chip, .evidence-remove { margin: 0; }
 .evidence-list { display: flex; flex-wrap: wrap; gap: 10rpx; margin-top: 12rpx; }
 .evidence-draft { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; padding: 14rpx 16rpx; margin: 10rpx 0; border-radius: 14rpx; background: #f5f1ef; font-size: 24rpx; }
+
+/* Restrained redesign */
+.case-hero { padding: 32rpx; border: 1rpx solid #E4E6E8; border-radius: 28rpx; }
+.safety-hero { border-color: #E8C9CD; background: #FAEEEE; }
+.support-hero { border-color: #C8D8E1; background: #EEF3F6; }
+.hero-kicker { color: #9B405B; }
+.hero-title, .section-title { color: #202124; font-weight: 700; }
+.hero-copy, .detail-row, .privacy-note, .closed-note, .case-body, .follow-up-text { color: #646970; }
+.submitted-summary { border-color: #E4E6E8; background: #F7F7F5; }
+.detail-label, .detail-row text:first-child, .follow-up-time, .resolution-code { color: #8A9098; }
+.submitted-summary-copy { color: #202124; }
+.detail-row, .follow-up { border-color: #E4E6E8; }
+.privacy-note, .closed-note, .evidence-draft { background: #F1F2F3; }
+.follow-up-input { border-color: #E4E6E8; background: #FFFFFF; color: #202124; }
+.full-button, .retry-button { min-height: 88rpx; border-radius: 14rpx; }
+.order-button, .center-button { min-height: 80rpx; border-color: #D7BEC6; border-radius: 14rpx; background: #FFFFFF; color: #9B405B; }
+.resolution-card { border-left-color: #2F6B55; background: #EDF6F1; }
+.retry-button { background: #9B405B; color: #FFFFFF; }
+.retry-button.button-hover { background: #7F3248; }
+.retry-button[disabled], .full-button[disabled] { opacity: 0.52; }
