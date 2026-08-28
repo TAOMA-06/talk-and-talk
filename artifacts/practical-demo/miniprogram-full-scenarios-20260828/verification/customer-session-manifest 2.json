@@ -1,0 +1,22 @@
+{
+  "generatedAt": "2026-08-27T17:15:35.036Z",
+  "authBridge": "development phone login for local Developer Tools only",
+  "user": {
+    "id": "d643f151-c773-44d1-a8d8-dc13a9552e19",
+    "role": "user"
+  },
+  "legalConsent": {
+    "receiptId": "a09cda83-0ce5-4f9e-be8f-216f1fb49abe",
+    "version": "2.2-2026-08-01",
+    "recorded": true
+  },
+  "devtoolsStorageKeys": [
+    "talkandtalk.accessToken",
+    "talkandtalk.refreshToken",
+    "talkandtalk.user",
+    "talkandtalk.legalConsent"
+  ],
+  "secretsPersistedInArtifact": false,
+  "runtimeSessionPath": "outside artifact under /private/tmp",
+  "runtimeStoragePayloadPath": "outside artifact under /private/tmp"
+}

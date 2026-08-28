@@ -1,0 +1,208 @@
+# This Compose file is consumed only by run-migration-compatibility.mjs with
+# `docker compose --env-file /dev/null`. Its runtime env_file is a newly written
+# 0600 file in a runner-owned temporary directory, never a repository .env.
+# All images must already be local, immutable digest references; pull_policy
+# and the runner both reject implicit network pulls. This harness intentionally
+# starts from a fresh schema: it does not claim historical-data migration
+# semantics or accept an arbitrary fixture image as evidence for them.
+x-migration-compatibility-labels: &migration-compatibility-labels
+  io.talkandtalk.migration-compatibility.run-id: "${MIGRATION_RUN_ID:?MIGRATION_RUN_ID must be set}"
+  io.talkandtalk.migration-compatibility.ownership-marker-sha256: "${MIGRATION_OWNERSHIP_MARKER_SHA256:?MIGRATION_OWNERSHIP_MARKER_SHA256 must be set}"
+
+services:
+  postgres:
+    image: "${MIGRATION_POSTGRES_IMAGE:?MIGRATION_POSTGRES_IMAGE must be set}"
+    pull_policy: never
+    environment:
+      POSTGRES_DB: "${MIGRATION_DATABASE_NAME:?MIGRATION_DATABASE_NAME must be set}"
+      POSTGRES_PASSWORD: talk
+      POSTGRES_USER: talk
+    networks: [migration-internal]
+    restart: "no"
+    volumes: ["postgres-data:/var/lib/postgresql/data"]
+    labels: *migration-compatibility-labels
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U talk -d $${POSTGRES_DB}"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  redis:
+    image: "${MIGRATION_REDIS_IMAGE:?MIGRATION_REDIS_IMAGE must be set}"
+    pull_policy: never
+    networks: [migration-internal]
+    restart: "no"
+    volumes: ["redis-data:/data"]
+    labels: *migration-compatibility-labels
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  previous-migrate:
+    image: "${MIGRATION_PREVIOUS_IMAGE:?MIGRATION_PREVIOUS_IMAGE must be set}"
+    pull_policy: never
+    entrypoint: ["/app/node_modules/.bin/prisma"]
+    command: ["migrate", "deploy"]
+    env_file: "${MIGRATION_RUNTIME_ENV_FILE:?MIGRATION_RUNTIME_ENV_FILE must be set}"
+    networks: [migration-internal]
+    labels: *migration-compatibility-labels
+    restart: "no"
+    user: "node"
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=64m"]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    pids_limit: 256
+    mem_limit: 512m
+    cpus: "1.0"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  candidate-migrate:
+    image: "${MIGRATION_CANDIDATE_IMAGE:?MIGRATION_CANDIDATE_IMAGE must be set}"
+    pull_policy: never
+    entrypoint: ["/app/node_modules/.bin/prisma"]
+    command: ["migrate", "deploy"]
+    env_file: "${MIGRATION_RUNTIME_ENV_FILE:?MIGRATION_RUNTIME_ENV_FILE must be set}"
+    networks: [migration-internal]
+    labels: *migration-compatibility-labels
+    restart: "no"
+    user: "node"
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=64m"]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    pids_limit: 256
+    mem_limit: 512m
+    cpus: "1.0"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  candidate-migrate-status:
+    image: "${MIGRATION_CANDIDATE_IMAGE:?MIGRATION_CANDIDATE_IMAGE must be set}"
+    pull_policy: never
+    entrypoint: ["/app/node_modules/.bin/prisma"]
+    command: ["migrate", "status"]
+    env_file: "${MIGRATION_RUNTIME_ENV_FILE:?MIGRATION_RUNTIME_ENV_FILE must be set}"
+    networks: [migration-internal]
+    labels: *migration-compatibility-labels
+    restart: "no"
+    user: "node"
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=64m"]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    pids_limit: 256
+    mem_limit: 512m
+    cpus: "1.0"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # This service intentionally uses the previous artifact's normal production
+  # entrypoint before candidate migration, simulating the still-running older
+  # replica during a rolling forward upgrade.
+  previous-api:
+    image: "${MIGRATION_PREVIOUS_IMAGE:?MIGRATION_PREVIOUS_IMAGE must be set}"
+    pull_policy: never
+    env_file: "${MIGRATION_RUNTIME_ENV_FILE:?MIGRATION_RUNTIME_ENV_FILE must be set}"
+    networks: [migration-internal]
+    labels: *migration-compatibility-labels
+    restart: "no"
+    user: "node"
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=64m"]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    pids_limit: 256
+    mem_limit: 768m
+    cpus: "1.0"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS -H \"Authorization: Bearer $${METRICS_TOKEN}\" http://127.0.0.1:3000/api/v1/health/ready >/dev/null"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # The old entrypoint correctly rejects a database that is ahead of its own
+  # migration directory. This service deliberately bypasses only that entrypoint
+  # after candidate migration to test the old compiled API binary itself; it is
+  # not a production-entrypoint or rollback claim.
+  previous-api-compatible:
+    image: "${MIGRATION_PREVIOUS_IMAGE:?MIGRATION_PREVIOUS_IMAGE must be set}"
+    pull_policy: never
+    entrypoint: ["/usr/local/bin/node"]
+    command: ["dist/src/main.js"]
+    env_file: "${MIGRATION_RUNTIME_ENV_FILE:?MIGRATION_RUNTIME_ENV_FILE must be set}"
+    networks: [migration-internal]
+    labels: *migration-compatibility-labels
+    restart: "no"
+    user: "node"
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=64m"]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    pids_limit: 256
+    mem_limit: 768m
+    cpus: "1.0"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS -H \"Authorization: Bearer $${METRICS_TOKEN}\" http://127.0.0.1:3000/api/v1/health/ready >/dev/null"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  candidate-api:
+    image: "${MIGRATION_CANDIDATE_IMAGE:?MIGRATION_CANDIDATE_IMAGE must be set}"
+    pull_policy: never
+    env_file: "${MIGRATION_RUNTIME_ENV_FILE:?MIGRATION_RUNTIME_ENV_FILE must be set}"
+    networks: [migration-internal]
+    labels: *migration-compatibility-labels
+    restart: "no"
+    user: "node"
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=64m"]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    pids_limit: 256
+    mem_limit: 768m
+    cpus: "1.0"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS -H \"Authorization: Bearer $${METRICS_TOKEN}\" http://127.0.0.1:3000/api/v1/health/ready >/dev/null"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+networks:
+  migration-internal:
+    internal: true
+    labels: *migration-compatibility-labels
+
+volumes:
+  postgres-data:
+    labels: *migration-compatibility-labels
+  redis-data:
+    labels: *migration-compatibility-labels

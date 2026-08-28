@@ -1,0 +1,454 @@
+
+> talk-and-talk-api@0.1.0 start
+> node dist/src/main.js
+
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [NestFactory] Starting Nest application...
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [InstanceLoader] PassportModule dependencies initialized +9ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [InstanceLoader] ConfigHostModule dependencies initialized +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [InstanceLoader] JwtModule dependencies initialized +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [InstanceLoader] JwtModule dependencies initialized +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [InstanceLoader] ConfigModule dependencies initialized +15ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [InstanceLoader] ConfigModule dependencies initialized +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [InstanceLoader] AppModule dependencies initialized +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [InstanceLoader] DatabaseModule dependencies initialized +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [InstanceLoader] SmsModule dependencies initialized +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [InstanceLoader] MetricsModule dependencies initialized +1ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [InstanceLoader] AuditModule dependencies initialized +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [InstanceLoader] HealthModule dependencies initialized +1ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [InstanceLoader] VoiceModule dependencies initialized +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [InstanceLoader] CrisisInterventionModule dependencies initialized +1ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [InstanceLoader] LegalModule dependencies initialized +1ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [InstanceLoader] NotificationsModule dependencies initialized +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [InstanceLoader] AuthModule dependencies initialized +4ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [InstanceLoader] ReviewModule dependencies initialized +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [InstanceLoader] CommunityModule dependencies initialized +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [InstanceLoader] ReviewsModule dependencies initialized +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [InstanceLoader] FavoritesModule dependencies initialized +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [InstanceLoader] CompanionsModule dependencies initialized +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [InstanceLoader] UsersModule dependencies initialized +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [InstanceLoader] ModerationModule dependencies initialized +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [InstanceLoader] AdminModule dependencies initialized +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [InstanceLoader] RecommendationsModule dependencies initialized +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [InstanceLoader] AccountGovernanceModule dependencies initialized +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [InstanceLoader] ConversationsModule dependencies initialized +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [InstanceLoader] AttendanceDisputesModule dependencies initialized +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [InstanceLoader] SupportModule dependencies initialized +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [InstanceLoader] PaymentsModule dependencies initialized +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [InstanceLoader] CommercialModule dependencies initialized +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [InstanceLoader] OrdersModule dependencies initialized +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RoutesResolver] AuthController {/api/v1/auth}: +4ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/auth/sms/send-code, POST} route +1ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/auth/phone/login, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/auth/staff/login, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/auth/apple, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/auth/wechat/mini-program, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/auth/wechat/mini-program/status, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/auth/refresh, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/auth/logout, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RoutesResolver] AccountGovernanceController {/api/v1/me}: +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/me/account-actions, GET} route +1ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/me/account-actions/:id/appeals, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/me/account-actions/:id/appeal-evidence-uploads, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/me/account-actions/:id/appeal-evidence-uploads/:assetId/complete, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/me/account-actions/:id/appeal-evidence-uploads/:assetId, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/me/account-actions/:id/appeal-evidence-attachments/:attachmentId/read-url, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/me/sessions, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/me/sessions, DELETE} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/me/sessions/:id, DELETE} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/me/data-rights, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/me/data-rights, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/me/data-rights/:id/follow-ups, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/me/invoice-requests, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/me/invoice-requests/eligible-orders, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/me/invoice-requests, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/me/invoice-requests/:id/cancel, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RoutesResolver] AccountGovernanceAdminController {/api/v1/admin/account-governance}: +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/account-governance/account-appeals, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/account-governance/account-appeals/:id/claim, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/account-governance/account-appeals/:id/assign, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/account-governance/account-appeals/:id/resolve, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/account-governance/data-rights, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/account-governance/data-rights/claimable, GET} route +1ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/account-governance/data-rights/:id/claim, PATCH} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/account-governance/data-rights/:id/status, PATCH} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/account-governance/invoice-requests, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/account-governance/invoice-requests/:id/status, PATCH} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RoutesResolver] DataExportDeliveryController {/api/v1/me/data-rights}: +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/me/data-rights/:id/export, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RoutesResolver] ModerationController {/api/v1/moderation}: +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/moderation/status, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/moderation/check, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/moderation/reports, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/moderation/reports/me, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/moderation/reports/:id, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/moderation/reports/:id/follow-ups, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/moderation/appeals, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/moderation/appeals/me, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/moderation/appeals/eligible, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/moderation/cases, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RoutesResolver] ControlledCaseEvidenceController {/api/v1}: +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/support/tickets/:id/evidence-uploads, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/attendance-disputes/:id/evidence-uploads, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/commercial/companion/incident-evidence-uploads, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/case-evidence/uploads/:assetId/complete, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/case-evidence/uploads/:assetId, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/case-evidence/attachments/:attachmentId/read-url, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RoutesResolver] CrisisInterventionController {/api/v1/crisis}: +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/crisis/resources, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/crisis/readiness, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/crisis/interventions, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/crisis/interventions/active, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/crisis/interventions/:id, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/crisis/interventions/:id/resource-view-completions, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RoutesResolver] NotificationsController {/api/v1/notifications}: +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/notifications/status, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/notifications, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/notifications/unread-count, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/notifications/subscription-templates, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/notifications/channels/availability-reminder, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/notifications/subscription-grants, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/notifications/read-all, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/notifications/:id/read, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RoutesResolver] AttendanceDisputesController {/api/v1}: +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/attendance-disputes/policy, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/callbacks/trtc/room-events, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/orders/:orderId/attendance-events, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/orders/:orderId/attendance-disputes, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/orders/:orderId/attendance-disputes/me, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/attendance-disputes/mine, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/attendance-disputes/:id, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/attendance-disputes/:id/evidence-completion, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/attendance-disputes/:id/statements, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/attendance-disputes/:id/appeals, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RoutesResolver] AdminAttendanceDisputesController {/api/v1/admin/commercial/attendance-disputes}: +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/attendance-disputes, GET} route +1ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/attendance-disputes/claimable, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/attendance-disputes/:id, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/attendance-disputes/:id/claims, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/attendance-disputes/:id/decisions, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/attendance-disputes/:id/appeal-claims, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/attendance-disputes/:id/finalizations, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RoutesResolver] CommercialController {/api/v1/commercial}: +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/commercial/earnings/me, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RoutesResolver] CompanionLifecycleController {/api/v1/commercial/companion}: +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/commercial/companion/overview, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/commercial/companion/profile, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/commercial/companion/profile/submissions, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/commercial/companion/training, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/commercial/companion/training/attempts, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/commercial/companion/quality, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/commercial/companion/actions, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/commercial/companion/actions/:id/appeals, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/commercial/companion/actions/:id/appeal-evidence-uploads, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/commercial/companion/actions/:id/appeal-evidence-uploads/:assetId/complete, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/commercial/companion/actions/:id/appeal-evidence-uploads/:assetId, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/commercial/companion/incidents, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/commercial/companion/incidents, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/commercial/companion/withdrawals, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/commercial/companion/withdrawals, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/commercial/companion/withdrawals/:id/cancel, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RoutesResolver] CompanionLifecycleAdminController {/api/v1/admin/commercial/companion-lifecycle}: +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/actions, POST} route +1ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/actions/:id/reactivation, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/appeals/:id/resolution, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/appeals/claimable, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/appeals/:id/claims, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/appeals/:id/assignments, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/appeals/:id/reactivation, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/appeals, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/voice-intros, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/companions/:id/voice-intro-read, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/companions/:id/voice-intro-review, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/training, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/review-due, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/actions, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/incidents, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/incidents/claimable, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/incidents/:id, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/incidents/:id/claims, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/incidents/:id/assignments, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/incidents/:id/status, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/withdrawals, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companion-lifecycle/withdrawals/:id/status, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RoutesResolver] AvailabilityReminderOperationsController {/api/v1/admin/commercial/availability-reminders}: +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/availability-reminders/readiness, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/availability-reminders/fanout-jobs/:id/retry, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/availability-reminders/preparation-candidates/:id/retry, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/availability-reminders/reservation-handoffs/:id/retry, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/availability-reminders/delivery-attempts/:id/retry, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/availability-reminders/terminal-attempts/:id/resolve, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RoutesResolver] FavoritesController {/api/v1/favorites/companions}: +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/favorites/companions, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/favorites/companions/:id/status, GET} route +1ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/favorites/companions/:id, PUT} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/favorites/companions/:id/availability-reminder, PUT} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/favorites/companions/:id, DELETE} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RoutesResolver] RecentlyViewedCompanionsController {/api/v1/recently-viewed/companions}: +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/recently-viewed/companions, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/recently-viewed/companions/:id, PUT} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/recently-viewed/companions, DELETE} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RoutesResolver] PaymentsController {/api/v1/payments}: +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/payments/status, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/payments/wechat/notify, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/payments/wechat/refund-notify, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/payments/refunds/:id/approve, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/payments/refunds/review-queue, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/payments/refunds/:id/claim, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/payments/refunds/:id/reject, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/payments/refunds/:id/retry, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/payments/refunds/:id/sync, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/payments/wechat/mock-notify, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RoutesResolver] PaymentDisputesController {/api/v1/payments}: +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/payments/wechat/complaint-notify, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/payments/disputes/me, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/payments/disputes/by-order/:orderId, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/payments/disputes/:id, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RoutesResolver] AdminPaymentDisputesController {/api/v1/admin/commercial/payment-disputes}: +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-disputes, GET} route +1ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-disputes/:id, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-disputes/:id/evidence/:resource, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-disputes/:id/claims, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-disputes/:id/assignments, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-disputes/:id/replies, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-disputes/:id/completions, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-disputes/:id/sync, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RoutesResolver] OrdersController {/api/v1/orders}: +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/orders/status, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/orders, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/orders, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/orders/service, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/orders/service/today, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/orders/:id/timeline, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/orders/:id/voice-room/access, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/orders/:id/reschedule-requests, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/orders/:id/reschedule-requests/:requestId/accept, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/orders/:id/reschedule-requests/:requestId/reject, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/orders/service/:id/start, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/orders/service/:id/confirm, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/orders/service/:id/reject, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/orders/service/:id/complete, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/orders/:id, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/orders/:id/cancel, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/orders/:id/completion-confirmations, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/orders/:id/service-guidelines-confirmations, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/orders/:id/experience-feedback, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/orders/:id/prepay, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/orders/:id/payment/sync, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/orders/:id/refund, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/orders/:id/refund/sync, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RoutesResolver] RecommendationsController {/api/v1/recommendations}: +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/recommendations/topics, GET} route +1ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/recommendations/me/preferences, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/recommendations/me/preferences, PATCH} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/recommendations/me/tags/:id, DELETE} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/recommendations/me/companion-exclusions, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/recommendations/me/companion-exclusions/:id, PUT} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/recommendations/me/companion-exclusions/:id, DELETE} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/recommendations/companions, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/recommendations/events, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RoutesResolver] AdminRecommendationsController {/api/v1/admin/recommendations}: +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/recommendations/metrics, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/recommendations/companions/:id/policies/:placement, PATCH} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RoutesResolver] CompanionsController {/api/v1/companions}: +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/companions/status, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/companions, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/companions/me/profile, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/companions/me/application, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/companions/me/profile, PATCH} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/companions/me/service-offerings, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/companions/me/service-offerings, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/companions/me/service-offerings/:id, PATCH} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/companions/me/availability-windows, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/companions/me/availability-windows, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/companions/me/availability-windows/:id, PATCH} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/companions/me/availability-schedule/rules, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/companions/me/availability-schedule/rules, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/companions/me/availability-schedule/rules/:id/deactivate, PATCH} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/companions/me/availability-schedule/blackouts, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/companions/me/availability-schedule/blackouts, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/companions/me/availability-schedule/blackouts/:id/deactivate, PATCH} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/companions/me/availability-schedule/drafts, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/companions/me/availability-schedule/drafts/materialize, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/companions/me/availability-schedule/drafts/:id/activate, PATCH} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/companions/:id/service-offerings, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/companions/:id/availability, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/companions/:id, GET} route +1ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RoutesResolver] UsersController {/api/v1/users}: +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/users/me, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/users/me/legal-consents, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/users/me/legal-consents, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/users/me/legal-consents/current, DELETE} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RoutesResolver] MeController {/api/v1}: +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/me, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/me, PATCH} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/me/adult-eligibility, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/me/adult-eligibility/submissions, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/me/deletion-request, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/me/deletion-request, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/me/deletion-request/cancel, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RoutesResolver] LegalController {/api/v1/legal}: +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/legal/terms, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/legal/privacy, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/legal/platform-rules, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/legal/:document/versions/:version, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RoutesResolver] DataRetentionLegalHoldController {/api/v1/admin/data-retention}: +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/data-retention/legal-hold-policy, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/data-retention/records, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/data-retention/records/:retentionRecordId/legal-holds, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/data-retention/records/:retentionRecordId/legal-hold-placement-requests, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/data-retention/legal-holds/:legalHoldId/release-requests, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/data-retention/legal-hold-actions/:actionId/approvals, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/data-retention/legal-hold-actions/:actionId/rejections, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RoutesResolver] CommunityController {/api/v1/community/posts}: +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/community/posts, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/community/posts, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/community/posts/:id/report, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/community/posts/:id/like, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RoutesResolver] CommunityReportsController {/api/v1/community/reports}: +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/community/reports/mine, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RoutesResolver] ConversationsController {/api/v1/conversations}: +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/conversations/status, GET} route +1ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/conversations/:id/status, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/conversations, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/conversations/summary, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/conversations/:id/notification-preference, PUT} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/conversations/:id/block, PUT} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/conversations/:id/future-booking-boundary, PUT} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/conversations/:id/messages, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/conversations/:id/messages, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/conversations/:id/media-uploads, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/conversations/:id/media-uploads/:assetId/complete, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RoutesResolver] ReviewsController {/api/v1/reviews}: +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/reviews/companion/:id, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/reviews/orders/:orderId/me, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/reviews, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RoutesResolver] PublicSupportController {/api/v1/support}: +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/support/public-info, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RoutesResolver] SupportController {/api/v1/support}: +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/support/tickets, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/support/tickets/:id/order-facts, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/support/tickets/me, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/support/orders/:orderId/tickets, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/support/tickets/:id, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RoutesResolver] AdminController {/api/v1/admin}: +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/status, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/account-deletions, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/account-deletions/:id/settlement, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/account-deletions/:id/start, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/account-deletions/:id/complete, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/account-deletions/:id/retry, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/account-deletions/:id/orders/:orderId/payment/sync, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/account-deletions/:id/orders/:orderId/refund/sync, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/account-deletions/:id/orders/:orderId/refund/initiate, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/users/:id/account-status, PATCH} route +1ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/users/:id/verification, PATCH} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/identity-verification-requests, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/identity-verification-requests/:id/approve, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/identity-verification-requests/:id/reject, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/customer-adult-eligibility, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/customer-adult-eligibility/:id/adult, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/customer-adult-eligibility/:id/ineligible, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/companions, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/companions, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/companions/:id, PATCH} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/companions/:id/publish, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/companions/:id/unpublish, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RoutesResolver] AdminCommercialController {/api/v1/admin/commercial}: +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/readiness, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/funnel, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/earnings, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companions, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companions/:id/profile-submissions, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companions/:id/profile-verifications, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/companions/:id/profile-suspensions, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/earnings/:id/payout-claims, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/earnings/:id/payout-submissions, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/earnings/:id/payout-cancellations, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/earnings/:id/payout-verifications, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/recoveries, GET} route +1ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/recoveries/:id/evidence, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/recoveries/:id/verify, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/support/tickets, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/support/tickets/:id, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/support/claimable, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/support/tickets/:id/claim, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/support/tickets/:id/assign, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/support/tickets/:id/resolve, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/support/tickets/:id/refunds, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RoutesResolver] AdminPaymentReconciliationController {/api/v1/admin/commercial/payment-reconciliation}: +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-reconciliation/readiness, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-reconciliation/merchant-imports, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-reconciliation/merchant-imports, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-reconciliation/merchant-imports/text, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-reconciliation/merchant-imports/:id/reviews, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-reconciliation/cash-ledger, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-reconciliation/cash-ledger/:id/classifications, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-reconciliation/cash-ledger/classifications/:id/reviews, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-reconciliation/runs, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-reconciliation/runs, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-reconciliation/runs/:id/retry, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-reconciliation/issues, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-reconciliation/issues/:id/claims, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-reconciliation/issues/:id/resolutions, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/commercial/payment-reconciliation/issues/:id/resolution-reviews, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RoutesResolver] AdminOperationsController {/api/v1/admin/operations}: +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/operations/context, GET} route +1ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/operations/orders, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/operations/support/orders, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/operations/users, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/operations/support-assignees, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/operations/audit-logs, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RoutesResolver] AdminStaffController {/api/v1/admin/staff}: +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/staff, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/staff/eligible-successors, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/admin/staff/:userId/suspensions, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RoutesResolver] ReviewAuthController {/api/v1/review/auth}: +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/review/auth/login, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/review/auth/refresh, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/review/auth/logout, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/review/auth/me, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RoutesResolver] ReviewModerationController {/api/v1/review}: +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/review/overview, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/review/cases, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/review/cases/:id, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/review/cases/:id/conversation, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/review/cases/:id/claim, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/review/cases/:id/assignment, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/review/staff, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/review/staff/offboarding, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/review/staff/:id/suspension, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/review/cases/:id/actions, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/review/labels, POST} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/review/labels/export, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RoutesResolver] MetricsController {/api/v1/metrics}: +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/metrics, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RoutesResolver] HealthController {/api/v1/health}: +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/health, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [RouterExplorer] Mapped {/api/v1/health/ready, GET} route +0ms
+[Nest] 78065  - 08/27/2026, 5:20:13 PM     LOG [NestApplication] Nest application successfully started +87ms
+{"level":"info","type":"http_request","requestId":"b8dcaf02-a6c6-49ab-a5c9-a86d5d7a43a4","method":"GET","path":"/api/v1/health","statusCode":200,"durationMs":10}
+[Nest] 78065  - 08/27/2026, 5:20:50 PM     LOG [MockSmsProvider] [MOCK SMS] 139****8271 → ******
+{"level":"info","type":"http_request","requestId":"3d3a0ada-1777-4b37-8d26-b94bbdecf8dd","method":"POST","path":"/api/v1/auth/sms/send-code","statusCode":201,"durationMs":57}
+{"level":"info","type":"http_request","requestId":"1f450369-3675-4834-a819-ebe6909f2b97","method":"POST","path":"/api/v1/auth/phone/login","statusCode":201,"durationMs":71}
+{"level":"info","type":"http_request","requestId":"88c2c846-3a8f-4825-b8da-4a777485dd1e","method":"POST","path":"/api/v1/users/me/legal-consents","statusCode":201,"durationMs":15}
+{"level":"info","type":"http_request","requestId":"cfc219dc-fd13-42d0-a149-65fc6845f02a","method":"GET","path":"/api/v1/health","statusCode":200,"durationMs":4}
+{"level":"info","type":"http_request","requestId":"dfcf38d0-e183-4cb3-b08b-8932f16b7296","method":"GET","path":"/api/v1/health","statusCode":200,"durationMs":1}
+{"level":"info","type":"http_request","requestId":"84c3310c-8b3d-40a1-9d2d-c6150c39d3b6","method":"POST","path":"/api/v1/auth/refresh","statusCode":201,"durationMs":13}
+{"level":"info","type":"http_request","requestId":"633b6d06-dc85-4a69-b73b-b66a7af797bf","method":"POST","path":"/api/v1/auth/refresh","statusCode":201,"durationMs":5}
+{"level":"info","type":"http_request","requestId":"34caa755-3e70-4f73-98a5-daf986489d6e","method":"POST","path":"/api/v1/support/tickets","statusCode":201,"durationMs":15}
+{"level":"info","type":"http_request","requestId":"d53c182d-f5a1-46cb-aa34-df2f13b3e078","method":"POST","path":"/api/v1/auth/refresh","statusCode":201,"durationMs":9}
+{"level":"info","type":"http_request","requestId":"0bb59035-2383-4050-83f7-5118d15ad6be","method":"POST","path":"/api/v1/auth/staff/login","statusCode":201,"durationMs":214}
+{"level":"info","type":"http_request","requestId":"da62f594-a0e8-44b6-ae81-a56d70b71608","method":"POST","path":"/api/v1/auth/staff/login","statusCode":201,"durationMs":198}
+{"level":"info","type":"http_request","requestId":"a8726a22-c123-4fa2-8111-4b334c2ba6db","method":"GET","path":"/api/v1/admin/commercial/support/claimable?page=1&pageSize=50","statusCode":200,"durationMs":12}
+{"level":"warn","type":"http_request","requestId":"9a485e03-381e-455b-b587-c10d1eae0626","method":"GET","path":"/api/v1/admin/commercial/support/tickets/4b88471d-874b-47be-b657-95f33dd03c57","statusCode":404,"durationMs":24}
+{"level":"info","type":"http_request","requestId":"ecfecd06-fb75-4f49-963b-675245771155","method":"GET","path":"/api/v1/support/tickets/4b88471d-874b-47be-b657-95f33dd03c57","statusCode":200,"durationMs":17}
+(node:78065) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+{"level":"info","type":"http_request","requestId":"82b1bf8b-2c31-4549-b447-0437b1d8a4d8","method":"POST","path":"/api/v1/admin/commercial/support/tickets/4b88471d-874b-47be-b657-95f33dd03c57/claim","statusCode":201,"durationMs":27}
+{"level":"info","type":"http_request","requestId":"c85c23d6-3225-41a7-9085-9160d883d036","method":"GET","path":"/api/v1/admin/commercial/support/tickets/4b88471d-874b-47be-b657-95f33dd03c57","statusCode":200,"durationMs":7}
+{"level":"warn","type":"http_request","requestId":"ce2f5f0e-753a-4f26-9eb5-d2700ecae232","method":"GET","path":"/api/v1/admin/commercial/support/tickets/4b88471d-874b-47be-b657-95f33dd03c57","statusCode":404,"durationMs":4}
+{"level":"warn","type":"http_request","requestId":"953e9b30-6afb-4e47-ad5c-c58ddfd7567f","method":"POST","path":"/api/v1/admin/commercial/support/tickets/4b88471d-874b-47be-b657-95f33dd03c57/claim","statusCode":409,"durationMs":5}
+{"level":"info","type":"http_request","requestId":"e6495a80-1427-4e94-a9bc-5c991d20773a","method":"POST","path":"/api/v1/admin/commercial/support/tickets/4b88471d-874b-47be-b657-95f33dd03c57/resolve","statusCode":200,"durationMs":20}
+{"level":"info","type":"http_request","requestId":"461c0dfd-e504-474c-9e42-6542fac99a11","method":"GET","path":"/api/v1/support/tickets/4b88471d-874b-47be-b657-95f33dd03c57","statusCode":200,"durationMs":5}
+{"level":"info","type":"http_request","requestId":"9c2fab4c-8303-4bb0-bbca-de4e0ac45202","method":"GET","path":"/api/v1/notifications?page=1&pageSize=50&unreadOnly=true","statusCode":200,"durationMs":5}
+[Nest] 78065  - 08/27/2026, 6:23:51 PM    WARN [NotificationDeliveryWorker] Notification delivery 58af64a0-809d-4512-8505-8ebb8b36aeb3 failed before send (unknown template).

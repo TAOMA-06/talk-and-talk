@@ -1,0 +1,73 @@
+{
+  "generatedAt": "2026-08-27T10:34:21.261Z",
+  "phase": "preclaim",
+  "driver": "real local NestJS API plus isolated PostgreSQL",
+  "ticket": {
+    "id": "185f79f1-0bf3-4a68-ab50-57fe437d2594",
+    "status": "open",
+    "category": "general",
+    "priority": "normal"
+  },
+  "claimableSummary": {
+    "id": "185f79f1-0bf3-4a68-ab50-57fe437d2594",
+    "category": "general",
+    "priority": "normal",
+    "dueAt": "2026-08-28T10:32:23.525Z",
+    "hasOrder": false
+  },
+  "directDetail": {
+    "status": 404,
+    "errorCode": "SUPPORT_TICKET_NOT_FOUND"
+  },
+  "uiCapture": {
+    "outcome": "blocked",
+    "reason": "Google Chrome returned ERR_TOO_MANY_REDIRECTS for /admin/ before any UI action"
+  },
+  "assertions": [
+    {
+      "id": "real-customer-api-ticket-open",
+      "outcome": "pass",
+      "evidence": "database contains the real API-created open and unassigned fixture"
+    },
+    {
+      "id": "customer-open-view-hides-operations-identities",
+      "outcome": "pass",
+      "evidence": "requester view contains the ticket but no operations identities"
+    },
+    {
+      "id": "claimable-summary-present",
+      "outcome": "pass",
+      "evidence": "support claimable endpoint contains the fixture"
+    },
+    {
+      "id": "claimable-summary-exact-allowlist",
+      "outcome": "pass",
+      "evidence": "claimable summary uses exactly five fields",
+      "details": {
+        "returnedKeys": [
+          "category",
+          "dueAt",
+          "hasOrder",
+          "id",
+          "priority"
+        ]
+      }
+    },
+    {
+      "id": "claimable-summary-private-fields-absent",
+      "outcome": "pass",
+      "evidence": "claimable summary omits requester, content, order identity, facts, assignment and resolution fields"
+    },
+    {
+      "id": "preclaim-detail-non-probing-404",
+      "outcome": "pass",
+      "evidence": "unassigned detail and missing detail share the same response"
+    },
+    {
+      "id": "creation-audit-bounded",
+      "outcome": "pass",
+      "evidence": "creation audit binds the requester without copying ticket text"
+    }
+  ],
+  "overall": "pass"
+}

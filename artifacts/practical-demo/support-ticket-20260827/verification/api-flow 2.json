@@ -1,0 +1,10 @@
+{
+  "generatedAt": "2026-08-27T10:23:40.858Z",
+  "ticketId": "4b88471d-874b-47be-b657-95f33dd03c57",
+  "claimStatus": 201,
+  "resolveStatus": 200,
+  "preclaimOverall": "pass",
+  "finalOverall": "pass",
+  "credentialsPersistedInArtifact": false,
+  "runtimeSessionPath": "outside artifact under /private/tmp"
+}

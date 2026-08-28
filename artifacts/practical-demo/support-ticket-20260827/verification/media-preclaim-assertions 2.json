@@ -1,0 +1,74 @@
+{
+  "generatedAt": "2026-08-27T10:32:25.036Z",
+  "phase": "preclaim",
+  "ticket": {
+    "id": "185f79f1-0bf3-4a68-ab50-57fe437d2594",
+    "status": "open",
+    "category": "general",
+    "priority": "normal"
+  },
+  "claimableSummary": {
+    "id": "185f79f1-0bf3-4a68-ab50-57fe437d2594",
+    "category": "general",
+    "priority": "normal",
+    "dueAt": "2026-08-28T10:32:23.525Z",
+    "hasOrder": false
+  },
+  "directDetail": {
+    "status": 404,
+    "errorCode": "SUPPORT_TICKET_NOT_FOUND"
+  },
+  "screenshot": "screenshots/02-admin-anonymous-queue.png",
+  "assertions": [
+    {
+      "id": "real-api-ticket-created",
+      "outcome": "pass",
+      "evidence": "real customer API returned 201 or an existing matching fixture was resumed"
+    },
+    {
+      "id": "ticket-open-and-unassigned",
+      "outcome": "pass",
+      "evidence": "database ticket is open and unassigned"
+    },
+    {
+      "id": "requester-response-hides-operations-identities",
+      "outcome": "pass",
+      "evidence": "customer create response omits operational identities"
+    },
+    {
+      "id": "claimable-summary-exact-allowlist",
+      "outcome": "pass",
+      "evidence": "claimable item is the exact five-field summary",
+      "details": {
+        "returnedKeys": [
+          "category",
+          "dueAt",
+          "hasOrder",
+          "id",
+          "priority"
+        ]
+      }
+    },
+    {
+      "id": "claimable-summary-hides-private-fields",
+      "outcome": "pass",
+      "evidence": "claimable item omits requester, content, order identity, facts, assignment and resolution fields"
+    },
+    {
+      "id": "anonymous-ui-hides-ticket-content",
+      "outcome": "pass",
+      "evidence": "real admin UI renders only anonymous claimable copy"
+    },
+    {
+      "id": "preclaim-detail-non-probing-404",
+      "outcome": "pass",
+      "evidence": "support detail is unavailable before ownership"
+    },
+    {
+      "id": "creation-audit-bounded",
+      "outcome": "pass",
+      "evidence": "creation audit binds actor and bounded metadata without ticket text"
+    }
+  ],
+  "overall": "pass"
+}

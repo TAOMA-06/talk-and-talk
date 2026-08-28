@@ -1,0 +1,59 @@
+{
+  "inspectedAt": "2026-08-27T10:36:00Z",
+  "method": "Manual visual inspection with view_image after automated 1440x810 dimension checks",
+  "overall": "pass",
+  "screenshots": [
+    {
+      "file": "screenshots/01-admin-login.png",
+      "sourceKind": "application-ui",
+      "provenance": "Exact backend/api/public/admin assets served by the artifact-local proxy; captured by installed Google Chrome before credentials were entered",
+      "sha256": "a21ad804cae30fbe4a2203f1ffef0acfbb8f093e3a73b7ff20f7e883ef6d2902",
+      "dimensions": "1440x810",
+      "visualResult": "pass",
+      "privacyResult": "pass",
+      "note": "Login fields are empty; no username, password or TOTP is visible."
+    },
+    {
+      "file": "screenshots/02-admin-anonymous-queue.png",
+      "sourceKind": "application-ui",
+      "provenance": "Exact admin assets plus real claimable and assigned API responses through the same-origin proxy",
+      "sha256": "61a5876d6f81e0829e45b3aae9d13c8d22b51645cc1b3f0f0ce477a3f749680c",
+      "dimensions": "1440x810",
+      "visualResult": "pass",
+      "privacyResult": "pass",
+      "note": "Fresh ticket appears only as an anonymous claimable card; its subject, body and requester are absent. Existing fixture identifiers are UI-masked."
+    },
+    {
+      "file": "screenshots/03-admin-claim-dialog.png",
+      "sourceKind": "application-ui",
+      "provenance": "Exact admin controlled-action dialog opened for the fresh real ticket through Google Chrome",
+      "sha256": "bef63bc0bdd34f493275d108504f515e403d397371863153a0452e822efd697b",
+      "dimensions": "1440x810",
+      "visualResult": "pass",
+      "privacyResult": "pass",
+      "note": "Operation reason and confirmation inputs are empty. The opaque ticket ID, operation ID and one-time UI confirmation code are non-secret evidence references."
+    },
+    {
+      "file": "screenshots/08-evidence-run-summary.png",
+      "sourceKind": "evidence-card",
+      "provenance": "Self-contained HTML generated from media-api-preclaim-assertions.json and media-api-final-assertions.json",
+      "sha256": "484174ce49f3f6481ca9c74a850a0e9d872c265785280d55bfbb8d720a5ed982",
+      "dimensions": "1440x810",
+      "visualResult": "pass",
+      "privacyResult": "pass",
+      "note": "Clearly labeled EVIDENCE CARD / NOT APPLICATION UI; records the proxy and API fallback boundaries."
+    },
+    {
+      "file": "screenshots/09-evidence-audit-notification.png",
+      "sourceKind": "evidence-card",
+      "provenance": "Self-contained HTML generated from the fresh ticket audit and notification assertion JSON",
+      "sha256": "4a1b1017209d83bda2fa99a328207c106b5b3a0fab7107907eb6874a6f609b74",
+      "dimensions": "1440x810",
+      "visualResult": "pass",
+      "privacyResult": "pass",
+      "note": "Clearly labeled evidence card; states that pending is not external delivery and Mini UI remains blocked."
+    }
+  ],
+  "removedOrRedone": [],
+  "secretsObserved": false
+}

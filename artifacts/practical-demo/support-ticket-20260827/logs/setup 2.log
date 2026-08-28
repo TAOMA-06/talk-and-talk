@@ -1,0 +1,404 @@
+Created isolated PostgreSQL database: talk_and_talk_demo_support_20260827_ea11230f_01
+Allocated empty Redis DB: 12
+
+> talk-and-talk-api@0.1.0 prisma:deploy
+> prisma migrate deploy
+
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma/schema.prisma.
+Datasource "db": PostgreSQL database "talk_and_talk_demo_support_20260827_ea11230f_01", schema "public" at "localhost:5432"
+
+117 migrations found in prisma/migrations
+
+Applying migration `20260709000000_init_auth`
+Applying migration `20260709010000_add_companions`
+Applying migration `20260709020000_add_conversations`
+Applying migration `20260709030000_add_moderation_evidence_logs`
+Applying migration `20260709040000_add_audit_log_and_labels`
+Applying migration `20260709050000_add_orders_payments`
+Applying migration `20260709060000_add_notifications_security`
+Applying migration `20260712070000_production_data_integrity`
+Applying migration `20260712100000_add_wechat_miniprogram_identity`
+Applying migration `20260719010000_add_legal_consent_receipts`
+Applying migration `20260719020000_single_active_payment`
+Applying migration `20260719021000_add_payment_expiry`
+Applying migration `20260719030000_legal_consent_withdrawal_and_adult_gate`
+Applying migration `20260719040000_precise_message_read_cursor`
+Applying migration `20260719050000_companion_order_confirmation`
+Applying migration `20260719050000_single_refund_request`
+Applying migration `20260719060000_staff_credentials`
+Applying migration `20260719070000_chat_moderation_v2`
+Applying migration `20260719100000_core_reliability_fixes`
+Applying migration `20260720090000_add_companion_recommendations`
+Applying migration `20260720110000_commercial_pilot_foundation`
+Applying migration `20260720150000_commercial_refund_window`
+Applying migration `20260720151000_subscription_template_snapshot`
+Applying migration `20260720152000_post_payout_refund_recovery`
+Applying migration `20260720153000_companion_commercial_profile`
+Applying migration `20260720154000_support_resolution_code`
+Applying migration `20260720155000_customer_completion_confirmation`
+Applying migration `20260720156000_uncertain_payout_recovery`
+Applying migration `20260720157000_commercial_evidence_snapshots`
+Applying migration `20260720159000_support_refund_exception`
+Applying migration `20260720160000_order_intake_controls`
+Applying migration `20260720161000_payment_prepay_recovery`
+Applying migration `20260720162000_refund_provider_binding`
+Applying migration `20260720163000_refund_reconciliation_schedule`
+Applying migration `20260720170000_companion_service_offerings`
+Applying migration `20260720171000_order_service_offering_snapshots`
+Applying migration `20260720172000_companion_availability_windows`
+Applying migration `20260720173000_order_availability_window_snapshots`
+Applying migration `20260720174000_order_reschedule_timeline_foundation`
+Applying migration `20260720175000_order_service_guidelines_confirmations`
+Applying migration `20260720176000_order_experience_feedback`
+Applying migration `20260720177000_companion_favorites`
+Applying migration `20260720178000_companion_recent_views`
+Applying migration `20260720179000_conversation_notification_preferences`
+Applying migration `20260720180000_order_support_facts`
+Applying migration `20260720181000_conversation_blocks`
+Applying migration `20260720182000_community_post_reports`
+Applying migration `20260720183000_community_post_report_case_aggregation`
+Applying migration `20260720184000_companion_favorite_availability_reminders`
+Applying migration `20260720185000_availability_reminder_candidates`
+Applying migration `20260720186000_availability_reminder_preflight`
+Applying migration `20260720187000_availability_reminder_handoffs`
+Applying migration `20260720188000_availability_reminder_attempt_reservations`
+Applying migration `20260720189000_availability_reminder_attempt_consumption_state`
+Applying migration `20260720190000_availability_reminder_provider_delivery_state`
+Applying migration `20260720191000_companion_recurring_availability_rules`
+Applying migration `20260720192000_companion_recurring_availability_drafts`
+Applying migration `20260720193000_voice_sessions`
+Applying migration `20260720200000_voice_room_control_dispatch_lease`
+Applying migration `20260725100000_derive_companion_trust_metrics`
+Applying migration `20260727000000_add_review_department`
+Applying migration `20260727213000_add_web_legal_consent_source`
+Applying migration `20260731160000_companion_lifecycle`
+Applying migration `20260731170000_account_governance`
+Applying migration `20260731183000_account_governance_hardening`
+Applying migration `20260731190000_identity_verification_review`
+Applying migration `20260731193000_account_deletion_two_person`
+Applying migration `20260731210000_attendance_disputes`
+Applying migration `20260731212000_payment_disputes`
+Applying migration `20260731214000_user_companion_recommendation_exclusions`
+Applying migration `20260731220000_companion_appeal_sla`
+Applying migration `20260731221000_companion_adult_eligibility`
+Applying migration `20260731222000_order_service_intent_snapshot`
+Applying migration `20260731223000_refund_sla_ownership`
+Applying migration `20260731224000_moderation_appeal_sla`
+Applying migration `20260731225000_user_account_action_appeals`
+Applying migration `20260731226000_account_deletion_sla`
+Applying migration `20260731227000_account_deletion_retention_ledger`
+Applying migration `20260731228000_user_account_action_evidence`
+Applying migration `20260731229000_customer_adult_eligibility`
+Applying migration `20260731230000_crisis_intervention`
+Applying migration `20260731231000_retention_ledger_fail_closed`
+Applying migration `20260731232000_account_deletion_cancellation`
+Applying migration `20260731233000_staff_credential_offboarding`
+Applying migration `20260731234000_review_staff_assignment_guard`
+Applying migration `20260731235000_account_deletion_retention_legacy_backfill`
+Applying migration `20260731236000_wechat_daily_bill_reconciliation`
+Applying migration `20260731237000_account_deletion_retention_legacy_repair`
+Applying migration `20260731238000_wechat_reconciliation_financial_controls`
+Applying migration `20260731239000_finance_terminal_audit_controls`
+Applying migration `20260731241000_review_staff_directory_scale`
+Applying migration `20260801001000_attendance_client_event_bound`
+Applying migration `20260801002000_availability_reminder_fanout_jobs`
+Applying migration `20260801003000_availability_reminder_attempt_reservation`
+Applying migration `20260801004000_order_scheduling_overlap_indexes`
+Applying migration `20260801005000_notification_delivery_claim_readiness`
+Applying migration `20260801005500_review_label_export_pagination`
+Applying migration `20260801006000_availability_reminder_worker_claims`
+Applying migration `20260801006100_availability_reminder_terminal_resolution`
+Applying migration `20260801007000_account_deletion_phased_erasure`
+Applying migration `20260801007100_account_deletion_auth_tombstones`
+Applying migration `20260801007200_retention_graph_schema`
+Applying migration `20260801007300_retention_graph_guards`
+Applying migration `20260801007400_account_data_retention_legal_holds`
+Applying migration `20260801007500_order_refund_policy_snapshots`
+Applying migration `20260801007600_audit_subject_policy_registry`
+Applying migration `20260801007700_controlled_case_evidence_attachments`
+Applying migration `20260801007800_companion_customer_future_boundaries`
+Applying migration `20260803010000_account_deletion_future_booking_phase`
+Applying migration `20260807010000_recommendation_personalization_default_off`
+Applying migration `20260811010000_reset_historical_recommendation_personalization`
+Applying migration `20260825010000_companion_appeal_reactivation`
+Applying migration `20260825020000_controlled_account_appeal_evidence`
+Applying migration `20260825030000_retention_media_legal_hold_barrier`
+Applying migration `20260825040000_companion_incident_assignment_acl`
+Applying migration `20260825050000_audit_subject_policy_registry_v3`
+Applying migration `20260826010000_companion_appeal_assignment_acl`
+
+The following migration(s) have been applied:
+
+migrations/
+  └─ 20260709000000_init_auth/
+    └─ migration.sql
+  └─ 20260709010000_add_companions/
+    └─ migration.sql
+  └─ 20260709020000_add_conversations/
+    └─ migration.sql
+  └─ 20260709030000_add_moderation_evidence_logs/
+    └─ migration.sql
+  └─ 20260709040000_add_audit_log_and_labels/
+    └─ migration.sql
+  └─ 20260709050000_add_orders_payments/
+    └─ migration.sql
+  └─ 20260709060000_add_notifications_security/
+    └─ migration.sql
+  └─ 20260712070000_production_data_integrity/
+    └─ migration.sql
+  └─ 20260712100000_add_wechat_miniprogram_identity/
+    └─ migration.sql
+  └─ 20260719010000_add_legal_consent_receipts/
+    └─ migration.sql
+  └─ 20260719020000_single_active_payment/
+    └─ migration.sql
+  └─ 20260719021000_add_payment_expiry/
+    └─ migration.sql
+  └─ 20260719030000_legal_consent_withdrawal_and_adult_gate/
+    └─ migration.sql
+  └─ 20260719040000_precise_message_read_cursor/
+    └─ migration.sql
+  └─ 20260719050000_companion_order_confirmation/
+    └─ migration.sql
+  └─ 20260719050000_single_refund_request/
+    └─ migration.sql
+  └─ 20260719060000_staff_credentials/
+    └─ migration.sql
+  └─ 20260719070000_chat_moderation_v2/
+    └─ migration.sql
+  └─ 20260719100000_core_reliability_fixes/
+    └─ migration.sql
+  └─ 20260720090000_add_companion_recommendations/
+    └─ migration.sql
+  └─ 20260720110000_commercial_pilot_foundation/
+    └─ migration.sql
+  └─ 20260720150000_commercial_refund_window/
+    └─ migration.sql
+  └─ 20260720151000_subscription_template_snapshot/
+    └─ migration.sql
+  └─ 20260720152000_post_payout_refund_recovery/
+    └─ migration.sql
+  └─ 20260720153000_companion_commercial_profile/
+    └─ migration.sql
+  └─ 20260720154000_support_resolution_code/
+    └─ migration.sql
+  └─ 20260720155000_customer_completion_confirmation/
+    └─ migration.sql
+  └─ 20260720156000_uncertain_payout_recovery/
+    └─ migration.sql
+  └─ 20260720157000_commercial_evidence_snapshots/
+    └─ migration.sql
+  └─ 20260720159000_support_refund_exception/
+    └─ migration.sql
+  └─ 20260720160000_order_intake_controls/
+    └─ migration.sql
+  └─ 20260720161000_payment_prepay_recovery/
+    └─ migration.sql
+  └─ 20260720162000_refund_provider_binding/
+    └─ migration.sql
+  └─ 20260720163000_refund_reconciliation_schedule/
+    └─ migration.sql
+  └─ 20260720170000_companion_service_offerings/
+    └─ migration.sql
+  └─ 20260720171000_order_service_offering_snapshots/
+    └─ migration.sql
+  └─ 20260720172000_companion_availability_windows/
+    └─ migration.sql
+  └─ 20260720173000_order_availability_window_snapshots/
+    └─ migration.sql
+  └─ 20260720174000_order_reschedule_timeline_foundation/
+    └─ migration.sql
+  └─ 20260720175000_order_service_guidelines_confirmations/
+    └─ migration.sql
+  └─ 20260720176000_order_experience_feedback/
+    └─ migration.sql
+  └─ 20260720177000_companion_favorites/
+    └─ migration.sql
+  └─ 20260720178000_companion_recent_views/
+    └─ migration.sql
+  └─ 20260720179000_conversation_notification_preferences/
+    └─ migration.sql
+  └─ 20260720180000_order_support_facts/
+    └─ migration.sql
+  └─ 20260720181000_conversation_blocks/
+    └─ migration.sql
+  └─ 20260720182000_community_post_reports/
+    └─ migration.sql
+  └─ 20260720183000_community_post_report_case_aggregation/
+    └─ migration.sql
+  └─ 20260720184000_companion_favorite_availability_reminders/
+    └─ migration.sql
+  └─ 20260720185000_availability_reminder_candidates/
+    └─ migration.sql
+  └─ 20260720186000_availability_reminder_preflight/
+    └─ migration.sql
+  └─ 20260720187000_availability_reminder_handoffs/
+    └─ migration.sql
+  └─ 20260720188000_availability_reminder_attempt_reservations/
+    └─ migration.sql
+  └─ 20260720189000_availability_reminder_attempt_consumption_state/
+    └─ migration.sql
+  └─ 20260720190000_availability_reminder_provider_delivery_state/
+    └─ migration.sql
+  └─ 20260720191000_companion_recurring_availability_rules/
+    └─ migration.sql
+  └─ 20260720192000_companion_recurring_availability_drafts/
+    └─ migration.sql
+  └─ 20260720193000_voice_sessions/
+    └─ migration.sql
+  └─ 20260720200000_voice_room_control_dispatch_lease/
+    └─ migration.sql
+  └─ 20260725100000_derive_companion_trust_metrics/
+    └─ migration.sql
+  └─ 20260727000000_add_review_department/
+    └─ migration.sql
+  └─ 20260727213000_add_web_legal_consent_source/
+    └─ migration.sql
+  └─ 20260731160000_companion_lifecycle/
+    └─ migration.sql
+  └─ 20260731170000_account_governance/
+    └─ migration.sql
+  └─ 20260731183000_account_governance_hardening/
+    └─ migration.sql
+  └─ 20260731190000_identity_verification_review/
+    └─ migration.sql
+  └─ 20260731193000_account_deletion_two_person/
+    └─ migration.sql
+  └─ 20260731210000_attendance_disputes/
+    └─ migration.sql
+  └─ 20260731212000_payment_disputes/
+    └─ migration.sql
+  └─ 20260731214000_user_companion_recommendation_exclusions/
+    └─ migration.sql
+  └─ 20260731220000_companion_appeal_sla/
+    └─ migration.sql
+  └─ 20260731221000_companion_adult_eligibility/
+    └─ migration.sql
+  └─ 20260731222000_order_service_intent_snapshot/
+    └─ migration.sql
+  └─ 20260731223000_refund_sla_ownership/
+    └─ migration.sql
+  └─ 20260731224000_moderation_appeal_sla/
+    └─ migration.sql
+  └─ 20260731225000_user_account_action_appeals/
+    └─ migration.sql
+  └─ 20260731226000_account_deletion_sla/
+    └─ migration.sql
+  └─ 20260731227000_account_deletion_retention_ledger/
+    └─ migration.sql
+  └─ 20260731228000_user_account_action_evidence/
+    └─ migration.sql
+  └─ 20260731229000_customer_adult_eligibility/
+    └─ migration.sql
+  └─ 20260731230000_crisis_intervention/
+    └─ migration.sql
+  └─ 20260731231000_retention_ledger_fail_closed/
+    └─ migration.sql
+  └─ 20260731232000_account_deletion_cancellation/
+    └─ migration.sql
+  └─ 20260731233000_staff_credential_offboarding/
+    └─ migration.sql
+  └─ 20260731234000_review_staff_assignment_guard/
+    └─ migration.sql
+  └─ 20260731235000_account_deletion_retention_legacy_backfill/
+    └─ migration.sql
+  └─ 20260731236000_wechat_daily_bill_reconciliation/
+    └─ migration.sql
+  └─ 20260731237000_account_deletion_retention_legacy_repair/
+    └─ migration.sql
+  └─ 20260731238000_wechat_reconciliation_financial_controls/
+    └─ migration.sql
+  └─ 20260731239000_finance_terminal_audit_controls/
+    └─ migration.sql
+  └─ 20260731241000_review_staff_directory_scale/
+    └─ migration.sql
+  └─ 20260801001000_attendance_client_event_bound/
+    └─ migration.sql
+  └─ 20260801002000_availability_reminder_fanout_jobs/
+    └─ migration.sql
+  └─ 20260801003000_availability_reminder_attempt_reservation/
+    └─ migration.sql
+  └─ 20260801004000_order_scheduling_overlap_indexes/
+    └─ migration.sql
+  └─ 20260801005000_notification_delivery_claim_readiness/
+    └─ migration.sql
+  └─ 20260801005500_review_label_export_pagination/
+    └─ migration.sql
+  └─ 20260801006000_availability_reminder_worker_claims/
+    └─ migration.sql
+  └─ 20260801006100_availability_reminder_terminal_resolution/
+    └─ migration.sql
+  └─ 20260801007000_account_deletion_phased_erasure/
+    └─ migration.sql
+  └─ 20260801007100_account_deletion_auth_tombstones/
+    └─ migration.sql
+  └─ 20260801007200_retention_graph_schema/
+    └─ migration.sql
+  └─ 20260801007300_retention_graph_guards/
+    └─ migration.sql
+  └─ 20260801007400_account_data_retention_legal_holds/
+    └─ migration.sql
+  └─ 20260801007500_order_refund_policy_snapshots/
+    └─ migration.sql
+  └─ 20260801007600_audit_subject_policy_registry/
+    └─ migration.sql
+  └─ 20260801007700_controlled_case_evidence_attachments/
+    └─ migration.sql
+  └─ 20260801007800_companion_customer_future_boundaries/
+    └─ migration.sql
+  └─ 20260803010000_account_deletion_future_booking_phase/
+    └─ migration.sql
+  └─ 20260807010000_recommendation_personalization_default_off/
+    └─ migration.sql
+  └─ 20260811010000_reset_historical_recommendation_personalization/
+    └─ migration.sql
+  └─ 20260825010000_companion_appeal_reactivation/
+    └─ migration.sql
+  └─ 20260825020000_controlled_account_appeal_evidence/
+    └─ migration.sql
+  └─ 20260825030000_retention_media_legal_hold_barrier/
+    └─ migration.sql
+  └─ 20260825040000_companion_incident_assignment_acl/
+    └─ migration.sql
+  └─ 20260825050000_audit_subject_policy_registry_v3/
+    └─ migration.sql
+  └─ 20260826010000_companion_appeal_assignment_acl/
+    └─ migration.sql
+
+All migrations have been successfully applied.
+
+> talk-and-talk-api@0.1.0 prisma:seed
+> ts-node src/database/seed.ts
+
+
+> talk-and-talk-api@0.1.0 build
+> npm run prisma:generate && tsc -p tsconfig.build.json && node scripts/copy-public-assets.mjs
+
+
+> talk-and-talk-api@0.1.0 prisma:generate
+> prisma generate
+
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma/schema.prisma.
+┌─────────────────────────────────────────────────────────┐
+│  Update available 7.9.0 -> 8.0.0-rc.12                  │
+│                                                         │
+│  This is a major update - please follow the guide at    │
+│  https://pris.ly/d/major-version-upgrade                │
+│                                                         │
+│  Run the following to update                            │
+│    npm i --save-dev prisma@latest                       │
+│    npm i @prisma/client@latest                          │
+└─────────────────────────────────────────────────────────┘
+
+✔ Generated Prisma Client (7.9.0) to ./generated/prisma in 393ms
+
+
+> talk-and-talk-api@0.1.0 staff:bootstrap
+> node dist/src/database/bootstrap-staff.js
+
+Staff credential provisioned: support.demo (support)
+Isolated demo backend prepared

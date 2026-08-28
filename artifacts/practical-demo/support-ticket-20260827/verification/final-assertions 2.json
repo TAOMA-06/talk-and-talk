@@ -1,0 +1,125 @@
+{
+  "generatedAt": "2026-08-27T10:23:40.858Z",
+  "phase": "final",
+  "driver": "real local NestJS API plus isolated PostgreSQL and Redis",
+  "ticket": {
+    "id": "4b88471d-874b-47be-b657-95f33dd03c57",
+    "status": "resolved",
+    "category": "general",
+    "priority": "normal",
+    "assigned": true,
+    "resolutionCode": "noRefund"
+  },
+  "auditActions": [
+    "support.ticket_created",
+    "support.ticket_claimed",
+    "support.ticket_resolved"
+  ],
+  "notification": {
+    "id": "31afdb1c-d9cc-44a1-b9b7-4e82f83ffd9c",
+    "type": "supportUpdate",
+    "title": "客服工单已更新",
+    "status": "resolved",
+    "unread": true
+  },
+  "deliveryIntent": {
+    "templateKey": "supportUpdate",
+    "status": "pending",
+    "attemptCount": 0
+  },
+  "uiEvidence": {
+    "miniProgram": {
+      "outcome": "blocked",
+      "reason": "No genuine Mini Program screenshot existed after one inspection; automation was not retried"
+    },
+    "adminChrome": {
+      "outcome": "blocked",
+      "reason": "Installed Google Chrome returned ERR_TOO_MANY_REDIRECTS at /admin/ before interaction"
+    }
+  },
+  "externalWechatDeliveryValidated": false,
+  "assertions": [
+    {
+      "id": "claim-api-status",
+      "outcome": "pass",
+      "evidence": "real claim endpoint returned 201 and moved the ticket to inProgress"
+    },
+    {
+      "id": "claim-returns-authorized-detail",
+      "outcome": "pass",
+      "evidence": "successful claim is the first response containing requester, content and assignee"
+    },
+    {
+      "id": "assigned-operator-detail-access",
+      "outcome": "pass",
+      "evidence": "current assignee can read canonical detail"
+    },
+    {
+      "id": "other-support-detail-non-probing",
+      "outcome": "pass",
+      "evidence": "another support operator receives the non-probing 404"
+    },
+    {
+      "id": "other-support-claim-conflict",
+      "outcome": "pass",
+      "evidence": "second compare-and-set claim cannot steal ownership"
+    },
+    {
+      "id": "resolve-api-status",
+      "outcome": "pass",
+      "evidence": "real resolve endpoint returned the customer-readable result"
+    },
+    {
+      "id": "resolved-database-state",
+      "outcome": "pass",
+      "evidence": "database preserves assignment, result and completion time"
+    },
+    {
+      "id": "customer-sees-result-without-operations-identities",
+      "outcome": "pass",
+      "evidence": "requester receives the outcome without staff identities"
+    },
+    {
+      "id": "audit-actions-complete",
+      "outcome": "pass",
+      "evidence": "created, claimed and resolved audit rows exist",
+      "details": {
+        "actions": [
+          "support.ticket_created",
+          "support.ticket_claimed",
+          "support.ticket_resolved"
+        ]
+      }
+    },
+    {
+      "id": "claim-audit-bounded",
+      "outcome": "pass",
+      "evidence": "claim audit binds actor and bounded order-link fact"
+    },
+    {
+      "id": "resolve-audit-bounded",
+      "outcome": "pass",
+      "evidence": "resolution audit omits customer-readable text"
+    },
+    {
+      "id": "audit-subject-edges-complete",
+      "outcome": "pass",
+      "evidence": "every controlled audit action has an explicit requester subject edge"
+    },
+    {
+      "id": "customer-unread-notification-visible",
+      "outcome": "pass",
+      "evidence": "requester notification API returns the unread support update"
+    },
+    {
+      "id": "transactional-outbox-durable",
+      "outcome": "pass",
+      "evidence": "inbox row and delivery intent are transactionally durable",
+      "details": {
+        "deliveryStatus": "pending",
+        "attemptCount": 0
+      }
+    }
+  ],
+  "overall": "pass"
+}

@@ -1,0 +1,32 @@
+{
+  "capturedAt": "2026-08-27T10:24:05Z",
+  "repository": {
+    "branch": "codex/g1-text-only-release-candidate",
+    "sha": "ea11230f19b169863e5579b5992796228d0ac222"
+  },
+  "api": {
+    "origin": "http://127.0.0.1:3000",
+    "health": "ok",
+    "mode": "local development fixture"
+  },
+  "database": {
+    "name": "talk_and_talk_demo_support_20260827_ea11230f_01",
+    "scope": "isolated local PostgreSQL database",
+    "retained": true,
+    "aggregateRows": {
+      "supportTickets": 1,
+      "supportTicketAuditLogs": 3,
+      "supportUpdateNotifications": 1,
+      "supportUpdateDeliveryIntents": 1
+    }
+  },
+  "redis": {
+    "database": 13,
+    "scope": "local demo session and rate-limit state"
+  },
+  "credentials": {
+    "persistedInShareableArtifacts": false,
+    "runtimeFilesMode": "0600",
+    "runtimeFilesRemovedDuringCleanup": true
+  }
+}
