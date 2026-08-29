@@ -1,0 +1,3 @@
+<view class="segmented" aria-role="tablist">
+  <view wx:for="{{items}}" wx:key="value" class="segment {{value === item.value ? 'segment-selected' : ''}}" data-value="{{item.value}}" bindtap="choose" aria-role="tab" aria-selected="{{value === item.value}}">{{item.label}}</view>
+</view>

@@ -10,7 +10,7 @@
   <block wx:elif="{{state === 'application'}}">
     <view class="hero">
       <view class="eyebrow">第一步 · 基础申请</view>
-      <view class="hero-title">成为 Talk&amp;Talk 陪伴者</view>
+      <view class="hero-title">成为 {{brandName}} 陪伴者</view>
       <view class="hero-copy">基础资料只会进入待审核状态，不会自动获得商用资格或公开展示。</view>
     </view>
     <view class="card form-card">

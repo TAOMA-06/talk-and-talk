@@ -39,6 +39,7 @@ const EXPERIENCE_FEEDBACK_RATING_OPTIONS = [
 ] as const;
 
 type DisplayOrder = Order & {
+  detailsOpen: boolean;
   displayName: string;
   scheduledAtText: string;
   paymentDeadlineText: string;
@@ -999,6 +1000,7 @@ function displayOrder(order: Order, viewerRole: OrderViewerRole): DisplayOrder {
   const rescheduleDefaults = rescheduleDateTimeDefaults();
   return {
     ...order,
+    detailsOpen: false,
     displayName: serviceName(order),
     scheduledAtText: formatDateTime(order.scheduledAt),
     paymentDeadlineText: formatDateTime(paymentDeadline),
@@ -1442,6 +1444,12 @@ Page({
     if (customerOrder) return { order: customerOrder, viewerRole: "customer" };
     const serviceOrder = (this.data.serviceOrders as DisplayOrder[]).find((item) => item.id === id);
     return serviceOrder ? { order: serviceOrder, viewerRole: "companion" } : null;
+  },
+  toggleOrderDetails(event: any) {
+    const id = String(event.currentTarget.dataset.id || "");
+    const context = this.orderContext(id);
+    if (!context) return;
+    this.patchOrder(id, { detailsOpen: !context.order.detailsOpen });
   },
   async toggleTimeline(event: any) {
     const id = String(event.currentTarget.dataset.id || "");

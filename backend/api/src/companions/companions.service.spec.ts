@@ -32,6 +32,8 @@ const companionRecord = {
   createdAt: new Date("2026-07-09T00:00:00.000Z"),
   updatedAt: new Date("2026-07-09T00:00:00.000Z"),
   serviceTags: [{ tag: { id: "tag-1", name: "心理学背景" } }],
+  avatarAsset: { id: "avatar-1", status: "approved", storageDeletedAt: null },
+  coverAsset: null,
   commercialProfile: {
     verifiedAt: new Date("2026-07-01T00:00:00.000Z"),
     nextReviewDueAt: new Date("2099-07-01T00:00:00.000Z"),
@@ -378,6 +380,8 @@ describe("CompanionsService", () => {
       deliveryModes: ["voice"]
     }));
     expect(result.items[0]).toEqual(expect.objectContaining({
+      avatarUrl: "/api/v1/companions/c1/media/avatar",
+      coverUrl: null,
       languages: ["中文"],
       specialties: ["情绪倾听"],
       livedExperience: "有长期异地生活与职场转型经验。",

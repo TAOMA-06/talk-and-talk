@@ -1,7 +1,7 @@
 <view class="page notifications-page">
   <view class="notification-hero">
     <view>
-      <view class="hero-title">事务与消息提醒</view>
+      <view class="tt-kicker">通知中心</view><view class="hero-title">事务与消息提醒</view>
       <view class="hero-copy">订单、支付、客服、安全和聊天通知集中在这里；微信订阅授权不影响站内记录。</view>
     </view>
     <view wx:if="{{unreadState === 'error'}}" class="unread-count unread-count-unknown">未读数待核对</view>
@@ -16,12 +16,9 @@
     <button class="unread-retry" bindtap="retryUnreadCount" aria-label="重新读取通知未读数量">重新读取未读数</button>
   </view>
 
-  <view wx:if="{{loading}}" class="empty">正在读取通知…</view>
-  <view wx:elif="{{error}}" class="empty">
-    <view>{{error}}</view>
-    <button class="retry-button" bindtap="load">重新加载通知</button>
-  </view>
-  <view wx:elif="{{!notifications.length}}" class="empty">暂无通知。订单状态和客服进度仍可在对应页面主动查看。</view>
+  <tt-skeleton wx:if="{{loading}}" rows="3" />
+  <tt-state wx:elif="{{error}}" type="error" title="通知暂时无法加载" description="{{error}}" action-text="重新加载通知" bindaction="load" />
+  <tt-state wx:elif="{{!notifications.length}}" type="empty" title="暂无通知" description="订单状态和客服进度仍可在对应页面主动查看。" />
   <block wx:else>
     <view class="notification-card {{item.readAt ? '' : 'unread'}}" wx:for="{{notifications}}" wx:key="id" bindtap="openNotification" data-id="{{item.id}}" aria-role="button" aria-label="{{item.readAt ? '已读通知' : '未读通知'}}：{{item.title}}" tabindex="0">
       <view class="notification-top"><text class="type">{{item.typeText}}</text><text class="time">{{item.timeText}}</text></view>

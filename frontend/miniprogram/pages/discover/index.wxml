@@ -1,120 +1,101 @@
-<view class="page">
-  <view class="hero">
-    <view class="hero-title">找一位合适的陪伴者</view>
-    <view class="hero-copy">所有沟通都在平台内完成，守住边界也守住安心。</view>
+<view class="discover-root">
+<view class="page discover-page">
+  <view class="discover-heading tt-animate-in">
+    <view class="tt-kicker">发现陪伴者</view>
+    <view class="hero-title">找到适合此刻的那个人</view>
+    <view class="hero-copy">公开资料、真实商品和当前可约时间，会在进入详情与下单时再次校验。</view>
   </view>
-  <view class="emergency-entry" bindtap="openEmergencyHelp" aria-role="button" aria-label="查看紧急帮助与官方电话号码" tabindex="0">
-    <view>
-      <view class="emergency-title">正处在即时危险中？先查看紧急帮助</view>
-      <view class="emergency-copy">平台不会代你报警或救援；普通客服工单不是紧急服务</view>
+
+  <view class="search-surface">
+    <view class="search-row">
+      <input class="search-input" value="{{searchInput}}" maxlength="40" confirm-type="search" placeholder="搜索名称、角色、服务或标签" bindinput="setSearchInput" bindconfirm="submitSearch" />
+      <button class="search-submit" bindtap="submitSearch">搜索</button>
     </view>
-    <view class="emergency-arrow">›</view>
+    <view class="search-copy">只检索当前公开资料，不保存搜索历史。</view>
   </view>
+
+  <view class="discover-toolbar">
+    <view>
+      <view class="result-title">{{isFiltering ? '筛选结果' : '为你推荐'}}</view>
+      <view class="result-meta">{{loading ? '正在读取' : companions.length + ' 位当前可展示'}}</view>
+    </view>
+    <button class="filter-trigger" bindtap="openFilters" aria-label="打开服务筛选">
+      <text>筛选</text><text wx:if="{{isFiltering}}" class="filter-count">●</text>
+    </button>
+  </view>
+  <view wx:if="{{isFiltering}}" class="active-filter">
+    <text>{{activeFilterSummary || '已选择服务条件'}}</text>
+    <button bindtap="clearFilters">清除</button>
+  </view>
+
   <view wx:if="{{recoveryNotice}}" class="recovery-notice" aria-live="polite">
     <view class="recovery-heading"><text>重新匹配 · 订单 {{recoverySourceOrderId}}</text><button bindtap="dismissRecoveryNotice" aria-label="关闭重新匹配说明">关闭</button></view>
     <view class="recovery-copy">{{recoveryNotice}}</view>
   </view>
-  <view class="filter-panel">
-    <view class="search-heading">搜索公开资料</view>
-    <view class="search-row">
-      <input class="search-input" value="{{searchInput}}" maxlength="40" confirm-type="search" placeholder="名称、角色、服务或标签" bindinput="setSearchInput" bindconfirm="submitSearch" />
-      <button class="search-submit" bindtap="submitSearch">搜索</button>
-    </view>
-    <view class="search-copy">提交后才会查询；只检索当前公开的名称、角色、服务和标签，不保存搜索历史。</view>
-    <view class="filter-heading">按当前服务筛选</view>
-    <view class="filter-copy">默认只显示未来 7 天内有上架商品和结构化剩余容量的资料；价格按单次服务总价，“3天内可约”会进一步收窄范围。详情页和下单都会再次校验。</view>
+
+  <tt-skeleton wx:if="{{loading}}" rows="3" />
+  <tt-state wx:elif="{{error}}" type="error" title="发现页暂时不可用" description="{{error}}" action-text="重新加载" bindaction="load" />
+  <tt-state wx:elif="{{!companions.length}}" type="empty" title="暂时没有合适结果"
+    description="可以调整筛选条件，或稍后再查看当前公开可约服务。"
+    action-text="{{isFiltering ? '清除筛选' : ''}}" bindaction="clearFilters" />
+  <view wx:else class="results-surface">
+    <view class="filter-result-note" wx:if="{{selectedSortBy === 'soonestAvailable'}}">{{activeFilterSummary || '最早可约'}} · 只按本次读取的结构化剩余容量排序，不保留时段</view>
+    <view class="filter-result-note" wx:elif="{{isFiltering}}">{{activeFilterSummary || '当前条件'}} · 仅显示仍公开、商品上架且有真实可约容量的结果</view>
+    <view class="recommendation-note" wx:if="{{!recommendationFallback && !isFiltering}}">根据当前场景与服务状态推荐；可在“我的”中关闭个性化设置。</view>
+    <tt-media-card id="discover-recommendation-{{item.impressionId}}" wx:for="{{companions}}" wx:key="id"
+      avatar="{{item.avatarUrl}}" initials="{{item.initials}}" title="{{item.name}}" subtitle="{{item.role}} · {{item.availabilityText}}"
+      description="{{item.reasonText || item.bio}}" price="{{item.catalogPriceText}}" meta="{{item.metaText}}"
+      badge="{{item.isVerified ? '已认证' : ''}}" badge-tone="success" online="{{item.isOnline}}"
+      bindtap="openCompanion" data-id="{{item.id}}" data-impression-id="{{item.impressionId}}" data-theme-id="{{selectedTopicId || item.topicIds[0]}}" />
+  </view>
+
+  <view class="emergency-entry" bindtap="openEmergencyHelp" aria-role="button" aria-label="查看紧急帮助与官方电话号码" tabindex="0">
+    <view><view class="emergency-title">正处在即时危险中？</view><view class="emergency-copy">先查看 110、120 等官方紧急资源；普通客服不是紧急服务。</view></view>
+    <view class="emergency-arrow">›</view>
+  </view>
+</view>
+
+<view wx:if="{{filterSheetOpen}}" class="filter-root" aria-role="dialog" aria-modal="true">
+      <view class="filter-mask" bindtap="closeFilters" catchtouchmove="noop" aria-role="button" aria-label="关闭筛选面板" tabindex="0"></view>
+      <view class="filter-sheet">
+        <view class="filter-handle"></view>
+        <view class="filter-header"><view class="filter-heading"><view class="filter-title">筛选当前服务</view><view class="filter-summary">{{activeFilterSummary || '默认显示未来 7 天内真实可约服务'}}</view></view><button class="filter-close" bindtap="closeFilters" aria-label="关闭">×</button></view>
+        <scroll-view class="filter-body" scroll-y enhanced show-scrollbar="{{false}}">
+    <view class="filter-copy">价格按单次服务总价；详情页和下单都会重新确认商品与剩余容量。</view>
     <view class="filter-group">
       <view class="filter-label">主题</view>
       <view wx:if="{{topicsState === 'loading'}}" class="filter-resource-state" aria-live="polite">正在读取主题…</view>
-      <view wx:elif="{{topicsState === 'error'}}" class="filter-resource-error" aria-live="polite">
-        <text>{{topicsError}}</text>
-        <button class="filter-resource-retry" bindtap="retryTopics" aria-label="重新读取主题列表">重试主题</button>
-      </view>
-      <scroll-view wx:else class="filter-scroll" scroll-x="true" enable-flex="true" show-scrollbar="false">
-        <view class="filter-options">
-          <button class="filter-chip {{!selectedTopicId ? 'filter-chip-selected' : ''}}" bindtap="selectTopic" data-id="">全部主题</button>
-          <button wx:for="{{topicFilters}}" wx:key="id" class="filter-chip {{item.selected ? 'filter-chip-selected' : ''}}" bindtap="selectTopic" data-id="{{item.id}}">{{item.name}}</button>
-        </view>
-      </scroll-view>
+      <view wx:elif="{{topicsState === 'error'}}" class="filter-resource-error" aria-live="polite"><text>{{topicsError}}</text><button class="filter-resource-retry" bindtap="retryTopics">重试</button></view>
+      <view wx:else class="filter-options"><button class="filter-chip {{!selectedTopicId ? 'filter-chip-selected' : ''}}" bindtap="selectTopic" data-id="">全部主题</button><button wx:for="{{topicFilters}}" wx:key="id" class="filter-chip {{item.selected ? 'filter-chip-selected' : ''}}" bindtap="selectTopic" data-id="{{item.id}}">{{item.name}}</button></view>
     </view>
     <view class="filter-group">
       <view class="filter-label">沟通语言</view>
-      <scroll-view class="filter-scroll" scroll-x="true" enable-flex="true" show-scrollbar="false">
-        <view class="filter-options">
-          <button class="filter-chip {{!selectedLanguage ? 'filter-chip-selected' : ''}}" bindtap="selectLanguage" data-value="" aria-label="沟通语言：全部语言" aria-pressed="{{!selectedLanguage}}">全部语言</button>
-          <button wx:for="{{languageFilters}}" wx:key="value" class="filter-chip {{item.selected ? 'filter-chip-selected' : ''}}" bindtap="selectLanguage" data-value="{{item.value}}" aria-label="沟通语言：{{item.label}}" aria-pressed="{{item.selected}}">{{item.label}}</button>
-        </view>
-      </scroll-view>
+      <view class="filter-options"><button class="filter-chip {{!selectedLanguage ? 'filter-chip-selected' : ''}}" bindtap="selectLanguage" data-value="">全部语言</button><button wx:for="{{languageFilters}}" wx:key="value" class="filter-chip {{item.selected ? 'filter-chip-selected' : ''}}" bindtap="selectLanguage" data-value="{{item.value}}">{{item.label}}</button></view>
     </view>
     <view class="filter-group">
-      <view class="filter-label">擅长与互动方式</view>
-      <scroll-view class="filter-scroll" scroll-x="true" enable-flex="true" show-scrollbar="false">
-        <view class="filter-options">
-          <button class="filter-chip {{!selectedSpecialty ? 'filter-chip-selected' : ''}}" bindtap="selectSpecialty" data-value="" aria-label="擅长与互动方式：全部类型" aria-pressed="{{!selectedSpecialty}}">全部类型</button>
-          <button wx:for="{{specialtyFilters}}" wx:key="value" class="filter-chip {{item.selected ? 'filter-chip-selected' : ''}}" bindtap="selectSpecialty" data-value="{{item.value}}" aria-label="擅长与互动方式：{{item.label}}" aria-pressed="{{item.selected}}">{{item.label}}</button>
-        </view>
-      </scroll-view>
-      <view class="sort-copy">只匹配陪伴者当前公开资料中明确填写的擅长方向，不读取申请材料、审核备注或用户行为。</view>
+      <view class="filter-label">擅长方向</view>
+      <view class="filter-options"><button class="filter-chip {{!selectedSpecialty ? 'filter-chip-selected' : ''}}" bindtap="selectSpecialty" data-value="">全部类型</button><button wx:for="{{specialtyFilters}}" wx:key="value" class="filter-chip {{item.selected ? 'filter-chip-selected' : ''}}" bindtap="selectSpecialty" data-value="{{item.value}}">{{item.label}}</button></view>
+      <view class="sort-copy">只匹配公开资料，不读取申请材料、审核备注或用户行为。</view>
     </view>
-    <view class="filter-group filter-group-last">
+    <view class="filter-group">
       <view class="filter-label">服务方式</view>
-      <view class="filter-options">
-        <button class="filter-chip {{!selectedDeliveryMode ? 'filter-chip-selected' : ''}}" bindtap="selectDeliveryMode" data-value="">全部方式</button>
-        <button wx:for="{{deliveryModeFilters}}" wx:key="value" class="filter-chip {{item.selected ? 'filter-chip-selected' : ''}}" bindtap="selectDeliveryMode" data-value="{{item.value}}">{{item.label}}</button>
-      </view>
+      <view class="filter-options"><button class="filter-chip {{!selectedDeliveryMode ? 'filter-chip-selected' : ''}}" bindtap="selectDeliveryMode" data-value="">全部方式</button><button wx:for="{{deliveryModeFilters}}" wx:key="value" class="filter-chip {{item.selected ? 'filter-chip-selected' : ''}}" bindtap="selectDeliveryMode" data-value="{{item.value}}">{{item.label}}</button></view>
     </view>
-    <view class="filter-group filter-group-last">
-      <view class="filter-label">单次服务总价上限</view>
-      <view class="filter-options">
-        <button class="filter-chip {{!selectedMaxServicePriceCents ? 'filter-chip-selected' : ''}}" bindtap="selectPriceLimit" data-value="0">全部价格</button>
-        <button wx:for="{{priceFilters}}" wx:key="value" class="filter-chip {{item.selected ? 'filter-chip-selected' : ''}}" bindtap="selectPriceLimit" data-value="{{item.value}}">{{item.label}}</button>
-      </view>
+    <view class="filter-group">
+      <view class="filter-label">单次总价</view>
+      <view class="filter-options"><button class="filter-chip {{!selectedMaxServicePriceCents ? 'filter-chip-selected' : ''}}" bindtap="selectPriceLimit" data-value="0">全部价格</button><button wx:for="{{priceFilters}}" wx:key="value" class="filter-chip {{item.selected ? 'filter-chip-selected' : ''}}" bindtap="selectPriceLimit" data-value="{{item.value}}">{{item.label}}</button></view>
     </view>
-    <view class="filter-group filter-group-last">
+    <view class="filter-group">
       <view class="filter-label">可约时间</view>
-      <view class="filter-options">
-        <button class="filter-chip {{!selectedAvailableWithinDays ? 'filter-chip-selected' : ''}}" bindtap="selectAvailabilityWithinDays" data-value="0">不限</button>
-        <button wx:for="{{availabilityWithinDaysFilters}}" wx:key="value" class="filter-chip {{item.selected ? 'filter-chip-selected' : ''}}" bindtap="selectAvailabilityWithinDays" data-value="{{item.value}}">{{item.label}}</button>
-      </view>
+      <view class="filter-options"><button class="filter-chip {{!selectedAvailableWithinDays ? 'filter-chip-selected' : ''}}" bindtap="selectAvailabilityWithinDays" data-value="0">不限</button><button wx:for="{{availabilityWithinDaysFilters}}" wx:key="value" class="filter-chip {{item.selected ? 'filter-chip-selected' : ''}}" bindtap="selectAvailabilityWithinDays" data-value="{{item.value}}">{{item.label}}</button></view>
     </view>
     <view class="filter-group filter-group-last">
       <view class="filter-label">公开排序</view>
-      <scroll-view class="filter-scroll" scroll-x="true" enable-flex="true" show-scrollbar="false">
-        <view class="filter-options">
-          <button class="filter-chip {{!selectedSortBy ? 'filter-chip-selected' : ''}}" bindtap="selectPublicSort" data-value="">默认 / 推荐</button>
-          <button wx:for="{{publicSortFilters}}" wx:key="value" class="filter-chip {{item.selected ? 'filter-chip-selected' : ''}}" bindtap="selectPublicSort" data-value="{{item.value}}">{{item.label}}</button>
-        </view>
-      </scroll-view>
-      <view class="sort-copy">主动选择后只按公开信息排序；“最早可约”只看未来 7 天内（已选更短窗口时按该窗口）结构化、未满额的候选，不会保留时段。不选时首页沿用推荐；价格和可约情况仍以详情页及下单时为准。</view>
+      <view class="filter-options"><button class="filter-chip {{!selectedSortBy ? 'filter-chip-selected' : ''}}" bindtap="selectPublicSort" data-value="">默认推荐</button><button wx:for="{{publicSortFilters}}" wx:key="value" class="filter-chip {{item.selected ? 'filter-chip-selected' : ''}}" bindtap="selectPublicSort" data-value="{{item.value}}">{{item.label}}</button></view>
+      <view class="sort-copy">主动选择后只按公开信息排序，不会保留时段。</view>
     </view>
-    <view wx:if="{{isFiltering}}" class="filter-summary">
-      <text>当前条件：{{activeFilterSummary || '已选服务条件'}}</text>
-      <button class="filter-clear" bindtap="clearFilters">清除条件，恢复推荐</button>
-    </view>
-  </view>
-  <view wx:if="{{loading}}" class="empty">正在加载…</view>
-  <view wx:elif="{{error}}" class="empty">{{error}}</view>
-  <view wx:elif="{{!companions.length}}" class="empty filter-empty">
-    <view wx:if="{{selectedSortBy === 'soonestAvailable'}}">暂时没有同时符合当前条件的结构化可约候选。</view>
-    <view wx:elif="{{selectedKeyword}}">没有找到与“{{selectedKeyword}}”匹配的当前公开资料或服务。</view>
-    <view wx:elif="{{isFiltering}}">暂时没有符合当前公开服务条件的陪伴者。</view>
-    <view wx:else>推荐中暂时没有可预约的陪伴者。已停止推荐的陪伴者仍可通过上方搜索手动查找。</view>
-    <button wx:if="{{isFiltering}}" class="empty-clear" bindtap="clearFilters">清除条件，恢复推荐</button>
-  </view>
-  <view wx:else>
-    <view class="filter-result-note" wx:if="{{selectedSortBy === 'soonestAvailable'}}">{{activeFilterSummary || '最早可约'}} · 只按本次读取的结构化剩余容量排序，不保留时段；详情页和下单会再次校验</view>
-    <view class="filter-result-note" wx:elif="{{isFiltering}}">{{activeFilterSummary || '当前条件'}} · 仅显示仍公开、商品上架且有真实可约容量的结果</view>
-    <view class="recommendation-note" wx:if="{{!recommendationFallback && !isFiltering}}">根据你的设置、当前场景与服务状态推荐；可在“我的”中关闭。</view>
-    <view id="discover-recommendation-{{item.impressionId}}" class="card companion" wx:for="{{companions}}" wx:key="id" bindtap="openCompanion" data-id="{{item.id}}" data-impression-id="{{item.impressionId}}" data-theme-id="{{selectedTopicId || item.topicIds[0]}}" aria-role="button" aria-label="查看陪伴者：{{item.name}}，{{item.role}}" tabindex="0">
-      <view class="avatar">{{item.initials}}</view>
-      <view class="content">
-        <view class="row"><text class="name">{{item.name}}</text><text wx:if="{{item.isVerified}}" class="verified">已认证</text></view>
-        <view class="muted">{{item.role}} · {{item.availability}}</view>
-        <view wx:if="{{item.reasonText}}" class="reason">{{item.reasonText}}</view>
-        <view class="bio">{{item.bio}}</view>
-        <view class="muted">{{item.nextAvailableText}} · {{item.catalogDetailText}}</view>
-        <view class="row footer"><text>★ {{item.rating}}（{{item.reviewCount}}）</text><text>{{item.catalogPriceText}}</text></view>
+        </scroll-view>
+        <view class="filter-footer"><button class="filter-reset" bindtap="resetFilters">重置</button><button class="filter-apply" bindtap="applyFilters">查看结果</button></view>
       </view>
-    </view>
-  </view>
+</view>
 </view>

@@ -1,38 +1,46 @@
 <view class="page home-page">
-  <view class="hero">
-    <view class="eyebrow">此刻，先从你的需要开始</view>
-    <view class="hero-title">你现在最想聊什么？</view>
-    <view class="hero-copy">写一句就好。文字只在本页用于识别场景，不会作为聊天内容保存或发送给陪伴者。</view>
+  <view class="home-intro tt-animate-in">
+    <view class="eyebrow">{{brandName}} · 此刻的陪伴</view>
+    <view class="hero-title">先说说，你现在需要什么</view>
+    <view class="hero-copy">一句话就好。它只在本页帮助识别场景，不会被保存为聊天内容。</view>
+  </view>
+
+  <image class="hero-visual tt-animate-in" src="{{homeHeroAsset}}" mode="aspectFill" aria-label="安静的线上陪伴空间插画" />
+
+  <view class="intent-card tt-animate-in">
     <textarea class="intent-input" value="{{intentInput}}" maxlength="120" placeholder="例如：今天工作很累，只想找人听我说一会儿" bindinput="setIntent"></textarea>
+    <view class="intent-foot"><text>最多 120 字</text><text>{{intentInput.length}} / 120</text></view>
   </view>
 
   <view wx:if="{{riskDetected}}" class="risk-card">
     <view class="risk-kicker">安全优先</view>
     <view class="risk-title">这段话可能涉及即时安全风险</view>
-    <view class="risk-copy">Talk&amp;Talk 不是报警、医疗或危机干预服务。如果你或他人正处在即时危险中，请先离开危险环境，联系当地紧急服务或身边可信的人。</view>
+    <view class="risk-copy">{{brandName}} 不是报警、医疗或危机干预服务。如果你或他人正处在即时危险中，请先离开危险环境，联系当地紧急服务或身边可信的人。</view>
     <button class="risk-primary" bindtap="openEmergencyHelp">查看紧急帮助与一键拨号</button>
     <button class="risk-secondary" bindtap="openSafetyCenter">查看安全边界</button>
     <button class="risk-text" bindtap="acknowledgeNonEmergency">我确认现在没有即时危险，继续找陪伴</button>
     <view wx:if="{{riskAcknowledged}}" class="risk-acknowledged">已确认。平台仍只提供非紧急线上陪伴。</view>
   </view>
 
-  <view class="section-heading">
+  <view class="section-heading scenes-heading">
     <view>
       <view class="section-title">也可以直接选一个场景</view>
       <view class="section-subtitle">选择后会优先展示未来 3 天较早可约的服务</view>
     </view>
   </view>
+  <scroll-view class="scenario-scroll" scroll-x enhanced show-scrollbar="{{false}}">
   <view class="scenario-grid">
     <view wx:for="{{scenarios}}" wx:key="id" class="scenario {{item.selected ? 'selected' : ''}}" data-id="{{item.id}}" bindtap="selectScenario" aria-role="radio" aria-checked="{{item.selected}}" aria-label="选择陪伴场景：{{item.title}}" tabindex="0">
       <view class="scenario-title">{{item.title}}</view>
       <view class="scenario-description">{{item.description}}</view>
     </view>
   </view>
+  </scroll-view>
 
   <button class="primary-button match-button" bindtap="continueDiscovery">{{selectedTopicId ? '查看适合这个场景的人' : '查看最近可约的人'}}</button>
   <button class="browse-all" bindtap="browseAll">浏览全部陪伴者</button>
 
-  <view class="boundary-strip">
+  <view class="boundary-strip" aria-label="平台服务边界">
     <view class="boundary-item"><text class="boundary-mark">18+</text><text>仅成年人</text></view>
     <view class="boundary-item"><text class="boundary-mark">内</text><text>平台内支付沟通</text></view>
     <view class="boundary-item"><text class="boundary-mark">止</text><text>不适可随时停止</text></view>
@@ -52,33 +60,17 @@
       <view class="section-subtitle">当前真实商品与可约时间以详情页为准</view>
     </view>
   </view>
-  <view wx:if="{{loading || recommendationsState === 'loading'}}" class="empty compact">正在读取当前可约服务…</view>
-  <view wx:elif="{{error}}" class="empty compact">
-    <view>{{error}}</view>
-    <button class="retry-button" bindtap="load" aria-label="重新加载首页">重新加载首页</button>
-  </view>
-  <view wx:elif="{{recommendationsState === 'error'}}" class="empty compact" aria-live="polite">
-    <view>{{recommendationsError}}</view>
-    <button class="retry-button" bindtap="retryRecommendations" aria-label="重新读取首页推荐">重新读取推荐</button>
-  </view>
-  <view wx:elif="{{recommendationsState === 'empty'}}" class="empty compact">当前没有可展示的推荐，仍可进入发现页筛选。</view>
+  <view class="recommendations-surface">
+  <tt-skeleton wx:if="{{loading || recommendationsState === 'loading'}}" rows="3" />
+  <tt-state wx:elif="{{error}}" type="error" title="首页暂时无法加载" description="{{error}}" action-text="重新加载首页" bindaction="load" />
+  <tt-state wx:elif="{{recommendationsState === 'error'}}" type="error" title="推荐暂时不可用" description="{{recommendationsError}}" action-text="重新读取推荐" bindaction="retryRecommendations" />
+  <tt-state wx:elif="{{recommendationsState === 'empty'}}" type="empty" title="暂时没有推荐" description="仍可进入发现页，按场景和时间筛选当前可约服务。" />
   <block wx:elif="{{recommendationsState === 'available'}}">
-    <view class="recommendation-card" wx:for="{{recommendations}}" wx:key="impressionId" bindtap="openCompanion" data-id="{{item.id}}" data-impression-id="{{item.impressionId}}" data-theme-id="{{item.topicIds[0]}}" aria-role="button" aria-label="查看推荐陪伴者：{{item.name}}" tabindex="0">
-      <view class="avatar">{{item.initials}}</view>
-      <view class="recommendation-copy">
-        <view class="recommendation-title-row"><text class="recommendation-name">{{item.name}}</text><text class="verified">{{item.isVerified ? '当前可展示' : '暂不可约'}}</text></view>
-        <view class="recommendation-role">{{item.role}} · ★ {{item.rating}}</view>
-        <view class="recommendation-reason">{{item.reasonText || '基于当前服务状态展示'}}</view>
-        <view class="recommendation-meta">{{item.catalogPriceText}} · {{item.nextAvailableText}}</view>
-      </view>
-    </view>
+    <tt-media-card wx:for="{{recommendations}}" wx:key="impressionId" avatar="{{item.avatarUrl}}" initials="{{item.initials}}" title="{{item.name}}" subtitle="{{item.role}} · {{item.availabilityText}}" description="{{item.reasonText || '基于当前服务状态展示'}}" price="{{item.catalogPriceText}}" meta="{{item.metaText}}" badge="{{item.isVerified ? '当前可约' : '暂不可约'}}" badge-tone="{{item.isVerified ? 'success' : 'warning'}}" online="{{item.isOnline}}" bindtap="openCompanion" data-id="{{item.id}}" data-impression-id="{{item.impressionId}}" data-theme-id="{{item.topicIds[0]}}" />
   </block>
+  </view>
 
-  <view class="community-entry" bindtap="openSafetyCenter" aria-role="button" aria-label="打开安全与支持中心" tabindex="0">
-    <view>
-      <view class="community-title">先了解平台边界与安全支持</view>
-      <view class="community-copy">陪伴不替代医疗、心理治疗或紧急帮助</view>
-    </view>
-    <view class="community-arrow">›</view>
+  <view class="safety-surface">
+    <tt-list-cell title="平台边界与安全支持" subtitle="陪伴不替代医疗、心理治疗或紧急帮助" bindtap="openSafetyCenter" />
   </view>
 </view>

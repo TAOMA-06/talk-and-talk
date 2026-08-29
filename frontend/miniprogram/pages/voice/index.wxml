@@ -42,9 +42,9 @@
       <view class="device-status-row"><text>网络</text><text class="network-{{networkTone}}">{{networkTypeText}}</text></view>
       <view class="device-status-row"><text>麦克风</text><text>{{microphoneStatusText}}</text></view>
     </view>
-    <button class="preflight-check {{environmentConfirmed ? 'checked' : ''}}" bindtap="toggleEnvironmentConfirmation">{{environmentConfirmed ? '✓' : '○'}} 我在适合通话的环境，并已关闭外放或注意周围隐私</button>
-    <button class="preflight-check {{boundaryConfirmed ? 'checked' : ''}}" bindtap="toggleBoundaryConfirmation">{{boundaryConfirmed ? '✓' : '○'}} 我理解仅限本次订单，不录音、不私下转账，不提供医疗或紧急救助</button>
-    <button class="preflight-check {{trtcDisclosureConfirmed ? 'checked' : ''}}" bindtap="toggleTrtcDisclosureConfirmation">{{trtcDisclosureConfirmed ? '✓' : '○'}} 我知悉深圳市腾讯计算机系统有限公司提供的 TRTC 会在进入时处理麦克风音频、IP、网络及设备系统基础信息，用于实时音频传输和连接保障</button>
+    <button class="preflight-check {{environmentConfirmed ? 'checked' : ''}}" bindtap="toggleEnvironmentConfirmation">{{environmentConfirmed ? '已确认 · ' : '待确认 · '}}我在适合通话的环境，并已关闭外放或注意周围隐私</button>
+    <button class="preflight-check {{boundaryConfirmed ? 'checked' : ''}}" bindtap="toggleBoundaryConfirmation">{{boundaryConfirmed ? '已确认 · ' : '待确认 · '}}我理解仅限本次订单，不录音、不私下转账，不提供医疗或紧急救助</button>
+    <button class="preflight-check {{trtcDisclosureConfirmed ? 'checked' : ''}}" bindtap="toggleTrtcDisclosureConfirmation">{{trtcDisclosureConfirmed ? '已确认 · ' : '待确认 · '}}我知悉深圳市腾讯计算机系统有限公司提供的 TRTC 会在进入时处理麦克风音频、IP、网络及设备系统基础信息，用于实时音频传输和连接保障</button>
     <view class="trtc-boundary">本通话为纯音频，不启用摄像头；平台默认不录音、不启用云端录制或 AI 转写。拒绝不会影响订单历史、客服和账号权利。</view>
     <button class="disclosure-link" bindtap="openPrivacyPolicy">查看《隐私政策》中的第三方处理说明</button>
     <button class="primary enter-button" disabled="{{!environmentConfirmed || !boundaryConfirmed || !trtcDisclosureConfirmed || preflightChecking}}" loading="{{preflightChecking}}" bindtap="confirmPreflight">检查权限并进入</button>

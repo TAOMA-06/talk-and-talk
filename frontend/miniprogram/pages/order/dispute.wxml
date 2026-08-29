@@ -26,7 +26,7 @@
       <view class="hint">提交后会冻结本单结算，并为另一方保留答辩期限。安全紧急情况请同时联系当地紧急服务。</view>
       <radio-group bindchange="chooseIssue" aria-label="选择履约问题类型">
         <label class="issue" wx:for="{{issues}}" wx:key="value">
-          <radio value="{{item.value}}" checked="{{issue === item.value}}" color="#9B405B" />
+          <radio value="{{item.value}}" checked="{{issue === item.value}}" color="#C65345" />
           <view><view class="issue-label">{{item.label}}</view><view class="issue-help">{{item.help}}</view></view>
         </label>
       </radio-group>

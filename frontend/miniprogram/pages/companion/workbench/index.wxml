@@ -1,5 +1,5 @@
-<view class="page">
-  <view wx:if="{{loading}}" class="empty">正在整理你的工作台…</view>
+<view class="page workbench-page">
+  <tt-skeleton wx:if="{{loading}}" rows="3" />
 
   <view wx:elif="{{accessState === 'ineligible'}}" class="empty access-empty">
     <view class="access-title">暂不能进入陪伴者工作台</view>
@@ -9,18 +9,22 @@
     <button class="plain-button retry-button" bindtap="retry">重新检查</button>
   </view>
 
-  <view wx:elif="{{accessState === 'error'}}" class="empty access-empty">
-    <view class="access-title">加载失败</view>
-    <view>{{loadError}}</view>
-    <button class="primary-button retry-button" bindtap="retry">重新加载</button>
-  </view>
+  <tt-state wx:elif="{{accessState === 'error'}}" type="error" title="工作台加载失败" description="{{loadError}}" action-text="重新加载" bindaction="retry" />
 
   <view wx:else>
     <view class="hero-card">
-      <view class="eyebrow">陪伴者工作台</view>
-      <view class="hero-title">把现在要处理的事放在一起</view>
+      <view class="tt-kicker">陪伴者工作台</view>
+      <view class="hero-title">今天需要处理什么</view>
       <view class="hero-copy">管理服务、开放时段和履约安排；客户侧只会看到你已经上架和开放的内容。</view>
       <view class="updated-at">更新于 {{updatedAtText}}（北京时间）</view>
+    </view>
+
+    <view class="profile-media-card">
+      <image class="profile-media-cover" src="{{profileCoverUrl}}" mode="aspectFill" aria-label="陪伴者资料封面" />
+      <view class="profile-media-main"><tt-avatar src="{{profileAvatarUrl}}" fallback="{{profileInitials}}" alt="陪伴者公开头像" size="lg" shape="rounded" /><view class="profile-media-copy"><view class="profile-media-title">公开头像与封面</view><view class="profile-media-note">{{profileMediaEnabled ? '图片审核通过后才会替换公开资料。' : '当前 text-only 发行面保持关闭；演示素材仅用于本地界面。'}}</view></view></view>
+      <view class="profile-media-actions"><button disabled="{{!profileMediaEnabled || profileMediaBusy}}" loading="{{profileMediaBusy}}" bindtap="chooseAvatar">更新头像</button><button disabled="{{!profileMediaEnabled || profileMediaBusy}}" loading="{{profileMediaBusy}}" bindtap="chooseCover">更新封面</button></view>
+      <view wx:if="{{profileMediaEnabled}}" class="profile-media-remove"><button disabled="{{profileMediaBusy}}" bindtap="removeAvatar">移除头像</button><button disabled="{{profileMediaBusy}}" bindtap="removeCover">移除封面</button></view>
+      <view wx:if="{{profileMediaMessage}}" class="profile-media-message" aria-live="polite">{{profileMediaMessage}}</view>
     </view>
 
     <view wx:if="{{pendingConfirmationCount}}" class="attention-card" bindtap="openOrders" hover-class="card-hover" aria-role="button" aria-label="打开待确认预约，共 {{pendingConfirmationCount}} 个" tabindex="0">

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query, Redirect, UseGuards } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 
 import { AuthenticatedUser } from "../auth/auth.service";
@@ -18,6 +18,7 @@ import {
 } from "./dto/manage-availability-schedule.dto";
 import { OwnRecurringAvailabilityDraftParamsDto } from "./dto/manage-recurring-availability-draft.dto";
 import { CreateOwnServiceOfferingDto, UpdateOwnServiceOfferingDto } from "./dto/manage-service-offering.dto";
+import { ReserveCompanionProfileMediaDto } from "./dto/reserve-companion-profile-media.dto";
 
 @Controller("companions")
 export class CompanionsController {
@@ -52,6 +53,42 @@ export class CompanionsController {
   @UseGuards(JwtAuthGuard)
   updateOwn(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpdateOwnCompanionDto) {
     return this.companionsService.updateOwn(user.id, dto);
+  }
+
+  @Post("me/profile-media/:slot/uploads")
+  @UseGuards(JwtAuthGuard)
+  reserveOwnProfileMedia(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("slot") slot: string,
+    @Body() dto: ReserveCompanionProfileMediaDto
+  ) {
+    return this.companionsService.reserveOwnProfileMedia(user.id, slot, dto);
+  }
+
+  @Post("me/profile-media/:slot/uploads/:assetId/complete")
+  @UseGuards(JwtAuthGuard)
+  completeOwnProfileMedia(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("slot") slot: string,
+    @Param("assetId") assetId: string
+  ) {
+    return this.companionsService.completeOwnProfileMedia(user.id, slot, assetId);
+  }
+
+  @Get("me/profile-media/:slot/uploads/:assetId")
+  @UseGuards(JwtAuthGuard)
+  ownProfileMediaStatus(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("slot") slot: string,
+    @Param("assetId") assetId: string
+  ) {
+    return this.companionsService.ownProfileMediaStatus(user.id, slot, assetId);
+  }
+
+  @Delete("me/profile-media/:slot")
+  @UseGuards(JwtAuthGuard)
+  removeOwnProfileMedia(@CurrentUser() user: AuthenticatedUser, @Param("slot") slot: string) {
+    return this.companionsService.removeOwnProfileMedia(user.id, slot);
   }
 
   @Get("me/service-offerings")
@@ -184,6 +221,13 @@ export class CompanionsController {
   @Get(":id/availability")
   listAvailability(@Param("id") id: string, @Query() query: ListCompanionAvailabilityQueryDto) {
     return this.companionsService.listPublishedAvailability(id, query);
+  }
+
+  @Get(":id/media/:slot")
+  @Redirect(undefined, 302)
+  @HttpCode(302)
+  async profileMedia(@Param("id") id: string, @Param("slot") slot: string) {
+    return { url: await this.companionsService.publicProfileMediaReadUrl(id, slot) };
   }
 
   @Get(":id")

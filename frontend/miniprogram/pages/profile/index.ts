@@ -28,7 +28,7 @@ function displayTimeSlots(selectedTimeSlots: string[]): DisplayTimeSlot[] {
 
 Page({
   data: {
-    user: null as AuthUser | null, displayName: "", gender: "" as UserGender | "", genderLabel: "暂不透露",
+    brandName: "Talk&Talk", user: null as AuthUser | null, userInitials: "我", displayName: "", gender: "" as UserGender | "", genderLabel: "暂不透露",
     genderLabels: GENDER_OPTIONS.map((option) => option.label), genderIndex: 0, notifications: [] as Notification[],
     unreadNotificationCount: 0, notificationState: "loading" as ProfileResourceState, notificationError: "",
     unreadNotificationState: "loading" as ProfileResourceState, unreadNotificationError: "",
@@ -157,6 +157,7 @@ Page({
         : 0;
       this.setData({
         user,
+        userInitials: String(user.profile?.displayName || "微信用户").slice(0, 2),
         displayName: user.profile?.displayName || "",
         gender: user.profile?.gender || "",
         genderLabel: GENDER_OPTIONS[genderIndex].label,

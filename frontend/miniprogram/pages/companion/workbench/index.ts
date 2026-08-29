@@ -1,9 +1,12 @@
-import { api, ApiError, ensureSession } from "../../../utils/api";
+import { api, ApiError, ensureSession, readLocalFile, uploadAuthorizedMedia } from "../../../utils/api";
 import {
-  CompanionTodayServiceEntry,
+  CompanionProfileMediaSlot, CompanionTodayServiceEntry,
   CompanionTodayServiceSchedule
 } from "../../../utils/models";
 import { companionCommercialApi } from "../../../utils/companion-commercial-api";
+import { clientCompanionProfileMediaEnabled } from "../../../utils/config";
+import { companionAvatarUrl, companionCoverUrl } from "../../../utils/design-assets";
+import { sha256Hex } from "../../../utils/sha256";
 
 type AccessState = "loading" | "ready" | "ineligible" | "error";
 type DisplayTodayService = CompanionTodayServiceEntry & {
@@ -96,7 +99,13 @@ Page({
     commercialStatusText: "状态待同步",
     trainingStatusText: "培训待同步",
     activeAccountActions: 0,
-    openIncidentCount: 0
+    openIncidentCount: 0,
+    profileAvatarUrl: "",
+    profileCoverUrl: "",
+    profileInitials: "我",
+    profileMediaEnabled: clientCompanionProfileMediaEnabled(),
+    profileMediaBusy: false,
+    profileMediaMessage: ""
   },
   onShow() { void this.load(); },
   onPullDownRefresh() { void this.load(true); },
@@ -107,9 +116,10 @@ Page({
       // Catalog and availability keep the established workbench eligibility
       // boundary. The narrow day feed and settlement card may degrade on their
       // own, so a non-critical outage never exposes broader order data.
-      const [catalog, availability] = await Promise.all([
+      const [catalog, availability, profile] = await Promise.all([
         api.ownServiceOfferings(),
-        api.ownAvailabilityWindows()
+        api.ownAvailabilityWindows(),
+        api.ownCompanion()
       ]);
       const [todayServiceSchedule, earnings, lifecycle] = await Promise.all([
         api.companionTodayServiceSchedule()
@@ -159,6 +169,9 @@ Page({
           : "培训暂无法同步",
         activeAccountActions: lifecycleOverview?.operationalSummary.activeRestrictionCount ?? 0,
         openIncidentCount: lifecycleOverview?.operationalSummary.openIncidentCount ?? 0,
+        profileAvatarUrl: companionAvatarUrl(profile, "large"),
+        profileCoverUrl: companionCoverUrl(profile),
+        profileInitials: profile.initials || profile.name.slice(0, 2),
         updatedAtText: formatShanghaiDateTime(new Date().toISOString())
       });
     } catch (error) {
@@ -174,6 +187,67 @@ Page({
     }
   },
   retry() { void this.load(); },
+  chooseAvatar() { void this.chooseProfileMedia("avatar"); },
+  chooseCover() { void this.chooseProfileMedia("cover"); },
+  removeAvatar() { void this.removeProfileMedia("avatar"); },
+  removeCover() { void this.removeProfileMedia("cover"); },
+  async chooseProfileMedia(slot: CompanionProfileMediaSlot) {
+    if (!this.data.profileMediaEnabled || this.data.profileMediaBusy) {
+      wx.showToast({ title: "当前发行面尚未开放资料图片上传", icon: "none" });
+      return;
+    }
+    try {
+      const result: any = await new Promise((resolve, reject) => wx.chooseMedia({
+        count: 1,
+        mediaType: ["image"],
+        sourceType: ["album", "camera"],
+        success: resolve,
+        fail: reject
+      }));
+      const file = result.tempFiles?.[0];
+      if (!file?.tempFilePath) return;
+      const maxBytes = slot === "avatar" ? 2 * 1024 * 1024 : 4 * 1024 * 1024;
+      if (!Number.isSafeInteger(file.size) || file.size < 1 || file.size > maxBytes) {
+        throw new Error(slot === "avatar" ? "头像需小于 2MB" : "封面需小于 4MB");
+      }
+      const extension = String(file.tempFilePath).toLowerCase().split(".").pop();
+      const mimeType = extension === "png" ? "image/png" : extension === "webp" ? "image/webp" : "image/jpeg";
+      this.setData({ profileMediaBusy: true, profileMediaMessage: "正在安全上传并审核图片…" });
+      const bytes = await readLocalFile(file.tempFilePath);
+      const reservation = await api.reserveOwnCompanionProfileMedia(slot, {
+        mimeType,
+        sizeBytes: file.size,
+        sha256: sha256Hex(bytes)
+      });
+      await uploadAuthorizedMedia(reservation.upload, bytes);
+      const completed = await api.completeOwnCompanionProfileMedia(slot, reservation.asset.id);
+      if (!completed.asset.published) {
+        this.setData({ profileMediaMessage: "图片未公开：审核状态为 " + completed.asset.status });
+        return;
+      }
+      this.setData({ profileMediaMessage: slot === "avatar" ? "头像已更新" : "封面已更新" });
+      await this.load();
+    } catch (error) {
+      const message = (error as Error).message || "资料图片更新失败";
+      this.setData({ profileMediaMessage: message });
+      wx.showToast({ title: message, icon: "none" });
+    } finally {
+      this.setData({ profileMediaBusy: false });
+    }
+  },
+  async removeProfileMedia(slot: CompanionProfileMediaSlot) {
+    if (!this.data.profileMediaEnabled || this.data.profileMediaBusy) return;
+    this.setData({ profileMediaBusy: true, profileMediaMessage: "正在移除图片…" });
+    try {
+      await api.removeOwnCompanionProfileMedia(slot);
+      this.setData({ profileMediaMessage: slot === "avatar" ? "头像已移除" : "封面已移除" });
+      await this.load();
+    } catch (error) {
+      this.setData({ profileMediaMessage: (error as Error).message || "移除失败" });
+    } finally {
+      this.setData({ profileMediaBusy: false });
+    }
+  },
   openServiceOfferings() { wx.navigateTo({ url: "/pages/companion/services/index" }); },
   openAvailabilityWindows() { wx.navigateTo({ url: "/pages/companion/availability/index" }); },
   openOnboarding() { wx.navigateTo({ url: "/pages/companion/onboarding/index" }); },

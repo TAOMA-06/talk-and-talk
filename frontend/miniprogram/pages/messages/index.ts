@@ -1,10 +1,13 @@
 import { api, ensureSession } from "../../utils/api";
 import { Conversation } from "../../utils/models";
 import { formatShanghaiDateTime } from "../../utils/order-display";
+import { companionAvatarUrl } from "../../utils/design-assets";
+
+type DisplayConversation = Conversation & { name: string; preview: string; updatedAtText: string; avatarUrl: string };
 
 Page({
   data: {
-    conversations: [] as Array<Conversation & { name: string; preview: string; updatedAtText: string }>,
+    conversations: [] as DisplayConversation[],
     unreadNotificationCount: 0,
     activeSupportCount: null as number | null,
     activeSupportCountText: "—",
@@ -33,6 +36,7 @@ Page({
       ]);
       const conversations = (result.conversations || []).map((item: Conversation) => ({
         ...item,
+        avatarUrl: companionAvatarUrl({ id: item.participant?.id || "", avatarUrl: null }),
         name: item.participant?.name || "平台会话",
         updatedAtText: formatShanghaiDateTime(item.updatedAt),
         preview: item.conversationBlockedByYou
@@ -67,6 +71,7 @@ Page({
       const result = await api.conversations({ page: nextPage, pageSize: 20 });
       const incoming = (result.conversations || []).map((item: Conversation) => ({
         ...item,
+        avatarUrl: companionAvatarUrl({ id: item.participant?.id || "", avatarUrl: null }),
         name: item.participant?.name || "平台会话",
         updatedAtText: formatShanghaiDateTime(item.updatedAt),
         preview: item.conversationBlockedByYou

@@ -1,38 +1,177 @@
-.hero { padding: 34rpx 30rpx; border-radius: 28rpx; background: linear-gradient(135deg, #fff, #eaf4ff); box-shadow: 0 10rpx 28rpx rgba(50, 78, 96, 0.08); }
-.eyebrow { color: #447ca7; font-size: 24rpx; font-weight: 700; }
-.hero-title { margin-top: 10rpx; font-size: 38rpx; font-weight: 700; }
-.hero-copy { margin-top: 14rpx; color: #587083; font-size: 25rpx; line-height: 1.6; }
-.suspended { margin-top: 20rpx; padding: 18rpx; border-radius: 16rpx; background: #ffeadf; color: #8c4526; font-size: 24rpx; line-height: 1.55; }
-.inline-error { margin-top: 20rpx; padding: 18rpx; border-radius: 16rpx; background: #fff0f0; color: #a43f3f; font-size: 24rpx; }
-.section-title { margin: 34rpx 4rpx 16rpx; font-size: 30rpx; font-weight: 700; }
-.form-card { padding: 26rpx; }
-.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14rpx; margin-bottom: 20rpx; }
-.picker-field { box-sizing: border-box; min-height: 76rpx; padding: 18rpx; border: 2rpx solid #dce8ee; border-radius: 15rpx; background: #f8fcff; color: #445d70; font-size: 24rpx; line-height: 38rpx; }
-.row-card { display: flex; align-items: center; gap: 18rpx; padding: 24rpx; }
-.row-main { flex: 1; min-width: 0; }
-.row-title { color: #364d5d; font-size: 27rpx; font-weight: 700; line-height: 1.45; }
-.row-note { margin-top: 8rpx; color: #8295a3; font-size: 22rpx; line-height: 1.5; }
-.small-button { flex: none; margin: 0; padding: 0 18rpx; background: #f0f6fa; color: #4c7897; font-size: 23rpx; line-height: 62rpx; }
-.small-button.approve { background: #e4f4ea; color: #2d7547; }
-.empty-card { color: #7f929f; font-size: 24rpx; line-height: 1.6; }
-.draft-control { padding: 26rpx; }
-.secondary-button { margin-top: 18rpx; background: #edf5fa; color: #3f759b; }
-.empty-title { margin-bottom: 14rpx; color: #4b353a; font-size: 34rpx; font-weight: 700; }
-.retry { margin-top: 28rpx; }
+.hero {
+  padding: 32rpx;
+  border-radius: 28rpx;
+  background: var(--tt-accent-soft);
+  box-shadow: none;
+  border: 1rpx solid var(--tt-border);
+}
 
-/* Restrained redesign */
-.primary-button { min-height: 88rpx; }
-.hero { padding: 32rpx; border: 1rpx solid #E4E6E8; background: #F6ECEF; box-shadow: none; }
-.eyebrow { color: #9B405B; }
-.hero-title, .section-title, .row-title, .empty-title { color: #202124; font-weight: 700; }
-.hero-copy { color: #646970; }
-.row-note, .empty-card { color: #8A9098; }
-.suspended { border: 1rpx solid #ECDDBD; background: #FAF4E8; color: #8A6426; }
-.inline-error { border: 1rpx solid #E8C9CD; background: #FAEEEE; color: #A33D45; }
-.form-card, .row-card, .draft-control { border: 1rpx solid #E4E6E8; background: #FFFFFF; }
-.picker-field { border: 1rpx solid #E4E6E8; border-radius: 14rpx; background: #FFFFFF; color: #202124; }
-.small-button { min-height: 64rpx; border: 1rpx solid #D7BEC6; border-radius: 14rpx; background: #FFFFFF; color: #9B405B; }
-.small-button.approve { border-color: #BFD9CD; background: #EDF6F1; color: #2F6B55; }
-.secondary-button { min-height: 80rpx; border: 1rpx solid #D7BEC6; border-radius: 14rpx; background: #FFFFFF; color: #9B405B; }
-.primary-button.button-hover { background: #7F3248; }
-.primary-button[disabled], .secondary-button[disabled], .small-button[disabled] { opacity: 0.52; }
+.eyebrow {
+  color: var(--tt-accent);
+  font-size: 24rpx;
+  font-weight: 700;
+}
+
+.hero-title {
+  margin-top: 10rpx;
+  font-size: 38rpx;
+  font-weight: 700;
+}
+
+.hero-copy {
+  margin-top: 14rpx;
+  color: var(--tt-text-secondary);
+  font-size: 25rpx;
+  line-height: 1.6;
+}
+
+.suspended {
+  margin-top: 20rpx;
+  padding: 18rpx;
+  border-radius: 16rpx;
+  background: var(--tt-warning-soft);
+  color: var(--tt-warning);
+  font-size: 24rpx;
+  line-height: 1.55;
+  border: 1rpx solid var(--tt-border);
+}
+
+.inline-error {
+  margin-top: 20rpx;
+  padding: 18rpx;
+  border-radius: 16rpx;
+  background: var(--tt-danger-soft);
+  color: var(--tt-danger);
+  font-size: 24rpx;
+  border: 1rpx solid var(--tt-border);
+}
+
+.section-title {
+  margin: 34rpx 4rpx 16rpx;
+  font-size: 30rpx;
+  font-weight: 700;
+}
+
+.form-card {
+  padding: 26rpx;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14rpx;
+  margin-bottom: 20rpx;
+}
+
+.picker-field {
+  box-sizing: border-box;
+  min-height: 76rpx;
+  padding: 18rpx;
+  border: 1rpx solid var(--tt-border);
+  border-radius: 14rpx;
+  background: var(--tt-surface);
+  color: var(--tt-text);
+  font-size: 24rpx;
+  line-height: 38rpx;
+}
+
+.row-card {
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+  padding: 24rpx;
+}
+
+.row-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.row-title {
+  color: var(--tt-info);
+  font-size: 27rpx;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.row-note {
+  margin-top: 8rpx;
+  color: var(--tt-info);
+  font-size: 22rpx;
+  line-height: 1.5;
+}
+
+.small-button {
+  flex: none;
+  margin: 0;
+  padding: 0 18rpx;
+  background: var(--tt-surface);
+  color: var(--tt-accent);
+  font-size: 23rpx;
+  line-height: 62rpx;
+  min-height: 64rpx;
+  border: 1rpx solid var(--tt-accent-soft);
+  border-radius: 14rpx;
+}
+
+.small-button.approve {
+  background: var(--tt-success-soft);
+  color: var(--tt-success);
+  border-color: var(--tt-border-strong);
+}
+
+.empty-card {
+  color: var(--tt-info);
+  font-size: 24rpx;
+  line-height: 1.6;
+}
+
+.draft-control {
+  padding: 26rpx;
+}
+
+.secondary-button {
+  margin-top: 18rpx;
+  background: var(--tt-surface);
+  color: var(--tt-accent);
+  min-height: 80rpx;
+  border: 1rpx solid var(--tt-accent-soft);
+  border-radius: 14rpx;
+}
+
+.empty-title {
+  margin-bottom: 14rpx;
+  color: var(--tt-danger);
+  font-size: 34rpx;
+  font-weight: 700;
+}
+
+.retry {
+  margin-top: 28rpx;
+}
+
+.primary-button {
+  min-height: 88rpx;
+}
+
+.hero-title, .section-title, .row-title, .empty-title {
+  color: var(--tt-text);
+  font-weight: 700;
+}
+
+.row-note, .empty-card {
+  color: var(--tt-text-tertiary);
+}
+
+.form-card, .row-card, .draft-control {
+  border: 1rpx solid var(--tt-border);
+  background: var(--tt-surface);
+}
+
+.primary-button.button-hover {
+  background: var(--tt-accent-pressed);
+}
+
+.primary-button[disabled], .secondary-button[disabled], .small-button[disabled] {
+  opacity: 0.52;
+}

@@ -1,4 +1,4 @@
-import { api, ApiError, ensureSession, readLocalFile, uploadAuthorizedMedia } from "../../utils/api";
+import { api, ApiError, currentUser, ensureSession, readLocalFile, uploadAuthorizedMedia } from "../../utils/api";
 import {
   clientChatMediaEnabled,
   clientPublicInteractionIdentityGrantsAvailable,
@@ -66,6 +66,17 @@ function chatRestrictionFromError(error: unknown): { endsAt: string; reason: str
   };
 }
 
+function chatLoadErrorMessage(error: unknown): string {
+  const apiError = error as ApiError;
+  if (apiError?.code === "PAYMENT_REQUIRED") {
+    return "当前没有可用的已支付订单，会话记录暂时无法查看。";
+  }
+  if (apiError?.code === "CONVERSATION_NOT_FOUND") {
+    return "会话不存在或已结束，请返回消息列表查看当前可用会话。";
+  }
+  return apiError?.message || "加载消息失败";
+}
+
 function imageMimeType(path: string): string {
   const extension = path.split("?")[0].split(".").pop()?.toLowerCase();
   if (extension === "png") return "image/png";
@@ -101,7 +112,9 @@ Page({
     restrictionEndsAt: "",
     restrictionNotice: "",
     appealCaseId: "",
-    error: ""
+    error: "",
+    currentUserId: "",
+    conversationControlsOpen: false
   },
   conversationId: "",
   nextCursor: null as string | null,
@@ -223,6 +236,7 @@ Page({
       this.setData({ loading: true, error: "" });
       try {
         await ensureSession();
+        const user = currentUser();
         const [result, status] = await Promise.all([
           api.messages(this.conversationId),
           api.conversationStatus(this.conversationId)
@@ -242,6 +256,7 @@ Page({
           futureBookingsDeclinedByYou: status.futureBookingsDeclinedByYou,
           messageHistoryAvailable: status.messageHistoryAvailable,
           messageInteractionAvailable: status.messageInteractionAvailable,
+          currentUserId: user?.id || "",
           error: ""
         });
         this.applyRestriction(status.chatRestriction);
@@ -250,7 +265,7 @@ Page({
         this.setData({
           loading: false,
           hasLoadedInitial: false,
-          error: (error as Error).message || "加载消息失败"
+          error: chatLoadErrorMessage(error)
         });
       }
     })();
@@ -263,6 +278,9 @@ Page({
   async retryInitial() {
     if (this.data.loading || this.hasLoadedInitial) return;
     await this.loadInitial();
+  },
+  toggleConversationControls() {
+    this.setData({ conversationControlsOpen: !this.data.conversationControlsOpen });
   },
   async refreshLatest(showFailure = false) {
     if (!this.hasLoadedInitial) {

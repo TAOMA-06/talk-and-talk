@@ -106,6 +106,19 @@ describe("bounded account erasure graph", () => {
     expect(sql).not.toMatch(/\bAVG\s*\(/i);
   });
 
+  it("detaches public profile images while anonymizing a deleted companion", async () => {
+    const { tx, subject } = createHarness();
+
+    await eraseSubjectPhaseBatch(tx, "companion_profile", subject);
+
+    const sql = tx.$executeRaw.mock.calls
+      .map((call: any[]) => Array.from(call[0] as readonly string[]).join(""))
+      .join("\n");
+    expect(sql).toContain('"avatarAssetId" = NULL');
+    expect(sql).toContain('"coverAssetId" = NULL');
+    expect(sql).toContain('"isPublished" = FALSE');
+  });
+
   it("moves both shorter and longer media expiries to the exact retained deadline", async () => {
     const { tx, subject } = createHarness();
     const retentionEndsAt = new Date("2029-08-26T00:00:00.000Z");

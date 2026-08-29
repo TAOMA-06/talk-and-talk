@@ -1,103 +1,553 @@
-.support-page { padding-bottom: 66rpx; }
-.support-hero { padding: 34rpx; border-radius: 28rpx; background: linear-gradient(140deg, #f8e9ed, #fff9f5 60%, #edf4f7); }
-.hero-kicker { color: #a54460; font-size: 22rpx; font-weight: 800; letter-spacing: 3rpx; }
-.hero-title { margin-top: 10rpx; color: #443138; font-size: 40rpx; font-weight: 800; }
-.hero-copy { margin-top: 13rpx; color: #735c64; font-size: 24rpx; line-height: 1.65; }
-.hero-actions { display: flex; gap: 14rpx; margin-top: 22rpx; }
-.hero-button, .hero-link { flex: 1; margin: 0; border-radius: 13rpx; font-size: 24rpx; }
-.hero-button { background: #b94a68; color: #fff; }
-.hero-link { border: 1rpx solid #dbc5cb; background: rgba(255, 255, 255, 0.8); color: #82475a; }
-.public-support-card { margin-top: 22rpx; border: 1rpx solid #d9e4df; }
-.public-support-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16rpx; }
-.public-support-copy { margin-top: 8rpx; color: #79676d; font-size: 22rpx; line-height: 1.6; }
-.public-badge { flex: 0 0 auto; padding: 5rpx 10rpx; border-radius: 9rpx; background: #eaf4ef; color: #3d775e; font-size: 19rpx; }
-.public-operator { margin-top: 18rpx; color: #4b363d; font-size: 25rpx; font-weight: 800; }
-.public-meta { margin-top: 8rpx; color: #735e65; font-size: 22rpx; line-height: 1.55; overflow-wrap: anywhere; }
-.public-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12rpx; margin-top: 17rpx; }
-.public-action { width: 100%; margin: 0; border: 1rpx solid #cbdcd3; background: #f8fcfa; color: #416d58; font-size: 22rpx; }
-.emergency-boundary { margin-top: 16rpx; padding: 13rpx 15rpx; border-radius: 12rpx; background: #fff5f3; color: #8b5055; font-size: 20rpx; line-height: 1.6; }
-.public-support-error { margin-top: 14rpx; color: #8a4b50; font-size: 22rpx; line-height: 1.55; }
-.wechat-complaint-card { margin-top: 22rpx; border: 1rpx solid #d7e2dc; background: linear-gradient(145deg, #f9fcfa, #fffaf8); }
-.wechat-complaint-heading { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; color: #49383e; font-size: 27rpx; font-weight: 800; }
-.wechat-complaint-heading text:last-child { padding: 5rpx 10rpx; border-radius: 9rpx; background: #eaf4ef; color: #3d775e; font-size: 19rpx; }
-.wechat-complaint-copy { margin-top: 14rpx; color: #6f5b62; font-size: 23rpx; line-height: 1.7; }
-.wechat-complaint-boundary { margin-top: 15rpx; padding: 14rpx 16rpx; border-radius: 12rpx; background: #f4f1f2; color: #806b72; font-size: 21rpx; line-height: 1.65; }
-.wechat-complaint-state { margin-top: 18rpx; color: #745f66; font-size: 22rpx; line-height: 1.65; }
-.wechat-complaint-error { color: #914a55; }
-.wechat-complaint-retry, .wechat-complaint-order-link { width: 100%; margin-top: 14rpx; border: 1rpx solid #cbdcd3; background: #f8fcfa; color: #416d58; font-size: 22rpx; }
-.wechat-complaint-list { margin-top: 18rpx; }
-.wechat-complaint-item { margin-top: 14rpx; padding: 18rpx; border: 1rpx solid #e2e9e5; border-radius: 15rpx; background: rgba(255, 255, 255, 0.82); }
-.wechat-complaint-item-top { display: flex; align-items: center; justify-content: space-between; gap: 14rpx; }
-.wechat-complaint-order { min-width: 0; overflow: hidden; color: #705b62; font-size: 20rpx; text-overflow: ellipsis; white-space: nowrap; }
-.wechat-complaint-status { flex: 0 0 auto; padding: 5rpx 10rpx; border-radius: 999rpx; background: #f2ecee; color: #775b64; font-size: 19rpx; font-weight: 800; }
-.wechat-complaint-waiting { background: #fff2dc; color: #8c6333; }
-.wechat-complaint-active { background: #eaf2f8; color: #486e8a; }
-.wechat-complaint-resolved { background: #e8f4ee; color: #3f765d; }
-.wechat-complaint-attention { background: #fff0f0; color: #9a4653; }
-.wechat-complaint-summary { margin-top: 12rpx; color: #6f5b62; font-size: 22rpx; line-height: 1.65; }
-.wechat-complaint-meta { margin-top: 8rpx; color: #907b82; font-size: 20rpx; line-height: 1.55; }
-.form-card { margin-top: 22rpx; border: 2rpx solid #ecd8dd; }
-.section-title { color: #49343a; font-size: 29rpx; font-weight: 800; }
-.picker, .form-input, .form-textarea { box-sizing: border-box; width: 100%; margin-top: 17rpx; border: 1rpx solid #e5d6da; border-radius: 14rpx; background: #fffdfd; color: #523c43; font-size: 25rpx; }
-.picker, .form-input { padding: 20rpx; }
-.form-textarea { min-height: 220rpx; padding: 20rpx; line-height: 1.6; }
-.order-link { margin-top: 16rpx; padding: 14rpx; border-radius: 12rpx; background: #f4f1f2; color: #806a72; font-size: 22rpx; word-break: break-all; }
-.form-boundary { margin-top: 14rpx; color: #907780; font-size: 22rpx; line-height: 1.6; }
-.submit-button { width: 100%; margin-top: 20rpx; font-size: 26rpx; }
-.section-heading { display: flex; align-items: center; justify-content: space-between; margin: 34rpx 4rpx 16rpx; }
-.section-hint { color: #9b838a; font-size: 21rpx; }
-.partial-warning { margin-bottom: 16rpx; padding: 16rpx; border-left: 6rpx solid #b07b49; background: #fff8ed; color: #806548; font-size: 22rpx; line-height: 1.6; }
-.case-card { margin-bottom: 16rpx; padding: 24rpx; border-left: 7rpx solid #55748f; border-radius: 20rpx; background: #fff; box-shadow: 0 7rpx 20rpx rgba(84, 50, 60, 0.06); }
-.case-resolved { border-left-color: #4d8068; }
-.case-attention { border-left-color: #a94458; }
-.case-top { display: flex; align-items: center; justify-content: space-between; gap: 12rpx; }
-.case-kind { color: #92777f; font-size: 21rpx; }
-.case-status { flex: 0 0 auto; color: #84475a; font-size: 22rpx; font-weight: 800; }
-.case-title { margin-top: 11rpx; color: #4b363d; font-size: 28rpx; font-weight: 800; overflow-wrap: anywhere; }
-.case-summary { display: -webkit-box; margin-top: 10rpx; overflow: hidden; color: #735e65; font-size: 23rpx; line-height: 1.6; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
-.case-meta { margin-top: 13rpx; color: #9a8289; font-size: 20rpx; }
-.pagination-row { display: flex; align-items: center; justify-content: space-between; gap: 12rpx; margin: 18rpx 0; color: #806a72; font-size: 20rpx; text-align: center; }
-.pagination-row button { flex: 0 0 auto; margin: 0; border: 1rpx solid #ddc8ce; background: #fff; color: #8a4358; font-size: 21rpx; }
-.pagination-row text { flex: 1; }
-.compact { padding: 46rpx 20rpx; }
-.receipt-note { padding: 16rpx; border-radius: 13rpx; background: #f5f1ee; color: #806f65; font-size: 22rpx; line-height: 1.6; }
-.receipt-row { display: flex; justify-content: space-between; gap: 14rpx; padding: 16rpx 4rpx; border-bottom: 1rpx solid #eadfe1; color: #806970; font-size: 21rpx; }
-.receipt-row text:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.receipt-row text:last-child { flex: 0 0 auto; }
-.community-button { width: 100%; margin-top: 16rpx; border: 1rpx solid #ddc8ce; background: #fff; color: #8a4358; font-size: 24rpx; }
-.retry-button { width: 100%; margin-top: 16rpx; border: 1rpx solid #ddc8ce; background: #fff; color: #8a4358; font-size: 23rpx; }
-.hero-button::after, .hero-link::after, .community-button::after, .retry-button::after, .public-action::after, .wechat-complaint-retry::after, .wechat-complaint-order-link::after { border: 0; }
+.support-page {
+  padding-bottom: 66rpx;
+}
 
-/* Restrained redesign */
-.support-hero { padding: 32rpx; border: 1rpx solid #E4E6E8; background: #F6ECEF; }
-.hero-kicker { color: #9B405B; }
-.hero-title, .section-title, .public-operator, .wechat-complaint-heading, .case-title { color: #202124; font-weight: 700; }
-.hero-copy, .public-support-copy, .public-meta, .wechat-complaint-copy, .wechat-complaint-state, .case-summary { color: #646970; }
-.hero-button, .hero-link { min-height: 88rpx; border-radius: 14rpx; }
-.hero-button { background: #9B405B; color: #FFFFFF; }
-.hero-link { border-color: #D7BEC6; background: #FFFFFF; color: #9B405B; }
-.public-support-card, .wechat-complaint-card, .form-card { border: 1rpx solid #E4E6E8; background: #FFFFFF; }
-.public-badge, .wechat-complaint-heading text:last-child { border-radius: 999rpx; background: #EDF6F1; color: #2F6B55; }
-.public-action { min-height: 80rpx; border-color: #C8D8E1; border-radius: 14rpx; background: #EEF3F6; color: #3F647A; }
-.emergency-boundary { background: #FAEEEE; color: #A33D45; }
-.public-support-error, .wechat-complaint-error, .catalog-pagination-error { color: #A33D45; }
-.wechat-complaint-boundary, .order-link, .receipt-note { background: #F1F2F3; color: #646970; }
-.wechat-complaint-retry, .wechat-complaint-order-link { min-height: 80rpx; border-color: #C8D8E1; border-radius: 14rpx; background: #EEF3F6; color: #3F647A; }
-.wechat-complaint-item { border-color: #E4E6E8; background: #FFFFFF; }
-.wechat-complaint-status { background: #F1F2F3; color: #646970; }
-.wechat-complaint-waiting { background: #FAF4E8; color: #8A6426; }
-.wechat-complaint-active { background: #EEF3F6; color: #3F647A; }
-.wechat-complaint-resolved { background: #EDF6F1; color: #2F6B55; }
-.wechat-complaint-attention { background: #FAEEEE; color: #A33D45; }
-.wechat-complaint-order, .wechat-complaint-meta, .case-kind, .case-meta, .section-hint { color: #8A9098; }
-.picker, .form-input, .form-textarea { border-color: #E4E6E8; background: #FFFFFF; color: #202124; }
-.submit-button { min-height: 88rpx; border-radius: 14rpx; }
-.partial-warning { border-left-color: #8A6426; background: #FAF4E8; color: #8A6426; }
-.case-card { border: 1rpx solid #E4E6E8; border-left: 6rpx solid #3F647A; background: #FFFFFF; box-shadow: none; }
-.case-resolved { border-left-color: #2F6B55; }
-.case-attention { border-left-color: #A33D45; }
-.case-status, .pagination-row button, .community-button, .retry-button { color: #9B405B; }
-.pagination-row, .receipt-row { color: #646970; }
-.pagination-row button, .community-button, .retry-button { min-height: 80rpx; border-color: #D7BEC6; border-radius: 14rpx; background: #FFFFFF; }
-.hero-button.button-hover { background: #7F3248; }
-.hero-button[disabled], .submit-button[disabled], .public-action[disabled] { opacity: 0.52; }
+.support-hero {
+  padding: 32rpx;
+  border-radius: 28rpx;
+  background: var(--tt-accent-soft);
+  border: 1rpx solid var(--tt-border);
+}
+
+.hero-kicker {
+  color: var(--tt-accent);
+  font-size: 22rpx;
+  font-weight: 800;
+  letter-spacing: 3rpx;
+}
+
+.hero-title {
+  margin-top: 10rpx;
+  color: var(--tt-accent);
+  font-size: 40rpx;
+  font-weight: 800;
+}
+
+.hero-copy {
+  margin-top: 13rpx;
+  color: var(--tt-text);
+  font-size: 24rpx;
+  line-height: 1.65;
+}
+
+.hero-actions {
+  display: flex;
+  gap: 14rpx;
+  margin-top: 22rpx;
+}
+
+.hero-button, .hero-link {
+  flex: 1;
+  margin: 0;
+  border-radius: 14rpx;
+  font-size: 24rpx;
+  min-height: 88rpx;
+}
+
+.hero-button {
+  background: var(--tt-accent);
+  color: var(--tt-on-accent);
+}
+
+.hero-link {
+  border: 1rpx solid var(--tt-border-strong);
+  background: var(--tt-surface);
+  color: var(--tt-accent);
+  border-color: var(--tt-border-strong);
+}
+
+.public-support-card {
+  margin-top: 22rpx;
+  border: 1rpx solid var(--tt-success-soft);
+}
+
+.public-support-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
+.public-support-copy {
+  margin-top: 8rpx;
+  color: var(--tt-text-secondary);
+  font-size: 22rpx;
+  line-height: 1.6;
+}
+
+.public-badge {
+  flex: 0 0 auto;
+  padding: 5rpx 10rpx;
+  border-radius: 9rpx;
+  background: var(--tt-success-soft);
+  color: var(--tt-success);
+  font-size: 19rpx;
+}
+
+.public-operator {
+  margin-top: 18rpx;
+  color: var(--tt-accent);
+  font-size: 25rpx;
+  font-weight: 800;
+}
+
+.public-meta {
+  margin-top: 8rpx;
+  color: var(--tt-text);
+  font-size: 22rpx;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.public-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12rpx;
+  margin-top: 17rpx;
+}
+
+.public-action {
+  width: 100%;
+  margin: 0;
+  border: 1rpx solid var(--tt-success-soft);
+  background: var(--tt-info-soft);
+  color: var(--tt-info);
+  font-size: 22rpx;
+  min-height: 80rpx;
+  border-color: var(--tt-info-soft);
+  border-radius: 14rpx;
+}
+
+.emergency-boundary {
+  margin-top: 16rpx;
+  padding: 13rpx 15rpx;
+  border-radius: 12rpx;
+  background: var(--tt-danger-soft);
+  color: var(--tt-danger);
+  font-size: 20rpx;
+  line-height: 1.6;
+}
+
+.public-support-error {
+  margin-top: 14rpx;
+  color: var(--tt-danger);
+  font-size: 22rpx;
+  line-height: 1.55;
+}
+
+.wechat-complaint-card {
+  margin-top: 22rpx;
+  border: 1rpx solid var(--tt-success-soft);
+  background: var(--tt-surface-alt);
+}
+
+.wechat-complaint-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  color: var(--tt-text);
+  font-size: 27rpx;
+  font-weight: 800;
+}
+
+.wechat-complaint-heading text:last-child {
+  padding: 5rpx 10rpx;
+  border-radius: 9rpx;
+  background: var(--tt-success-soft);
+  color: var(--tt-success);
+  font-size: 19rpx;
+}
+
+.wechat-complaint-copy {
+  margin-top: 14rpx;
+  color: var(--tt-text);
+  font-size: 23rpx;
+  line-height: 1.7;
+}
+
+.wechat-complaint-boundary {
+  margin-top: 15rpx;
+  padding: 14rpx 16rpx;
+  border-radius: 12rpx;
+  background: var(--tt-surface);
+  color: var(--tt-text-secondary);
+  font-size: 21rpx;
+  line-height: 1.65;
+}
+
+.wechat-complaint-state {
+  margin-top: 18rpx;
+  color: var(--tt-text);
+  font-size: 22rpx;
+  line-height: 1.65;
+}
+
+.wechat-complaint-error {
+  color: var(--tt-danger);
+}
+
+.wechat-complaint-retry, .wechat-complaint-order-link {
+  width: 100%;
+  margin-top: 14rpx;
+  border: 1rpx solid var(--tt-success-soft);
+  background: var(--tt-info-soft);
+  color: var(--tt-info);
+  font-size: 22rpx;
+  min-height: 80rpx;
+  border-color: var(--tt-info-soft);
+  border-radius: 14rpx;
+}
+
+.wechat-complaint-list {
+  margin-top: 18rpx;
+}
+
+.wechat-complaint-item {
+  margin-top: 14rpx;
+  padding: 18rpx;
+  border: 1rpx solid var(--tt-border);
+  border-radius: 15rpx;
+  background: var(--tt-surface);
+  border-color: var(--tt-border);
+}
+
+.wechat-complaint-item-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14rpx;
+}
+
+.wechat-complaint-order {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--tt-text);
+  font-size: 20rpx;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wechat-complaint-status {
+  flex: 0 0 auto;
+  padding: 5rpx 10rpx;
+  border-radius: 999rpx;
+  background: var(--tt-surface-alt);
+  color: var(--tt-text-secondary);
+  font-size: 19rpx;
+  font-weight: 800;
+}
+
+.wechat-complaint-waiting {
+  background: var(--tt-warning-soft);
+  color: var(--tt-warning);
+}
+
+.wechat-complaint-active {
+  background: var(--tt-info-soft);
+  color: var(--tt-info);
+}
+
+.wechat-complaint-resolved {
+  background: var(--tt-success-soft);
+  color: var(--tt-success);
+}
+
+.wechat-complaint-attention {
+  background: var(--tt-danger-soft);
+  color: var(--tt-danger);
+}
+
+.wechat-complaint-summary {
+  margin-top: 12rpx;
+  color: var(--tt-text);
+  font-size: 22rpx;
+  line-height: 1.65;
+}
+
+.wechat-complaint-meta {
+  margin-top: 8rpx;
+  color: var(--tt-text-secondary);
+  font-size: 20rpx;
+  line-height: 1.55;
+}
+
+.form-card {
+  margin-top: 22rpx;
+  border: 2rpx solid var(--tt-danger-soft);
+}
+
+.section-title {
+  color: var(--tt-accent);
+  font-size: 29rpx;
+  font-weight: 800;
+}
+
+.picker, .form-input, .form-textarea {
+  box-sizing: border-box;
+  width: 100%;
+  margin-top: 17rpx;
+  border: 1rpx solid var(--tt-accent-soft);
+  border-radius: 14rpx;
+  background: var(--tt-surface);
+  color: var(--tt-text);
+  font-size: 25rpx;
+  border-color: var(--tt-border);
+}
+
+.picker, .form-input {
+  padding: 20rpx;
+}
+
+.form-textarea {
+  min-height: 220rpx;
+  padding: 20rpx;
+  line-height: 1.6;
+}
+
+.order-link {
+  margin-top: 16rpx;
+  padding: 14rpx;
+  border-radius: 12rpx;
+  background: var(--tt-surface);
+  color: var(--tt-text-secondary);
+  font-size: 22rpx;
+  word-break: break-all;
+}
+
+.form-boundary {
+  margin-top: 14rpx;
+  color: var(--tt-text-secondary);
+  font-size: 22rpx;
+  line-height: 1.6;
+}
+
+.submit-button {
+  width: 100%;
+  margin-top: 20rpx;
+  font-size: 26rpx;
+  min-height: 88rpx;
+  border-radius: 14rpx;
+}
+
+.section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 34rpx 4rpx 16rpx;
+}
+
+.section-hint {
+  color: var(--tt-text-secondary);
+  font-size: 21rpx;
+}
+
+.partial-warning {
+  margin-bottom: 16rpx;
+  padding: 16rpx;
+  border-left: 6rpx solid var(--tt-warning);
+  background: var(--tt-warning-soft);
+  color: var(--tt-warning);
+  font-size: 22rpx;
+  line-height: 1.6;
+  border-left-color: var(--tt-warning);
+}
+
+.case-card {
+  margin-bottom: 16rpx;
+  padding: 24rpx;
+  border-left: 6rpx solid var(--tt-info);
+  border-radius: 20rpx;
+  background: var(--tt-surface);
+  box-shadow: none;
+  border: 1rpx solid var(--tt-border);
+}
+
+.case-resolved {
+  border-left-color: var(--tt-success);
+}
+
+.case-attention {
+  border-left-color: var(--tt-danger);
+}
+
+.case-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12rpx;
+}
+
+.case-kind {
+  color: var(--tt-text-secondary);
+  font-size: 21rpx;
+}
+
+.case-status {
+  flex: 0 0 auto;
+  color: var(--tt-accent);
+  font-size: 22rpx;
+  font-weight: 800;
+}
+
+.case-title {
+  margin-top: 11rpx;
+  color: var(--tt-accent);
+  font-size: 28rpx;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.case-summary {
+  display: -webkit-box;
+  margin-top: 10rpx;
+  overflow: hidden;
+  color: var(--tt-text);
+  font-size: 23rpx;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.case-meta {
+  margin-top: 13rpx;
+  color: var(--tt-text-secondary);
+  font-size: 20rpx;
+}
+
+.pagination-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12rpx;
+  margin: 18rpx 0;
+  color: var(--tt-text-secondary);
+  font-size: 20rpx;
+  text-align: center;
+}
+
+.pagination-row button {
+  flex: 0 0 auto;
+  margin: 0;
+  border: 1rpx solid var(--tt-accent-soft);
+  background: var(--tt-surface);
+  color: var(--tt-accent);
+  font-size: 21rpx;
+}
+
+.pagination-row text {
+  flex: 1;
+}
+
+.compact {
+  padding: 46rpx 20rpx;
+}
+
+.receipt-note {
+  padding: 16rpx;
+  border-radius: 13rpx;
+  background: var(--tt-warning-soft);
+  color: var(--tt-text-secondary);
+  font-size: 22rpx;
+  line-height: 1.6;
+}
+
+.receipt-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 14rpx;
+  padding: 16rpx 4rpx;
+  border-bottom: 1rpx solid var(--tt-danger-soft);
+  color: var(--tt-text-secondary);
+  font-size: 21rpx;
+}
+
+.receipt-row text:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.receipt-row text:last-child {
+  flex: 0 0 auto;
+}
+
+.community-button {
+  width: 100%;
+  margin-top: 16rpx;
+  border: 1rpx solid var(--tt-accent-soft);
+  background: var(--tt-surface);
+  color: var(--tt-accent);
+  font-size: 24rpx;
+}
+
+.retry-button {
+  width: 100%;
+  margin-top: 16rpx;
+  border: 1rpx solid var(--tt-accent-soft);
+  background: var(--tt-surface);
+  color: var(--tt-accent);
+  font-size: 23rpx;
+}
+
+.hero-button::after, .hero-link::after, .community-button::after, .retry-button::after, .public-action::after, .wechat-complaint-retry::after, .wechat-complaint-order-link::after {
+  border: 0;
+}
+
+.hero-title, .section-title, .public-operator, .wechat-complaint-heading, .case-title {
+  color: var(--tt-text);
+  font-weight: 700;
+}
+
+.hero-copy, .public-support-copy, .public-meta, .wechat-complaint-copy, .wechat-complaint-state, .case-summary {
+  color: var(--tt-text-secondary);
+}
+
+.public-support-card, .wechat-complaint-card, .form-card {
+  border: 1rpx solid var(--tt-border);
+  background: var(--tt-surface);
+}
+
+.public-badge, .wechat-complaint-heading text:last-child {
+  border-radius: 999rpx;
+  background: var(--tt-success-soft);
+  color: var(--tt-success);
+}
+
+.public-support-error, .wechat-complaint-error, .catalog-pagination-error {
+  color: var(--tt-danger);
+}
+
+.wechat-complaint-boundary, .order-link, .receipt-note {
+  background: var(--tt-surface-alt);
+  color: var(--tt-text-secondary);
+}
+
+.wechat-complaint-order, .wechat-complaint-meta, .case-kind, .case-meta, .section-hint {
+  color: var(--tt-text-tertiary);
+}
+
+.case-status, .pagination-row button, .community-button, .retry-button {
+  color: var(--tt-accent);
+}
+
+.pagination-row, .receipt-row {
+  color: var(--tt-text-secondary);
+}
+
+.pagination-row button, .community-button, .retry-button {
+  min-height: 80rpx;
+  border-color: var(--tt-accent-soft);
+  border-radius: 14rpx;
+  background: var(--tt-surface);
+}
+
+.hero-button.button-hover {
+  background: var(--tt-accent-pressed);
+}
+
+.hero-button[disabled], .submit-button[disabled], .public-action[disabled] {
+  opacity: 0.52;
+}

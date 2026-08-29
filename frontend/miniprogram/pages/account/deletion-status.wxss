@@ -1,9 +1,9 @@
 .unavailable-page {
   min-height: 100vh;
   box-sizing: border-box;
-  padding: 112rpx 40rpx 56rpx;
-  background: #fffafa;
-  color: #2d2527;
+  padding: 112rpx 32rpx calc(56rpx + env(safe-area-inset-bottom));
+  background: var(--tt-bg);
+  color: var(--tt-text);
   text-align: center;
 }
 
@@ -11,83 +11,88 @@
   width: 104rpx;
   height: 104rpx;
   margin: 0 auto 36rpx;
-  border-radius: 52rpx;
-  background: #f4e6e9;
-  color: #9e405b;
+  border-radius: 999rpx;
+  background: var(--tt-accent-soft);
+  color: var(--tt-accent);
   font-size: 58rpx;
   line-height: 104rpx;
   font-weight: 600;
+  margin-bottom: 32rpx;
+  border: 1rpx solid var(--tt-border);
 }
 
 .title {
   font-size: 44rpx;
   line-height: 1.25;
-  font-weight: 650;
+  font-weight: 700;
+  color: var(--tt-text);
 }
 
 .message {
   margin-top: 24rpx;
-  color: #65575b;
+  color: var(--tt-text);
   font-size: 30rpx;
   line-height: 1.7;
 }
 
 .privacy-card {
-  margin: 56rpx 0 48rpx;
+  margin: 48rpx 0 40rpx;
   padding: 32rpx;
-  border: 1rpx solid #eadfe2;
-  border-radius: 24rpx;
-  background: #ffffff;
+  border: 1rpx solid var(--tt-border);
+  border-radius: 20rpx;
+  background: var(--tt-surface);
   text-align: left;
+  border-color: var(--tt-border);
 }
 
 .privacy-title {
   font-size: 28rpx;
-  font-weight: 600;
+  font-weight: 700;
+  color: var(--tt-text);
 }
 
 .privacy-copy {
   margin-top: 14rpx;
-  color: #76686c;
+  color: var(--tt-text-secondary);
   font-size: 26rpx;
   line-height: 1.65;
 }
 
-.primary-button,
-.secondary-button {
+.primary-button, .secondary-button {
   width: 100%;
-  height: 92rpx;
+  height: auto;
   margin-top: 20rpx;
-  border-radius: 46rpx;
+  border-radius: 14rpx;
   font-size: 30rpx;
-  line-height: 92rpx;
+  line-height: 1.35;
+  min-height: 88rpx;
+  padding: 20rpx 24rpx;
 }
 
 .primary-button {
-  background: #a3435d;
-  color: #ffffff;
+  background: var(--tt-accent);
+  color: var(--tt-on-accent);
 }
 
 .secondary-button {
-  border: 1rpx solid #dfd2d6;
-  background: #ffffff;
-  color: #514448;
+  border: 1rpx solid var(--tt-border);
+  background: var(--tt-surface);
+  color: var(--tt-text);
+  border-color: var(--tt-border);
 }
 
-.primary-button::after,
-.secondary-button::after {
+.primary-button::after, .secondary-button::after {
   border: 0;
 }
 
-/* Restrained redesign */
-.unavailable-page { padding: 112rpx 32rpx calc(56rpx + env(safe-area-inset-bottom)); background: #F7F7F5; color: #202124; }
-.status-mark { margin-bottom: 32rpx; border: 1rpx solid #E4E6E8; border-radius: 999rpx; background: #F6ECEF; color: #9B405B; }
-.title { color: #202124; font-weight: 700; }
-.message, .privacy-copy { color: #646970; }
-.privacy-card { margin: 48rpx 0 40rpx; border-color: #E4E6E8; border-radius: 20rpx; background: #FFFFFF; }
-.privacy-title { color: #202124; font-weight: 700; }
-.primary-button, .secondary-button { min-height: 88rpx; height: auto; padding: 20rpx 24rpx; border-radius: 14rpx; line-height: 1.35; }
-.primary-button { background: #9B405B; color: #FFFFFF; }
-.secondary-button { border-color: #E4E6E8; background: #FFFFFF; color: #202124; }
-.primary-button.button-hover { background: #7F3248; }
-.secondary-button.button-hover { background: #F1F2F3; }
+.message, .privacy-copy {
+  color: var(--tt-text-secondary);
+}
+
+.primary-button.button-hover {
+  background: var(--tt-accent-pressed);
+}
+
+.secondary-button.button-hover {
+  background: var(--tt-surface-alt);
+}

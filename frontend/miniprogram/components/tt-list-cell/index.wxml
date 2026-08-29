@@ -1,0 +1,8 @@
+<view class="cell {{disabled ? 'cell-disabled' : ''}}" aria-role="{{disabled ? '' : 'button'}}" tabindex="{{disabled ? -1 : 0}}" bindtap="onTap">
+  <slot name="leading"></slot>
+  <view class="cell-copy">
+    <view class="cell-title">{{title}}</view>
+    <view wx:if="{{subtitle}}" class="cell-subtitle">{{subtitle}}</view>
+  </view>
+  <view class="cell-trailing"><slot name="trailing"></slot><text wx:if="{{meta}}" class="cell-meta">{{meta}}</text><text wx:if="{{arrow}}" class="cell-arrow">›</text></view>
+</view>

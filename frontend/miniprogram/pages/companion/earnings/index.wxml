@@ -25,7 +25,7 @@
     </picker>
     <view wx:if="{{!earnings.length}}" class="card empty-card">当前没有收益记录。平台不会用占位金额制造可提现余额。</view>
     <view wx:for="{{earnings}}" wx:key="id" wx:for-item="earning" class="card earning-card {{earning.selected ? 'selected' : ''}}" data-id="{{earning.id}}" bindtap="toggleEarning" aria-role="checkbox" aria-checked="{{earning.selected}}" aria-label="选择收益明细，金额 {{earning.amountText}}，状态 {{earning.statusText}}" tabindex="0">
-      <view class="check">{{earning.status === 'available' ? (earning.selected ? '✓' : '○') : '·'}}</view>
+      <view class="check">{{earning.status === 'available' ? (earning.selected ? '已选' : '选择') : '不可选'}}</view>
       <view class="earning-main">
         <view class="earning-head"><view class="amount">{{earning.amountText}}</view><view class="status status-{{earning.status}}">{{earning.statusText}}</view></view>
         <view class="meta">订单 {{earning.orderId}} · 可结算日 {{earning.timeText}}</view>

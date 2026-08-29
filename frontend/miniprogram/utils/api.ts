@@ -2,7 +2,7 @@ import { BackendConfig, backendConfig } from "./config";
 import {
   AccountDeletionPolicy, AccountDeletionRequest, AccountSession, AuthSession, AuthUser, AvailabilityReminderChannel, ChatMessage, CommunityPost, CommunityPostReportReceipt, CommunityReportReceipt, Companion, Conversation, CrisisIntervention, CrisisInterventionRiskCode, CrisisInterventionSource, CrisisResourceCatalog, CustomerAdultEligibilityMethod, CustomerAdultEligibilityStatus, DataRightsFollowUp, DataRightsRequest, DataRightsRequestType, FavoriteAvailabilityReminderPreference, FavoriteCompanion, InvoiceRequest, MediaAttachment, MiniProgramPayParams,
   InvoiceCandidateOrder, LoginIdentityUnavailableNotice, ModerationAppeal, ModerationAppealableCase, Notification, Order, OrderExperienceFeedbackTag, OrderRescheduleRequest, OrderServiceIntentCode, OrderTimeline, PaymentDispute, PublicSupportInfo, RecommendationCompanionExclusion, RecommendationPlacement, RecommendationPreference, RecommendationTopic, RecommendedCompanion, RefundRequestResult, ReporterCase, ReporterCaseFollowUp, ReporterCaseSummary, Review, VoiceRoomAccess,
-  CompanionTodayServiceSchedule,
+  CompanionTodayServiceSchedule, CompanionProfileMediaAsset, CompanionProfileMediaSlot,
   CompanionAvailabilityResponse, CreateOwnAvailabilityWindowInput, CreateOwnServiceOfferingInput, OwnAvailabilityWindow, OwnServiceOffering, ServiceOffering,
   SupportTicket, SupportTicketCategory, UpdateOwnAvailabilityWindowInput, UpdateOwnServiceOfferingInput, UserAccountAction, UserAccountAppeal
 } from "./models";
@@ -40,6 +40,11 @@ export type MediaUploadReservation = {
 
 export type ControlledEvidenceAsset = Omit<MediaAttachment, "url"> & {
   purpose: "orderSupportFact" | "attendanceDisputeStatement" | "companionIncidentReport";
+};
+
+export type CompanionProfileMediaReservation = {
+  asset: CompanionProfileMediaAsset;
+  upload: { url: string; method: "PUT" | "POST"; headers: Record<string, string>; expiresAt: string };
 };
 
 const ACCESS_TOKEN_KEY = "talkandtalk.accessToken";
@@ -140,6 +145,19 @@ function ensureCloudInitialized(config: Extract<BackendConfig, { transport: "clo
 export function initializeBackend(): void {
   const config = backendConfig();
   if (config.transport === "cloudRun") ensureCloudInitialized(config);
+}
+
+/** Resolve a server-returned stable media path without exposing Cloud Run internals. */
+export function resolveBackendMediaUrl(path: string | null | undefined): string {
+  if (!path) return "";
+  if (/^https?:\/\//i.test(path)) return path;
+  const config = backendConfig();
+  if (config.transport !== "https") return "";
+  try {
+    return new URL(path, new URL(config.baseUrl).origin).toString();
+  } catch {
+    return "";
+  }
 }
 
 function sleep(ms: number): Promise<void> {
@@ -1003,6 +1021,26 @@ export const api = {
   ),
   clearRecentlyViewedCompanions: () => request<{ cleared: number }>("/recently-viewed/companions", { method: "DELETE" }),
   ownCompanion: () => request<Companion>("/companions/me/profile"),
+  reserveOwnCompanionProfileMedia: (
+    slot: CompanionProfileMediaSlot,
+    data: { mimeType: "image/jpeg" | "image/png" | "image/webp"; sizeBytes: number; sha256: string }
+  ) => request<CompanionProfileMediaReservation>(
+    `/companions/me/profile-media/${slot}/uploads`,
+    { method: "POST", data }
+  ),
+  completeOwnCompanionProfileMedia: (slot: CompanionProfileMediaSlot, assetId: string) =>
+    request<{ asset: CompanionProfileMediaAsset }>(
+      `/companions/me/profile-media/${slot}/uploads/${encodeURIComponent(assetId)}/complete`,
+      { method: "POST" }
+    ),
+  ownCompanionProfileMediaStatus: (slot: CompanionProfileMediaSlot, assetId: string) =>
+    request<{ asset: CompanionProfileMediaAsset }>(
+      `/companions/me/profile-media/${slot}/uploads/${encodeURIComponent(assetId)}`
+    ),
+  removeOwnCompanionProfileMedia: (slot: CompanionProfileMediaSlot) => request<{
+    removed: boolean;
+    slot: CompanionProfileMediaSlot;
+  }>(`/companions/me/profile-media/${slot}`, { method: "DELETE" }),
   ownServiceOfferings: (options: { page?: number; pageSize?: number } = {}) => {
     const query = [
       options.page ? `page=${encodeURIComponent(String(options.page))}` : "",

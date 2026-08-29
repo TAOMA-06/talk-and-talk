@@ -1,0 +1,750 @@
+{
+  "theme": "dark",
+  "capturedAt": "2026-08-29T03:05:59.899Z",
+  "routes": [
+    {
+      "name": "01-consent",
+      "route": "/pages/consent/index",
+      "profile": "anonymous",
+      "theme": "dark",
+      "outcome": "captured",
+      "actualPath": "pages/consent/index",
+      "expectedPath": "pages/consent/index",
+      "captureMethod": "computer-use-devtools-window-crop",
+      "simulator": {
+        "model": "iPhone 12/13 (Pro)",
+        "logicalWidth": 390,
+        "logicalHeight": 844,
+        "scale": "80%"
+      },
+      "crop": {
+        "x": 729,
+        "y": 79,
+        "width": 274,
+        "height": 586
+      },
+      "rawFile": "../dark-raw/01-consent.jpeg",
+      "screenshotFile": "01-consent.png"
+    },
+    {
+      "name": "02-home",
+      "route": "/pages/home/index",
+      "profile": "customer",
+      "theme": "dark",
+      "outcome": "captured",
+      "actualPath": "pages/home/index",
+      "expectedPath": "pages/home/index",
+      "captureMethod": "computer-use-devtools-window-crop",
+      "simulator": {
+        "model": "iPhone 12/13 (Pro)",
+        "logicalWidth": 390,
+        "logicalHeight": 844,
+        "scale": "80%"
+      },
+      "crop": {
+        "x": 729,
+        "y": 79,
+        "width": 274,
+        "height": 586
+      },
+      "rawFile": "../dark-raw/02-home.jpeg",
+      "screenshotFile": "02-home.png"
+    },
+    {
+      "name": "03-discover",
+      "route": "/pages/discover/index",
+      "profile": "customer",
+      "theme": "dark",
+      "outcome": "captured",
+      "actualPath": "pages/discover/index",
+      "expectedPath": "pages/discover/index",
+      "captureMethod": "computer-use-devtools-window-crop",
+      "simulator": {
+        "model": "iPhone 12/13 (Pro)",
+        "logicalWidth": 390,
+        "logicalHeight": 844,
+        "scale": "80%"
+      },
+      "crop": {
+        "x": 729,
+        "y": 79,
+        "width": 274,
+        "height": 586
+      },
+      "rawFile": "../dark-raw/03-discover.jpeg",
+      "screenshotFile": "03-discover.png"
+    },
+    {
+      "name": "04-community",
+      "route": "/pages/community/index",
+      "profile": "customer",
+      "theme": "dark",
+      "outcome": "captured",
+      "actualPath": "pages/community/index",
+      "expectedPath": "pages/community/index",
+      "captureMethod": "computer-use-devtools-window-crop",
+      "simulator": {
+        "model": "iPhone 12/13 (Pro)",
+        "logicalWidth": 390,
+        "logicalHeight": 844,
+        "scale": "80%"
+      },
+      "crop": {
+        "x": 729,
+        "y": 79,
+        "width": 274,
+        "height": 586
+      },
+      "rawFile": "../dark-raw/04-community.jpeg",
+      "screenshotFile": "04-community.png"
+    },
+    {
+      "name": "05-orders",
+      "route": "/pages/orders/index",
+      "profile": "customer",
+      "theme": "dark",
+      "outcome": "captured",
+      "actualPath": "pages/orders/index",
+      "expectedPath": "pages/orders/index",
+      "captureMethod": "computer-use-devtools-window-crop",
+      "simulator": {
+        "model": "iPhone 12/13 (Pro)",
+        "logicalWidth": 390,
+        "logicalHeight": 844,
+        "scale": "80%"
+      },
+      "crop": {
+        "x": 729,
+        "y": 79,
+        "width": 274,
+        "height": 586
+      },
+      "rawFile": "../dark-raw/05-orders.jpeg",
+      "screenshotFile": "05-orders.png"
+    },
+    {
+      "name": "06-order-detail",
+      "route": "/pages/order/detail?id=demo-20260828-u1-order-paid",
+      "profile": "customer",
+      "theme": "dark",
+      "outcome": "captured",
+      "actualPath": "pages/order/detail",
+      "expectedPath": "pages/order/detail",
+      "captureMethod": "computer-use-devtools-window-crop",
+      "simulator": {
+        "model": "iPhone 12/13 (Pro)",
+        "logicalWidth": 390,
+        "logicalHeight": 844,
+        "scale": "80%"
+      },
+      "crop": {
+        "x": 729,
+        "y": 79,
+        "width": 274,
+        "height": 586
+      },
+      "rawFile": "../dark-raw/06-order-detail.jpeg",
+      "screenshotFile": "06-order-detail.png"
+    },
+    {
+      "name": "07-order-payment",
+      "route": "/pages/order/payment?orderId=demo-20260828-u1-order-pending",
+      "profile": "customer",
+      "theme": "dark",
+      "outcome": "captured",
+      "actualPath": "pages/order/payment",
+      "expectedPath": "pages/order/payment",
+      "captureMethod": "computer-use-devtools-window-crop",
+      "simulator": {
+        "model": "iPhone 12/13 (Pro)",
+        "logicalWidth": 390,
+        "logicalHeight": 844,
+        "scale": "80%"
+      },
+      "crop": {
+        "x": 729,
+        "y": 79,
+        "width": 274,
+        "height": 586
+      },
+      "rawFile": "../dark-raw/07-order-payment.jpeg",
+      "screenshotFile": "07-order-payment.png"
+    },
+    {
+      "name": "08-order-aftercare",
+      "route": "/pages/order/aftercare?orderId=demo-20260828-u1-order-refunded",
+      "profile": "customer",
+      "theme": "dark",
+      "outcome": "captured",
+      "actualPath": "pages/order/aftercare",
+      "expectedPath": "pages/order/aftercare",
+      "captureMethod": "computer-use-devtools-window-crop",
+      "simulator": {
+        "model": "iPhone 12/13 (Pro)",
+        "logicalWidth": 390,
+        "logicalHeight": 844,
+        "scale": "80%"
+      },
+      "crop": {
+        "x": 729,
+        "y": 79,
+        "width": 274,
+        "height": 586
+      },
+      "rawFile": "../dark-raw/08-order-aftercare.jpeg",
+      "screenshotFile": "08-order-aftercare.png"
+    },
+    {
+      "name": "09-order-dispute",
+      "route": "/pages/order/dispute?orderId=demo-20260828-u1-order-refunded",
+      "profile": "customer",
+      "theme": "dark",
+      "outcome": "captured",
+      "actualPath": "pages/order/dispute",
+      "expectedPath": "pages/order/dispute",
+      "captureMethod": "computer-use-devtools-window-crop",
+      "simulator": {
+        "model": "iPhone 12/13 (Pro)",
+        "logicalWidth": 390,
+        "logicalHeight": 844,
+        "scale": "80%"
+      },
+      "crop": {
+        "x": 729,
+        "y": 79,
+        "width": 274,
+        "height": 586
+      },
+      "rawFile": "../dark-raw/09-order-dispute.jpeg",
+      "screenshotFile": "09-order-dispute.png"
+    },
+    {
+      "name": "10-messages",
+      "route": "/pages/messages/index",
+      "profile": "customer",
+      "theme": "dark",
+      "outcome": "captured",
+      "actualPath": "pages/messages/index",
+      "expectedPath": "pages/messages/index",
+      "captureMethod": "computer-use-devtools-window-crop",
+      "simulator": {
+        "model": "iPhone 12/13 (Pro)",
+        "logicalWidth": 390,
+        "logicalHeight": 844,
+        "scale": "80%"
+      },
+      "crop": {
+        "x": 729,
+        "y": 79,
+        "width": 274,
+        "height": 586
+      },
+      "rawFile": "../dark-raw/10-messages.jpeg",
+      "screenshotFile": "10-messages.png"
+    },
+    {
+      "name": "11-notifications",
+      "route": "/pages/notifications/index",
+      "profile": "customer",
+      "theme": "dark",
+      "outcome": "captured",
+      "actualPath": "pages/notifications/index",
+      "expectedPath": "pages/notifications/index",
+      "captureMethod": "computer-use-devtools-window-crop",
+      "simulator": {
+        "model": "iPhone 12/13 (Pro)",
+        "logicalWidth": 390,
+        "logicalHeight": 844,
+        "scale": "80%"
+      },
+      "crop": {
+        "x": 729,
+        "y": 79,
+        "width": 274,
+        "height": 586
+      },
+      "rawFile": "../dark-raw/11-notifications.jpeg",
+      "screenshotFile": "11-notifications.png"
+    },
+    {
+      "name": "12-profile",
+      "route": "/pages/profile/index",
+      "profile": "customer",
+      "theme": "dark",
+      "outcome": "captured",
+      "actualPath": "pages/profile/index",
+      "expectedPath": "pages/profile/index",
+      "captureMethod": "computer-use-devtools-window-crop",
+      "simulator": {
+        "model": "iPhone 12/13 (Pro)",
+        "logicalWidth": 390,
+        "logicalHeight": 844,
+        "scale": "80%"
+      },
+      "crop": {
+        "x": 729,
+        "y": 79,
+        "width": 274,
+        "height": 586
+      },
+      "rawFile": "../dark-raw/12-profile.jpeg",
+      "screenshotFile": "12-profile.png"
+    },
+    {
+      "name": "13-account",
+      "route": "/pages/account/index",
+      "profile": "customer",
+      "theme": "dark",
+      "outcome": "captured",
+      "actualPath": "pages/account/index",
+      "expectedPath": "pages/account/index",
+      "captureMethod": "computer-use-devtools-window-crop",
+      "simulator": {
+        "model": "iPhone 12/13 (Pro)",
+        "logicalWidth": 390,
+        "logicalHeight": 844,
+        "scale": "80%"
+      },
+      "crop": {
+        "x": 729,
+        "y": 79,
+        "width": 274,
+        "height": 586
+      },
+      "rawFile": "../dark-raw/13-account.jpeg",
+      "screenshotFile": "13-account.png"
+    },
+    {
+      "name": "14-adult-eligibility",
+      "route": "/pages/account/adult-eligibility",
+      "profile": "customer",
+      "theme": "dark",
+      "outcome": "captured",
+      "actualPath": "pages/account/adult-eligibility",
+      "expectedPath": "pages/account/adult-eligibility",
+      "captureMethod": "computer-use-devtools-window-crop",
+      "simulator": {
+        "model": "iPhone 12/13 (Pro)",
+        "logicalWidth": 390,
+        "logicalHeight": 844,
+        "scale": "80%"
+      },
+      "crop": {
+        "x": 729,
+        "y": 79,
+        "width": 274,
+        "height": 586
+      },
+      "rawFile": "../dark-raw/14-adult-eligibility.jpeg",
+      "screenshotFile": "14-adult-eligibility.png"
+    },
+    {
+      "name": "15-deletion-status",
+      "route": "/pages/account/deletion-status",
+      "profile": "customer",
+      "theme": "dark",
+      "outcome": "captured",
+      "actualPath": "pages/account/deletion-status",
+      "expectedPath": "pages/account/deletion-status",
+      "captureMethod": "computer-use-devtools-window-crop",
+      "simulator": {
+        "model": "iPhone 12/13 (Pro)",
+        "logicalWidth": 390,
+        "logicalHeight": 844,
+        "scale": "80%"
+      },
+      "crop": {
+        "x": 729,
+        "y": 79,
+        "width": 274,
+        "height": 586
+      },
+      "rawFile": "../dark-raw/15-deletion-status.jpeg",
+      "screenshotFile": "15-deletion-status.png"
+    },
+    {
+      "name": "20-companion-detail",
+      "route": "/pages/companion/detail?id=c1",
+      "profile": "customer",
+      "theme": "dark",
+      "outcome": "captured",
+      "actualPath": "pages/companion/detail",
+      "expectedPath": "pages/companion/detail",
+      "captureMethod": "computer-use-devtools-window-crop",
+      "simulator": {
+        "model": "iPhone 12/13 (Pro)",
+        "logicalWidth": 390,
+        "logicalHeight": 844,
+        "scale": "80%"
+      },
+      "crop": {
+        "x": 729,
+        "y": 79,
+        "width": 274,
+        "height": 586
+      },
+      "rawFile": "../dark-raw/20-companion-detail.jpeg",
+      "screenshotFile": "20-companion-detail.png"
+    },
+    {
+      "name": "16-safety",
+      "route": "/pages/safety/index",
+      "profile": "customer",
+      "theme": "dark",
+      "outcome": "captured",
+      "actualPath": "pages/safety/index",
+      "expectedPath": "pages/safety/index",
+      "captureMethod": "computer-use-devtools-window-crop",
+      "simulator": {
+        "model": "iPhone 12/13 (Pro)",
+        "logicalWidth": 390,
+        "logicalHeight": 844,
+        "scale": "80%"
+      },
+      "crop": {
+        "x": 729,
+        "y": 79,
+        "width": 274,
+        "height": 586
+      },
+      "rawFile": "../dark-raw/16-safety.jpeg",
+      "screenshotFile": "16-safety.png"
+    },
+    {
+      "name": "17-crisis",
+      "route": "/pages/crisis/index",
+      "profile": "customer",
+      "theme": "dark",
+      "outcome": "captured",
+      "actualPath": "pages/crisis/index",
+      "expectedPath": "pages/crisis/index",
+      "captureMethod": "computer-use-devtools-window-crop",
+      "simulator": {
+        "model": "iPhone 12/13 (Pro)",
+        "logicalWidth": 390,
+        "logicalHeight": 844,
+        "scale": "80%"
+      },
+      "crop": {
+        "x": 729,
+        "y": 79,
+        "width": 274,
+        "height": 586
+      },
+      "rawFile": "../dark-raw/17-crisis.jpeg",
+      "screenshotFile": "17-crisis.png"
+    },
+    {
+      "name": "18-support",
+      "route": "/pages/support/index",
+      "profile": "customer",
+      "theme": "dark",
+      "outcome": "captured",
+      "actualPath": "pages/support/index",
+      "expectedPath": "pages/support/index",
+      "captureMethod": "computer-use-devtools-window-crop",
+      "simulator": {
+        "model": "iPhone 12/13 (Pro)",
+        "logicalWidth": 390,
+        "logicalHeight": 844,
+        "scale": "80%"
+      },
+      "crop": {
+        "x": 729,
+        "y": 79,
+        "width": 274,
+        "height": 586
+      },
+      "rawFile": "../dark-raw/18-support.jpeg",
+      "screenshotFile": "18-support.png"
+    },
+    {
+      "name": "19-support-detail",
+      "route": "/pages/support/detail?id=demo-20260828-u1-support-resolved",
+      "profile": "customer",
+      "theme": "dark",
+      "outcome": "captured",
+      "actualPath": "pages/support/detail",
+      "expectedPath": "pages/support/detail",
+      "captureMethod": "computer-use-devtools-window-crop",
+      "simulator": {
+        "model": "iPhone 12/13 (Pro)",
+        "logicalWidth": 390,
+        "logicalHeight": 844,
+        "scale": "80%"
+      },
+      "crop": {
+        "x": 729,
+        "y": 79,
+        "width": 274,
+        "height": 586
+      },
+      "rawFile": "../dark-raw/19-support-detail.jpeg",
+      "screenshotFile": "19-support-detail.png"
+    },
+    {
+      "name": "21-companion-workbench",
+      "route": "/pages/companion/workbench/index",
+      "profile": "companion",
+      "theme": "dark",
+      "outcome": "captured",
+      "actualPath": "pages/companion/workbench/index",
+      "expectedPath": "pages/companion/workbench/index",
+      "captureMethod": "computer-use-devtools-window-crop",
+      "simulator": {
+        "model": "iPhone 12/13 (Pro)",
+        "logicalWidth": 390,
+        "logicalHeight": 844,
+        "scale": "80%"
+      },
+      "crop": {
+        "x": 729,
+        "y": 79,
+        "width": 274,
+        "height": 586
+      },
+      "rawFile": "../dark-raw/21-companion-workbench.jpeg",
+      "screenshotFile": "21-companion-workbench.png"
+    },
+    {
+      "name": "22-companion-onboarding",
+      "route": "/pages/companion/onboarding/index",
+      "profile": "companion",
+      "theme": "dark",
+      "outcome": "captured",
+      "actualPath": "pages/companion/onboarding/index",
+      "expectedPath": "pages/companion/onboarding/index",
+      "captureMethod": "computer-use-devtools-window-crop",
+      "simulator": {
+        "model": "iPhone 12/13 (Pro)",
+        "logicalWidth": 390,
+        "logicalHeight": 844,
+        "scale": "80%"
+      },
+      "crop": {
+        "x": 729,
+        "y": 79,
+        "width": 274,
+        "height": 586
+      },
+      "rawFile": "../dark-raw/22-companion-onboarding.jpeg",
+      "screenshotFile": "22-companion-onboarding.png"
+    },
+    {
+      "name": "23-companion-schedule",
+      "route": "/pages/companion/schedule/index",
+      "profile": "companion",
+      "theme": "dark",
+      "outcome": "captured",
+      "actualPath": "pages/companion/schedule/index",
+      "expectedPath": "pages/companion/schedule/index",
+      "captureMethod": "computer-use-devtools-window-crop",
+      "simulator": {
+        "model": "iPhone 12/13 (Pro)",
+        "logicalWidth": 390,
+        "logicalHeight": 844,
+        "scale": "80%"
+      },
+      "crop": {
+        "x": 729,
+        "y": 79,
+        "width": 274,
+        "height": 586
+      },
+      "rawFile": "../dark-raw/23-companion-schedule.jpeg",
+      "screenshotFile": "23-companion-schedule.png"
+    },
+    {
+      "name": "24-companion-development",
+      "route": "/pages/companion/development/index",
+      "profile": "companion",
+      "theme": "dark",
+      "outcome": "captured",
+      "actualPath": "pages/companion/development/index",
+      "expectedPath": "pages/companion/development/index",
+      "captureMethod": "computer-use-devtools-window-crop",
+      "simulator": {
+        "model": "iPhone 12/13 (Pro)",
+        "logicalWidth": 390,
+        "logicalHeight": 844,
+        "scale": "80%"
+      },
+      "crop": {
+        "x": 729,
+        "y": 79,
+        "width": 274,
+        "height": 586
+      },
+      "rawFile": "../dark-raw/24-companion-development.jpeg",
+      "screenshotFile": "24-companion-development.png"
+    },
+    {
+      "name": "25-companion-earnings",
+      "route": "/pages/companion/earnings/index",
+      "profile": "companion",
+      "theme": "dark",
+      "outcome": "captured",
+      "actualPath": "pages/companion/earnings/index",
+      "expectedPath": "pages/companion/earnings/index",
+      "captureMethod": "computer-use-devtools-window-crop",
+      "simulator": {
+        "model": "iPhone 12/13 (Pro)",
+        "logicalWidth": 390,
+        "logicalHeight": 844,
+        "scale": "80%"
+      },
+      "crop": {
+        "x": 729,
+        "y": 79,
+        "width": 274,
+        "height": 586
+      },
+      "rawFile": "../dark-raw/25-companion-earnings.jpeg",
+      "screenshotFile": "25-companion-earnings.png"
+    },
+    {
+      "name": "26-companion-safety",
+      "route": "/pages/companion/safety/index",
+      "profile": "companion",
+      "theme": "dark",
+      "outcome": "captured",
+      "actualPath": "pages/companion/safety/index",
+      "expectedPath": "pages/companion/safety/index",
+      "captureMethod": "computer-use-devtools-window-crop",
+      "simulator": {
+        "model": "iPhone 12/13 (Pro)",
+        "logicalWidth": 390,
+        "logicalHeight": 844,
+        "scale": "80%"
+      },
+      "crop": {
+        "x": 729,
+        "y": 79,
+        "width": 274,
+        "height": 586
+      },
+      "rawFile": "../dark-raw/26-companion-safety.jpeg",
+      "screenshotFile": "26-companion-safety.png"
+    },
+    {
+      "name": "27-companion-services",
+      "route": "/pages/companion/services/index",
+      "profile": "companion",
+      "theme": "dark",
+      "outcome": "captured",
+      "actualPath": "pages/companion/services/index",
+      "expectedPath": "pages/companion/services/index",
+      "captureMethod": "computer-use-devtools-window-crop",
+      "simulator": {
+        "model": "iPhone 12/13 (Pro)",
+        "logicalWidth": 390,
+        "logicalHeight": 844,
+        "scale": "80%"
+      },
+      "crop": {
+        "x": 729,
+        "y": 79,
+        "width": 274,
+        "height": 586
+      },
+      "rawFile": "../dark-raw/27-companion-services.jpeg",
+      "screenshotFile": "27-companion-services.png"
+    },
+    {
+      "name": "28-companion-availability",
+      "route": "/pages/companion/availability/index",
+      "profile": "companion",
+      "theme": "dark",
+      "outcome": "captured",
+      "actualPath": "pages/companion/availability/index",
+      "expectedPath": "pages/companion/availability/index",
+      "captureMethod": "computer-use-devtools-window-crop",
+      "simulator": {
+        "model": "iPhone 12/13 (Pro)",
+        "logicalWidth": 390,
+        "logicalHeight": 844,
+        "scale": "80%"
+      },
+      "crop": {
+        "x": 729,
+        "y": 79,
+        "width": 274,
+        "height": 586
+      },
+      "rawFile": "../dark-raw/28-companion-availability.jpeg",
+      "screenshotFile": "28-companion-availability.png"
+    },
+    {
+      "name": "29-chat",
+      "route": "/pages/chat/index?id=c1",
+      "profile": "customer",
+      "theme": "dark",
+      "outcome": "captured",
+      "actualPath": "pages/chat/index",
+      "expectedPath": "pages/chat/index",
+      "captureMethod": "computer-use-devtools-window-crop",
+      "simulator": {
+        "model": "iPhone 12/13 (Pro)",
+        "logicalWidth": 390,
+        "logicalHeight": 844,
+        "scale": "80%"
+      },
+      "crop": {
+        "x": 729,
+        "y": 79,
+        "width": 274,
+        "height": 586
+      },
+      "rawFile": "../dark-raw/29-chat.jpeg",
+      "screenshotFile": "29-chat.png"
+    },
+    {
+      "name": "30-voice",
+      "route": "/pages/voice/index?orderId=demo-20260828-u1-order-paid",
+      "profile": "customer",
+      "theme": "dark",
+      "outcome": "captured",
+      "actualPath": "pages/voice/index",
+      "expectedPath": "pages/voice/index",
+      "captureMethod": "computer-use-devtools-window-crop",
+      "simulator": {
+        "model": "iPhone 12/13 (Pro)",
+        "logicalWidth": 390,
+        "logicalHeight": 844,
+        "scale": "80%"
+      },
+      "crop": {
+        "x": 729,
+        "y": 79,
+        "width": 274,
+        "height": 586
+      },
+      "rawFile": "../dark-raw/30-voice.jpeg",
+      "screenshotFile": "30-voice.png"
+    },
+    {
+      "name": "31-legal",
+      "route": "/pages/legal/index?type=privacy",
+      "profile": "customer",
+      "theme": "dark",
+      "outcome": "captured",
+      "actualPath": "pages/legal/index",
+      "expectedPath": "pages/legal/index",
+      "captureMethod": "computer-use-devtools-window-crop",
+      "simulator": {
+        "model": "iPhone 12/13 (Pro)",
+        "logicalWidth": 390,
+        "logicalHeight": 844,
+        "scale": "80%"
+      },
+      "crop": {
+        "x": 729,
+        "y": 79,
+        "width": 274,
+        "height": 586
+      },
+      "rawFile": "../dark-raw/31-legal.jpeg",
+      "screenshotFile": "31-legal.png"
+    }
+  ]
+}

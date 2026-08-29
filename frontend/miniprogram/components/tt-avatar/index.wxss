@@ -1,0 +1,11 @@
+:host { display: inline-flex; flex: none; }
+.avatar { position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 1rpx solid var(--tt-border); background: var(--tt-accent-soft); color: var(--tt-accent); font-weight: 700; }
+.avatar-circle { border-radius: 999rpx; }
+.avatar-rounded { border-radius: 20rpx; }
+.avatar-sm { width: 64rpx; height: 64rpx; font-size: 22rpx; }
+.avatar-md { width: 88rpx; height: 88rpx; font-size: 28rpx; }
+.avatar-lg { width: 120rpx; height: 120rpx; font-size: 34rpx; }
+.avatar-xl { width: 168rpx; height: 168rpx; font-size: 42rpx; }
+.avatar-image { width: 100%; height: 100%; }
+.avatar-fallback { display: flex; width: 100%; height: 100%; align-items: center; justify-content: center; }
+.avatar-online { position: absolute; right: 4rpx; bottom: 4rpx; width: 18rpx; height: 18rpx; border: 4rpx solid var(--tt-surface); border-radius: 999rpx; background: var(--tt-success); }

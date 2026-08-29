@@ -1,0 +1,10 @@
+.skeleton { display: flex; gap: 20rpx; padding: 26rpx 0; }
+.skeleton-avatar { width: 88rpx; height: 88rpx; flex: none; border-radius: 999rpx; }
+.skeleton-copy { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 14rpx; padding-top: 6rpx; }
+.skeleton-line { height: 18rpx; border-radius: 999rpx; }
+.skeleton-line-0 { width: 58%; }
+.skeleton-line-1 { width: 92%; }
+.skeleton-line-2 { width: 72%; }
+.shimmer { background: var(--tt-surface-alt); animation: pulse 1.4s ease-in-out infinite; }
+@keyframes pulse { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .shimmer { animation: none; } }

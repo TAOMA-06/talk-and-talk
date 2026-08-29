@@ -1,111 +1,467 @@
-.order-detail-page { padding-bottom: 64rpx; }
-.status-hero { margin-bottom: 22rpx; padding: 34rpx; border-radius: 28rpx; background: linear-gradient(135deg, #fff0f3, #fffaf7); }
-.status-paid, .status-inService, .status-completed { background: linear-gradient(135deg, #edf8f3, #f9fcfb); }
-.status-cancelled, .status-refunded { background: #f4f1f2; }
-.status-kicker { color: #a56a7a; font-size: 21rpx; word-break: break-all; }
-.status-title { margin-top: 10rpx; color: #443037; font-size: 42rpx; font-weight: 800; }
-.status-copy { margin-top: 14rpx; color: #715860; font-size: 25rpx; line-height: 1.7; }
-.section-title { margin-bottom: 14rpx; color: #49343a; font-size: 30rpx; font-weight: 800; }
-.detail-row { display: flex; justify-content: space-between; gap: 24rpx; padding: 14rpx 0; border-bottom: 1rpx solid #f0e5e7; color: #715a61; font-size: 25rpx; line-height: 1.55; }
-.detail-row text:first-child { flex: 0 0 120rpx; color: #998087; }
-.detail-row text:last-child { flex: 1; text-align: right; }
-.detail-row.total text:last-child { color: #b74665; font-size: 31rpx; font-weight: 800; }
-.snapshot-note { margin-top: 18rpx; color: #937c83; font-size: 22rpx; line-height: 1.6; }
-.refund-policy-card { border: 1rpx solid #ead9dd; background: linear-gradient(145deg, #fffdfd, #fff8f9); }
-.refund-policy-copy { margin-top: 17rpx; color: #715a61; font-size: 23rpx; line-height: 1.72; }
-.refund-policy-error { padding: 16rpx; border-left: 5rpx solid #b65a6e; background: #fff4f5; color: #8f4853; font-size: 23rpx; line-height: 1.65; }
-.refund-policy-link { width: 100%; margin-top: 16rpx; border: 1rpx solid #ddc8ce; background: #fff; color: #8a4358; font-size: 24rpx; }
-.refund-card { border-left: 7rpx solid #b07b49; }
-.refund-copy { margin-top: 16rpx; color: #755e65; font-size: 24rpx; line-height: 1.65; }
-.payment-dispute-card { border: 1rpx solid #dbe4df; background: linear-gradient(145deg, #fbfdfc, #fffaf8); }
-.payment-dispute-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18rpx; }
-.payment-dispute-kicker { color: #8f7a81; font-size: 20rpx; line-height: 1.5; }
-.payment-dispute-badge { flex: 0 0 auto; max-width: 220rpx; padding: 7rpx 12rpx; border-radius: 999rpx; background: #f2ecee; color: #775b64; font-size: 20rpx; font-weight: 800; text-align: center; }
-.payment-dispute-waiting { background: #fff2dc; color: #8c6333; }
-.payment-dispute-active { background: #eaf2f8; color: #486e8a; }
-.payment-dispute-resolved { background: #e8f4ee; color: #3f765d; }
-.payment-dispute-attention { background: #fff0f0; color: #9a4653; }
-.payment-dispute-copy, .payment-dispute-summary { margin-top: 20rpx; color: #715d64; font-size: 23rpx; line-height: 1.7; }
-.payment-dispute-error { color: #8f4853; }
-.timeline-resource-state { color: #806970; font-size: 23rpx; line-height: 1.65; }
-.timeline-resource-error { padding: 16rpx; border-left: 5rpx solid #b65a6e; background: #fff6f7; color: #8f4853; }
-.resource-retry { width: 100%; margin: 14rpx 0 0; padding: 10rpx 14rpx; border: 1rpx solid #d6b9c1; background: #fff; color: #8c4056; font-size: 24rpx; line-height: 1.5; }
-.payment-dispute-boundary { margin-top: 18rpx; padding: 15rpx 17rpx; border-radius: 13rpx; background: #f4f1f2; color: #806c73; font-size: 21rpx; line-height: 1.65; }
-.payment-dispute-guide { width: 100%; margin-top: 16rpx; border: 1rpx solid #cbdcd3; background: #f8fcfa; color: #416d58; font-size: 24rpx; }
-.attendance-dispute-card { border: 1rpx solid #ecd7b8; background: linear-gradient(145deg, #fffaf1, #fffdf9); }
-.attendance-dispute-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18rpx; }
-.attendance-dispute-copy { color: #735d42; font-size: 24rpx; line-height: 1.6; }
-.attendance-dispute-badge { flex: 0 0 auto; padding: 7rpx 13rpx; border-radius: 999rpx; background: #fff0d6; color: #8a6131; font-size: 20rpx; font-weight: 800; }
-.action-card { background: #fffdfc; }
-.replacement-notice { margin: 4rpx 0 18rpx; padding: 18rpx; border-left: 6rpx solid #9a7b4f; background: #fcfaf5; }
-.replacement-title { color: #6f5738; font-size: 26rpx; font-weight: 800; }
-.replacement-copy { margin-top: 8rpx; color: #75664f; font-size: 23rpx; line-height: 1.65; }
-.replacement-action { width: 100%; margin: 14rpx 0 0; border: 1rpx solid #d4c4a7; background: #fff; color: #725938; font-size: 24rpx; }
-.replacement-action::after { border: 0; }
-.action-button { width: 100%; margin-top: 14rpx; border-radius: 14rpx; font-size: 26rpx; }
-.service-action-notice { margin-top: 14rpx; padding: 14rpx 16rpx; border-radius: 12rpx; background: #f6f1f2; color: #7c626a; font-size: 23rpx; line-height: 1.6; }
-.secondary-button { border: 1rpx solid #ddc8ce; background: #fff; color: #8a4358; }
-.danger-button { border: 1rpx solid #d3aab2; background: #fff5f5; color: #9a3e50; }
-.safety-button { background: #8f3e51; color: #fff; }
-.timeline-item { display: flex; gap: 18rpx; padding: 14rpx 0; }
-.timeline-dot { width: 14rpx; height: 14rpx; flex: 0 0 14rpx; margin-top: 11rpx; border: 5rpx solid #f3dce2; border-radius: 50%; background: #b94a68; }
-.timeline-copy { min-width: 0; flex: 1; padding-bottom: 18rpx; border-bottom: 1rpx solid #f0e4e7; }
-.timeline-heading { display: flex; justify-content: space-between; gap: 14rpx; color: #503940; font-size: 25rpx; font-weight: 700; }
-.timeline-heading text:last-child { flex: 0 0 auto; color: #a18a91; font-size: 20rpx; font-weight: 400; }
-.timeline-description { margin-top: 8rpx; color: #806970; font-size: 23rpx; line-height: 1.6; }
-.order-meta { color: #9c858c; font-size: 21rpx; text-align: center; }
-.retry-button { margin-top: 24rpx; background: #b94a68; color: #fff; font-size: 25rpx; }
-.secondary-button::after, .danger-button::after, .safety-button::after, .retry-button::after, .payment-dispute-guide::after, .resource-retry::after, .refund-policy-link::after { border: 0; }
+.order-detail-page {
+  padding-bottom: calc(64rpx + env(safe-area-inset-bottom));
+}
 
-/* Shared transaction hierarchy */
-.order-detail-page { padding-bottom: calc(64rpx + env(safe-area-inset-bottom)); }
-.status-hero { margin-bottom: 24rpx; padding: 32rpx; border: 1rpx solid #e3cbd2; border-left: 8rpx solid #9b405b; border-radius: 28rpx; background: #f6ecef; }
-.status-pending { border-color: #eadfca; border-left-color: #8a6426; background: #faf4e8; }
-.status-paid, .status-inService, .status-completed { border-color: #cee3d7; border-left-color: #2f6b55; background: #edf6f1; }
-.status-cancelled, .status-refunded { border-color: #e4e6e8; border-left-color: #646970; background: #f1f2f3; }
-.status-kicker { color: #646970; font-size: 22rpx; line-height: 1.55; word-break: break-all; }
-.status-title { margin-top: 10rpx; color: #202124; font-size: 42rpx; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
-.status-copy { margin-top: 14rpx; color: #3f4247; font-size: 25rpx; line-height: 1.7; overflow-wrap: anywhere; }
-.section-title { margin-bottom: 16rpx; color: #202124; font-size: 30rpx; font-weight: 700; }
-.detail-row { color: #3f4247; border-bottom-color: #e4e6e8; }
-.detail-row text:first-child { color: #646970; }
-.detail-row text:last-child { min-width: 0; color: #202124; overflow-wrap: anywhere; }
-.detail-row.total text:last-child { color: #9b405b; font-weight: 700; }
-.snapshot-note { color: #646970; font-size: 23rpx; overflow-wrap: anywhere; }
-.refund-policy-card { border-color: #e3cbd2; border-left: 6rpx solid #9b405b; background: #ffffff; }
-.refund-policy-copy, .refund-copy { color: #3f4247; overflow-wrap: anywhere; }
-.refund-policy-error, .payment-dispute-error, .timeline-resource-error { border-left-color: #a33d45; background: #faeeee; color: #a33d45; }
-.refund-policy-link, .resource-retry { min-height: 88rpx; border-color: #d8b7c1; background: #ffffff; color: #9b405b; }
-.refund-card { border-left-color: #8a6426; background: #faf4e8; }
-.payment-dispute-card { border-color: #d7e2e8; border-left: 6rpx solid #3f647a; background: #ffffff; }
-.payment-dispute-heading > view:first-child, .attendance-dispute-heading > view:first-child { min-width: 0; flex: 1; }
-.payment-dispute-kicker { color: #646970; font-size: 21rpx; }
-.payment-dispute-badge { border: 1rpx solid #e4e6e8; background: #f1f2f3; color: #3f4247; font-weight: 700; overflow-wrap: anywhere; }
-.payment-dispute-waiting { border-color: #eadfca; background: #faf4e8; color: #8a6426; }
-.payment-dispute-active { border-color: #d7e2e8; background: #eef3f6; color: #3f647a; }
-.payment-dispute-resolved { border-color: #cee3d7; background: #edf6f1; color: #2f6b55; }
-.payment-dispute-attention { border-color: #efcdd0; background: #faeeee; color: #a33d45; }
-.payment-dispute-copy, .payment-dispute-summary { color: #3f4247; overflow-wrap: anywhere; }
-.timeline-resource-state { color: #646970; }
-.payment-dispute-boundary { border: 1rpx solid #d7e2e8; background: #eef3f6; color: #3f647a; }
-.payment-dispute-guide { min-height: 88rpx; border-color: #bdd0da; background: #ffffff; color: #3f647a; }
-.attendance-dispute-card { border-color: #eadfca; border-left: 6rpx solid #8a6426; background: #ffffff; }
-.attendance-dispute-copy { color: #646970; overflow-wrap: anywhere; }
-.attendance-dispute-badge { border: 1rpx solid #eadfca; background: #faf4e8; color: #8a6426; font-weight: 700; }
-.action-card { border-color: #e3cbd2; background: #ffffff; }
-.replacement-notice { border: 1rpx solid #d7e2e8; border-left: 6rpx solid #3f647a; border-radius: 14rpx; background: #eef3f6; }
-.replacement-title { color: #202124; font-weight: 700; }
-.replacement-copy { color: #646970; overflow-wrap: anywhere; }
-.replacement-action { min-height: 88rpx; border-color: #bdd0da; color: #3f647a; }
-.action-button { min-height: 88rpx; margin-top: 16rpx; }
-.service-action-notice { border: 1rpx solid #e4e6e8; background: #f1f2f3; color: #646970; overflow-wrap: anywhere; }
-.secondary-button { border-color: #d8b7c1; color: #9b405b; }
-.danger-button { border-color: #efcdd0; background: #faeeee; color: #a33d45; }
-.safety-button { border-color: #a33d45; background: #a33d45; color: #ffffff; }
-.timeline-dot { border-color: #f6ecef; background: #9b405b; }
-.timeline-copy { border-bottom-color: #e4e6e8; }
-.timeline-heading { color: #202124; }
-.timeline-heading text:last-child { color: #8a9098; }
-.timeline-description { color: #646970; overflow-wrap: anywhere; }
-.order-meta { color: #8a9098; }
-.retry-button { min-height: 88rpx; border-color: #9b405b; background: #9b405b; color: #ffffff; }
+.status-hero {
+  margin-bottom: 24rpx;
+  padding: 32rpx;
+  border-radius: 28rpx;
+  background: var(--tt-accent-soft);
+  border: 1rpx solid var(--tt-accent-soft);
+  border-left: 8rpx solid var(--tt-accent);
+}
+
+.status-paid, .status-inService, .status-completed {
+  background: var(--tt-success-soft);
+  border-color: var(--tt-border);
+  border-left-color: var(--tt-success);
+}
+
+.status-cancelled, .status-refunded {
+  background: var(--tt-surface-alt);
+  border-color: var(--tt-border);
+  border-left-color: var(--tt-text-secondary);
+}
+
+.status-kicker {
+  color: var(--tt-text-secondary);
+  font-size: 22rpx;
+  word-break: break-all;
+  line-height: 1.55;
+}
+
+.status-title {
+  margin-top: 10rpx;
+  color: var(--tt-text);
+  font-size: 42rpx;
+  font-weight: 700;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.status-copy {
+  margin-top: 14rpx;
+  color: var(--tt-text);
+  font-size: 25rpx;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.section-title {
+  margin-bottom: 16rpx;
+  color: var(--tt-text);
+  font-size: 30rpx;
+  font-weight: 700;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 24rpx;
+  padding: 14rpx 0;
+  border-bottom: 1rpx solid var(--tt-danger-soft);
+  color: var(--tt-text);
+  font-size: 25rpx;
+  line-height: 1.55;
+  border-bottom-color: var(--tt-border);
+}
+
+.detail-row text:first-child {
+  flex: 0 0 120rpx;
+  color: var(--tt-text-secondary);
+}
+
+.detail-row text:last-child {
+  flex: 1;
+  text-align: right;
+  min-width: 0;
+  color: var(--tt-text);
+  overflow-wrap: anywhere;
+}
+
+.detail-row.total text:last-child {
+  color: var(--tt-accent);
+  font-size: 31rpx;
+  font-weight: 700;
+}
+
+.snapshot-note {
+  margin-top: 18rpx;
+  color: var(--tt-text-secondary);
+  font-size: 23rpx;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.refund-policy-card {
+  border: 1rpx solid var(--tt-border);
+  background: var(--tt-surface);
+  border-color: var(--tt-border);
+  border-left: 6rpx solid var(--tt-accent);
+}
+
+.refund-policy-copy {
+  margin-top: 17rpx;
+  color: var(--tt-text);
+  font-size: 23rpx;
+  line-height: 1.72;
+}
+
+.refund-policy-error {
+  padding: 16rpx;
+  border-left: 5rpx solid var(--tt-danger);
+  background: var(--tt-danger-soft);
+  color: var(--tt-danger);
+  font-size: 23rpx;
+  line-height: 1.65;
+}
+
+.refund-policy-link {
+  width: 100%;
+  margin-top: 16rpx;
+  border: 1rpx solid var(--tt-accent-soft);
+  background: var(--tt-surface);
+  color: var(--tt-accent);
+  font-size: 24rpx;
+}
+
+.refund-card {
+  border-left: 7rpx solid var(--tt-warning);
+  border-left-color: var(--tt-warning);
+  background: var(--tt-warning-soft);
+}
+
+.refund-copy {
+  margin-top: 16rpx;
+  color: var(--tt-text);
+  font-size: 24rpx;
+  line-height: 1.65;
+}
+
+.payment-dispute-card {
+  border: 1rpx solid var(--tt-border);
+  background: var(--tt-surface);
+  border-color: var(--tt-border);
+  border-left: 6rpx solid var(--tt-info);
+}
+
+.payment-dispute-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18rpx;
+}
+
+.payment-dispute-kicker {
+  color: var(--tt-text-secondary);
+  font-size: 21rpx;
+  line-height: 1.5;
+}
+
+.payment-dispute-badge {
+  flex: 0 0 auto;
+  max-width: 220rpx;
+  padding: 7rpx 12rpx;
+  border-radius: 999rpx;
+  background: var(--tt-surface-alt);
+  color: var(--tt-text);
+  font-size: 20rpx;
+  font-weight: 700;
+  text-align: center;
+  border: 1rpx solid var(--tt-border);
+  overflow-wrap: anywhere;
+}
+
+.payment-dispute-waiting {
+  background: var(--tt-warning-soft);
+  color: var(--tt-warning);
+  border-color: var(--tt-border);
+}
+
+.payment-dispute-active {
+  background: var(--tt-info-soft);
+  color: var(--tt-info);
+  border-color: var(--tt-border);
+}
+
+.payment-dispute-resolved {
+  background: var(--tt-success-soft);
+  color: var(--tt-success);
+  border-color: var(--tt-border);
+}
+
+.payment-dispute-attention {
+  background: var(--tt-danger-soft);
+  color: var(--tt-danger);
+  border-color: var(--tt-border);
+}
+
+.payment-dispute-copy, .payment-dispute-summary {
+  margin-top: 20rpx;
+  color: var(--tt-text);
+  font-size: 23rpx;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.payment-dispute-error {
+  color: var(--tt-danger);
+}
+
+.timeline-resource-state {
+  color: var(--tt-text-secondary);
+  font-size: 23rpx;
+  line-height: 1.65;
+}
+
+.timeline-resource-error {
+  padding: 16rpx;
+  border-left: 5rpx solid var(--tt-danger);
+  background: var(--tt-danger-soft);
+  color: var(--tt-danger);
+}
+
+.resource-retry {
+  width: 100%;
+  margin: 14rpx 0 0;
+  padding: 10rpx 14rpx;
+  border: 1rpx solid var(--tt-accent-soft);
+  background: var(--tt-surface);
+  color: var(--tt-accent);
+  font-size: 24rpx;
+  line-height: 1.5;
+}
+
+.payment-dispute-boundary {
+  margin-top: 18rpx;
+  padding: 15rpx 17rpx;
+  border-radius: 13rpx;
+  background: var(--tt-info-soft);
+  color: var(--tt-info);
+  font-size: 21rpx;
+  line-height: 1.65;
+  border: 1rpx solid var(--tt-border);
+}
+
+.payment-dispute-guide {
+  width: 100%;
+  margin-top: 16rpx;
+  border: 1rpx solid var(--tt-success-soft);
+  background: var(--tt-surface);
+  color: var(--tt-info);
+  font-size: 24rpx;
+  min-height: 88rpx;
+  border-color: var(--tt-info-soft);
+}
+
+.attendance-dispute-card {
+  border: 1rpx solid var(--tt-border);
+  background: var(--tt-surface);
+  border-color: var(--tt-border);
+  border-left: 6rpx solid var(--tt-warning);
+}
+
+.attendance-dispute-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18rpx;
+}
+
+.attendance-dispute-copy {
+  color: var(--tt-text-secondary);
+  font-size: 24rpx;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.attendance-dispute-badge {
+  flex: 0 0 auto;
+  padding: 7rpx 13rpx;
+  border-radius: 999rpx;
+  background: var(--tt-warning-soft);
+  color: var(--tt-warning);
+  font-size: 20rpx;
+  font-weight: 700;
+  border: 1rpx solid var(--tt-border);
+}
+
+.action-card {
+  background: var(--tt-surface);
+  border-color: var(--tt-border);
+}
+
+.replacement-notice {
+  margin: 4rpx 0 18rpx;
+  padding: 18rpx;
+  border-left: 6rpx solid var(--tt-info);
+  background: var(--tt-info-soft);
+  border: 1rpx solid var(--tt-border);
+  border-radius: 14rpx;
+}
+
+.replacement-title {
+  color: var(--tt-text);
+  font-size: 26rpx;
+  font-weight: 700;
+}
+
+.replacement-copy {
+  margin-top: 8rpx;
+  color: var(--tt-text-secondary);
+  font-size: 23rpx;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.replacement-action {
+  width: 100%;
+  margin: 14rpx 0 0;
+  border: 1rpx solid var(--tt-warning);
+  background: var(--tt-surface);
+  color: var(--tt-info);
+  font-size: 24rpx;
+  min-height: 88rpx;
+  border-color: var(--tt-info-soft);
+}
+
+.replacement-action::after {
+  border: 0;
+}
+
+.action-button {
+  width: 100%;
+  margin-top: 16rpx;
+  border-radius: 14rpx;
+  font-size: 26rpx;
+  min-height: 88rpx;
+}
+
+.service-action-notice {
+  margin-top: 14rpx;
+  padding: 14rpx 16rpx;
+  border-radius: 12rpx;
+  background: var(--tt-surface-alt);
+  color: var(--tt-text-secondary);
+  font-size: 23rpx;
+  line-height: 1.6;
+  border: 1rpx solid var(--tt-border);
+  overflow-wrap: anywhere;
+}
+
+.secondary-button {
+  border: 1rpx solid var(--tt-border);
+  background: var(--tt-surface);
+  color: var(--tt-accent);
+  border-color: var(--tt-border-strong);
+}
+
+.danger-button {
+  border: 1rpx solid var(--tt-border-strong);
+  background: var(--tt-danger-soft);
+  color: var(--tt-danger);
+  border-color: var(--tt-border);
+}
+
+.safety-button {
+  background: var(--tt-danger);
+  color: var(--tt-on-accent);
+  border-color: var(--tt-danger);
+}
+
+.timeline-item {
+  display: flex;
+  gap: 18rpx;
+  padding: 14rpx 0;
+}
+
+.timeline-dot {
+  width: 14rpx;
+  height: 14rpx;
+  flex: 0 0 14rpx;
+  margin-top: 11rpx;
+  border: 5rpx solid var(--tt-accent-soft);
+  border-radius: 50%;
+  background: var(--tt-accent);
+  border-color: var(--tt-accent-soft);
+}
+
+.timeline-copy {
+  min-width: 0;
+  flex: 1;
+  padding-bottom: 18rpx;
+  border-bottom: 1rpx solid var(--tt-danger-soft);
+  border-bottom-color: var(--tt-border);
+}
+
+.timeline-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 14rpx;
+  color: var(--tt-text);
+  font-size: 25rpx;
+  font-weight: 700;
+}
+
+.timeline-heading text:last-child {
+  flex: 0 0 auto;
+  color: var(--tt-text-tertiary);
+  font-size: 20rpx;
+  font-weight: 400;
+}
+
+.timeline-description {
+  margin-top: 8rpx;
+  color: var(--tt-text-secondary);
+  font-size: 23rpx;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.order-meta {
+  color: var(--tt-text-tertiary);
+  font-size: 21rpx;
+  text-align: center;
+}
+
+.retry-button {
+  margin-top: 24rpx;
+  background: var(--tt-accent);
+  color: var(--tt-on-accent);
+  font-size: 25rpx;
+  min-height: 88rpx;
+  border-color: var(--tt-accent);
+}
+
+.secondary-button::after, .danger-button::after, .safety-button::after, .retry-button::after, .payment-dispute-guide::after, .resource-retry::after, .refund-policy-link::after {
+  border: 0;
+}
+
+.status-pending {
+  border-color: var(--tt-border);
+  border-left-color: var(--tt-warning);
+  background: var(--tt-warning-soft);
+}
+
+.refund-policy-copy, .refund-copy {
+  color: var(--tt-text);
+  overflow-wrap: anywhere;
+}
+
+.refund-policy-error, .payment-dispute-error, .timeline-resource-error {
+  border-left-color: var(--tt-danger);
+  background: var(--tt-danger-soft);
+  color: var(--tt-danger);
+}
+
+.refund-policy-link, .resource-retry {
+  min-height: 88rpx;
+  border-color: var(--tt-border-strong);
+  background: var(--tt-surface);
+  color: var(--tt-accent);
+}
+
+.payment-dispute-heading > view:first-child, .attendance-dispute-heading > view:first-child {
+  min-width: 0;
+  flex: 1;
+}

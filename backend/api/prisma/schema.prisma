@@ -147,6 +147,8 @@ enum MediaAssetPurpose {
   companionIncidentReport
   userAccountAppeal
   companionAccountAppeal
+  companionAvatar
+  companionCover
 }
 
 enum ModerationDecision {
@@ -959,6 +961,8 @@ model CustomerAdultEligibility {
 model CompanionProfile {
   id                               String                                 @id
   ownerUserId                      String?                                @unique
+  avatarAssetId                    String?                                @unique
+  coverAssetId                     String?                                @unique
   name                             String
   role                             String
   initials                         String
@@ -994,6 +998,9 @@ model CompanionProfile {
   conversations                    Conversation[]
   orders                           Order[]
   owner                            User?                                  @relation("CompanionOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  avatarAsset                      MediaAsset?                            @relation("CompanionAvatarAsset", fields: [avatarAssetId], references: [id], onDelete: SetNull)
+  coverAsset                       MediaAsset?                            @relation("CompanionCoverAsset", fields: [coverAssetId], references: [id], onDelete: SetNull)
+  profileMediaAssets               MediaAsset[]                           @relation("CompanionProfileMediaScope")
   reviews                          Review[]
   recommendationImpressions        RecommendationImpression[]
   recommendationPolicies           CompanionRecommendationPolicy[]
@@ -2111,6 +2118,7 @@ model MediaAsset {
   companionId                   String?
   userAccountActionId           String?
   companionAccountActionId      String?
+  profileCompanionId            String?
   kind                          MediaAssetKind
   status                        MediaAssetStatus  @default(reserved)
   storageKey                    String            @unique
@@ -2149,6 +2157,9 @@ model MediaAsset {
   companion                CompanionProfile?                 @relation("CompanionIncidentEvidenceScope", fields: [companionId], references: [id], onDelete: Restrict)
   userAccountAction        UserAccountAction?                @relation("UserAccountAppealEvidenceScope", fields: [userAccountActionId], references: [id], onDelete: Restrict)
   companionAccountAction   CompanionAccountAction?           @relation("CompanionAccountAppealEvidenceScope", fields: [companionAccountActionId], references: [id], onDelete: Restrict)
+  profileCompanion         CompanionProfile?                 @relation("CompanionProfileMediaScope", fields: [profileCompanionId], references: [id], onDelete: Restrict)
+  avatarForCompanion       CompanionProfile?                 @relation("CompanionAvatarAsset")
+  coverForCompanion        CompanionProfile?                 @relation("CompanionCoverAsset")
   retentionExpiryRecord    AccountDataRetentionRecord?       @relation("RetentionExpiryMediaAssets", fields: [retentionExpiryRecordId], references: [id], onDelete: Restrict, map: "MediaAsset_retention_expiry_record_fkey")
   controlledCaseAttachment ControlledCaseEvidenceAttachment?
 
@@ -2159,6 +2170,7 @@ model MediaAsset {
   @@index([purpose, companionId, uploaderId, status, createdAt], map: "MediaAsset_incident_evidence_scope")
   @@index([purpose, userAccountActionId, uploaderId, status, createdAt], map: "MediaAsset_user_appeal_evidence_scope")
   @@index([purpose, companionAccountActionId, uploaderId, status, createdAt], map: "MediaAsset_companion_appeal_evidence_scope")
+  @@index([purpose, profileCompanionId, uploaderId, status, createdAt], map: "MediaAsset_companion_profile_media_scope")
   @@index([purpose, status, nextAttemptAt, moderationProcessingAt, createdAt], map: "MediaAsset_controlled_moderation_queue")
   @@index([messageId])
   @@index([expiresAt])

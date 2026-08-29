@@ -14,10 +14,12 @@ describe("first-release-capability-matrix", () => {
       voiceIntro: false,
       trtcUserSig: false,
       voiceSkuActivation: false,
-      caseEvidenceMedia: false
+      caseEvidenceMedia: false,
+      companionProfileMedia: false
     });
     expect(isFirstReleaseCapabilityEnabled("trtcUserSig", { get: () => "text_only" })).toBe(false);
     expect(isFirstReleaseCapabilityEnabled("chatMediaUpload", { get: () => "text_only" })).toBe(false);
+    expect(isFirstReleaseCapabilityEnabled("companionProfileMedia", { get: () => "text_only" })).toBe(false);
   });
 
   it("opens media capabilities only when COMMERCIAL_SURFACE is full", () => {
@@ -29,5 +31,6 @@ describe("first-release-capability-matrix", () => {
     expect(matrix.trtcUserSig).toBe(true);
     expect(matrix.voiceSkuActivation).toBe(true);
     expect(matrix.caseEvidenceMedia).toBe(true);
+    expect(matrix.companionProfileMedia).toBe(true);
   });
 });

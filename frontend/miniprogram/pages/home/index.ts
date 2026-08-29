@@ -2,6 +2,11 @@ import { api, ensureSession } from "../../utils/api";
 import { CatalogDisplay, withCatalogDisplays } from "../../utils/catalog";
 import { openCrisisResources, passCrisisGate } from "../../utils/crisis-gate";
 import { CrisisInterventionRiskCode, RecommendedCompanion } from "../../utils/models";
+import { companionAvatarUrl, HOME_HERO_ASSET } from "../../utils/design-assets";
+import {
+  companionAvailabilityText,
+  companionMetaText
+} from "../../utils/companion-presentation";
 
 type Scenario = {
   id: string;
@@ -11,7 +16,11 @@ type Scenario = {
   selected: boolean;
 };
 
-type HomeCompanion = CatalogDisplay<RecommendedCompanion>;
+type HomeCompanion = CatalogDisplay<RecommendedCompanion> & {
+  avatarUrl: string;
+  availabilityText: string;
+  metaText: string;
+};
 
 const SCENARIOS: Array<Omit<Scenario, "selected">> = [
   { id: "emotion", topicId: "t1", title: "想找人听我说", description: "情绪倾听" },
@@ -47,6 +56,7 @@ function inferredTopic(value: string): string {
 
 Page({
   data: {
+    brandName: "Talk&Talk",
     intentInput: "",
     scenarios: displayScenarios(""),
     selectedScenarioId: "",
@@ -59,6 +69,7 @@ Page({
     recommendationsState: "loading" as "loading" | "available" | "empty" | "error",
     recommendationsError: "",
     recommendations: [] as HomeCompanion[],
+    homeHeroAsset: HOME_HERO_ASSET,
   },
   onShow() { void this.load(); },
   async load() {
@@ -88,7 +99,12 @@ Page({
     this.setData({ recommendations: [], recommendationsState: "loading", recommendationsError: "" });
     try {
       const response = await api.recommendedCompanions({ placement: "discoverHome", pageSize: 4 });
-      const recommendations = withCatalogDisplays(response.items || []);
+      const recommendations = withCatalogDisplays(response.items || []).map((item) => ({
+        ...item,
+        avatarUrl: companionAvatarUrl(item),
+        availabilityText: companionAvailabilityText(item.availability),
+        metaText: companionMetaText(item.nextAvailableText, item)
+      }));
       this.setData({
         recommendations,
         recommendationsState: recommendations.length ? "available" : "empty",

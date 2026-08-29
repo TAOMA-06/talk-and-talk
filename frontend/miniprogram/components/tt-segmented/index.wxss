@@ -1,0 +1,4 @@
+.segmented { display: flex; min-height: 72rpx; padding: 6rpx; border: 1rpx solid var(--tt-border); border-radius: 18rpx; background: var(--tt-surface-alt); }
+.segment { display: flex; min-width: 0; flex: 1; align-items: center; justify-content: center; padding: 12rpx 16rpx; border-radius: 13rpx; color: var(--tt-text-secondary); font-size: 24rpx; font-weight: 600; }
+.segment-selected { background: var(--tt-surface); color: var(--tt-text); box-shadow: 0 2rpx 8rpx rgba(23,23,23,.08); }
+@media (prefers-color-scheme: dark) { .segment-selected { box-shadow: none; } }

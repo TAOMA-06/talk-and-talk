@@ -1,0 +1,34 @@
+.sheet-root {
+  --sheet-surface: #fffcf9;
+  --sheet-surface-alt: #f0eeeb;
+  --sheet-text: #171717;
+  --sheet-text-secondary: #64615d;
+  --sheet-border: #e2dfda;
+  --sheet-border-strong: #cbc6c0;
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+}
+.sheet-mask { position: absolute; inset: 0; background: rgba(14,15,16,.46); animation: fade 200ms ease both; }
+.sheet { position: absolute; right: 0; bottom: 0; left: 0; display: flex; width: 100%; height: 88vh; max-height: 88vh; flex-direction: column; overflow: hidden; border-radius: 32rpx 32rpx 0 0; background: var(--sheet-surface); color: var(--sheet-text); animation: rise 240ms ease both; }
+.sheet-handle { width: 72rpx; height: 8rpx; margin: 14rpx auto 4rpx; flex: 0 0 auto; border-radius: 999rpx; background: var(--sheet-border-strong); }
+.sheet-header { display: flex; flex: 0 0 auto; align-items: flex-start; gap: 20rpx; padding: 20rpx 28rpx 18rpx; }
+.sheet-heading { min-width: 0; flex: 1; }
+.sheet-title { font-size: 34rpx; font-weight: 700; line-height: 1.3; }
+.sheet-subtitle { margin-top: 8rpx; color: var(--sheet-text-secondary); font-size: 24rpx; line-height: 1.5; }
+.sheet-close { display: flex; width: 64rpx; min-height: 64rpx; flex: 0 0 64rpx; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 999rpx; background: var(--sheet-surface-alt); color: var(--sheet-text-secondary); font-size: 38rpx; font-weight: 400; }
+.sheet-body { width: 100%; height: 0; min-height: 0; flex: 1 1 auto; padding: 0 28rpx 24rpx; overflow: hidden; }
+.sheet-footer { flex: 0 0 auto; padding: 16rpx 28rpx calc(20rpx + env(safe-area-inset-bottom)); border-top: 1rpx solid var(--sheet-border); background: var(--sheet-surface); }
+@keyframes fade { from { opacity: 0; } }
+@keyframes rise { from { transform: translateY(36rpx); opacity: .7; } }
+@media (prefers-reduced-motion: reduce) { .sheet,.sheet-mask { animation: none; } }
+@media (prefers-color-scheme: dark) {
+  .sheet-root {
+    --sheet-surface: #1d2022;
+    --sheet-surface-alt: #202326;
+    --sheet-text: #f5f3f0;
+    --sheet-text-secondary: #a6a29d;
+    --sheet-border: #2b2e31;
+    --sheet-border-strong: #3b3f43;
+  }
+}

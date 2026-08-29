@@ -32,26 +32,40 @@
     "pages/voice/index",
     "pages/legal/index"
   ],
+  "usingComponents": {
+    "tt-avatar": "/components/tt-avatar/index",
+    "tt-status": "/components/tt-status/index",
+    "tt-state": "/components/tt-state/index",
+    "tt-list-cell": "/components/tt-list-cell/index",
+    "tt-segmented": "/components/tt-segmented/index",
+    "tt-skeleton": "/components/tt-skeleton/index",
+    "tt-action-bar": "/components/tt-action-bar/index",
+    "tt-sheet": "/components/tt-sheet/index",
+    "tt-filter-sheet": "/components/tt-filter-sheet/index",
+    "tt-media-card": "/components/tt-media-card/index"
+  },
   "window": {
-    "navigationBarBackgroundColor": "#F7F7F5",
-    "navigationBarTextStyle": "black",
+    "navigationBarBackgroundColor": "@navigationBarBackgroundColor",
+    "navigationBarTextStyle": "@navigationBarTextStyle",
     "navigationBarTitleText": "Talk&Talk",
-    "backgroundColor": "#F7F7F5",
-    "backgroundTextStyle": "dark"
+    "backgroundColor": "@backgroundColor",
+    "backgroundTextStyle": "@backgroundTextStyle"
   },
   "tabBar": {
-    "color": "#646970",
-    "selectedColor": "#9B405B",
-    "backgroundColor": "#FFFFFF",
-    "borderStyle": "black",
+    "color": "@tabBarColor",
+    "selectedColor": "@tabBarSelectedColor",
+    "backgroundColor": "@tabBarBackgroundColor",
+    "borderStyle": "@tabBarBorderStyle",
     "list": [
-      { "pagePath": "pages/home/index", "text": "首页" },
-      { "pagePath": "pages/discover/index", "text": "发现" },
-      { "pagePath": "pages/orders/index", "text": "订单" },
-      { "pagePath": "pages/messages/index", "text": "消息" },
-      { "pagePath": "pages/profile/index", "text": "我的" }
+      { "pagePath": "pages/home/index", "text": "首页", "iconPath": "@homeIcon", "selectedIconPath": "@homeIconSelected" },
+      { "pagePath": "pages/discover/index", "text": "发现", "iconPath": "@discoverIcon", "selectedIconPath": "@discoverIconSelected" },
+      { "pagePath": "pages/orders/index", "text": "订单", "iconPath": "@ordersIcon", "selectedIconPath": "@ordersIconSelected" },
+      { "pagePath": "pages/messages/index", "text": "消息", "iconPath": "@messagesIcon", "selectedIconPath": "@messagesIconSelected" },
+      { "pagePath": "pages/profile/index", "text": "我的", "iconPath": "@profileIcon", "selectedIconPath": "@profileIconSelected" }
     ]
   },
+  "darkmode": true,
+  "themeLocation": "theme.json",
   "sitemapLocation": "sitemap.json",
   "style": "v2"
 }

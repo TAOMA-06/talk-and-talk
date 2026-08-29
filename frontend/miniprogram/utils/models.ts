@@ -50,6 +50,7 @@ export type PublicCompanionTrust = {
 
 export type Companion = {
   id: string; name: string; role: string; initials: string; bio: string;
+  avatarUrl: string | null; coverUrl: string | null;
   rating: number; reviewCount: number; pricePerHalfHour: number; isOnline: boolean;
   isVerified: boolean; availability: string; tags?: string[]; serviceTags?: string[]; availableTimes?: string[];
   topicIds?: string[]; languages?: string[]; specialties?: string[]; cityDistrict?: string;
@@ -58,6 +59,19 @@ export type Companion = {
   completedOrders?: number; responseTime?: string;
   publicTrust?: PublicCompanionTrust;
   catalog?: PublicCatalogSummary;
+};
+
+export type CompanionProfileMediaSlot = "avatar" | "cover";
+export type CompanionProfileMediaAsset = {
+  id: string;
+  slot: CompanionProfileMediaSlot;
+  status: "reserved" | "scanning" | "approved" | "reviewRequired" | "blocked" | "failed" | "expired";
+  mimeType: "image/jpeg" | "image/png" | "image/webp";
+  sizeBytes: number;
+  published: boolean;
+  uploadExpiresAt: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
 };
 
 /** Customer-only bookmark fields. The opaque subscription grant is never

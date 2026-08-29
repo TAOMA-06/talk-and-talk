@@ -1,6 +1,6 @@
 <view class="page payment-page">
   <view class="payment-state state-{{paymentState}}">
-    <view class="state-symbol">{{paymentState === 'success' ? '✓' : paymentState === 'error' ? '!' : paymentState === 'cancelled' ? '—' : '·'}}</view>
+    <view class="state-symbol">{{paymentState === 'success' ? '完成' : paymentState === 'error' ? '异常' : paymentState === 'cancelled' ? '已取消' : '处理中'}}</view>
     <view class="state-title">{{stateTitle}}</view>
     <view class="state-message">{{stateMessage}}</view>
   </view>
@@ -21,7 +21,7 @@
     <view class="policy-version">本单退款规则版本 {{view.refundPolicyVersion}} · 小时数与版本已固定，之后的新规则不会缩短本单期限。</view>
     <button class="policy-link" bindtap="openRefundTerms">查看用户协议与完整退款条款</button>
     <view class="rule">• 微信受理后仍需等待服务端确认；不要因页面未及时变化而重复付款。</view>
-    <button class="terms-check {{termsConfirmed ? 'checked' : ''}}" bindtap="toggleTerms">{{termsConfirmed ? '✓' : '○'}} 我已核对金额、服务、{{view.refundRequestWindowHours}} 小时退款窗口与规则版本</button>
+    <button class="terms-check {{termsConfirmed ? 'checked' : ''}}" bindtap="toggleTerms">{{termsConfirmed ? '已确认 · ' : '待确认 · '}}我已核对金额、服务、{{view.refundRequestWindowHours}} 小时退款窗口与规则版本</button>
     <button class="primary-button pay-button" disabled="{{!termsConfirmed}}" bindtap="pay">确认并调起微信支付</button>
   </view>
 

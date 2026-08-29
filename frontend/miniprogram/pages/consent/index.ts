@@ -1,7 +1,7 @@
 import { currentLegalConsent, ensurePrivacyAuthorization, openLegalDocument, recordLegalConsent } from "../../utils/privacy";
 
 Page({
-  data: { agreed: false, adultConfirmed: false, submitting: false },
+  data: { brandName: "Talk&Talk", agreed: false, adultConfirmed: false, submitting: false, detailsExpanded: false },
   onShow() {
     if (currentLegalConsent()) wx.switchTab({ url: "/pages/home/index" });
   },
@@ -9,6 +9,7 @@ Page({
   setAdultConfirmation(event: any) { this.setData({ adultConfirmed: event.detail.value.includes("adult") }); },
   openTerms() { openLegalDocument("terms"); },
   openPrivacy() { openLegalDocument("privacy"); },
+  toggleDetails() { this.setData({ detailsExpanded: !this.data.detailsExpanded }); },
   async enterAccountRights() {
     if (this.data.submitting) return;
     this.setData({ submitting: true });

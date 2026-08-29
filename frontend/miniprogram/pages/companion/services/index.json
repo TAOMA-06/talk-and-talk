@@ -1,5 +1,5 @@
 {
   "navigationBarTitleText": "服务商品",
   "enablePullDownRefresh": true,
-  "backgroundColor": "#F7F7F5"
+  "backgroundColor": "@backgroundColor"
 }

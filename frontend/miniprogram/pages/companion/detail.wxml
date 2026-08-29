@@ -1,4 +1,4 @@
-<view class="page" wx:if="{{companion}}">
+<view class="page companion-page" wx:if="{{companion}}">
   <view class="emergency-entry" bindtap="openEmergencyHelp" aria-role="button" aria-label="查看紧急帮助与官方电话号码" tabindex="0">
     <view>
       <view class="emergency-title">即时危险不适合继续预约</view>
@@ -6,10 +6,12 @@
     </view>
     <view class="emergency-arrow">›</view>
   </view>
-  <view class="card profile">
-    <view class="avatar">{{companion.initials}}</view>
-    <view class="title">{{companion.name}}</view>
-    <view class="muted">{{companion.role}} · {{companion.availability}} · ★ {{companion.rating}}</view>
+  <view class="profile">
+    <image class="profile-cover" src="{{coverUrl}}" mode="aspectFill" aria-label="{{companion.name}}的资料封面" />
+    <view class="profile-main">
+      <tt-avatar src="{{avatarUrl}}" fallback="{{companion.initials}}" alt="{{companion.name}}的头像" size="xl" shape="rounded" online="{{companion.isOnline}}" />
+      <view class="profile-copy"><view class="profile-name-row"><view class="title">{{companion.name}}</view><tt-status wx:if="{{companion.isVerified}}" text="已认证" tone="success" /></view><view class="muted">{{companion.role}} · {{availabilityText}} · {{ratingText}}</view></view>
+    </view>
     <view class="bio">{{companion.bio}}</view>
     <view wx:if="{{publicProfile}}" class="public-profile-section" aria-role="group" aria-label="陪伴者公开信任资料">
       <view class="public-profile-heading">
@@ -51,7 +53,7 @@
         <view class="public-profile-label">服务边界</view>
         <view wx:if="{{publicProfile.serviceBoundaries.length}}" class="boundary-list">
           <view wx:for="{{publicProfile.serviceBoundaries}}" wx:key="*this" class="boundary-item">
-            <text class="boundary-marker">✓</text><text>{{item}}</text>
+            <text class="boundary-marker"></text><text>{{item}}</text>
           </view>
         </view>
         <view wx:else class="public-profile-empty">除平台通用边界外，暂未填写个性化边界。</view>
@@ -218,7 +220,7 @@
     </view>
     <view wx:if="{{selectedAvailabilityCandidate}}" class="booking-summary booking-slot-summary">已选时段：{{selectedAvailabilityCandidate.dateLabel}} {{selectedAvailabilityCandidate.timeLabel}}–{{selectedAvailabilityCandidate.endTimeLabel}}（北京时间）</view>
     <view wx:if="{{!publicInteractionIdentityAvailable}}" class="availability-state availability-unavailable">身份核验授权通道尚未开放，新预约和支付暂不可用；可前往账号页查看说明与客服入口。</view>
-    <button class="primary-button" disabled="{{!canBook || booking}}" loading="{{booking}}" bindtap="book">{{bookingButtonText}}</button>
+    <tt-action-bar primary-text="{{bookingButtonText}}" disabled="{{!canBook || booking}}" loading="{{booking}}" bindprimary="book" />
   </view>
   <view class="title section-title">用户评价</view>
   <view wx:if="{{!reviews.length}}" class="empty">暂时还没有评价</view>
@@ -229,7 +231,7 @@
   <view wx:if="{{reviewsError}}" class="empty">{{reviewsError}}</view>
   <button wx:if="{{reviewPage < reviewTotalPages}}" class="plain-button" loading="{{reviewsLoadingMore}}" disabled="{{reviewsLoadingMore}}" bindtap="loadMoreReviews">加载更多评价（已显示 {{reviews.length}} / {{reviewTotal}}）</button>
   <view wx:if="{{bookingConfirmationVisible && bookingPreview}}" class="booking-overlay">
-    <view class="booking-confirmation">
+    <view class="booking-confirmation" aria-role="dialog" aria-modal="true">
       <view class="confirmation-kicker">创建订单前最后确认</view>
       <view class="confirmation-title">请核对这次预约</view>
       <view class="confirmation-row"><text>服务对象</text><text>{{bookingPreview.companionName}}</text></view>
@@ -240,8 +242,8 @@
       <view class="confirmation-row"><text>时长</text><text>{{bookingPreview.durationText}}</text></view>
       <view class="confirmation-row total"><text>订单金额</text><text>{{bookingPreview.priceText}}</text></view>
       <view class="confirmation-note">本次操作只创建待确认订单，不会立即扣款。陪伴者确认后，你仍需在订单中主动完成微信支付。</view>
-      <button class="confirmation-check {{bookingAccuracyConfirmed ? 'checked' : ''}}" bindtap="toggleBookingAccuracy">{{bookingAccuracyConfirmed ? '✓' : '○'}} 我已核对对象、商品、金额和北京时间</button>
-      <button class="confirmation-check {{bookingBoundaryConfirmed ? 'checked' : ''}}" bindtap="toggleBookingBoundary">{{bookingBoundaryConfirmed ? '✓' : '○'}} 我理解仅限平台内沟通，不含医疗、治疗或紧急救助</button>
+      <button class="confirmation-check {{bookingAccuracyConfirmed ? 'checked' : ''}}" bindtap="toggleBookingAccuracy">{{bookingAccuracyConfirmed ? '已确认 · ' : '待确认 · '}}我已核对对象、商品、金额和北京时间</button>
+      <button class="confirmation-check {{bookingBoundaryConfirmed ? 'checked' : ''}}" bindtap="toggleBookingBoundary">{{bookingBoundaryConfirmed ? '已确认 · ' : '待确认 · '}}我理解仅限平台内沟通，不含医疗、治疗或紧急救助</button>
       <view class="confirmation-actions">
         <button class="confirmation-cancel" disabled="{{booking}}" bindtap="closeBookingConfirmation">返回修改</button>
         <button class="confirmation-submit" disabled="{{booking || !bookingAccuracyConfirmed || !bookingBoundaryConfirmed}}" loading="{{booking}}" bindtap="confirmBooking">确认创建订单</button>

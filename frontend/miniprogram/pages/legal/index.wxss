@@ -1,1 +1,4 @@
-page { background: #F7F7F5; color: #202124; }
+page {
+  background: var(--tt-bg);
+  color: var(--tt-text);
+}

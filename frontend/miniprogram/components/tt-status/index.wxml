@@ -1,0 +1,1 @@
+<view class="status status-{{tone}}"><view class="status-dot"></view><text>{{text}}</text></view>

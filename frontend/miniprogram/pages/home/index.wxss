@@ -1,49 +1,42 @@
-.home-page { padding-bottom: 72rpx; }
-.hero { margin: 0 0 24rpx; padding: 32rpx; border: 1rpx solid #e4e6e8; border-radius: 20rpx; background: #f6ecef; }
-.eyebrow { color: #9b405b; font-size: 22rpx; font-weight: 700; letter-spacing: 3rpx; }
-.hero-title { margin-top: 12rpx; color: #202124; font-size: 46rpx; font-weight: 800; line-height: 1.25; overflow-wrap: anywhere; }
-.hero-copy { margin-top: 12rpx; color: #646970; font-size: 24rpx; line-height: 1.65; overflow-wrap: anywhere; }
-.intent-input { box-sizing: border-box; width: 100%; min-height: 168rpx; margin-top: 24rpx; padding: 20rpx; border: 1rpx solid #e4e6e8; border-radius: 14rpx; background: #ffffff; color: #202124; font-size: 27rpx; line-height: 1.6; }
-.risk-card { margin: 0 0 24rpx; padding: 24rpx; border: 1rpx solid #a33d45; border-radius: 20rpx; background: #faeeee; }
-.risk-kicker { color: #a33d45; font-size: 22rpx; font-weight: 800; letter-spacing: 2rpx; }
-.risk-title { margin-top: 8rpx; color: #202124; font-size: 32rpx; font-weight: 800; line-height: 1.35; }
-.risk-copy { margin-top: 12rpx; color: #646970; font-size: 25rpx; line-height: 1.7; overflow-wrap: anywhere; }
-.risk-primary, .risk-secondary { width: 100%; min-height: 88rpx; margin-top: 16rpx; border-radius: 14rpx; font-size: 26rpx; }
-.risk-primary { border-color: #a33d45; background: #a33d45; color: #ffffff; }
-.risk-secondary { border: 1rpx solid #e4e6e8; background: #ffffff; color: #a33d45; }
-.risk-text { min-height: 88rpx; margin-top: 8rpx; padding: 16rpx; border: 0; background: transparent; color: #646970; font-size: 23rpx; line-height: 1.5; }
-.risk-acknowledged { margin-top: 12rpx; color: #2f6b55; font-size: 23rpx; text-align: center; }
-.section-heading { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 8rpx 16rpx; margin: 32rpx 0 16rpx; }
-.section-title { color: #202124; font-size: 32rpx; font-weight: 800; line-height: 1.35; }
-.section-subtitle { margin-top: 6rpx; color: #646970; font-size: 22rpx; line-height: 1.5; }
-.scenario-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12rpx; }
-.scenario { box-sizing: border-box; min-height: 136rpx; padding: 20rpx; border: 1rpx solid #e4e6e8; border-radius: 20rpx; background: #ffffff; }
-.scenario:active { border-color: #9b405b; background: #f6ecef; }
-.scenario.selected { border-color: #9b405b; background: #f6ecef; }
-.scenario-title { color: #202124; font-size: 26rpx; font-weight: 700; line-height: 1.45; overflow-wrap: anywhere; }
-.scenario-description { margin-top: 8rpx; color: #646970; font-size: 21rpx; line-height: 1.45; overflow-wrap: anywhere; }
-.match-button { width: 100%; min-height: 88rpx; margin-top: 24rpx; font-size: 28rpx; font-weight: 700; }
-.browse-all { min-height: 88rpx; margin-top: 8rpx; border: 0; background: transparent; color: #9b405b; font-size: 25rpx; }
-.boundary-strip { display: flex; flex-wrap: wrap; gap: 8rpx; margin-top: 24rpx; padding: 16rpx; border-radius: 14rpx; background: #f1f2f3; }
-.boundary-item { display: flex; min-width: 180rpx; flex: 1; align-items: center; justify-content: center; gap: 8rpx; color: #646970; font-size: 20rpx; line-height: 1.4; }
-.boundary-mark { display: flex; width: 36rpx; height: 36rpx; flex: 0 0 36rpx; align-items: center; justify-content: center; border-radius: 50%; background: #ffffff; color: #9b405b; font-size: 19rpx; font-weight: 800; }
-.emergency-entry { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; margin-top: 16rpx; padding: 24rpx; border: 1rpx solid #a33d45; border-radius: 20rpx; background: #faeeee; }
-.emergency-title { color: #a33d45; font-size: 27rpx; font-weight: 800; }
-.emergency-copy { margin-top: 6rpx; color: #646970; font-size: 21rpx; line-height: 1.55; overflow-wrap: anywhere; }
-.recommendations-heading { margin-top: 40rpx; }
-.recommendation-card { display: flex; gap: 20rpx; margin-bottom: 16rpx; padding: 24rpx; border: 1rpx solid #e4e6e8; border-radius: 20rpx; background: #ffffff; }
-.recommendation-card:active { border-color: #9b405b; background: #f6ecef; }
-.avatar { display: flex; width: 80rpx; height: 80rpx; flex: 0 0 80rpx; align-items: center; justify-content: center; border-radius: 50%; background: #f6ecef; color: #9b405b; font-size: 24rpx; font-weight: 800; }
-.recommendation-copy { min-width: 0; flex: 1; }
-.recommendation-title-row { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 8rpx 14rpx; }
-.recommendation-name { min-width: 0; color: #202124; font-size: 29rpx; font-weight: 800; line-height: 1.4; overflow-wrap: anywhere; }
-.verified { flex: 0 0 auto; padding: 4rpx 10rpx; border-radius: 999rpx; background: #edf6f1; color: #2f6b55; font-size: 20rpx; }
-.recommendation-role, .recommendation-reason, .recommendation-meta { margin-top: 8rpx; color: #646970; font-size: 22rpx; line-height: 1.5; overflow-wrap: anywhere; }
-.recommendation-reason { color: #9b405b; }
-.community-entry { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; margin-top: 32rpx; padding: 24rpx; border: 1rpx solid #e4e6e8; border-radius: 20rpx; background: #eef3f6; }
-.community-title { color: #3f647a; font-size: 27rpx; font-weight: 800; }
-.community-copy { margin-top: 6rpx; color: #646970; font-size: 21rpx; line-height: 1.5; overflow-wrap: anywhere; }
-.community-arrow { flex: 0 0 auto; color: #3f647a; font-size: 44rpx; }
-.compact { padding: 40rpx 20rpx; }
-.retry-button { width: 100%; min-height: 88rpx; margin-top: 16rpx; border: 1rpx solid #e4e6e8; background: #ffffff; color: #9b405b; font-size: 23rpx; }
-.risk-primary::after, .risk-secondary::after, .risk-text::after, .browse-all::after, .retry-button::after { border: 0; }
+.home-page { padding-top: 36rpx; }
+.home-intro { padding: 4rpx 4rpx 26rpx; }
+.eyebrow { color: var(--tt-accent); font-size: 21rpx; font-weight: 700; letter-spacing: 2.5rpx; text-transform: uppercase; }
+.hero-title { max-width: 620rpx; margin-top: 14rpx; color: var(--tt-text); font-size: 50rpx; font-weight: 700; letter-spacing: -1.5rpx; line-height: 1.14; }
+.hero-copy { max-width: 620rpx; margin-top: 14rpx; color: var(--tt-text-secondary); font-size: 25rpx; line-height: 1.62; }
+.hero-visual { display: block; width: 100%; height: 370rpx; border-radius: 28rpx; background: var(--tt-surface-alt); }
+.intent-card { margin-top: -38rpx; margin-right: 20rpx; margin-left: 20rpx; padding: 22rpx; border: 1rpx solid var(--tt-border); border-radius: 22rpx; background: var(--tt-surface-raised); }
+.intent-input { width: 100%; min-height: 156rpx; padding: 18rpx; border: 0; background: transparent; line-height: 1.6; }
+.intent-foot { display: flex; justify-content: space-between; gap: 16rpx; padding: 8rpx 12rpx 0; color: var(--tt-text-tertiary); font-size: 21rpx; }
+.risk-card { margin-top: 24rpx; padding: 26rpx; border: 1rpx solid var(--tt-danger); border-radius: 22rpx; background: var(--tt-danger-soft); }
+.risk-kicker { color: var(--tt-danger); font-size: 21rpx; font-weight: 700; letter-spacing: 2rpx; }
+.risk-title { margin-top: 8rpx; color: var(--tt-text); font-size: 32rpx; font-weight: 700; line-height: 1.35; }
+.risk-copy { margin-top: 12rpx; color: var(--tt-text-secondary); font-size: 25rpx; line-height: 1.68; }
+.risk-primary,.risk-secondary { width: 100%; margin-top: 16rpx; }
+.risk-primary { border-color: var(--tt-danger); background: var(--tt-danger); color: var(--tt-on-accent); }
+.risk-secondary { background: var(--tt-surface); color: var(--tt-danger); }
+.risk-text { width: 100%; margin-top: 8rpx; border: 0; background: transparent; color: var(--tt-text-secondary); font-size: 23rpx; }
+.risk-acknowledged { margin-top: 12rpx; color: var(--tt-success); font-size: 23rpx; text-align: center; }
+.section-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 16rpx; margin: 48rpx 4rpx 18rpx; }
+.section-title { font-size: 34rpx; }
+.section-subtitle { margin-top: 6rpx; color: var(--tt-text-secondary); font-size: 22rpx; line-height: 1.5; }
+.scenes-heading { margin-top: 42rpx; }
+.scenario-scroll { width: calc(100% + 32rpx); margin-right: -32rpx; }
+.scenario-grid { display: flex; width: max-content; gap: 14rpx; padding-right: 32rpx; }
+.scenario { width: 250rpx; min-height: 128rpx; padding: 20rpx; border: 1rpx solid var(--tt-border); border-radius: 20rpx; background: var(--tt-surface); transition: transform 160ms ease, background-color 160ms ease; }
+.scenario:active { transform: scale(.98); }
+.scenario.selected { border-color: var(--tt-accent); background: var(--tt-accent-soft); }
+.scenario-title { color: var(--tt-text); font-size: 26rpx; font-weight: 700; line-height: 1.42; }
+.scenario-description { margin-top: 7rpx; color: var(--tt-text-secondary); font-size: 22rpx; }
+.match-button { width: 100%; margin-top: 24rpx; }
+.browse-all { width: 100%; margin-top: 8rpx; border-color: transparent; background: transparent; color: var(--tt-accent); }
+.boundary-strip { display: flex; gap: 8rpx; margin-top: 26rpx; padding: 16rpx; border-radius: 18rpx; background: var(--tt-surface-alt); }
+.boundary-item { display: flex; min-width: 0; flex: 1; flex-direction: column; align-items: center; gap: 7rpx; color: var(--tt-text-secondary); font-size: 19rpx; text-align: center; }
+.boundary-mark { display: flex; width: 40rpx; height: 40rpx; align-items: center; justify-content: center; border-radius: 999rpx; background: var(--tt-surface); color: var(--tt-accent); font-size: 18rpx; font-weight: 700; }
+.emergency-entry { display: flex; align-items: center; justify-content: space-between; gap: 18rpx; margin-top: 16rpx; padding: 22rpx 24rpx; border: 1rpx solid var(--tt-danger); border-radius: 20rpx; background: var(--tt-danger-soft); }
+.emergency-title { color: var(--tt-danger); font-size: 26rpx; font-weight: 700; }
+.emergency-copy { margin-top: 5rpx; color: var(--tt-text-secondary); font-size: 21rpx; line-height: 1.5; }
+.recommendations-heading { margin-top: 52rpx; }
+.recommendations-surface,.safety-surface { padding: 0 24rpx; border: 1rpx solid var(--tt-border); border-radius: 24rpx; background: var(--tt-surface); }
+.safety-surface { margin-top: 28rpx; }
+.community-arrow { flex: none; color: var(--tt-text-tertiary); font-size: 40rpx; }
+@media (prefers-reduced-motion: reduce) { .scenario { transition: none; } }

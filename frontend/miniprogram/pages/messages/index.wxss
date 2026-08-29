@@ -1,28 +1,28 @@
-.message-hero { margin-bottom: 16rpx; padding: 24rpx; border: 1rpx solid #e4e6e8; border-radius: 20rpx; background: #eef3f6; }
-.hero-title { color: #202124; font-size: 36rpx; font-weight: 800; line-height: 1.35; }
-.hero-copy { margin-top: 8rpx; color: #646970; font-size: 23rpx; line-height: 1.6; overflow-wrap: anywhere; }
-.quick-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12rpx; margin-top: 20rpx; }
-.quick-action { display: flex; min-height: 104rpx; flex-direction: column; align-items: center; justify-content: center; padding: 12rpx 8rpx; border: 1rpx solid #e4e6e8; border-radius: 14rpx; background: #ffffff; text-align: center; }
-.quick-action:active { border-color: #9b405b; background: #f6ecef; }
-.quick-value { color: #9b405b; font-size: 26rpx; font-weight: 800; overflow-wrap: anywhere; }
-.quick-label { margin-top: 4rpx; color: #646970; font-size: 19rpx; line-height: 1.35; overflow-wrap: anywhere; }
-.safety { box-sizing: border-box; display: flex; min-height: 88rpx; align-items: center; margin-bottom: 16rpx; padding: 20rpx; border: 1rpx solid #e4e6e8; border-radius: 14rpx; background: #f6ecef; color: #9b405b; font-size: 24rpx; line-height: 1.55; overflow-wrap: anywhere; }
-.safety:active { border-color: #9b405b; background: #ffffff; }
-.partial-warning { margin-bottom: 16rpx; padding: 16rpx; border-left: 5rpx solid #8a6426; border-radius: 0 14rpx 14rpx 0; background: #faf4e8; color: #8a6426; font-size: 21rpx; line-height: 1.55; overflow-wrap: anywhere; }
-.row { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 8rpx 16rpx; }
+.messages-page { padding-top: 36rpx; }
+.message-hero { padding: 4rpx 4rpx 28rpx; }
+.hero-title { max-width: 620rpx; margin-top: 12rpx; color: var(--tt-text); font-size: 46rpx; font-weight: 700; letter-spacing: -1.2rpx; line-height: 1.16; }
+.hero-copy { margin-top: 12rpx; color: var(--tt-text-secondary); font-size: 24rpx; line-height: 1.58; }
+.quick-actions { display: grid; grid-template-columns: repeat(3,1fr); gap: 12rpx; margin-top: 26rpx; }
+.quick-action { display: flex; min-height: 116rpx; flex-direction: column; align-items: center; justify-content: center; padding: 14rpx 8rpx; border: 1rpx solid var(--tt-border); border-radius: 20rpx; background: var(--tt-surface); text-align: center; }
+.quick-value { color: var(--tt-accent); font-size: 27rpx; font-weight: 700; }
+.quick-label { margin-top: 4rpx; color: var(--tt-text-secondary); font-size: 19rpx; line-height: 1.35; }
+.safety { display: flex; min-height: 80rpx; align-items: center; justify-content: space-between; gap: 16rpx; margin-bottom: 26rpx; padding: 18rpx 22rpx; border-radius: 18rpx; background: var(--tt-accent-soft); color: var(--tt-accent); font-size: 23rpx; line-height: 1.5; }
+.partial-warning { margin-bottom: 18rpx; padding: 16rpx 18rpx; border-left: 5rpx solid var(--tt-warning); border-radius: 0 16rpx 16rpx 0; background: var(--tt-warning-soft); color: var(--tt-warning); font-size: 21rpx; line-height: 1.55; }
+.conversation-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 16rpx; margin: 34rpx 4rpx 16rpx; }
+.conversation { display: flex; gap: 20rpx; padding: 24rpx; }
+.conversation-copy { min-width: 0; flex: 1; }
+.row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12rpx; }
 .conversation-name { display: flex; min-width: 0; flex: 1; flex-wrap: wrap; align-items: center; gap: 8rpx; }
-.name { color: #202124; font-weight: 700; overflow-wrap: anywhere; }
-.notification-muted { flex: 0 0 auto; padding: 4rpx 10rpx; border-radius: 999rpx; background: #f1f2f3; color: #646970; font-size: 20rpx; line-height: 1.35; }
-.conversation-blocked, .conversation-unavailable { flex: 0 0 auto; padding: 4rpx 10rpx; border-radius: 999rpx; font-size: 20rpx; line-height: 1.35; }
-.conversation-blocked { background: #faeeee; color: #a33d45; }
-.conversation-unavailable { background: #faf4e8; color: #8a6426; }
-.preview { margin-top: 12rpx; overflow: hidden; color: #646970; line-height: 1.5; white-space: nowrap; text-overflow: ellipsis; }
-.conversation-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8rpx 16rpx; margin-top: 12rpx; font-size: 21rpx; }
-.unread-badge { padding: 4rpx 10rpx; border-radius: 999rpx; background: #9b405b; color: #ffffff; }
-.read-state { color: #8a9098; }
-.open-chat { color: #9b405b; }
-.retry-button { width: 100%; min-height: 88rpx; margin-top: 16rpx; border: 1rpx solid #e4e6e8; background: #ffffff; color: #9b405b; font-size: 23rpx; }
-.retry-button::after { border: 0; }
-.conversation-pagination { margin: 16rpx 0 8rpx; padding: 16rpx; border-radius: 14rpx; background: #f1f2f3; text-align: center; }
-.load-more-error { margin-top: 8rpx; color: #a33d45; font-size: 21rpx; line-height: 1.5; }
-.conversation:active { border-color: #9b405b; background: #f6ecef; }
+.name { color: var(--tt-text); font-size: 28rpx; font-weight: 700; }
+.notification-muted,.conversation-blocked,.conversation-unavailable { flex: none; padding: 4rpx 10rpx; border-radius: 999rpx; font-size: 19rpx; }
+.notification-muted { background: var(--tt-surface-alt); color: var(--tt-text-secondary); }
+.conversation-blocked { background: var(--tt-danger-soft); color: var(--tt-danger); }
+.conversation-unavailable { background: var(--tt-warning-soft); color: var(--tt-warning); }
+.preview { margin-top: 10rpx; overflow: hidden; color: var(--tt-text-secondary); font-size: 24rpx; line-height: 1.5; white-space: nowrap; text-overflow: ellipsis; }
+.conversation-footer { display: flex; align-items: center; justify-content: space-between; gap: 12rpx; margin-top: 12rpx; font-size: 20rpx; }
+.unread-badge { padding: 4rpx 10rpx; border-radius: 999rpx; background: var(--tt-accent); color: var(--tt-on-accent); }
+.read-state { color: var(--tt-text-tertiary); }
+.open-chat { color: var(--tt-accent); }
+.conversation-pagination { margin: 18rpx 0 8rpx; padding: 18rpx; border-radius: 16rpx; background: var(--tt-surface-alt); text-align: center; }
+.load-more-error { margin-top: 8rpx; color: var(--tt-danger); font-size: 21rpx; }
+.retry-button { width: 100%; margin-top: 14rpx; }

@@ -1,0 +1,5 @@
+<view class="avatar avatar-{{size}} avatar-{{shape}}" aria-label="{{alt}}">
+  <image wx:if="{{src && !failed}}" class="avatar-image" src="{{src}}" mode="aspectFill" lazy-load binderror="onError" aria-label="{{alt}}" />
+  <view wx:else class="avatar-fallback">{{fallback || 'T'}}</view>
+  <view wx:if="{{online}}" class="avatar-online" aria-label="在线"></view>
+</view>

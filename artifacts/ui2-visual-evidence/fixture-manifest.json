@@ -1,0 +1,60 @@
+{
+  "generatedAt": "2026-08-29T01:47:23.423Z",
+  "target": {
+    "database": "talk_and_talk_miniprogram_full_20260828_ui2_01",
+    "loopback": true
+  },
+  "mapping": {
+    "U0": "fresh normal customer with empty order, conversation, support and notification states",
+    "U1": "normal customer with order_pending, order_paid, order_refunded, conversation, successful refund, resolved support and notification fixtures",
+    "P1": "seeded seed-owner-c1 companion identity with c1 workbench and U1 service orders",
+    "R1": "restricted customer with a visible active restriction and read-only/minimal account-rights behavior"
+  },
+  "profiles": {
+    "U0": {
+      "userId": "afdac4cf-5997-4a49-971d-f9060525af7d",
+      "runtimePayload": "runtime/devtools-storage-payload.json"
+    },
+    "U1": {
+      "userId": "1af7c1e6-8905-46d7-a937-0b93448ef27e",
+      "runtimePayload": "runtime/u1/devtools-storage-payload.json"
+    },
+    "P1": {
+      "userId": "seed-owner-c1",
+      "companionId": "c1",
+      "runtimePayload": "runtime/p1/devtools-storage-payload.json"
+    },
+    "R1": {
+      "userId": "f87a985d-af91-4468-aa07-b0bc09da9716",
+      "accountStatus": "restricted",
+      "runtimePayload": "runtime/r1/devtools-storage-payload.json"
+    }
+  },
+  "records": {
+    "companion": {
+      "id": "c1",
+      "ownerUserId": "seed-owner-c1"
+    },
+    "conversationId": "demo-20260828-u1-c1-conversation",
+    "orders": {
+      "pending": "demo-20260828-u1-order-pending",
+      "paid": "demo-20260828-u1-order-paid",
+      "refunded": "demo-20260828-u1-order-refunded"
+    },
+    "payments": {
+      "paid": "demo-20260828-u1-payment-paid",
+      "refunded": "demo-20260828-u1-payment-refunded"
+    },
+    "refundId": "demo-20260828-u1-refund-success",
+    "supportTicketId": "demo-20260828-u1-support-resolved",
+    "restrictionId": "demo-20260828-r1-restriction"
+  },
+  "safetyBoundaries": {
+    "providerCallsMade": false,
+    "realPaymentClaimed": false,
+    "bannedProfilePrepared": false,
+    "bannedProfileReason": "Banned JWT requests are rejected by the current guard; restricted is the safe recordable R1 minimal-rights snapshot.",
+    "productSourceModified": false,
+    "idempotentIds": true
+  }
+}

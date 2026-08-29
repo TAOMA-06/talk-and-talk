@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "usage": "Synthetic local/staging UI fixtures only; never a production companion identity",
+  "generatedAt": "2026-08-28T14:26:00.000Z",
+  "assets": [
+    {
+      "companionId": "c1",
+      "name": "林屿",
+      "source": { "path": "source/c1-linyu.png", "sha256": "da758ae212df856aedf3173e8cf485eb04afa83fd1a0fcb927f59c00bd3d9cbe" },
+      "outputs": [
+        { "path": "../../frontend/miniprogram/assets/avatars/c1-linyu-384.webp", "sha256": "34c91a53d8f2b56208ed08e26aa948cfefba43af69c4fe9383b35680d7032ca3" },
+        { "path": "../../frontend/miniprogram/assets/avatars/c1-linyu-768.webp", "sha256": "7f25058c5567dd73d5f34167ccfb21087a0c8334549481b9891dcf8aa65a2e86" }
+      ]
+    },
+    {
+      "companionId": "c2",
+      "name": "许澈",
+      "source": { "path": "source/c2-xuche.png", "sha256": "1bf9b75dd5f57f582977b9f31bb5477b2e34580ea30de2522cc7c4b6284bbaf0" },
+      "outputs": [
+        { "path": "../../frontend/miniprogram/assets/avatars/c2-xuche-384.webp", "sha256": "a94ce36bdc14ffbb34df8247b2e6e0ca4b900f33eb78ea9ff7365c3c81663455" },
+        { "path": "../../frontend/miniprogram/assets/avatars/c2-xuche-768.webp", "sha256": "6c42554c75cdecc88a0a2f5ce80cc386a3c397b14c7da19e7f69487e0b5d3844" }
+      ]
+    },
+    {
+      "companionId": "c3",
+      "name": "周映",
+      "source": { "path": "source/c3-zhouying.png", "sha256": "f78d0093e60e2f8f4c621fbd44581e79235a481b3ebc5fb71fe4234e1db6deed" },
+      "outputs": [
+        { "path": "../../frontend/miniprogram/assets/avatars/c3-zhouying-384.webp", "sha256": "6c59dce91a5e38992919bc7c6f5dd82eeca35c93a1ff528c61604884c576b94a" },
+        { "path": "../../frontend/miniprogram/assets/avatars/c3-zhouying-768.webp", "sha256": "e83bcbcae102e939601d903059b503b4ab43501da14a7dccc7c8057033a6d877" }
+      ]
+    },
+    {
+      "companionId": "c4",
+      "name": "沈一",
+      "source": { "path": "source/c4-shenyi.png", "sha256": "40f315fc3bb1dca953b51ad86ee81fb2d99a68a9a2f1142392808ca62efa4c84" },
+      "outputs": [
+        { "path": "../../frontend/miniprogram/assets/avatars/c4-shenyi-384.webp", "sha256": "0b2a73654bc8c3a80f4a7984e45a8898ecccfd9953a87b22d5fcaa6dd6fb24d1" },
+        { "path": "../../frontend/miniprogram/assets/avatars/c4-shenyi-768.webp", "sha256": "fc701928b936a374f8a03e7794be19902d99c2106216cd2e7987ec7176611111" }
+      ]
+    },
+    {
+      "companionId": "c5",
+      "name": "闻舟",
+      "source": { "path": "source/c5-wenzhou.png", "sha256": "1fd927be1b12e0da16e24b769abf68fb1e0d76653f04864509f1fbc6a9d9aa7b" },
+      "outputs": [
+        { "path": "../../frontend/miniprogram/assets/avatars/c5-wenzhou-384.webp", "sha256": "2184b611a07ffd390b14d6c4e91c7b85c05ebf879c4eac342035b2a6d3298737" },
+        { "path": "../../frontend/miniprogram/assets/avatars/c5-wenzhou-768.webp", "sha256": "24c8ce9282dec12aef31e326bf284941e1c8911593f12b4ba4280e97b6bc209a" }
+      ]
+    },
+    {
+      "role": "homeHero",
+      "source": { "path": "source/home-hero.png", "sha256": "56db1cefe4cb793c55a328427fb09dc017e19097ff6b5704e27d102f0d068959" },
+      "outputs": [
+        { "path": "../../frontend/miniprogram/assets/illustrations/home-hero.webp", "sha256": "b5d6a1be55f03a024dafaf6a34b3e3359dd3b3d73afd32eb3244cb1d8ddea817" }
+      ]
+    }
+  ]
+}

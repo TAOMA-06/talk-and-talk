@@ -10,7 +10,12 @@ describe("CompanionsController owner schedule routes", () => {
     deactivateOwnAvailabilityBlackout: jest.fn(),
     listOwnRecurringAvailabilityDrafts: jest.fn(),
     materializeOwnRecurringAvailabilityDrafts: jest.fn(),
-    activateOwnRecurringAvailabilityDraft: jest.fn()
+    activateOwnRecurringAvailabilityDraft: jest.fn(),
+    reserveOwnProfileMedia: jest.fn(),
+    completeOwnProfileMedia: jest.fn(),
+    ownProfileMediaStatus: jest.fn(),
+    removeOwnProfileMedia: jest.fn(),
+    publicProfileMediaReadUrl: jest.fn()
   } as any;
   const controller = new CompanionsController(companionsService, { getOrThrow: () => "development" } as any);
   const user = { id: "owner-1" } as any;
@@ -63,5 +68,28 @@ describe("CompanionsController owner schedule routes", () => {
     expect(companionsService.activateOwnRecurringAvailabilityDraft).toHaveBeenCalledWith("owner-1", {
       id: "123e4567-e89b-42d3-a456-426614174000"
     });
+  });
+
+  it("keeps profile media mutations owner-scoped and returns only the public redirect", async () => {
+    companionsService.reserveOwnProfileMedia.mockResolvedValue({ asset: { id: "asset-1" } });
+    companionsService.completeOwnProfileMedia.mockResolvedValue({ asset: { id: "asset-1", status: "approved" } });
+    companionsService.ownProfileMediaStatus.mockResolvedValue({ asset: { id: "asset-1", status: "approved" } });
+    companionsService.removeOwnProfileMedia.mockResolvedValue({ removed: true });
+    companionsService.publicProfileMediaReadUrl.mockResolvedValue("https://media.example/avatar");
+    const dto = { mimeType: "image/webp", sizeBytes: 120_000, sha256: "a".repeat(64) };
+
+    await controller.reserveOwnProfileMedia(user, "avatar", dto);
+    await controller.completeOwnProfileMedia(user, "avatar", "asset-1");
+    await controller.ownProfileMediaStatus(user, "avatar", "asset-1");
+    await controller.removeOwnProfileMedia(user, "avatar");
+    await expect(controller.profileMedia("c1", "avatar")).resolves.toEqual({
+      url: "https://media.example/avatar"
+    });
+
+    expect(companionsService.reserveOwnProfileMedia).toHaveBeenCalledWith("owner-1", "avatar", dto);
+    expect(companionsService.completeOwnProfileMedia).toHaveBeenCalledWith("owner-1", "avatar", "asset-1");
+    expect(companionsService.ownProfileMediaStatus).toHaveBeenCalledWith("owner-1", "avatar", "asset-1");
+    expect(companionsService.removeOwnProfileMedia).toHaveBeenCalledWith("owner-1", "avatar");
+    expect(companionsService.publicProfileMediaReadUrl).toHaveBeenCalledWith("c1", "avatar");
   });
 });

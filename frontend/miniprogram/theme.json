@@ -1,0 +1,42 @@
+{
+  "light": {
+    "navigationBarTextStyle": "black",
+    "navigationBarBackgroundColor": "#F7F5F2",
+    "backgroundColor": "#F7F5F2",
+    "backgroundTextStyle": "dark",
+    "tabBarColor": "#7B7772",
+    "tabBarSelectedColor": "#C65345",
+    "tabBarBorderStyle": "black",
+    "tabBarBackgroundColor": "#FFFFFF",
+    "homeIcon": "assets/tabbar/home-light-off.png",
+    "homeIconSelected": "assets/tabbar/home-light-on.png",
+    "discoverIcon": "assets/tabbar/discover-light-off.png",
+    "discoverIconSelected": "assets/tabbar/discover-light-on.png",
+    "ordersIcon": "assets/tabbar/orders-light-off.png",
+    "ordersIconSelected": "assets/tabbar/orders-light-on.png",
+    "messagesIcon": "assets/tabbar/messages-light-off.png",
+    "messagesIconSelected": "assets/tabbar/messages-light-on.png",
+    "profileIcon": "assets/tabbar/profile-light-off.png",
+    "profileIconSelected": "assets/tabbar/profile-light-on.png"
+  },
+  "dark": {
+    "navigationBarTextStyle": "white",
+    "navigationBarBackgroundColor": "#0E0F10",
+    "backgroundColor": "#0E0F10",
+    "backgroundTextStyle": "light",
+    "tabBarColor": "#A6A29D",
+    "tabBarSelectedColor": "#FF8A78",
+    "tabBarBorderStyle": "white",
+    "tabBarBackgroundColor": "#17191B",
+    "homeIcon": "assets/tabbar/home-dark-off.png",
+    "homeIconSelected": "assets/tabbar/home-dark-on.png",
+    "discoverIcon": "assets/tabbar/discover-dark-off.png",
+    "discoverIconSelected": "assets/tabbar/discover-dark-on.png",
+    "ordersIcon": "assets/tabbar/orders-dark-off.png",
+    "ordersIconSelected": "assets/tabbar/orders-dark-on.png",
+    "messagesIcon": "assets/tabbar/messages-dark-off.png",
+    "messagesIconSelected": "assets/tabbar/messages-dark-on.png",
+    "profileIcon": "assets/tabbar/profile-dark-off.png",
+    "profileIconSelected": "assets/tabbar/profile-dark-on.png"
+  }
+}

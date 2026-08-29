@@ -1,0 +1,4 @@
+.action-bar { display: flex; gap: 16rpx; padding: 18rpx 24rpx calc(18rpx + env(safe-area-inset-bottom)); border-top: 1rpx solid var(--tt-border); background: var(--tt-surface); }
+.action-bar-fixed { position: fixed; z-index: 30; right: 0; bottom: 0; left: 0; }
+.action-secondary { min-width: 180rpx; border-color: var(--tt-border-strong); background: var(--tt-surface); color: var(--tt-text-secondary); }
+.action-primary { min-width: 0; flex: 1; border-color: var(--tt-accent); background: var(--tt-accent); color: var(--tt-on-accent); font-weight: 700; }

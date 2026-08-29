@@ -68,6 +68,8 @@ import { RuleEngine } from "./rule-engine";
     ModerationCaseService,
     RuleEngine,
     ChatRestrictionService,
+    MEDIA_STORAGE_PROVIDER,
+    MEDIA_ANALYSIS_PROVIDER,
     MediaAssetService,
     MediaModerationWorker,
     ControlledCaseEvidenceWorker,

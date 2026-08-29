@@ -42,6 +42,16 @@ export function miniProgramEnvironment(): MiniProgramEnvironment {
   return "develop";
 }
 
+/** Synthetic UI fixtures are allowed only in explicitly identified local/staging builds. */
+export function clientSyntheticDesignAssetsEnabled(): boolean {
+  try {
+    const value = wx.getAccountInfoSync?.().miniProgram?.envVersion;
+    return value === "develop" || value === "trial";
+  } catch {
+    return false;
+  }
+}
+
 /**
  * `miniProgramEnvironment()` deliberately falls back to develop for transport
  * configuration in older tools. Capability safety has a stricter rule: only a
@@ -127,6 +137,11 @@ export function clientRealtimeVoiceEnabled(): boolean {
 
 /** Voice intro playback/edit is part of the global text-only fail-closed matrix. */
 export function clientVoiceIntroEnabled(): boolean {
+  return !isCommercialTextOnly();
+}
+
+/** Companion profile image management uses the same fail-closed media surface. */
+export function clientCompanionProfileMediaEnabled(): boolean {
   return !isCommercialTextOnly();
 }
 

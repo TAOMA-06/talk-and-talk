@@ -12,7 +12,8 @@ export type FirstReleaseCapability =
   | "voiceIntro"
   | "trtcUserSig"
   | "voiceSkuActivation"
-  | "caseEvidenceMedia";
+  | "caseEvidenceMedia"
+  | "companionProfileMedia";
 
 export type FirstReleaseCapabilityMatrix = Record<FirstReleaseCapability, boolean>;
 
@@ -28,7 +29,9 @@ export function firstReleaseCapabilityMatrix(
     trtcUserSig: mediaAllowed,
     voiceSkuActivation: mediaAllowed,
     // MP-D05 global text-only: case-evidence media is also fail-closed for first release.
-    caseEvidenceMedia: mediaAllowed
+    caseEvidenceMedia: mediaAllowed,
+    // Public profile images share the same storage and moderation trust boundary.
+    companionProfileMedia: mediaAllowed
   };
 }
 

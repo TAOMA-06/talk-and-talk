@@ -1,0 +1,8 @@
+:host { display: inline-flex; }
+.status { display: inline-flex; min-height: 44rpx; align-items: center; gap: 10rpx; padding: 6rpx 16rpx; border-radius: 999rpx; background: var(--tt-surface-alt); color: var(--tt-text-secondary); font-size: 22rpx; font-weight: 600; line-height: 1.3; }
+.status-dot { width: 10rpx; height: 10rpx; border-radius: 999rpx; background: currentColor; }
+.status-success { background: var(--tt-success-soft); color: var(--tt-success); }
+.status-warning { background: var(--tt-warning-soft); color: var(--tt-warning); }
+.status-danger { background: var(--tt-danger-soft); color: var(--tt-danger); }
+.status-info { background: var(--tt-info-soft); color: var(--tt-info); }
+.status-accent { background: var(--tt-accent-soft); color: var(--tt-accent); }

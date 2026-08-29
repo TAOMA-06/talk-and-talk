@@ -364,6 +364,8 @@ async function anonymizeCompanionProfile(
       "voiceIntroAssetRef" = NULL,
       "voiceIntroDurationSeconds" = NULL,
       "voiceIntroStatus" = 'notSubmitted',
+      "avatarAssetId" = NULL,
+      "coverAssetId" = NULL,
       "isPublished" = FALSE
     WHERE "id" = ${subject.companionId}
       AND "ownerUserId" = ${subject.userId}

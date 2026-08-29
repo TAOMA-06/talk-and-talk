@@ -1,6 +1,6 @@
 <view class="page safety-page">
   <view class="safety-hero">
-    <view class="safety-eyebrow">安全与支持</view>
+    <view class="safety-eyebrow tt-kicker">安全与支持</view>
     <view class="safety-title">先照顾自己的感受与安全</view>
     <view class="safety-copy">这里说明平台现在能做什么、不能做什么，以及需要帮助时可以从哪里开始。</view>
   </view>
@@ -8,7 +8,7 @@
   <view class="card urgent-card">
     <view class="section-title">感到不适或不安全时</view>
     <view class="section-copy">请先停止回复、离开当前会话，不要继续私下转账、交换联系方式或安排线下见面。出现即时危险时，请联系当地紧急服务或身边可信的人。</view>
-    <view class="section-note">Talk&amp;Talk 不提供报警、紧急救援、医疗或危机干预服务。</view>
+    <view class="section-note">平台不提供报警、紧急救援、医疗或危机干预服务。</view>
     <button class="leave-button" bindtap="leaveCurrentInteraction">先离开当前互动</button>
     <view class="action-note">离开不会取消已有订单，也不会代为提交举报。</view>
   </view>

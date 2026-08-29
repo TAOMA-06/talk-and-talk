@@ -1,0 +1,113 @@
+{
+  "generatedAt": "2026-08-29T05:00:27.220Z",
+  "simulator": {
+    "320x568": {
+      "model": "iPhone 5",
+      "theme": "light",
+      "fontSize": 16,
+      "evidence": {
+        "files": [
+          "01-home.png",
+          "02-discover.png",
+          "03-orders.png",
+          "04-companion-detail.png",
+          "05-workbench.png",
+          "06-chat.png"
+        ],
+        "dimensions": [
+          "640x912",
+          "640x1008"
+        ]
+      }
+    },
+    "390x844": {
+      "model": "iPhone 12/13 (Pro)",
+      "theme": "light+dark",
+      "fontSize": 16,
+      "evidence": {
+        "mainMatrix": "light/ + dark/",
+        "screenshots": 62
+      }
+    },
+    "430x932": {
+      "model": "iPhone 14 Pro Max",
+      "theme": "light",
+      "fontSize": 16,
+      "evidence": {
+        "files": [
+          "01-home.png",
+          "02-discover.png",
+          "03-orders.png",
+          "04-companion-detail.png",
+          "05-workbench.png",
+          "06-chat.png"
+        ],
+        "dimensions": [
+          "860x1504",
+          "860x1668"
+        ]
+      }
+    }
+  },
+  "enlargedFont": {
+    "logicalDevice": "320x568",
+    "fontSize": 26,
+    "evidence": {
+      "files": [
+        "01-home.png",
+        "02-orders.png",
+        "03-workbench.png",
+        "04-chat.png"
+      ],
+      "dimensions": [
+        "640x912",
+        "640x1008"
+      ]
+    }
+  },
+  "states": {
+    "filterSheet": {
+      "path": "states/01-filter-sheet.png",
+      "dimensions": {
+        "width": 780,
+        "height": 1342
+      }
+    },
+    "avatarFallback": {
+      "path": "states/03-avatar-fallback.png",
+      "dimensions": {
+        "width": 780,
+        "height": 1506
+      }
+    },
+    "empty": {
+      "path": "device-320x568/02-discover.png",
+      "dimensions": {
+        "width": 640,
+        "height": 912
+      }
+    },
+    "disabled": {
+      "path": "light/20-companion-detail.png",
+      "dimensions": {
+        "width": 780,
+        "height": 1506
+      }
+    },
+    "localizedError": {
+      "path": "font-26-320x568/04-chat.png",
+      "dimensions": {
+        "width": 640,
+        "height": 1008
+      }
+    },
+    "loadingSkeleton": {
+      "status": "not_captured",
+      "reason": "Developer Tools crashed during the final visible skeleton capture"
+    },
+    "keyboard": {
+      "status": "not_captured",
+      "reason": "Developer Tools reported noWindowsAvailable, then crashed before focus evidence"
+    }
+  }
+}

@@ -1,13 +1,10 @@
 <view class="page account-page">
-  <view wx:if="{{loading}}" class="empty">正在读取账户信息…</view>
-  <view wx:elif="{{error && !limitedAccountMode}}" class="state-panel error-panel">
-    <view>{{error}}</view>
-    <button class="retry-button" bindtap="load">重新读取</button>
-  </view>
+  <tt-skeleton wx:if="{{loading}}" rows="3" />
+  <tt-state wx:elif="{{error && !limitedAccountMode}}" type="error" title="账户信息暂时无法读取" description="{{error}}" action-text="重新读取" bindaction="load" />
   <view wx:else>
     <block wx:if="{{user && !limitedAccountMode}}">
     <view class="account-hero">
-      <view class="avatar">{{avatarText}}</view>
+      <tt-avatar fallback="{{avatarText}}" alt="当前账号头像" size="lg" />
       <view class="identity">
         <view class="identity-name">{{displayName}}</view>
         <view class="identity-meta">{{maskedPhone}} · {{verificationText}}</view>
@@ -15,14 +12,10 @@
       <button class="edit-button" bindtap="openProfile">编辑资料</button>
     </view>
 
-    <view class="quick-grid">
-      <view class="quick-card" bindtap="openNotificationCenter" aria-role="button" aria-label="打开通知中心：订单、支付、客服与安全" tabindex="0"><view class="quick-title">通知中心</view><view class="quick-copy">订单、支付、客服与安全</view></view>
-      <view class="quick-card" bindtap="openSupportCenter" aria-role="button" aria-label="打开案件中心：查看处理状态和结果" tabindex="0"><view class="quick-title">案件中心</view><view class="quick-copy">查看处理状态和结果</view></view>
-    </view>
-    <view class="quick-card adult-eligibility-entry" bindtap="openAdultEligibility" aria-role="button" aria-label="打开成年资格核验：查看状态或提交受控证据引用" tabindex="0">
-      <view class="quick-title">成年资格核验</view>
-      <view class="quick-copy">付费预约、支付、改期及语音服务前由服务端独立核验</view>
-      <view class="entry-arrow">查看状态 ›</view>
+    <view class="quick-grid tt-card">
+      <tt-list-cell title="通知中心" subtitle="订单、支付、客服与安全" bindtap="openNotificationCenter" />
+      <tt-list-cell title="案件中心" subtitle="查看处理状态和结果" bindtap="openSupportCenter" />
+      <tt-list-cell title="成年资格核验" subtitle="付费预约、支付与改期前由服务端独立核验" meta="查看状态" bindtap="openAdultEligibility" />
     </view>
     <view wx:if="{{partialWarning}}" class="partial-warning">{{partialWarning}}</view>
     </block>

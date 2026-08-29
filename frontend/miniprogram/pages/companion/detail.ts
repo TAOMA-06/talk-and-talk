@@ -12,10 +12,15 @@ import {
 } from "../../utils/models";
 import { requestTransactionalSubscriptions } from "../../utils/subscription";
 import {
+  companionAvailabilityText,
+  companionRatingText
+} from "../../utils/companion-presentation";
+import {
   isPublicInteractionIdentityError,
   publicInteractionErrorUserMessage,
   publicInteractionRecoveryPath
 } from "../../utils/public-interaction-errors";
+import { companionAvatarUrl, companionCoverUrl } from "../../utils/design-assets";
 
 type ServiceCatalogStatus = "loading" | "available" | "empty";
 type AvailabilityStatus = "loading" | "structured" | "empty" | "unavailable";
@@ -372,6 +377,10 @@ Page({
     rebookingNotice: "",
     trustFacts: [] as TrustFact[],
     publicProfile: null as PublicProfileDisplay | null,
+    avatarUrl: "",
+    coverUrl: "",
+    availabilityText: "",
+    ratingText: "",
     canManageFavorites: false,
     favoriteState: "loading" as "loading" | "available" | "error",
     favoriteError: "",
@@ -431,6 +440,8 @@ Page({
       rebookingNotice: this.rebookingRequested ? "正在核对上次服务的当前价格与可约时段…" : "",
       trustFacts: [],
       publicProfile: null,
+      availabilityText: "",
+      ratingText: "",
       canManageFavorites: false,
       favoriteState: "loading",
       favoriteError: "",
@@ -464,6 +475,12 @@ Page({
       };
       const canManageFavorites = user.role === "user";
       const publicProfile = publicProfileDisplay(companion);
+      this.setData({
+        avatarUrl: companionAvatarUrl(companion, "large"),
+        coverUrl: companionCoverUrl(companion),
+        availabilityText: companionAvailabilityText(companion.availability),
+        ratingText: companionRatingText(companion)
+      });
       const [favoriteStatus, recommendationExclusions] = canManageFavorites
         ? await Promise.all([
           api.favoriteCompanionStatus(companion.id)

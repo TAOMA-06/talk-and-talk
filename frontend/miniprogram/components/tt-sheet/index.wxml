@@ -1,0 +1,14 @@
+<root-portal enable="{{true}}" wx:if="{{show}}">
+  <view class="sheet-root" aria-role="dialog" aria-modal="true">
+    <view class="sheet-mask" bindtap="closeMask" catchtouchmove="noop" aria-label="关闭弹层"></view>
+    <view class="sheet" catchtouchmove="noop">
+      <view class="sheet-handle"></view>
+      <view class="sheet-header">
+        <view class="sheet-heading" tabindex="0"><view class="sheet-title">{{title}}</view><view wx:if="{{subtitle}}" class="sheet-subtitle">{{subtitle}}</view></view>
+        <button wx:if="{{closable}}" class="sheet-close" bindtap="close" aria-label="关闭">×</button>
+      </view>
+      <scroll-view class="sheet-body" scroll-y enhanced show-scrollbar="{{false}}"><slot></slot></scroll-view>
+      <view class="sheet-footer"><slot name="footer"></slot></view>
+    </view>
+  </view>
+</root-portal>

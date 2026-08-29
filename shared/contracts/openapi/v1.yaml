@@ -1577,6 +1577,106 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
+  /companions/me/profile-media/{slot}/uploads:
+    post:
+      tags: [companions]
+      summary: Reserve an owner-scoped companion avatar or cover upload
+      description: Disabled on the first-release text-only surface. Only an approved image can replace the public slot.
+      operationId: reserveOwnCompanionProfileMedia
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CompanionProfileMediaSlotPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReserveCompanionProfileMediaInput"
+      responses:
+        "201":
+          description: Short-lived direct upload instruction
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+        "404":
+          $ref: "#/components/responses/Error"
+        "422":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /companions/me/profile-media/{slot}/uploads/{assetId}/complete:
+    post:
+      tags: [companions]
+      summary: Verify and moderate a companion profile image upload
+      description: The image is attached atomically only when moderation returns allow; review or blocked assets remain private.
+      operationId: completeOwnCompanionProfileMedia
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CompanionProfileMediaSlotPath"
+        - name: assetId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "201":
+          description: Moderated asset state and whether it became public
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /companions/me/profile-media/{slot}/uploads/{assetId}:
+    get:
+      tags: [companions]
+      summary: Read the authenticated owner's profile image moderation state
+      operationId: getOwnCompanionProfileMediaStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CompanionProfileMediaSlotPath"
+        - name: assetId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Owner-scoped profile image state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+        "404":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
+  /companions/me/profile-media/{slot}:
+    delete:
+      tags: [companions]
+      summary: Remove the current public avatar or cover and schedule storage deletion
+      operationId: removeOwnCompanionProfileMedia
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CompanionProfileMediaSlotPath"
+      responses:
+        "200":
+          description: Idempotent removal result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessEnvelope"
+        "404":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
   /companions/me/application:
     post:
       tags: [companions]
@@ -2213,6 +2313,24 @@ paths:
                       data:
                         $ref: "#/components/schemas/PublicCompanion"
         "404":
+          $ref: "#/components/responses/Error"
+  /companions/{id}/media/{slot}:
+    get:
+      tags: [companions]
+      summary: Redirect to the approved public avatar or cover object
+      operationId: readPublicCompanionProfileMedia
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/CompanionProfileMediaSlotPath"
+      responses:
+        "302":
+          description: Short-lived storage URL for an approved image
+          headers:
+            Location:
+              schema: { type: string, format: uri }
+        "404":
+          $ref: "#/components/responses/Error"
+        "503":
           $ref: "#/components/responses/Error"
   /companions/{id}/service-offerings:
     get:
@@ -9586,6 +9704,13 @@ components:
       required: true
       schema:
         type: string
+    CompanionProfileMediaSlotPath:
+      name: slot
+      in: path
+      required: true
+      schema:
+        type: string
+        enum: [avatar, cover]
     PageSizeQuery:
       name: pageSize
       in: query
@@ -9609,6 +9734,32 @@ components:
           schema:
             $ref: "#/components/schemas/LoginIdentityUnavailableErrorEnvelope"
   schemas:
+    ReserveCompanionProfileMediaInput:
+      type: object
+      additionalProperties: false
+      required: [mimeType, sizeBytes, sha256]
+      properties:
+        mimeType: { type: string, enum: [image/jpeg, image/png, image/webp] }
+        sizeBytes:
+          type: integer
+          minimum: 1
+          maximum: 4194304
+          description: The avatar endpoint applies a stricter 2097152-byte limit.
+        sha256: { type: string, pattern: "^[a-fA-F0-9]{64}$" }
+    CompanionProfileMediaAsset:
+      type: object
+      additionalProperties: false
+      required: [id, slot, status, mimeType, sizeBytes, published, uploadExpiresAt, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        slot: { type: string, enum: [avatar, cover] }
+        status: { type: string, enum: [reserved, scanning, approved, reviewRequired, blocked, failed, expired] }
+        mimeType: { type: string, enum: [image/jpeg, image/png, image/webp] }
+        sizeBytes: { type: integer, minimum: 1, maximum: 4194304 }
+        published: { type: boolean }
+        uploadExpiresAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time, nullable: true }
+        updatedAt: { type: string, format: date-time, nullable: true }
     CrisisInterventionSource:
       type: string
       enum: [homeIntent, homeBrowseAll, homeRecommendation, discover, companionDetail, order, chatSafetyRule, directEmergencyHelp]
@@ -12295,12 +12446,20 @@ components:
                     totalPages: { type: integer, minimum: 0 }
     PublicCompanion:
       type: object
-      required: [id, name, role, initials, tags, rating, reviewCount, pricePerHalfHour, isOnline, isVerified, bio, availableTimes, languages, specialties, topicIds, completedOrders, responseTime, distanceKm, availability, cityDistrict, isPublished, createdAt, updatedAt]
+      required: [id, name, role, initials, avatarUrl, coverUrl, tags, rating, reviewCount, pricePerHalfHour, isOnline, isVerified, bio, availableTimes, languages, specialties, topicIds, completedOrders, responseTime, distanceKm, availability, cityDistrict, isPublished, createdAt, updatedAt]
       properties:
         id: { type: string }
         name: { type: string }
         role: { type: string }
         initials: { type: string }
+        avatarUrl:
+          type: string
+          nullable: true
+          description: Stable API path that redirects only to the currently approved avatar; clients must fall back to initials when null or unreadable.
+        coverUrl:
+          type: string
+          nullable: true
+          description: Stable API path that redirects only to the currently approved profile cover.
         tags:
           type: array
           items: { type: string }

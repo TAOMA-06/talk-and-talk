@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
 import { readFile, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const require = createRequire(import.meta.url);
@@ -9,7 +9,10 @@ const repoRoot = resolve(artifactRoot, "../../..");
 const { PrismaPg } = require(`${repoRoot}/backend/api/node_modules/@prisma/adapter-pg`);
 const { PrismaClient } = require(`${repoRoot}/backend/api/dist/generated/prisma/client.js`);
 
-const expectedDatabase = "talk_and_talk_miniprogram_full_20260828_ea11230f_01";
+const allowedDatabases = new Set([
+  "talk_and_talk_miniprogram_full_20260828_ea11230f_01",
+  "talk_and_talk_miniprogram_full_20260828_ui2_01"
+]);
 const databaseUrl = process.env.DATABASE_URL?.trim();
 const runtimeRoot = process.env.DEMO_RUNTIME_ROOT?.trim();
 if (!databaseUrl || !runtimeRoot || process.env.DEMO_FIXTURE_AUTHORIZED !== "1") {
@@ -17,7 +20,7 @@ if (!databaseUrl || !runtimeRoot || process.env.DEMO_FIXTURE_AUTHORIZED !== "1")
 }
 const parsed = new URL(databaseUrl);
 const databaseName = decodeURIComponent(parsed.pathname.replace(/^\//, ""));
-if (!["127.0.0.1", "localhost", "::1"].includes(parsed.hostname) || databaseName !== expectedDatabase) {
+if (!["127.0.0.1", "localhost", "::1"].includes(parsed.hostname) || !allowedDatabases.has(databaseName)) {
   throw new Error(`Refusing scenario fixture target: ${parsed.hostname}/${databaseName}`);
 }
 if (process.env.APP_ENV === "production" || process.env.NODE_ENV === "production") {
@@ -352,5 +355,15 @@ const manifest = {
     idempotentIds: true
   }
 };
-await writeFile(resolve(artifactRoot, "verification/snapshot-fixture-manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+const defaultManifestOutput = resolve(artifactRoot, "verification/snapshot-fixture-manifest.json");
+const requestedManifestOutput = process.env.DEMO_FIXTURE_MANIFEST_OUTPUT?.trim();
+const manifestOutput = requestedManifestOutput ? resolve(requestedManifestOutput) : defaultManifestOutput;
+if (requestedManifestOutput) {
+  const ui2EvidenceRoot = resolve(repoRoot, "artifacts/ui2-visual-evidence");
+  const relativeOutput = relative(ui2EvidenceRoot, manifestOutput);
+  if (!relativeOutput || relativeOutput.startsWith("..") || isAbsolute(relativeOutput)) {
+    throw new Error("DEMO_FIXTURE_MANIFEST_OUTPUT must be a file inside artifacts/ui2-visual-evidence");
+  }
+}
+await writeFile(manifestOutput, `${JSON.stringify(manifest, null, 2)}\n`);
 process.stdout.write(JSON.stringify({ database: databaseName, profiles: Object.keys(manifest.profiles), orders: result.orders }) + "\n");

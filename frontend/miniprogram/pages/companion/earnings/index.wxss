@@ -1,53 +1,260 @@
-.hero { padding: 34rpx 30rpx; border-radius: 28rpx; background: linear-gradient(135deg, #fff, #eaf8ef); box-shadow: 0 10rpx 28rpx rgba(49, 96, 65, 0.08); }
-.eyebrow { color: #34734a; font-size: 24rpx; font-weight: 700; }
-.hero-title { margin-top: 10rpx; color: #234f32; font-size: 40rpx; font-weight: 700; }
-.hero-copy { margin-top: 14rpx; color: #5e7b68; font-size: 25rpx; line-height: 1.6; }
-.source { margin-top: 18rpx; color: #7e9887; font-size: 22rpx; line-height: 1.5; }
-.blocked { margin-top: 18rpx; padding: 18rpx; border-radius: 16rpx; background: #ffeadf; color: #8c4526; font-size: 24rpx; line-height: 1.55; }
-.link { color: #a43f5c; font-weight: 700; }
-.inline-error { margin-top: 20rpx; padding: 18rpx; border-radius: 16rpx; background: #fff0f0; color: #a43f3f; font-size: 24rpx; }
-.section-title { margin: 34rpx 4rpx 16rpx; font-size: 30rpx; font-weight: 700; }
-.empty-card { color: #7b8e80; font-size: 24rpx; line-height: 1.6; }
-.earning-card { display: flex; align-items: flex-start; gap: 16rpx; padding: 24rpx; border: 2rpx solid transparent; }
-.earning-card.selected { border-color: #75b189; background: #fbfffc; }
-.check { width: 36rpx; color: #4f8d63; font-size: 31rpx; font-weight: 700; text-align: center; }
-.earning-main { flex: 1; min-width: 0; }
-.earning-head, .withdrawal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16rpx; }
-.amount { color: #245737; font-size: 32rpx; font-weight: 700; }
-.status { flex: none; padding: 7rpx 12rpx; border-radius: 999rpx; background: #edf4ef; color: #4d7359; font-size: 21rpx; }
-.status-held, .status-card-rejected .status { background: #ffeadf; color: #974b2b; }
-.status-paid, .status-card-paid .status { background: #e4f4ea; color: #2d7547; }
-.meta, .fee, .recipient { margin-top: 10rpx; color: #829287; font-size: 22rpx; line-height: 1.5; word-break: break-all; }
-.hold, .rejection { margin-top: 14rpx; padding: 14rpx; border-radius: 12rpx; background: #fff2df; color: #8d5f21; font-size: 22rpx; line-height: 1.5; }
-.selection-bar { position: sticky; z-index: 5; bottom: 18rpx; display: flex; align-items: center; justify-content: space-between; gap: 20rpx; margin-top: 18rpx; padding: 20rpx 22rpx; border-radius: 22rpx; background: rgba(255, 255, 255, 0.96); box-shadow: 0 8rpx 28rpx rgba(55, 85, 65, 0.14); }
-.selection-label { color: #78907e; font-size: 22rpx; }
-.selection-value { margin-top: 5rpx; color: #245737; font-size: 30rpx; font-weight: 700; }
-.request-button { margin: 0; min-width: 220rpx; }
-.withdrawal-card { padding: 26rpx; }
-.next-step { margin-top: 18rpx; padding: 16rpx; border-radius: 14rpx; background: #f4f7f4; color: #526a59; font-size: 24rpx; line-height: 1.55; }
-.secondary-button { margin-top: 18rpx; background: #eef5f0; color: #3b7650; }
-.empty-title { margin-bottom: 14rpx; color: #4b353a; font-size: 34rpx; font-weight: 700; }
-.retry { margin-top: 28rpx; }
+.hero {
+  padding: 32rpx;
+  border-radius: 28rpx;
+  background: var(--tt-accent-soft);
+  box-shadow: none;
+  border: 1rpx solid var(--tt-border);
+}
 
-/* Restrained redesign */
-.page { padding-bottom: 48rpx; padding-bottom: calc(48rpx + constant(safe-area-inset-bottom)); padding-bottom: calc(48rpx + env(safe-area-inset-bottom)); }
-.primary-button { min-height: 88rpx; }
-.hero { padding: 32rpx; border: 1rpx solid #E4E6E8; background: #F6ECEF; box-shadow: none; }
-.eyebrow, .link { color: #9B405B; }
-.hero-title, .section-title, .amount, .selection-value, .empty-title { color: #202124; font-weight: 700; }
-.hero-copy, .meta, .fee, .recipient, .selection-label, .empty-card { color: #646970; }
-.source { color: #8A9098; }
-.blocked, .hold { border: 1rpx solid #ECDDBD; background: #FAF4E8; color: #8A6426; }
-.inline-error, .rejection { border: 1rpx solid #E8C9CD; background: #FAEEEE; color: #A33D45; }
-.earning-card, .withdrawal-card { border: 1rpx solid #E4E6E8; background: #FFFFFF; }
-.earning-card.selected { border-color: #9B405B; background: #F6ECEF; }
-.check { color: #9B405B; }
-.status { background: #F1F2F3; color: #646970; }
-.status-held, .status-card-rejected .status { background: #FAEEEE; color: #A33D45; }
-.status-paid, .status-card-paid .status { background: #EDF6F1; color: #2F6B55; }
-.selection-bar { position: static; z-index: auto; bottom: auto; border: 1rpx solid #E4E6E8; border-radius: 20rpx; background: #FFFFFF; box-shadow: none; }
-.request-button { min-height: 88rpx; }
-.next-step { background: #EEF3F6; color: #3F647A; }
-.secondary-button { min-height: 80rpx; border: 1rpx solid #D7BEC6; border-radius: 14rpx; background: #FFFFFF; color: #9B405B; }
-.primary-button.button-hover { background: #7F3248; }
-.primary-button[disabled], .secondary-button[disabled] { opacity: 0.52; }
+.eyebrow {
+  color: var(--tt-success);
+  font-size: 24rpx;
+  font-weight: 700;
+}
+
+.hero-title {
+  margin-top: 10rpx;
+  color: var(--tt-success);
+  font-size: 40rpx;
+  font-weight: 700;
+}
+
+.hero-copy {
+  margin-top: 14rpx;
+  color: var(--tt-text-secondary);
+  font-size: 25rpx;
+  line-height: 1.6;
+}
+
+.source {
+  margin-top: 18rpx;
+  color: var(--tt-text-tertiary);
+  font-size: 22rpx;
+  line-height: 1.5;
+}
+
+.blocked {
+  margin-top: 18rpx;
+  padding: 18rpx;
+  border-radius: 16rpx;
+  background: var(--tt-warning-soft);
+  color: var(--tt-warning);
+  font-size: 24rpx;
+  line-height: 1.55;
+}
+
+.link {
+  color: var(--tt-accent);
+  font-weight: 700;
+}
+
+.inline-error {
+  margin-top: 20rpx;
+  padding: 18rpx;
+  border-radius: 16rpx;
+  background: var(--tt-danger-soft);
+  color: var(--tt-danger);
+  font-size: 24rpx;
+}
+
+.section-title {
+  margin: 34rpx 4rpx 16rpx;
+  font-size: 30rpx;
+  font-weight: 700;
+}
+
+.empty-card {
+  color: var(--tt-text-secondary);
+  font-size: 24rpx;
+  line-height: 1.6;
+}
+
+.earning-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 16rpx;
+  padding: 24rpx;
+  border: 2rpx solid transparent;
+}
+
+.earning-card.selected {
+  border-color: var(--tt-accent);
+  background: var(--tt-accent-soft);
+}
+
+.check {
+  width: 36rpx;
+  color: var(--tt-accent);
+  font-size: 31rpx;
+  font-weight: 700;
+  text-align: center;
+}
+
+.earning-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.earning-head, .withdrawal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
+.amount {
+  color: var(--tt-success);
+  font-size: 32rpx;
+  font-weight: 700;
+}
+
+.status {
+  flex: none;
+  padding: 7rpx 12rpx;
+  border-radius: 999rpx;
+  background: var(--tt-surface-alt);
+  color: var(--tt-text-secondary);
+  font-size: 21rpx;
+}
+
+.status-held, .status-card-rejected .status {
+  background: var(--tt-danger-soft);
+  color: var(--tt-danger);
+}
+
+.status-paid, .status-card-paid .status {
+  background: var(--tt-success-soft);
+  color: var(--tt-success);
+}
+
+.meta, .fee, .recipient {
+  margin-top: 10rpx;
+  color: var(--tt-text-secondary);
+  font-size: 22rpx;
+  line-height: 1.5;
+  word-break: break-all;
+}
+
+.hold, .rejection {
+  margin-top: 14rpx;
+  padding: 14rpx;
+  border-radius: 12rpx;
+  background: var(--tt-warning-soft);
+  color: var(--tt-warning);
+  font-size: 22rpx;
+  line-height: 1.5;
+}
+
+.selection-bar {
+  position: static;
+  z-index: auto;
+  bottom: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+  margin-top: 18rpx;
+  padding: 20rpx 22rpx;
+  border-radius: 20rpx;
+  background: var(--tt-surface);
+  box-shadow: none;
+  border: 1rpx solid var(--tt-border);
+}
+
+.selection-label {
+  color: var(--tt-text-secondary);
+  font-size: 22rpx;
+}
+
+.selection-value {
+  margin-top: 5rpx;
+  color: var(--tt-success);
+  font-size: 30rpx;
+  font-weight: 700;
+}
+
+.request-button {
+  margin: 0;
+  min-width: 220rpx;
+  min-height: 88rpx;
+}
+
+.withdrawal-card {
+  padding: 26rpx;
+}
+
+.next-step {
+  margin-top: 18rpx;
+  padding: 16rpx;
+  border-radius: 14rpx;
+  background: var(--tt-info-soft);
+  color: var(--tt-info);
+  font-size: 24rpx;
+  line-height: 1.55;
+}
+
+.secondary-button {
+  margin-top: 18rpx;
+  background: var(--tt-surface);
+  color: var(--tt-accent);
+  min-height: 80rpx;
+  border: 1rpx solid var(--tt-accent-soft);
+  border-radius: 14rpx;
+}
+
+.empty-title {
+  margin-bottom: 14rpx;
+  color: var(--tt-danger);
+  font-size: 34rpx;
+  font-weight: 700;
+}
+
+.retry {
+  margin-top: 28rpx;
+}
+
+.page {
+  padding-bottom: calc(48rpx + env(safe-area-inset-bottom));
+}
+
+.primary-button {
+  min-height: 88rpx;
+}
+
+.eyebrow, .link {
+  color: var(--tt-accent);
+}
+
+.hero-title, .section-title, .amount, .selection-value, .empty-title {
+  color: var(--tt-text);
+  font-weight: 700;
+}
+
+.hero-copy, .meta, .fee, .recipient, .selection-label, .empty-card {
+  color: var(--tt-text-secondary);
+}
+
+.blocked, .hold {
+  border: 1rpx solid var(--tt-border);
+  background: var(--tt-warning-soft);
+  color: var(--tt-warning);
+}
+
+.inline-error, .rejection {
+  border: 1rpx solid var(--tt-border);
+  background: var(--tt-danger-soft);
+  color: var(--tt-danger);
+}
+
+.earning-card, .withdrawal-card {
+  border: 1rpx solid var(--tt-border);
+  background: var(--tt-surface);
+}
+
+.primary-button.button-hover {
+  background: var(--tt-accent-pressed);
+}
+
+.primary-button[disabled], .secondary-button[disabled] {
+  opacity: 0.52;
+}

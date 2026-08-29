@@ -1,56 +1,232 @@
-.payment-page { padding-bottom: 64rpx; }
-.payment-state { padding: 44rpx 30rpx; border-radius: 28rpx; background: #fff1f4; text-align: center; }
-.state-success { background: #edf8f3; }
-.state-error, .state-cancelled { background: #fff4f1; }
-.state-pending, .state-processing { background: #fff8e9; }
-.state-symbol { display: flex; width: 74rpx; height: 74rpx; margin: 0 auto; align-items: center; justify-content: center; border-radius: 50%; background: #fff; color: #a6435d; font-size: 40rpx; font-weight: 800; box-shadow: 0 8rpx 20rpx rgba(83, 47, 57, 0.08); }
-.state-success .state-symbol { color: #34735a; }
-.state-title { margin-top: 18rpx; color: #48343a; font-size: 38rpx; font-weight: 800; }
-.state-message { margin-top: 12rpx; color: #755d64; font-size: 24rpx; line-height: 1.65; }
-.order-summary { margin-top: 22rpx; }
-.summary-title { margin-bottom: 14rpx; color: #49343a; font-size: 31rpx; font-weight: 800; }
-.summary-row { display: flex; justify-content: space-between; gap: 24rpx; padding: 14rpx 0; border-bottom: 1rpx solid #f0e5e7; color: #765e65; font-size: 24rpx; line-height: 1.55; }
-.summary-row text:first-child { flex: 0 0 120rpx; color: #9b838a; }
-.summary-row text:last-child { flex: 1; text-align: right; }
-.summary-row.total text:last-child { color: #b74665; font-size: 32rpx; font-weight: 800; }
-.rules-title { color: #49343a; font-size: 29rpx; font-weight: 800; }
-.rule { margin-top: 13rpx; color: #775f66; font-size: 23rpx; line-height: 1.65; }
-.policy-rule { color: #614b53; font-weight: 600; }
-.policy-version { margin-top: 16rpx; padding: 15rpx 17rpx; border-radius: 12rpx; background: #f8f3f4; color: #765f67; font-size: 21rpx; line-height: 1.65; }
-.policy-link { width: 100%; margin-top: 14rpx; border: 1rpx solid #ddc8ce; background: #fff; color: #8a4358; font-size: 23rpx; }
-.terms-check { width: 100%; margin-top: 22rpx; padding: 18rpx; border: 2rpx solid #e5d5d9; background: #fff; color: #745862; font-size: 23rpx; text-align: left; }
-.terms-check.checked { border-color: #b94a68; background: #fff1f4; color: #853a51; }
-.pay-button, .full-button { width: 100%; margin-top: 18rpx; font-size: 27rpx; }
-.support-button { border: 1rpx solid #ddc8ce; background: #fff; color: #8a4358; }
-.authority-note { margin-top: 28rpx; padding: 0 16rpx; color: #947e85; font-size: 21rpx; line-height: 1.65; text-align: center; }
-.terms-check::after, .support-button::after, .policy-link::after { border: 0; }
+.payment-page {
+  padding-bottom: calc(64rpx + env(safe-area-inset-bottom));
+}
 
-/* Payment state and next-action hierarchy */
-.payment-page { padding-bottom: calc(64rpx + env(safe-area-inset-bottom)); }
-.payment-state { padding: 40rpx 30rpx; border: 1rpx solid #e3cbd2; border-left: 8rpx solid #9b405b; background: #f6ecef; text-align: left; }
-.state-success { border-color: #cee3d7; border-left-color: #2f6b55; background: #edf6f1; }
-.state-error, .state-cancelled { border-color: #efcdd0; border-left-color: #a33d45; background: #faeeee; }
-.state-pending, .state-processing { border-color: #eadfca; border-left-color: #8a6426; background: #faf4e8; }
-.state-unavailable { border-color: #d7e2e8; border-left-color: #3f647a; background: #eef3f6; }
-.state-symbol { width: 72rpx; height: 72rpx; margin: 0; border: 1rpx solid #e3cbd2; background: #ffffff; color: #9b405b; font-weight: 700; box-shadow: none; }
-.state-success .state-symbol { border-color: #cee3d7; color: #2f6b55; }
-.state-error .state-symbol, .state-cancelled .state-symbol { border-color: #efcdd0; color: #a33d45; }
-.state-pending .state-symbol, .state-processing .state-symbol { border-color: #eadfca; color: #8a6426; }
-.state-title { color: #202124; font-weight: 700; overflow-wrap: anywhere; }
-.state-message { color: #3f4247; overflow-wrap: anywhere; }
-.order-summary { margin-top: 24rpx; border-color: #e4e6e8; }
-.summary-title, .rules-title { color: #202124; font-weight: 700; overflow-wrap: anywhere; }
-.summary-row { border-bottom-color: #e4e6e8; color: #3f4247; }
-.summary-row text:first-child { color: #646970; }
-.summary-row text:last-child { min-width: 0; color: #202124; overflow-wrap: anywhere; }
-.summary-row.total text:last-child { color: #9b405b; font-weight: 700; }
-.rules-card { border-color: #e3cbd2; border-left: 6rpx solid #9b405b; }
-.rule { color: #646970; overflow-wrap: anywhere; }
-.policy-rule { color: #202124; }
-.policy-version { border: 1rpx solid #d7e2e8; background: #eef3f6; color: #3f647a; overflow-wrap: anywhere; }
-.policy-link { min-height: 88rpx; border-color: #d8b7c1; color: #9b405b; }
-.terms-check { min-height: 88rpx; border-color: #e4e6e8; color: #646970; line-height: 1.55; }
-.terms-check.checked { border-color: #9b405b; background: #f6ecef; color: #7f3248; font-weight: 600; }
-.pay-button, .full-button { min-height: 88rpx; margin-top: 18rpx; }
-.support-button { border-color: #d8b7c1; background: #ffffff; color: #9b405b; }
-.authority-note { margin-top: 28rpx; padding: 16rpx 18rpx; border: 1rpx solid #d7e2e8; border-radius: 14rpx; background: #eef3f6; color: #3f647a; text-align: left; overflow-wrap: anywhere; }
+.payment-state {
+  padding: 40rpx 30rpx;
+  border-radius: 28rpx;
+  background: var(--tt-accent-soft);
+  text-align: left;
+  border: 1rpx solid var(--tt-accent-soft);
+  border-left: 8rpx solid var(--tt-accent);
+}
+
+.state-success {
+  background: var(--tt-success-soft);
+  border-color: var(--tt-border);
+  border-left-color: var(--tt-success);
+}
+
+.state-error, .state-cancelled {
+  background: var(--tt-danger-soft);
+  border-color: var(--tt-border);
+  border-left-color: var(--tt-danger);
+}
+
+.state-pending, .state-processing {
+  background: var(--tt-warning-soft);
+  border-color: var(--tt-border);
+  border-left-color: var(--tt-warning);
+}
+
+.state-symbol {
+  display: flex;
+  width: fit-content;
+  min-width: 104rpx;
+  height: 52rpx;
+  margin: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999rpx;
+  background: var(--tt-surface);
+  color: var(--tt-accent);
+  font-size: 20rpx;
+  font-weight: 700;
+  box-shadow: none;
+  border: 1rpx solid var(--tt-accent-soft);
+}
+
+.state-success .state-symbol {
+  color: var(--tt-success);
+  border-color: var(--tt-border);
+}
+
+.state-title {
+  margin-top: 18rpx;
+  color: var(--tt-text);
+  font-size: 38rpx;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.state-message {
+  margin-top: 12rpx;
+  color: var(--tt-text);
+  font-size: 24rpx;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.order-summary {
+  margin-top: 24rpx;
+  border-color: var(--tt-border);
+}
+
+.summary-title {
+  margin-bottom: 14rpx;
+  color: var(--tt-accent);
+  font-size: 31rpx;
+  font-weight: 800;
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 24rpx;
+  padding: 14rpx 0;
+  border-bottom: 1rpx solid var(--tt-danger-soft);
+  color: var(--tt-text);
+  font-size: 24rpx;
+  line-height: 1.55;
+  border-bottom-color: var(--tt-border);
+}
+
+.summary-row text:first-child {
+  flex: 0 0 120rpx;
+  color: var(--tt-text-secondary);
+}
+
+.summary-row text:last-child {
+  flex: 1;
+  text-align: right;
+  min-width: 0;
+  color: var(--tt-text);
+  overflow-wrap: anywhere;
+}
+
+.summary-row.total text:last-child {
+  color: var(--tt-accent);
+  font-size: 32rpx;
+  font-weight: 700;
+}
+
+.rules-title {
+  color: var(--tt-accent);
+  font-size: 29rpx;
+  font-weight: 800;
+}
+
+.rule {
+  margin-top: 13rpx;
+  color: var(--tt-text-secondary);
+  font-size: 23rpx;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.policy-rule {
+  color: var(--tt-text);
+  font-weight: 600;
+}
+
+.policy-version {
+  margin-top: 16rpx;
+  padding: 15rpx 17rpx;
+  border-radius: 12rpx;
+  background: var(--tt-info-soft);
+  color: var(--tt-info);
+  font-size: 21rpx;
+  line-height: 1.65;
+  border: 1rpx solid var(--tt-border);
+  overflow-wrap: anywhere;
+}
+
+.policy-link {
+  width: 100%;
+  margin-top: 14rpx;
+  border: 1rpx solid var(--tt-accent-soft);
+  background: var(--tt-surface);
+  color: var(--tt-accent);
+  font-size: 23rpx;
+  min-height: 88rpx;
+  border-color: var(--tt-border-strong);
+}
+
+.terms-check {
+  width: 100%;
+  margin-top: 22rpx;
+  padding: 18rpx;
+  border: 2rpx solid var(--tt-danger-soft);
+  background: var(--tt-surface);
+  color: var(--tt-text-secondary);
+  font-size: 23rpx;
+  text-align: left;
+  min-height: 88rpx;
+  border-color: var(--tt-border);
+  line-height: 1.55;
+}
+
+.terms-check.checked {
+  border-color: var(--tt-accent);
+  background: var(--tt-accent-soft);
+  color: var(--tt-accent-pressed);
+  font-weight: 600;
+}
+
+.pay-button, .full-button {
+  width: 100%;
+  margin-top: 18rpx;
+  font-size: 27rpx;
+  min-height: 88rpx;
+}
+
+.support-button {
+  border: 1rpx solid var(--tt-border);
+  background: var(--tt-surface);
+  color: var(--tt-accent);
+  border-color: var(--tt-border-strong);
+}
+
+.authority-note {
+  margin-top: 28rpx;
+  padding: 16rpx 18rpx;
+  color: var(--tt-info);
+  font-size: 21rpx;
+  line-height: 1.65;
+  text-align: left;
+  border: 1rpx solid var(--tt-info-soft);
+  border-radius: 14rpx;
+  background: var(--tt-info-soft);
+  overflow-wrap: anywhere;
+}
+
+.terms-check::after, .support-button::after, .policy-link::after {
+  border: 0;
+}
+
+.state-unavailable {
+  border-color: var(--tt-border);
+  border-left-color: var(--tt-info);
+  background: var(--tt-info-soft);
+}
+
+.state-error .state-symbol, .state-cancelled .state-symbol {
+  border-color: var(--tt-border);
+  color: var(--tt-danger);
+}
+
+.state-pending .state-symbol, .state-processing .state-symbol {
+  border-color: var(--tt-border);
+  color: var(--tt-warning);
+}
+
+.summary-title, .rules-title {
+  color: var(--tt-text);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.rules-card {
+  border-color: var(--tt-border);
+  border-left: 6rpx solid var(--tt-accent);
+}

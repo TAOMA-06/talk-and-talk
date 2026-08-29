@@ -2,6 +2,8 @@
   <view class="notice">请在平台内完成沟通，勿交换私人联系方式、线下见面或私下转账。</view>
   <view wx:if="{{!publicInteractionIdentityAvailable}}" class="identity-unavailable-notice">身份核验授权通道尚未开放，消息记录仍可查看，但当前不能发送新消息。订单、退款、客服和安全入口不受影响。</view>
   <view wx:if="{{textOnly}}" class="notice">当前首发版本仅支持文字消息；图片和语音消息暂未开放。</view>
+  <view class="conversation-tools-trigger" bindtap="toggleConversationControls" aria-role="button" aria-label="{{conversationControlsOpen ? '收起' : '展开'}}会话设置与安全" aria-expanded="{{conversationControlsOpen}}" tabindex="0"><view><view class="conversation-tools-title">会话设置与安全</view><view class="conversation-tools-copy">提醒、未来预约、举报、拉黑与紧急帮助</view></view><text>{{conversationControlsOpen ? '收起' : '查看'}}</text></view>
+  <view wx:if="{{conversationControlsOpen}}" class="conversation-tools-panel">
   <view wx:if="{{hasConversation && messageInteractionAvailable}}" class="message-notification-setting">
     <view class="message-notification-copy">
       <view class="message-notification-title">本会话消息提醒</view>
@@ -20,7 +22,7 @@
   </view>
   <view class="safety-exit">
     <view class="safety-exit-title">感到不适或不安全？</view>
-    <view class="safety-exit-copy">可以先停止回复、离开会话或查看安全说明。出现即时危险时，请联系当地紧急服务或身边可信的人；Talk&amp;Talk 不提供报警或紧急救援。</view>
+    <view class="safety-exit-copy">可以先停止回复、离开会话或查看安全说明。出现即时危险时，请联系当地紧急服务或身边可信的人；平台不提供报警或紧急救援。</view>
     <view class="safety-exit-copy">需要举报具体内容可长按消息；举报会话仍需你自己填写原因后提交。</view>
     <view class="safety-exit-actions">
       <button class="safety-exit-action safety-exit-emergency" bindtap="openEmergencyHelp">紧急帮助与拨号</button>
@@ -30,16 +32,14 @@
       <button wx:if="{{hasConversation}}" class="safety-exit-action safety-exit-block" loading="{{conversationBlockUpdating}}" bindtap="toggleConversationBlock">{{conversationBlockedByYou ? '解除拉黑' : '为自己拉黑'}}</button>
     </view>
   </view>
+  </view>
   <view wx:if="{{restrictionNotice}}" class="restriction-notice">{{restrictionNotice}}。到期后可恢复发送。</view>
   <view wx:if="{{appealCaseId}}" class="appeal-notice">
     <text>严重处置可申请一次人工复核。</text>
     <button size="mini" bindtap="appeal">申请复核</button>
   </view>
-  <view wx:if="{{loading}}" class="empty">正在加载…</view>
-  <view wx:elif="{{error}}" class="empty initial-load-error">
-    <view>{{error}}</view>
-    <button size="mini" bindtap="retryInitial">重新加载消息</button>
-  </view>
+  <tt-skeleton wx:if="{{loading}}" rows="3" />
+  <tt-state wx:elif="{{error}}" type="error" title="消息暂时无法加载" description="{{error}}" action-text="重新加载消息" bindaction="retryInitial" />
   <view wx:elif="{{conversationBlockedByYou}}" class="conversation-boundary">
     <view class="conversation-boundary-title">你已为自己拉黑本会话</view>
     <view class="conversation-boundary-copy">消息记录暂不展示，双方不能继续在这里收发消息。拉黑不取消订单，也不代表举报、客服、退款或安全处置已经完成；需要时仍可使用上方入口。</view>
@@ -56,7 +56,7 @@
     <view wx:if="{{loadingOlder}}" class="history-status">正在加载更早消息…</view>
     <view wx:elif="{{hasMore}}" class="history-status">上拉加载更早消息</view>
     <view wx:elif="{{messages.length}}" class="history-status">已显示全部消息</view>
-    <view wx:for="{{messages}}" wx:key="id" class="message {{item.type === 'system' || item.type === 'safety' ? 'system' : ''}} {{item.moderationStatus !== 'published' ? 'held' : ''}}">
+    <view wx:for="{{messages}}" wx:key="id" class="message {{item.senderId === currentUserId ? 'mine' : 'theirs'}} {{item.type === 'system' || item.type === 'safety' ? 'system' : ''}} {{item.moderationStatus !== 'published' ? 'held' : ''}}">
       <view class="sender">{{item.senderName || item.senderId}}</view>
       <view class="bubble" bindlongpress="reportMessage" data-message-id="{{item.id}}">
         <view wx:if="{{item.content}}" class="message-content">{{item.content}}</view>

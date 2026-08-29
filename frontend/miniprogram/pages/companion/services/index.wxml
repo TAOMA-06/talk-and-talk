@@ -88,13 +88,13 @@
         <button class="topic-retry" bindtap="retryTopics" aria-label="重新读取服务主题">重新读取主题</button>
       </view>
       <view wx:elif="{{topicsState === 'available'}}" class="topic-choices">
-        <view wx:for="{{topicChoices}}" wx:key="id" class="topic-choice {{item.selected ? 'selected' : ''}}" bindtap="toggleFormTopic" data-id="{{item.id}}" aria-role="checkbox" aria-checked="{{item.selected}}" aria-label="服务主题：{{item.name}}" tabindex="0">{{item.selected ? '✓ ' : ''}}{{item.name}}</view>
+        <view wx:for="{{topicChoices}}" wx:key="id" class="topic-choice {{item.selected ? 'selected' : ''}}" bindtap="toggleFormTopic" data-id="{{item.id}}" aria-role="checkbox" aria-checked="{{item.selected}}" aria-label="服务主题：{{item.name}}" tabindex="0">{{item.name}}</view>
       </view>
       <view wx:else class="field-hint">平台当前没有可选择的服务主题；不影响保存服务。</view>
 
       <view class="publish-row">
         <view><view class="field-label compact-label">立即上架</view><view class="field-hint">关闭则保存为草稿，客户不可见。</view></view>
-        <switch checked="{{formActive}}" color="#9B405B" bindchange="setFormActive" aria-label="{{formActive ? '停用' : '启用'}}当前服务商品" />
+        <switch checked="{{formActive}}" color="#C65345" bindchange="setFormActive" aria-label="{{formActive ? '停用' : '启用'}}当前服务商品" />
       </view>
 
       <view wx:if="{{formError}}" class="form-error">{{formError}}</view>

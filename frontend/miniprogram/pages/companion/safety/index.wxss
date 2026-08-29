@@ -1,54 +1,282 @@
-.hero { padding: 34rpx 30rpx; border-radius: 28rpx; background: linear-gradient(135deg, #fff, #fff0e8); box-shadow: 0 10rpx 28rpx rgba(96, 64, 50, 0.08); }
-.eyebrow { color: #a35933; font-size: 24rpx; font-weight: 700; }
-.hero-title { margin-top: 10rpx; font-size: 38rpx; font-weight: 700; }
-.hero-copy { margin-top: 14rpx; color: #806553; font-size: 25rpx; line-height: 1.65; }
-.suspended { margin-top: 20rpx; padding: 18rpx; border-radius: 16rpx; background: #f7ede7; color: #805b45; font-size: 24rpx; line-height: 1.55; }
-.inline-error { margin-top: 20rpx; padding: 18rpx; border-radius: 16rpx; background: #fff0f0; color: #a43f3f; font-size: 24rpx; }
-.section-title { margin: 34rpx 4rpx 16rpx; font-size: 30rpx; font-weight: 700; }
-.form-card { padding: 28rpx; }
-.field { box-sizing: border-box; width: 100%; min-height: 78rpx; margin-bottom: 16rpx; padding: 19rpx 20rpx; border: 2rpx solid #eddfd7; border-radius: 15rpx; background: #fffbf9; color: #5e4e45; font-size: 25rpx; }
-.textarea { box-sizing: border-box; width: 100%; min-height: 210rpx; margin-bottom: 16rpx; padding: 20rpx; border: 2rpx solid #eddfd7; border-radius: 15rpx; background: #fffbf9; font-size: 25rpx; line-height: 1.55; }
-.textarea.compact { min-height: 140rpx; }
-.hint { margin: 4rpx 2rpx 22rpx; color: #9a8376; font-size: 22rpx; line-height: 1.55; }
-.empty-card { color: #927c70; font-size: 24rpx; line-height: 1.6; }
-.incident-card, .ticket-card { padding: 26rpx; }
-.card-head { display: flex; align-items: flex-start; gap: 18rpx; }
-.card-title { flex: 1; min-width: 0; font-size: 29rpx; font-weight: 700; line-height: 1.45; }
-.status-chip { flex: none; padding: 7rpx 12rpx; border-radius: 999rpx; background: #f5ece6; color: #895f47; font-size: 21rpx; }
-.status-resolved .status-chip, .status-closed .status-chip { background: #e4f4ea; color: #2d7547; }
-.card-meta, .evidence, .facts { margin-top: 11rpx; color: #9a8376; font-size: 22rpx; line-height: 1.5; word-break: break-all; }
-.card-body { margin-top: 16rpx; color: #5f4a40; font-size: 25rpx; line-height: 1.6; }
-.resolution, .pending-note { margin-top: 16rpx; padding: 16rpx; border-radius: 13rpx; background: #eaf5ed; color: #3d6f4c; font-size: 23rpx; line-height: 1.55; }
-.pending-note { background: #fff2df; color: #8d5f21; }
-.secondary-button { margin-top: 18rpx; background: #f7eee9; color: #8b583c; }
-.modal-mask { position: fixed; z-index: 20; inset: 0; display: flex; align-items: flex-end; background: rgba(38, 25, 30, 0.45); }
-.modal { box-sizing: border-box; width: 100%; padding: 34rpx 30rpx 46rpx; border-radius: 30rpx 30rpx 0 0; background: #fff; }
-.modal-title { font-size: 34rpx; font-weight: 700; }
-.modal-copy { margin: 14rpx 0 24rpx; color: #8d6e73; font-size: 24rpx; line-height: 1.6; }
-.empty-title { margin-bottom: 14rpx; color: #4b353a; font-size: 34rpx; font-weight: 700; }
-.retry { margin-top: 28rpx; }
-.evidence-toolbar, .evidence-list { display: flex; flex-wrap: wrap; gap: 12rpx; margin: 14rpx 0; }
-.evidence-toolbar button, .evidence-list button, .evidence-draft button { margin: 0; }
-.evidence-draft { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; padding: 12rpx 14rpx; margin: 8rpx 0; border-radius: 14rpx; background: #f5f1ef; font-size: 24rpx; }
+.hero {
+  padding: 32rpx;
+  border-radius: 28rpx;
+  background: var(--tt-accent-soft);
+  box-shadow: none;
+  border: 1rpx solid var(--tt-border);
+}
 
-/* Restrained redesign */
-.primary-button { min-height: 88rpx; }
-.hero { padding: 32rpx; border: 1rpx solid #E4E6E8; background: #F6ECEF; box-shadow: none; }
-.eyebrow { color: #9B405B; }
-.hero-title, .section-title, .card-title, .empty-title, .modal-title { color: #202124; font-weight: 700; }
-.hero-copy, .card-body, .modal-copy { color: #646970; }
-.card-meta, .evidence, .facts, .hint, .empty-card { color: #8A9098; }
-.suspended { border: 1rpx solid #ECDDBD; background: #FAF4E8; color: #8A6426; }
-.inline-error { border: 1rpx solid #E8C9CD; background: #FAEEEE; color: #A33D45; }
-.form-card, .incident-card, .ticket-card { border: 1rpx solid #E4E6E8; background: #FFFFFF; }
-.field, .textarea { border: 1rpx solid #E4E6E8; border-radius: 14rpx; background: #FFFFFF; color: #202124; }
-.status-chip { background: #F1F2F3; color: #646970; }
-.status-resolved .status-chip, .status-closed .status-chip, .resolution { background: #EDF6F1; color: #2F6B55; }
-.pending-note { background: #FAF4E8; color: #8A6426; }
-.secondary-button { min-height: 80rpx; border: 1rpx solid #D7BEC6; border-radius: 14rpx; background: #FFFFFF; color: #9B405B; }
-.modal-mask { background: rgba(32, 33, 36, 0.48); }
-.modal { box-sizing: border-box; max-height: 88vh; padding: 32rpx 32rpx 48rpx; padding-bottom: calc(48rpx + constant(safe-area-inset-bottom)); padding-bottom: calc(48rpx + env(safe-area-inset-bottom)); overflow-y: auto; -webkit-overflow-scrolling: touch; border-radius: 28rpx 28rpx 0 0; background: #FFFFFF; }
-.evidence-draft { border: 1rpx solid #E4E6E8; background: #F1F2F3; color: #646970; }
-.primary-button { min-height: 88rpx; }
-.primary-button.button-hover { background: #7F3248; }
-.primary-button[disabled], .secondary-button[disabled] { opacity: 0.52; }
+.eyebrow {
+  color: var(--tt-accent);
+  font-size: 24rpx;
+  font-weight: 700;
+}
+
+.hero-title {
+  margin-top: 10rpx;
+  font-size: 38rpx;
+  font-weight: 700;
+}
+
+.hero-copy {
+  margin-top: 14rpx;
+  color: var(--tt-warning);
+  font-size: 25rpx;
+  line-height: 1.65;
+}
+
+.suspended {
+  margin-top: 20rpx;
+  padding: 18rpx;
+  border-radius: 16rpx;
+  background: var(--tt-warning-soft);
+  color: var(--tt-warning);
+  font-size: 24rpx;
+  line-height: 1.55;
+  border: 1rpx solid var(--tt-border);
+}
+
+.inline-error {
+  margin-top: 20rpx;
+  padding: 18rpx;
+  border-radius: 16rpx;
+  background: var(--tt-danger-soft);
+  color: var(--tt-danger);
+  font-size: 24rpx;
+  border: 1rpx solid var(--tt-border);
+}
+
+.section-title {
+  margin: 34rpx 4rpx 16rpx;
+  font-size: 30rpx;
+  font-weight: 700;
+}
+
+.form-card {
+  padding: 28rpx;
+}
+
+.field {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 78rpx;
+  margin-bottom: 16rpx;
+  padding: 19rpx 20rpx;
+  border: 2rpx solid var(--tt-warning-soft);
+  border-radius: 15rpx;
+  background: var(--tt-warning-soft);
+  color: var(--tt-warning);
+  font-size: 25rpx;
+}
+
+.textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 210rpx;
+  margin-bottom: 16rpx;
+  padding: 20rpx;
+  border: 2rpx solid var(--tt-warning-soft);
+  border-radius: 15rpx;
+  background: var(--tt-warning-soft);
+  font-size: 25rpx;
+  line-height: 1.55;
+}
+
+.textarea.compact {
+  min-height: 140rpx;
+}
+
+.hint {
+  margin: 4rpx 2rpx 22rpx;
+  color: var(--tt-warning);
+  font-size: 22rpx;
+  line-height: 1.55;
+}
+
+.empty-card {
+  color: var(--tt-text-secondary);
+  font-size: 24rpx;
+  line-height: 1.6;
+}
+
+.incident-card, .ticket-card {
+  padding: 26rpx;
+}
+
+.card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 18rpx;
+}
+
+.card-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 29rpx;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.status-chip {
+  flex: none;
+  padding: 7rpx 12rpx;
+  border-radius: 999rpx;
+  background: var(--tt-surface-alt);
+  color: var(--tt-text-secondary);
+  font-size: 21rpx;
+}
+
+.status-resolved .status-chip, .status-closed .status-chip {
+  background: var(--tt-success-soft);
+  color: var(--tt-success);
+}
+
+.card-meta, .evidence, .facts {
+  margin-top: 11rpx;
+  color: var(--tt-warning);
+  font-size: 22rpx;
+  line-height: 1.5;
+  word-break: break-all;
+}
+
+.card-body {
+  margin-top: 16rpx;
+  color: var(--tt-warning);
+  font-size: 25rpx;
+  line-height: 1.6;
+}
+
+.resolution, .pending-note {
+  margin-top: 16rpx;
+  padding: 16rpx;
+  border-radius: 13rpx;
+  background: var(--tt-success-soft);
+  color: var(--tt-success);
+  font-size: 23rpx;
+  line-height: 1.55;
+}
+
+.pending-note {
+  background: var(--tt-warning-soft);
+  color: var(--tt-warning);
+}
+
+.secondary-button {
+  margin-top: 18rpx;
+  background: var(--tt-surface);
+  color: var(--tt-accent);
+  min-height: 80rpx;
+  border: 1rpx solid var(--tt-accent-soft);
+  border-radius: 14rpx;
+}
+
+.modal-mask {
+  position: fixed;
+  z-index: 20;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  background: rgba(32, 33, 36, 0.48);
+}
+
+.modal {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 32rpx 32rpx 48rpx;
+  border-radius: 28rpx 28rpx 0 0;
+  background: var(--tt-surface);
+  max-height: 88vh;
+  padding-bottom: calc(48rpx + env(safe-area-inset-bottom));
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.modal-title {
+  font-size: 34rpx;
+  font-weight: 700;
+}
+
+.modal-copy {
+  margin: 14rpx 0 24rpx;
+  color: var(--tt-text-secondary);
+  font-size: 24rpx;
+  line-height: 1.6;
+}
+
+.empty-title {
+  margin-bottom: 14rpx;
+  color: var(--tt-danger);
+  font-size: 34rpx;
+  font-weight: 700;
+}
+
+.retry {
+  margin-top: 28rpx;
+}
+
+.evidence-toolbar, .evidence-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin: 14rpx 0;
+}
+
+.evidence-toolbar button, .evidence-list button, .evidence-draft button {
+  margin: 0;
+}
+
+.evidence-draft {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  padding: 12rpx 14rpx;
+  margin: 8rpx 0;
+  border-radius: 14rpx;
+  background: var(--tt-surface-alt);
+  font-size: 24rpx;
+  border: 1rpx solid var(--tt-border);
+  color: var(--tt-text-secondary);
+}
+
+.primary-button {
+  min-height: 88rpx;
+}
+
+.hero-title, .section-title, .card-title, .empty-title, .modal-title {
+  color: var(--tt-text);
+  font-weight: 700;
+}
+
+.hero-copy, .card-body, .modal-copy {
+  color: var(--tt-text-secondary);
+}
+
+.card-meta, .evidence, .facts, .hint, .empty-card {
+  color: var(--tt-text-tertiary);
+}
+
+.form-card, .incident-card, .ticket-card {
+  border: 1rpx solid var(--tt-border);
+  background: var(--tt-surface);
+}
+
+.field, .textarea {
+  border: 1rpx solid var(--tt-border);
+  border-radius: 14rpx;
+  background: var(--tt-surface);
+  color: var(--tt-text);
+}
+
+.status-resolved .status-chip, .status-closed .status-chip, .resolution {
+  background: var(--tt-success-soft);
+  color: var(--tt-success);
+}
+
+.primary-button.button-hover {
+  background: var(--tt-accent-pressed);
+}
+
+.primary-button[disabled], .secondary-button[disabled] {
+  opacity: 0.52;
+}

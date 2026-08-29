@@ -35,7 +35,7 @@
           <view class="question-title">{{questionIndex + 1}}. {{question.prompt}}</view>
           <radio-group data-code="{{module.code}}" data-question-index="{{questionIndex}}" bindchange="selectAnswer">
             <label wx:for="{{question.options}}" wx:key="value" wx:for-item="option" class="option">
-              <radio value="{{option.value}}" checked="{{module.answers[questionIndex] === option.value}}" color="#9B405B" />
+              <radio value="{{option.value}}" checked="{{module.answers[questionIndex] === option.value}}" color="#C65345" />
               <text>{{option.label}}</text>
             </label>
           </radio-group>

@@ -32,6 +32,8 @@ import {
   COMPANION_RECURRING_AVAILABILITY_DRAFT_HORIZON_DAYS,
   COMPANION_MAX_INACTIVE_AVAILABILITY_WINDOWS
 } from "./companion-recurring-availability-draft-materializer.service";
+import { CompanionProfileMediaService } from "./companion-profile-media.service";
+import { ReserveCompanionProfileMediaDto } from "./dto/reserve-companion-profile-media.dto";
 import { deriveTopicIds, normalizeTopicIds } from "../recommendations/recommendation-topics";
 import {
   findCompanionCapacityMatches,
@@ -85,7 +87,8 @@ export class CompanionsService {
     private readonly availabilityReminderCandidates: AvailabilityReminderCandidateService,
     private readonly availabilityScheduleRules: CompanionAvailabilityScheduleRuleService,
     @Optional() private readonly config?: ConfigService,
-    @Optional() private readonly recurringAvailabilityDraftMaterializer?: CompanionRecurringAvailabilityDraftMaterializerService
+    @Optional() private readonly recurringAvailabilityDraftMaterializer?: CompanionRecurringAvailabilityDraftMaterializerService,
+    @Optional() private readonly profileMedia?: CompanionProfileMediaService
   ) {}
 
   async list(query: ListCompanionsQueryDto) {
@@ -321,6 +324,26 @@ export class CompanionsService {
       throw new AppException("COMPANION_PROFILE_NOT_FOUND", "Companion profile not found", HttpStatus.NOT_FOUND);
     }
     return this.toDto(item as CompanionRecord);
+  }
+
+  reserveOwnProfileMedia(userId: string, slot: string, dto: ReserveCompanionProfileMediaDto) {
+    return this.requireProfileMedia().reserve(userId, slot, dto);
+  }
+
+  completeOwnProfileMedia(userId: string, slot: string, assetId: string) {
+    return this.requireProfileMedia().complete(userId, slot, assetId);
+  }
+
+  ownProfileMediaStatus(userId: string, slot: string, assetId: string) {
+    return this.requireProfileMedia().status(userId, slot, assetId);
+  }
+
+  removeOwnProfileMedia(userId: string, slot: string) {
+    return this.requireProfileMedia().remove(userId, slot);
+  }
+
+  publicProfileMediaReadUrl(companionId: string, slot: string) {
+    return this.requireProfileMedia().publicReadUrl(companionId, slot);
   }
 
   /**
@@ -1657,6 +1680,12 @@ export class CompanionsService {
           passedAt: true,
           expiresAt: true
         }
+      },
+      avatarAsset: {
+        select: { id: true, status: true, storageDeletedAt: true }
+      },
+      coverAsset: {
+        select: { id: true, status: true, storageDeletedAt: true }
       }
     };
   }
@@ -2465,6 +2494,8 @@ export class CompanionsService {
       name: item.name,
       role: item.role,
       initials: item.initials,
+      avatarUrl: this.publicProfileMediaPath(item, "avatar"),
+      coverUrl: this.publicProfileMediaPath(item, "cover"),
       tags: item.serviceTags.map((entry) => entry.tag.name),
       rating: item.rating,
       reviewCount: item.reviewCount,
@@ -2527,6 +2558,30 @@ export class CompanionsService {
       createdAt: item.createdAt.toISOString(),
       updatedAt: item.updatedAt.toISOString()
     };
+  }
+
+  private publicProfileMediaPath(item: any, slot: "avatar" | "cover"): string | null {
+    if (!isFirstReleaseCapabilityEnabled("companionProfileMedia", this.config)) return null;
+    const asset = slot === "avatar" ? item.avatarAsset : item.coverAsset;
+    if (
+      !asset
+      || asset.status !== "approved"
+      || asset.storageDeletedAt
+      || (asset.expiresAt && asset.expiresAt.getTime() <= Date.now())
+    ) return null;
+    const prefix = (this.config?.get<string>("API_PREFIX") ?? "api/v1").replace(/^\/+|\/+$/g, "");
+    return `/${prefix}/companions/${encodeURIComponent(item.id)}/media/${slot}`;
+  }
+
+  private requireProfileMedia(): CompanionProfileMediaService {
+    if (!this.profileMedia) {
+      throw new AppException(
+        "PROFILE_MEDIA_UNAVAILABLE",
+        "Companion profile media service is unavailable",
+        HttpStatus.SERVICE_UNAVAILABLE
+      );
+    }
+    return this.profileMedia;
   }
 
   private toServiceOfferingDto(item: {

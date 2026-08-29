@@ -1,0 +1,6 @@
+<view class="state state-{{type}}" aria-live="polite">
+  <view class="state-mark"><view class="state-mark-inner"></view></view>
+  <view wx:if="{{title}}" class="state-title">{{title}}</view>
+  <view wx:if="{{description}}" class="state-copy">{{description}}</view>
+  <button wx:if="{{actionText}}" class="state-action" loading="{{busy}}" disabled="{{busy}}" bindtap="onAction">{{actionText}}</button>
+</view>

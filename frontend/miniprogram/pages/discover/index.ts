@@ -4,6 +4,11 @@ import { clientRealtimeVoiceEnabled } from "../../utils/config";
 import { openCrisisResources, passCrisisGate } from "../../utils/crisis-gate";
 import { Companion, RecommendedCompanion, RecommendationTopic } from "../../utils/models";
 import { flushRecommendationEvents, queueRecommendationEvent, trackRecommendationCardViews } from "../../utils/recommendations";
+import { companionAvatarUrl } from "../../utils/design-assets";
+import {
+  companionAvailabilityText,
+  companionMetaText
+} from "../../utils/companion-presentation";
 
 type DisplayTopic = RecommendationTopic & { selected: boolean };
 type DeliveryMode = "" | "text" | "voice";
@@ -13,7 +18,11 @@ type AvailabilityWithinDaysFilter = { value: number; label: string; selected: bo
 type PublicSort = "" | "online" | "rating" | "reviewCount" | "priceAsc" | "soonestAvailable";
 type PublicSortFilter = { value: Exclude<PublicSort, "">; label: string; selected: boolean };
 type TrustFacetFilter = { value: string; label: string; selected: boolean };
-type DisplayCompanion = CatalogDisplay<Companion | RecommendedCompanion>;
+type DisplayCompanion = CatalogDisplay<Companion | RecommendedCompanion> & {
+  avatarUrl: string;
+  availabilityText: string;
+  metaText: string;
+};
 type TopicLoadState = "loading" | "available" | "error";
 type DiscoveryIntent = {
   topicId?: string;
@@ -128,7 +137,12 @@ function normalizeKeyword(value: unknown): string {
 }
 
 function displayCompanions(items: Array<Companion | RecommendedCompanion>): DisplayCompanion[] {
-  return withCatalogDisplays(items);
+  return withCatalogDisplays(items).map((item) => ({
+    ...item,
+    avatarUrl: companionAvatarUrl(item),
+    availabilityText: companionAvailabilityText(item.availability),
+    metaText: companionMetaText(item.nextAvailableText, item)
+  }));
 }
 
 Page({
@@ -158,7 +172,8 @@ Page({
     topicsError: "",
     recommendationFallback: false,
     recoveryNotice: "",
-    recoverySourceOrderId: ""
+    recoverySourceOrderId: "",
+    filterSheetOpen: false
   },
   stopRecommendationTracking: null as (() => void) | null,
   loadSequence: 0,
@@ -196,6 +211,14 @@ Page({
   onPullDownRefresh() { void this.load(true); },
   dismissRecoveryNotice() {
     this.setData({ recoveryNotice: "", recoverySourceOrderId: "" });
+  },
+  openFilters() { this.setData({ filterSheetOpen: true }); },
+  closeFilters() { this.setData({ filterSheetOpen: false }); },
+  noop() {},
+  applyFilters() { this.setData({ filterSheetOpen: false }); },
+  async resetFilters() {
+    await this.clearFilters();
+    this.setData({ filterSheetOpen: false });
   },
   async load(stopRefresh = false) {
     this.stopTracking();

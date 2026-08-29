@@ -1,0 +1,1 @@
+{ "component": true, "usingComponents": { "tt-avatar": "/components/tt-avatar/index", "tt-status": "/components/tt-status/index" } }

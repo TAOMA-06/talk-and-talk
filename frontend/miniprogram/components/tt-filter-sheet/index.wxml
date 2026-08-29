@@ -1,0 +1,11 @@
+<root-portal enable="{{true}}" wx:if="{{show}}">
+  <view class="filter-root" aria-role="dialog" aria-modal="true">
+    <view class="filter-mask" bindtap="close" catchtouchmove="noop"></view>
+    <view class="filter-sheet">
+      <view class="filter-handle"></view>
+      <view class="filter-header"><view class="filter-heading"><view class="filter-title">{{title}}</view><view wx:if="{{summary}}" class="filter-summary">{{summary}}</view></view><button class="filter-close" bindtap="close" aria-label="关闭">×</button></view>
+      <scroll-view class="filter-body" scroll-y enhanced show-scrollbar="{{false}}"><slot></slot></scroll-view>
+      <view class="filter-footer"><button class="filter-reset" bindtap="reset">{{resetText}}</button><button class="filter-apply" bindtap="apply">{{applyText}}</button></view>
+    </view>
+  </view>
+</root-portal>
