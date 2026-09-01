@@ -8,7 +8,7 @@
 
 [v0.1 更新说明](./docs/releases/v0.1.md) · [最终本地验收](./docs/2026-09-01-ui4-final-validation.md) · [UI4 设计系统](./frontend/miniprogram/UI4_DESIGN_SYSTEM.md)
 
-> 当前结论：UI4 本地目标通过；候选分支 `codex/v0.1-ui4` 已提交并推送。尚未合并 `main`、创建 tag / GitHub Release、上传小程序或部署生产。
+> 当前结论：UI4 本地目标通过并已合并 `main`。尚未创建 tag / GitHub Release、上传小程序或部署生产。
 
 ## v0.1 有什么不同
 
@@ -124,9 +124,9 @@ PostgreSQL preflight、E2E、真实微信与生产操作需要获授权的隔离
 
 ## 发布边界
 
-本仓库当前只能准确声称“v0.1 UI4 已实现、完成本地验证，并已推送候选分支”。候选提交集已在独立 clean worktree 复验；原开发工作区仍保留未纳入候选的历史与中间文件。尚未完成：
+本仓库当前只能准确声称“v0.1 UI4 已实现、完成本地验证，并已合并 `main`”。提交集已在独立 clean worktree 复验；原开发工作区仍保留未纳入 `main` 的历史与中间文件。尚未完成：
 
-- 合并 `main`、冻结 Git tag 或创建 GitHub Release；
+- 冻结 Git tag 或创建 GitHub Release；
 - 微信 Preview、体验版 Upload、审核或生产部署；
 - 真实客户/陪伴者/Admin/Review 全角色流程；
 - 真实微信登录、身份授权、小额支付、服务端回调与退款；
