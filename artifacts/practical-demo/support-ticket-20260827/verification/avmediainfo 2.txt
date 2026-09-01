@@ -1,6 +1,0 @@
-Asset: video/talktalk-support-ticket-local-practical-demo.mp4
-Duration: 37.800 seconds (22680/600)
-Track count: 1
-Track 1: Video, Enabled, Format: H.264, Dimensions: 1920 x 1080, 30.000 fps, 39677998 bytes, 37.800 seconds
-
-Movie analyzed with 0 error.
