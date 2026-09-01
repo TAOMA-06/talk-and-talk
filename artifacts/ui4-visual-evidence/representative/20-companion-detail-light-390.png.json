@@ -1,0 +1,18 @@
+{
+  "captured": true,
+  "route": "/pages/companion/detail?id=c1",
+  "expectedPath": "pages/companion/detail",
+  "actualPath": "pages/companion/detail",
+  "routeMatched": true,
+  "screenshot": "artifacts/ui4-visual-evidence/representative/20-companion-detail-light-390.png",
+  "fixture": "ui4-local-visual-fixture",
+  "durationMs": 5617,
+  "simulator": {
+    "model": "iPhone 12/13 (Pro)",
+    "SDKVersion": "3.17.2",
+    "theme": "light",
+    "windowWidth": 390,
+    "windowHeight": 753,
+    "pixelRatio": 3
+  }
+}

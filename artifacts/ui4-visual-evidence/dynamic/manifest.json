@@ -1,0 +1,177 @@
+{
+  "generatedAt": "2026-09-01T01:57:01.249Z",
+  "capture": "deterministic WeChat DevTools screenshot frame sequence",
+  "systemInfo": {
+    "model": "iPhone 12/13 (Pro)",
+    "SDKVersion": "3.17.2",
+    "theme": "light",
+    "windowWidth": 390,
+    "windowHeight": 753
+  },
+  "fixture": "legal-only; no real identity/token/role/order/payment data",
+  "interactionBoundary": "route transition and finite stage entrance; separate interaction evidence covers back-card selection, filter apply and live AppService motionOff",
+  "sequences": [
+    {
+      "name": "home-scene-deal",
+      "route": "/pages/home/index",
+      "actualPath": "pages/home/index",
+      "frames": [
+        {
+          "file": "dynamic/home-scene-deal/frame-01.png",
+          "beforeCaptureMs": 945,
+          "completedAtMs": 992,
+          "sha256": "75083f7856d6627c055f492bc291d4c96e8691575ada7fc7cc857bbc2702bb19",
+          "dimensions": {
+            "width": 780,
+            "height": 1342
+          }
+        },
+        {
+          "file": "dynamic/home-scene-deal/frame-02.png",
+          "beforeCaptureMs": 1093,
+          "completedAtMs": 1144,
+          "sha256": "0063f615297262fec7cb86a95bb2d717c2f1f61da5170f4182f7d66ba9c22102",
+          "dimensions": {
+            "width": 780,
+            "height": 1342
+          }
+        },
+        {
+          "file": "dynamic/home-scene-deal/frame-03.png",
+          "beforeCaptureMs": 1325,
+          "completedAtMs": 1369,
+          "sha256": "9b1f54d03689f6f595055b9cf066e6406f399275024b8343bc60523219049f3c",
+          "dimensions": {
+            "width": 780,
+            "height": 1342
+          }
+        },
+        {
+          "file": "dynamic/home-scene-deal/frame-04.png",
+          "beforeCaptureMs": 1650,
+          "completedAtMs": 1704,
+          "sha256": "b025c6c8bb25aecd9d8880a444fb0b7b81022e664a158ccacd3cab562084d6da",
+          "dimensions": {
+            "width": 780,
+            "height": 1342
+          }
+        },
+        {
+          "file": "dynamic/home-scene-deal/frame-05.png",
+          "beforeCaptureMs": 2206,
+          "completedAtMs": 2257,
+          "sha256": "2deb246be4ac5b554a3f0934ab49c598bbb7152790c22fe4b2b768072f83b943",
+          "dimensions": {
+            "width": 780,
+            "height": 1342
+          }
+        }
+      ],
+      "uniqueEntranceFrames": 5,
+      "settled": {
+        "first": {
+          "file": "dynamic/home-scene-deal/settled-a.png",
+          "beforeCaptureMs": 3458,
+          "completedAtMs": 3526,
+          "sha256": "f2489e5697f714d385d89af1a55019ab5c2de4d48353b76a113e5328c286aa16",
+          "dimensions": {
+            "width": 780,
+            "height": 1342
+          }
+        },
+        "second": {
+          "file": "dynamic/home-scene-deal/settled-b.png",
+          "beforeCaptureMs": 4728,
+          "completedAtMs": 4795,
+          "sha256": "f2489e5697f714d385d89af1a55019ab5c2de4d48353b76a113e5328c286aa16",
+          "dimensions": {
+            "width": 780,
+            "height": 1342
+          }
+        },
+        "identical": true
+      }
+    },
+    {
+      "name": "discover-stage",
+      "route": "/pages/discover/index",
+      "actualPath": "pages/discover/index",
+      "frames": [
+        {
+          "file": "dynamic/discover-stage/frame-01.png",
+          "beforeCaptureMs": 882,
+          "completedAtMs": 926,
+          "sha256": "9504a310080b1d9e97b35c94c30acc866a1edcb0ff5300a0cb9fffd83c6e4d60",
+          "dimensions": {
+            "width": 780,
+            "height": 1342
+          }
+        },
+        {
+          "file": "dynamic/discover-stage/frame-02.png",
+          "beforeCaptureMs": 1028,
+          "completedAtMs": 1069,
+          "sha256": "b710d4daf4c74005db37c1636bc6724c81c9e56f7238f383c57ed3b24ef77ec3",
+          "dimensions": {
+            "width": 780,
+            "height": 1342
+          }
+        },
+        {
+          "file": "dynamic/discover-stage/frame-03.png",
+          "beforeCaptureMs": 1251,
+          "completedAtMs": 1288,
+          "sha256": "d8179cd31582703f700000014ad9a1b33ae0fcf67b9ee839bde155019906f1bb",
+          "dimensions": {
+            "width": 780,
+            "height": 1342
+          }
+        },
+        {
+          "file": "dynamic/discover-stage/frame-04.png",
+          "beforeCaptureMs": 1569,
+          "completedAtMs": 1632,
+          "sha256": "d8179cd31582703f700000014ad9a1b33ae0fcf67b9ee839bde155019906f1bb",
+          "dimensions": {
+            "width": 780,
+            "height": 1342
+          }
+        },
+        {
+          "file": "dynamic/discover-stage/frame-05.png",
+          "beforeCaptureMs": 2134,
+          "completedAtMs": 2196,
+          "sha256": "d8179cd31582703f700000014ad9a1b33ae0fcf67b9ee839bde155019906f1bb",
+          "dimensions": {
+            "width": 780,
+            "height": 1342
+          }
+        }
+      ],
+      "uniqueEntranceFrames": 3,
+      "settled": {
+        "first": {
+          "file": "dynamic/discover-stage/settled-a.png",
+          "beforeCaptureMs": 3398,
+          "completedAtMs": 3464,
+          "sha256": "d8179cd31582703f700000014ad9a1b33ae0fcf67b9ee839bde155019906f1bb",
+          "dimensions": {
+            "width": 780,
+            "height": 1342
+          }
+        },
+        "second": {
+          "file": "dynamic/discover-stage/settled-b.png",
+          "beforeCaptureMs": 4666,
+          "completedAtMs": 4727,
+          "sha256": "d8179cd31582703f700000014ad9a1b33ae0fcf67b9ee839bde155019906f1bb",
+          "dimensions": {
+            "width": 780,
+            "height": 1342
+          }
+        },
+        "identical": true
+      }
+    }
+  ]
+}

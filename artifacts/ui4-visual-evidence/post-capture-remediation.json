@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-09-01T04:24:05.788Z",
+  "matrixBatchAssociatedSourceDigest": "a71141adbdcf8c8543552e5b6fc05a6e97c50e102c6a5fe73866783d3c83afb6",
+  "associationBoundary": "The pre-remediation isolated-copy verification recorded this digest for the capture batch; the individual matrix manifests do not embed a source digest.",
+  "finalSourceDigest": "aaf718cd943eb3bbedd433aa16495bd22665b2ceface2a9db88fe026906de638",
+  "changedAfterMatrixCapture": [
+    {
+      "file": "frontend/miniprogram/components/tt-action-bar/index.wxss",
+      "change": "Replaced the component-forbidden `.motion-off button` selector with `.motion-off .action-secondary, .motion-off .action-primary`.",
+      "defaultScreenshotImpact": "None: the changed rule applies only when motionOff is true.",
+      "reducedMotionImpact": "Equivalent targeting of the component's two existing button classes."
+    },
+    {
+      "file": "frontend/miniprogram/scripts/ui2-audit.mjs",
+      "change": "Added a self-tested rejection gate for component WXSS tag, ID and attribute selectors.",
+      "defaultScreenshotImpact": "None: audit-only code."
+    }
+  ],
+  "postFixVerification": {
+    "isolatedCopy": "artifacts/ui4-visual-evidence/local-copy-verification.json",
+    "devtools": "artifacts/v0.1/post-fix-devtools.json",
+    "devtoolsScreenshot": "artifacts/v0.1/devtools-post-fix-consent.png",
+    "sourceSelectorWarningCount": 0,
+    "motionOff": "artifacts/ui4-visual-evidence/interaction/motion-off/manifest.json",
+    "motionOffByteIdenticalAfter1200Ms": true,
+    "currentSourceGates": [
+      "TypeScript",
+      "31-page structure validation",
+      "894-call runtime smoke",
+      "UI4 full audit including component selector rejection",
+      "light/dark contrast",
+      "copy-density audit"
+    ]
+  },
+  "matrixReuseDecision": "The 186 default-state screenshots are retained because the only UI stylesheet remediation is motionOff-only and class-equivalent; the changed motionOff path was rerun in the final isolated copy. This is post-capture remediation evidence, not a claim that the original manifests were SHA-bound to the final source."
+}

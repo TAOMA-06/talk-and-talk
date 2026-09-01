@@ -1,0 +1,333 @@
+{
+  "generatedAt": "2026-09-01T04:43:25.015Z",
+  "conclusion": "UI4 local implementation and requested visual/runtime validation complete, including post-capture component-selector remediation; external release gates remain separate",
+  "miniProgram": {
+    "totalStaticScreenshots": 186,
+    "localCopy": {
+      "passed": true,
+      "verifiedAt": "2026-09-01T04:43:18.970Z",
+      "sourceRoot": "frontend/miniprogram",
+      "localRoot": "system-temp/talktalk-ui4-v0.1-final-local-20260901-1215",
+      "isolatedVerification": true,
+      "comparedFiles": 275,
+      "sourceDigest": "aaf718cd943eb3bbedd433aa16495bd22665b2ceface2a9db88fe026906de638",
+      "localDigest": "aaf718cd943eb3bbedd433aa16495bd22665b2ceface2a9db88fe026906de638",
+      "expectedGeneratedDifferences": [
+        "project.config.json",
+        "utils/config.ts"
+      ],
+      "expectedGeneratedExtras": [
+        ".talkandtalk-local-build",
+        "README.LOCAL-ONLY.md"
+      ],
+      "assertions": {
+        "marker": true,
+        "localOnlyProjectName": true,
+        "noStoredAppId": true,
+        "localDomainCheckDisabled": true,
+        "localReadmeWarning": true,
+        "generatedConfigWarning": true,
+        "loopbackApiOnly": true
+      }
+    },
+    "matrix": {
+      "320/light": {
+        "model": "iPhone 5",
+        "SDKVersion": "3.17.2",
+        "windowWidth": 320,
+        "windowHeight": 504,
+        "theme": "light",
+        "routeMatches": 31,
+        "failed": 0,
+        "uniqueImages": 30,
+        "manifest": "artifacts/ui4-visual-evidence/matrix/320/light/manifest.json"
+      },
+      "320/dark": {
+        "model": "iPhone 5",
+        "SDKVersion": "3.17.2",
+        "windowWidth": 320,
+        "windowHeight": 504,
+        "theme": "dark",
+        "routeMatches": 31,
+        "failed": 0,
+        "uniqueImages": 30,
+        "manifest": "artifacts/ui4-visual-evidence/matrix/320/dark/manifest.json"
+      },
+      "390/light": {
+        "model": "iPhone 12/13 (Pro)",
+        "SDKVersion": "3.17.2",
+        "windowWidth": 390,
+        "windowHeight": 753,
+        "theme": "light",
+        "routeMatches": 31,
+        "failed": 0,
+        "uniqueImages": 30,
+        "manifest": "artifacts/ui4-visual-evidence/matrix/390/light/manifest.json"
+      },
+      "390/dark": {
+        "model": "iPhone 12/13 (Pro)",
+        "SDKVersion": "3.17.2",
+        "windowWidth": 390,
+        "windowHeight": 753,
+        "theme": "dark",
+        "routeMatches": 31,
+        "failed": 0,
+        "uniqueImages": 30,
+        "manifest": "artifacts/ui4-visual-evidence/matrix/390/dark/manifest.json"
+      },
+      "430/light": {
+        "model": "iPhone 14 Pro Max",
+        "SDKVersion": "3.17.2",
+        "windowWidth": 430,
+        "windowHeight": 834,
+        "theme": "light",
+        "routeMatches": 31,
+        "failed": 0,
+        "uniqueImages": 30,
+        "manifest": "artifacts/ui4-visual-evidence/matrix/430/light/manifest.json"
+      },
+      "430/dark": {
+        "model": "iPhone 14 Pro Max",
+        "SDKVersion": "3.17.2",
+        "windowWidth": 430,
+        "windowHeight": 834,
+        "theme": "dark",
+        "routeMatches": 31,
+        "failed": 0,
+        "uniqueImages": 30,
+        "manifest": "artifacts/ui4-visual-evidence/matrix/430/dark/manifest.json"
+      }
+    },
+    "dynamic": {
+      "manifest": "artifacts/ui4-visual-evidence/dynamic/manifest.json",
+      "sequences": [
+        {
+          "name": "home-scene-deal",
+          "route": "pages/home/index",
+          "uniqueEntranceFrames": 5,
+          "settledIdentical": true
+        },
+        {
+          "name": "discover-stage",
+          "route": "pages/discover/index",
+          "uniqueEntranceFrames": 3,
+          "settledIdentical": true
+        }
+      ]
+    },
+    "interactions": {
+      "homeBackCard": {
+        "result": "pass",
+        "observation": "WeChat accessibility state changed the work-pressure scene card from Value 0 to Value 1 and exposed the selected label",
+        "evidence": {
+          "path": "artifacts/ui4-visual-evidence/interaction/home-back-card-selected-copy-min-light-390.png",
+          "sha256": "e556e5d94abee63a95d22b3166f767943e9eb458fea3f6ab6ffa4d1b0fadb58d",
+          "dimensions": {
+            "format": "jpeg",
+            "height": 768,
+            "width": 1084
+          }
+        }
+      },
+      "discoverFilter": {
+        "result": "pass",
+        "observation": "filter sheet opened, Chinese filter was activated, View Results closed the sheet and retained pages/discover/index",
+        "open": {
+          "path": "artifacts/ui4-visual-evidence/interaction/discover-filter-open-copy-min-light-390.png",
+          "sha256": "7c8b9f065243c98c11e6660d7a96f4149e2590f8ba7c81f25d2a4b1c7b2136da",
+          "dimensions": {
+            "format": "jpeg",
+            "height": 768,
+            "width": 1084
+          }
+        },
+        "applied": {
+          "path": "artifacts/ui4-visual-evidence/interaction/discover-filter-applied-copy-min-light-390.png",
+          "sha256": "2dd215971adad8315c254401667259b33e7fed6e504808e4ddba7163c677f82e",
+          "dimensions": {
+            "format": "jpeg",
+            "height": 768,
+            "width": 1084
+          }
+        }
+      },
+      "motionOff": {
+        "result": "pass",
+        "runtime": {
+          "route": "pages/home/index",
+          "motionOff": true
+        },
+        "byteIdenticalAfter1200Ms": true,
+        "manifest": "artifacts/ui4-visual-evidence/interaction/motion-off/manifest.json"
+      }
+    },
+    "postCaptureRemediation": {
+      "manifest": "artifacts/ui4-visual-evidence/post-capture-remediation.json",
+      "matrixBatchAssociatedSourceDigest": "a71141adbdcf8c8543552e5b6fc05a6e97c50e102c6a5fe73866783d3c83afb6",
+      "finalSourceDigest": "aaf718cd943eb3bbedd433aa16495bd22665b2ceface2a9db88fe026906de638",
+      "changedFiles": [
+        "frontend/miniprogram/components/tt-action-bar/index.wxss",
+        "frontend/miniprogram/scripts/ui2-audit.mjs"
+      ],
+      "matrixReuseDecision": "The 186 default-state screenshots are retained because the only UI stylesheet remediation is motionOff-only and class-equivalent; the changed motionOff path was rerun in the final isolated copy. This is post-capture remediation evidence, not a claim that the original manifests were SHA-bound to the final source.",
+      "devtools": {
+        "verification": "artifacts/v0.1/post-fix-devtools.json",
+        "screenshot": "artifacts/v0.1/devtools-post-fix-consent.png",
+        "sourceSelectorWarningCount": 0
+      },
+      "motionOffReverified": true
+    }
+  },
+  "publicWeb": {
+    "home": {
+      "desktop": {
+        "path": "artifacts/ui4-web-copy-home-1280.png",
+        "sha256": "df4d9efa3e092fbc65855e2c09f053fd83653cfd9965bb9e4fd9b32f9183be8d",
+        "dimensions": {
+          "format": "jpeg",
+          "height": 900,
+          "width": 1280
+        }
+      },
+      "mobile": {
+        "path": "artifacts/ui4-web-copy-home-390.png",
+        "sha256": "1894549ca8b1306de408d54ae7c0214052d9d860abb50511d72c2605dc4231d7",
+        "dimensions": {
+          "format": "jpeg",
+          "height": 844,
+          "width": 390
+        }
+      }
+    },
+    "how": {
+      "desktop": {
+        "path": "artifacts/ui4-web-copy-how-1280.png",
+        "sha256": "5849c14b9d64e697bb9a7675d9cbed96726a301740c87535a6a1c06d94f26f13",
+        "dimensions": {
+          "format": "jpeg",
+          "height": 900,
+          "width": 1280
+        }
+      },
+      "mobile": {
+        "path": "artifacts/ui4-web-copy-how-390.png",
+        "sha256": "c3edcdb31be5d2719ccad2f972f42eaf07fc63efc391aacf400f9b47cc325d52",
+        "dimensions": {
+          "format": "jpeg",
+          "height": 844,
+          "width": 390
+        }
+      }
+    },
+    "safety": {
+      "desktop": {
+        "path": "artifacts/ui4-web-copy-safety-1280.png",
+        "sha256": "16a310aa449aba925ce3efd51ddd952d1f78d4b99205058b29c39538afc77863",
+        "dimensions": {
+          "format": "jpeg",
+          "height": 900,
+          "width": 1280
+        }
+      },
+      "mobile": {
+        "path": "artifacts/ui4-web-copy-safety-390.png",
+        "sha256": "7b1e7e38aba32923fa7bd31eb990470a1140b7cf31722ba3840b87ab486075d3",
+        "dimensions": {
+          "format": "jpeg",
+          "height": 844,
+          "width": 390
+        }
+      }
+    },
+    "about": {
+      "desktop": {
+        "path": "artifacts/ui4-web-copy-about-1280.png",
+        "sha256": "a6575584aca7733c95d23eb93bb67a9395e04d87ace021e4ee9994b3295cd65f",
+        "dimensions": {
+          "format": "jpeg",
+          "height": 900,
+          "width": 1280
+        }
+      },
+      "mobile": {
+        "path": "artifacts/ui4-web-copy-about-390.png",
+        "sha256": "3a844302dcd14504cc7ec6f11402bb03880a005df0c63119f48c06972ef4ddbd",
+        "dimensions": {
+          "format": "jpeg",
+          "height": 844,
+          "width": 390
+        }
+      }
+    },
+    "partners": {
+      "desktop": {
+        "path": "artifacts/ui4-web-copy-partners-1280.png",
+        "sha256": "e833f72ef7c19752e3f324640c652d812799e085b697aa455063511b70f875d5",
+        "dimensions": {
+          "format": "jpeg",
+          "height": 900,
+          "width": 1280
+        }
+      },
+      "mobile": {
+        "path": "artifacts/ui4-web-copy-partners-390.png",
+        "sha256": "197e0ae42d8120ae205866a70eb9b984fc0aa52838f84d692eac7b19d75d5daa",
+        "dimensions": {
+          "format": "jpeg",
+          "height": 844,
+          "width": 390
+        }
+      }
+    }
+  },
+  "ops": {
+    "admin": {
+      "desktop": {
+        "path": "artifacts/ui4-ops-copy-admin-1280.png",
+        "sha256": "621f2297ffafc36fddf1ed395e985bfc0c2196474f64df87a85a333ac787218d",
+        "dimensions": {
+          "format": "jpeg",
+          "height": 900,
+          "width": 1280
+        }
+      },
+      "mobile": {
+        "path": "artifacts/ui4-ops-copy-admin-390.png",
+        "sha256": "2c32e6acc9e61b6a9cf55efd80ea90a4c7b5b2dfb9b5de10dbc23b69efd95325",
+        "dimensions": {
+          "format": "jpeg",
+          "height": 844,
+          "width": 390
+        }
+      }
+    },
+    "review": {
+      "desktop": {
+        "path": "artifacts/ui4-ops-copy-review-1280.png",
+        "sha256": "6257dec0539b392f8d87c70724c4bd1d3f13c4948709f68a5e6336a9422d8564",
+        "dimensions": {
+          "format": "jpeg",
+          "height": 900,
+          "width": 1280
+        }
+      },
+      "mobile": {
+        "path": "artifacts/ui4-ops-copy-review-390.png",
+        "sha256": "1a2fa4b8eee293c2187b6fbe321b4679d1aba43c3eeff06699bc3dde3e83893d",
+        "dimensions": {
+          "format": "jpeg",
+          "height": 844,
+          "width": 390
+        }
+      }
+    }
+  },
+  "evidenceBoundary": {
+    "realIdentityToken": false,
+    "realRoleSession": false,
+    "realOrderOrPaymentData": false,
+    "miniLocalApiStarted": false,
+    "adminReviewAuthenticatedFlowRun": false,
+    "previewUploadDeploy": false
+  }
+}

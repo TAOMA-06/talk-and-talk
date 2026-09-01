@@ -1,0 +1,523 @@
+{
+  "generatedAt": "2026-09-01T01:43:31.365Z",
+  "capture": "WeChat DevTools App.captureScreenshot via miniprogram-automator",
+  "devtools": "Stable 2.01.2510290",
+  "simulator": {
+    "model": "iPhone 14 Pro Max",
+    "SDKVersion": "3.17.2",
+    "theme": "light",
+    "windowWidth": 430,
+    "windowHeight": 834,
+    "pixelRatio": 3
+  },
+  "stateBoundary": {
+    "fixtures": {
+      "consent": "fixture-empty-storage.json",
+      "allOtherRoutes": "fixture-legal-only.json"
+    },
+    "resetBeforeEveryRoute": true,
+    "realIdentityToken": false,
+    "realRoleSession": false,
+    "realOrderOrPaymentData": false,
+    "localApiStarted": false,
+    "interpretation": "actual local route and fail-closed rendering evidence; not real business-flow success"
+  },
+  "routes": [
+    {
+      "name": "01-consent",
+      "route": "/pages/consent/index",
+      "profileTarget": "anonymous",
+      "expectedPath": "pages/consent/index",
+      "actualPath": "pages/consent/index",
+      "outcome": "captured",
+      "error": "",
+      "screenshotFile": "01-consent.png",
+      "sha256": "984733a3ab7cf804212fd51f6ad216684fff6dbf8c14593cd213631181abf6f9",
+      "dimensions": {
+        "width": 860,
+        "height": 1668
+      },
+      "durationMs": 4651
+    },
+    {
+      "name": "02-home",
+      "route": "/pages/home/index",
+      "profileTarget": "customer",
+      "expectedPath": "pages/home/index",
+      "actualPath": "pages/home/index",
+      "outcome": "captured",
+      "error": "",
+      "screenshotFile": "02-home.png",
+      "sha256": "98a9d278a1cbed02cb1b0a3fc527383909f23f7344fe9af0c30491e45e241470",
+      "dimensions": {
+        "width": 860,
+        "height": 1504
+      },
+      "durationMs": 4921
+    },
+    {
+      "name": "03-discover",
+      "route": "/pages/discover/index",
+      "profileTarget": "customer",
+      "expectedPath": "pages/discover/index",
+      "actualPath": "pages/discover/index",
+      "outcome": "captured",
+      "error": "",
+      "screenshotFile": "03-discover.png",
+      "sha256": "46425b2c2383dc38fabf440b8923597b1a3ac9a8fab9a18c46a386b8f3614386",
+      "dimensions": {
+        "width": 860,
+        "height": 1504
+      },
+      "durationMs": 4834
+    },
+    {
+      "name": "04-community",
+      "route": "/pages/community/index",
+      "profileTarget": "customer",
+      "expectedPath": "pages/community/index",
+      "actualPath": "pages/community/index",
+      "outcome": "captured",
+      "error": "",
+      "screenshotFile": "04-community.png",
+      "sha256": "c9c6b0e47e9e97d056e47dd4d269b08d88f542afd60746a3f88a749303a0781b",
+      "dimensions": {
+        "width": 860,
+        "height": 1668
+      },
+      "durationMs": 4757
+    },
+    {
+      "name": "05-orders",
+      "route": "/pages/orders/index",
+      "profileTarget": "customer",
+      "expectedPath": "pages/orders/index",
+      "actualPath": "pages/orders/index",
+      "outcome": "captured",
+      "error": "",
+      "screenshotFile": "05-orders.png",
+      "sha256": "c52b762dedf67f3480f62685bada09bb5697ebc82dc53fb651a40b72ec71363b",
+      "dimensions": {
+        "width": 860,
+        "height": 1504
+      },
+      "durationMs": 4655
+    },
+    {
+      "name": "06-order-detail",
+      "route": "/pages/order/detail?id=demo-20260828-u1-order-paid",
+      "profileTarget": "customer",
+      "expectedPath": "pages/order/detail",
+      "actualPath": "pages/order/detail",
+      "outcome": "captured",
+      "error": "",
+      "screenshotFile": "06-order-detail.png",
+      "sha256": "dbb9470917e2de88ed6d5ce9be9670215b8126d6069156c17319aeef1732d157",
+      "dimensions": {
+        "width": 860,
+        "height": 1668
+      },
+      "durationMs": 4641
+    },
+    {
+      "name": "07-order-payment",
+      "route": "/pages/order/payment?orderId=demo-20260828-u1-order-pending",
+      "profileTarget": "customer",
+      "expectedPath": "pages/order/payment",
+      "actualPath": "pages/order/payment",
+      "outcome": "captured",
+      "error": "",
+      "screenshotFile": "07-order-payment.png",
+      "sha256": "4230aa599023dee7092230a784fb6ab6edb604c939b871c187fafa451fb7a938",
+      "dimensions": {
+        "width": 860,
+        "height": 1668
+      },
+      "durationMs": 4661
+    },
+    {
+      "name": "08-order-aftercare",
+      "route": "/pages/order/aftercare?orderId=demo-20260828-u1-order-refunded",
+      "profileTarget": "customer",
+      "expectedPath": "pages/order/aftercare",
+      "actualPath": "pages/order/aftercare",
+      "outcome": "captured",
+      "error": "",
+      "screenshotFile": "08-order-aftercare.png",
+      "sha256": "ec024b20d350db926b55fbd50ecd3817ea1a30fa8a7a8e8a24d98afd6b86791f",
+      "dimensions": {
+        "width": 860,
+        "height": 1668
+      },
+      "durationMs": 4637
+    },
+    {
+      "name": "09-order-dispute",
+      "route": "/pages/order/dispute?orderId=demo-20260828-u1-order-refunded",
+      "profileTarget": "customer",
+      "expectedPath": "pages/order/dispute",
+      "actualPath": "pages/order/dispute",
+      "outcome": "captured",
+      "error": "",
+      "screenshotFile": "09-order-dispute.png",
+      "sha256": "91d348154ad071231691ab13413b99d48409e10dddfa301efb97acc62df57e81",
+      "dimensions": {
+        "width": 860,
+        "height": 1668
+      },
+      "durationMs": 4636
+    },
+    {
+      "name": "10-messages",
+      "route": "/pages/messages/index",
+      "profileTarget": "customer",
+      "expectedPath": "pages/messages/index",
+      "actualPath": "pages/messages/index",
+      "outcome": "captured",
+      "error": "",
+      "screenshotFile": "10-messages.png",
+      "sha256": "e7d11b6f340fdfe0dd9f47b82755a47e3046438615e81566b599d5031c6870d0",
+      "dimensions": {
+        "width": 860,
+        "height": 1504
+      },
+      "durationMs": 6103
+    },
+    {
+      "name": "11-notifications",
+      "route": "/pages/notifications/index",
+      "profileTarget": "customer",
+      "expectedPath": "pages/notifications/index",
+      "actualPath": "pages/notifications/index",
+      "outcome": "captured",
+      "error": "",
+      "screenshotFile": "11-notifications.png",
+      "sha256": "6445876bf5e2aad99aee21f78d24606fafc59454249c4906ea74ad43de2536da",
+      "dimensions": {
+        "width": 860,
+        "height": 1668
+      },
+      "durationMs": 5938
+    },
+    {
+      "name": "12-profile",
+      "route": "/pages/profile/index",
+      "profileTarget": "customer",
+      "expectedPath": "pages/profile/index",
+      "actualPath": "pages/profile/index",
+      "outcome": "captured",
+      "error": "",
+      "screenshotFile": "12-profile.png",
+      "sha256": "396673648cca88a8080769f1e646cb6446103ad4e3cda8d1b183bed397f39f15",
+      "dimensions": {
+        "width": 860,
+        "height": 1504
+      },
+      "durationMs": 4629
+    },
+    {
+      "name": "13-account",
+      "route": "/pages/account/index",
+      "profileTarget": "customer",
+      "expectedPath": "pages/account/index",
+      "actualPath": "pages/account/index",
+      "outcome": "captured",
+      "error": "",
+      "screenshotFile": "13-account.png",
+      "sha256": "f1e2afe3547ac1145ab5240f384326bbc15df772a3b8c80bf5d6716cbe779b46",
+      "dimensions": {
+        "width": 860,
+        "height": 1668
+      },
+      "durationMs": 4667
+    },
+    {
+      "name": "14-adult-eligibility",
+      "route": "/pages/account/adult-eligibility",
+      "profileTarget": "customer",
+      "expectedPath": "pages/account/adult-eligibility",
+      "actualPath": "pages/account/adult-eligibility",
+      "outcome": "captured",
+      "error": "",
+      "screenshotFile": "14-adult-eligibility.png",
+      "sha256": "c3ec8a9e41c06cfcc8e1726472b6e2e46c476b3db32d3c980729a99ec7f95485",
+      "dimensions": {
+        "width": 860,
+        "height": 1668
+      },
+      "durationMs": 4639
+    },
+    {
+      "name": "15-deletion-status",
+      "route": "/pages/account/deletion-status",
+      "profileTarget": "customer",
+      "expectedPath": "pages/account/deletion-status",
+      "actualPath": "pages/account/deletion-status",
+      "outcome": "captured",
+      "error": "",
+      "screenshotFile": "15-deletion-status.png",
+      "sha256": "a4b268f837cb5d0898c81b17b07f333b3f059fd0cbc7ba57766b8b23bc369e11",
+      "dimensions": {
+        "width": 860,
+        "height": 1668
+      },
+      "durationMs": 4653
+    },
+    {
+      "name": "20-companion-detail",
+      "route": "/pages/companion/detail?id=c1",
+      "profileTarget": "customer",
+      "expectedPath": "pages/companion/detail",
+      "actualPath": "pages/companion/detail",
+      "outcome": "captured",
+      "error": "",
+      "screenshotFile": "20-companion-detail.png",
+      "sha256": "0fc89cab5f871d75df6d5762124bee361655751b2cd0c3919a34886f364d0c31",
+      "dimensions": {
+        "width": 860,
+        "height": 1668
+      },
+      "durationMs": 4651
+    },
+    {
+      "name": "16-safety",
+      "route": "/pages/safety/index",
+      "profileTarget": "customer",
+      "expectedPath": "pages/safety/index",
+      "actualPath": "pages/safety/index",
+      "outcome": "captured",
+      "error": "",
+      "screenshotFile": "16-safety.png",
+      "sha256": "1df3da61f8183efc9cc89f99c04c4ca5486d79f0ba85813a3b23683497cc1430",
+      "dimensions": {
+        "width": 860,
+        "height": 1668
+      },
+      "durationMs": 4661
+    },
+    {
+      "name": "17-crisis",
+      "route": "/pages/crisis/index",
+      "profileTarget": "customer",
+      "expectedPath": "pages/crisis/index",
+      "actualPath": "pages/crisis/index",
+      "outcome": "captured",
+      "error": "",
+      "screenshotFile": "17-crisis.png",
+      "sha256": "cd4531004f9ed72ff5c639f0a4d6bf73bd549e30a6ebb7c4978fc72f97c35ff8",
+      "dimensions": {
+        "width": 860,
+        "height": 1668
+      },
+      "durationMs": 4851
+    },
+    {
+      "name": "18-support",
+      "route": "/pages/support/index",
+      "profileTarget": "customer",
+      "expectedPath": "pages/support/index",
+      "actualPath": "pages/support/index",
+      "outcome": "captured",
+      "error": "",
+      "screenshotFile": "18-support.png",
+      "sha256": "a1eabb53ad700e5a4ec38911baa3553af528bb6da2f1bca5f8a876d3b85bdc43",
+      "dimensions": {
+        "width": 860,
+        "height": 1668
+      },
+      "durationMs": 4796
+    },
+    {
+      "name": "19-support-detail",
+      "route": "/pages/support/detail?id=demo-20260828-u1-support-resolved",
+      "profileTarget": "customer",
+      "expectedPath": "pages/support/detail",
+      "actualPath": "pages/support/detail",
+      "outcome": "captured",
+      "error": "",
+      "screenshotFile": "19-support-detail.png",
+      "sha256": "2db36c18c5914e5127d0f0268cf5938c13c8ed72582489b873effe98ff0ad23c",
+      "dimensions": {
+        "width": 860,
+        "height": 1668
+      },
+      "durationMs": 4640
+    },
+    {
+      "name": "21-companion-workbench",
+      "route": "/pages/companion/workbench/index",
+      "profileTarget": "companion",
+      "expectedPath": "pages/companion/workbench/index",
+      "actualPath": "pages/companion/workbench/index",
+      "outcome": "captured",
+      "error": "",
+      "screenshotFile": "21-companion-workbench.png",
+      "sha256": "765bf61af9d3e2ed08fafdc003bf9439d80bcb72ad33b0aeed5592382ddb4860",
+      "dimensions": {
+        "width": 860,
+        "height": 1668
+      },
+      "durationMs": 4639
+    },
+    {
+      "name": "22-companion-onboarding",
+      "route": "/pages/companion/onboarding/index",
+      "profileTarget": "companion",
+      "expectedPath": "pages/companion/onboarding/index",
+      "actualPath": "pages/companion/onboarding/index",
+      "outcome": "captured",
+      "error": "",
+      "screenshotFile": "22-companion-onboarding.png",
+      "sha256": "d8eb52a22889c7a5b35f3b5f12e24f869b8e628c5a4ad243d0e7b97d5edb40e8",
+      "dimensions": {
+        "width": 860,
+        "height": 1668
+      },
+      "durationMs": 4647
+    },
+    {
+      "name": "23-companion-schedule",
+      "route": "/pages/companion/schedule/index",
+      "profileTarget": "companion",
+      "expectedPath": "pages/companion/schedule/index",
+      "actualPath": "pages/companion/schedule/index",
+      "outcome": "captured",
+      "error": "",
+      "screenshotFile": "23-companion-schedule.png",
+      "sha256": "9ce0d920951c1f2687922db2b96f5781a6dc7a4ef5b2612a235ef929f4f820a3",
+      "dimensions": {
+        "width": 860,
+        "height": 1668
+      },
+      "durationMs": 4648
+    },
+    {
+      "name": "24-companion-development",
+      "route": "/pages/companion/development/index",
+      "profileTarget": "companion",
+      "expectedPath": "pages/companion/development/index",
+      "actualPath": "pages/companion/development/index",
+      "outcome": "captured",
+      "error": "",
+      "screenshotFile": "24-companion-development.png",
+      "sha256": "331402c7690fb0624c7ef521206e53fbaaacc268f1a0dda4ad250731f7ce9b12",
+      "dimensions": {
+        "width": 860,
+        "height": 1668
+      },
+      "durationMs": 4650
+    },
+    {
+      "name": "25-companion-earnings",
+      "route": "/pages/companion/earnings/index",
+      "profileTarget": "companion",
+      "expectedPath": "pages/companion/earnings/index",
+      "actualPath": "pages/companion/earnings/index",
+      "outcome": "captured",
+      "error": "",
+      "screenshotFile": "25-companion-earnings.png",
+      "sha256": "fa72ca1c7257b833dbc608bcafefee34f5be9cbaf4e4838c71ed86633ca428a9",
+      "dimensions": {
+        "width": 860,
+        "height": 1668
+      },
+      "durationMs": 4661
+    },
+    {
+      "name": "26-companion-safety",
+      "route": "/pages/companion/safety/index",
+      "profileTarget": "companion",
+      "expectedPath": "pages/companion/safety/index",
+      "actualPath": "pages/companion/safety/index",
+      "outcome": "captured",
+      "error": "",
+      "screenshotFile": "26-companion-safety.png",
+      "sha256": "654a65cdb14b847e6aff085e3af144fd64fefc86f1d33faefcb6368ce89b76cb",
+      "dimensions": {
+        "width": 860,
+        "height": 1668
+      },
+      "durationMs": 4649
+    },
+    {
+      "name": "27-companion-services",
+      "route": "/pages/companion/services/index",
+      "profileTarget": "companion",
+      "expectedPath": "pages/companion/services/index",
+      "actualPath": "pages/companion/services/index",
+      "outcome": "captured",
+      "error": "",
+      "screenshotFile": "27-companion-services.png",
+      "sha256": "6a27543a73d710eb9243b888a296b934280b2adc6ecf8e27dc37f27982670949",
+      "dimensions": {
+        "width": 860,
+        "height": 1668
+      },
+      "durationMs": 4642
+    },
+    {
+      "name": "28-companion-availability",
+      "route": "/pages/companion/availability/index",
+      "profileTarget": "companion",
+      "expectedPath": "pages/companion/availability/index",
+      "actualPath": "pages/companion/availability/index",
+      "outcome": "captured",
+      "error": "",
+      "screenshotFile": "28-companion-availability.png",
+      "sha256": "6a27543a73d710eb9243b888a296b934280b2adc6ecf8e27dc37f27982670949",
+      "dimensions": {
+        "width": 860,
+        "height": 1668
+      },
+      "durationMs": 4643
+    },
+    {
+      "name": "29-chat",
+      "route": "/pages/chat/index?id=c1",
+      "profileTarget": "customer",
+      "expectedPath": "pages/chat/index",
+      "actualPath": "pages/chat/index",
+      "outcome": "captured",
+      "error": "",
+      "screenshotFile": "29-chat.png",
+      "sha256": "2f5886ffa266339efd6673545ad4cec94177607d3919bb3b145d1ba5080871a2",
+      "dimensions": {
+        "width": 860,
+        "height": 1668
+      },
+      "durationMs": 4704
+    },
+    {
+      "name": "30-voice",
+      "route": "/pages/voice/index?orderId=demo-20260828-u1-order-paid",
+      "profileTarget": "customer",
+      "expectedPath": "pages/voice/index",
+      "actualPath": "pages/voice/index",
+      "outcome": "captured",
+      "error": "",
+      "screenshotFile": "30-voice.png",
+      "sha256": "3d605ee211b59cd7af8d37d1afb364fe1159ff5c98be9bc2d5df7686bcfdc43d",
+      "dimensions": {
+        "width": 860,
+        "height": 1668
+      },
+      "durationMs": 4659
+    },
+    {
+      "name": "31-legal",
+      "route": "/pages/legal/index?type=privacy",
+      "profileTarget": "customer",
+      "expectedPath": "pages/legal/index",
+      "actualPath": "pages/legal/index",
+      "outcome": "captured",
+      "error": "",
+      "screenshotFile": "31-legal.png",
+      "sha256": "38507de76b40ab83d7e0cf299ad86d364245562685e3064c00ddbdce87f7e772",
+      "dimensions": {
+        "width": 860,
+        "height": 1668
+      },
+      "durationMs": 4642
+    }
+  ]
+}

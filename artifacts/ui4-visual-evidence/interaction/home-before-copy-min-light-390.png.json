@@ -1,0 +1,18 @@
+{
+  "captured": true,
+  "route": "/pages/home/index",
+  "expectedPath": "pages/home/index",
+  "actualPath": "pages/home/index",
+  "routeMatched": true,
+  "screenshot": "artifacts/ui4-visual-evidence/interaction/home-before-copy-min-light-390.png",
+  "fixture": "ui4-local-visual-fixture",
+  "durationMs": 5248,
+  "simulator": {
+    "model": "iPhone 12/13 (Pro)",
+    "SDKVersion": "3.17.2",
+    "theme": "light",
+    "windowWidth": 390,
+    "windowHeight": 753,
+    "pixelRatio": 3
+  }
+}

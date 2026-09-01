@@ -1,0 +1,5 @@
+{
+  "kind": "ui4-empty-storage-fixture",
+  "description": "No legal consent, identity, credential, token, role, order or payment data.",
+  "storage": {}
+}

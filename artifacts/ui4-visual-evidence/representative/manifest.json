@@ -1,0 +1,141 @@
+{
+  "generatedAt": "2026-08-31T15:17:57.000Z",
+  "capture": "WeChat DevTools App.captureScreenshot via miniprogram-automator",
+  "devtools": "Stable 2.01.2510290",
+  "simulator": {
+    "model": "iPhone 12/13 (Pro)",
+    "SDKVersion": "3.17.2",
+    "theme": "light",
+    "windowWidth": 390,
+    "windowHeight": 753,
+    "pixelRatio": 3
+  },
+  "stateBoundary": {
+    "fixture": "fixture-legal-only.json",
+    "realIdentityToken": false,
+    "realRoleSession": false,
+    "apiStarted": false,
+    "interpretation": "local route and fail-closed visual evidence only; not real login, payment, role or business-flow success"
+  },
+  "routes": [
+    {
+      "name": "01-consent-empty",
+      "route": "/pages/consent/index",
+      "expectedPath": "pages/consent/index",
+      "actualPath": "pages/consent/index",
+      "outcome": "captured",
+      "error": "",
+      "durationMs": 5971
+    },
+    {
+      "name": "02-home-listening-lounge",
+      "route": "/pages/home/index",
+      "expectedPath": "pages/home/index",
+      "actualPath": "pages/home/index",
+      "outcome": "captured",
+      "error": "",
+      "durationMs": 6193
+    },
+    {
+      "name": "03-discover-garden",
+      "route": "/pages/discover/index",
+      "expectedPath": "pages/discover/index",
+      "actualPath": "pages/discover/index",
+      "outcome": "captured",
+      "error": "",
+      "durationMs": 6142
+    },
+    {
+      "name": "10-messages-post-office",
+      "route": "/pages/messages/index",
+      "expectedPath": "pages/messages/index",
+      "actualPath": "pages/messages/index",
+      "outcome": "captured",
+      "error": "",
+      "durationMs": 6075
+    },
+    {
+      "name": "20-companion-detail",
+      "route": "/pages/companion/detail?id=c1",
+      "expectedPath": "pages/companion/detail",
+      "actualPath": "pages/companion/detail",
+      "outcome": "captured",
+      "error": "",
+      "durationMs": 5942
+    },
+    {
+      "name": "07-payment-fail-closed",
+      "route": "/pages/order/payment?orderId=ui4-no-real-order",
+      "expectedPath": "pages/order/payment",
+      "actualPath": "pages/order/payment",
+      "outcome": "captured",
+      "error": "",
+      "durationMs": 6830
+    },
+    {
+      "name": "16-safety",
+      "route": "/pages/safety/index",
+      "expectedPath": "pages/safety/index",
+      "actualPath": "pages/safety/index",
+      "outcome": "captured",
+      "error": "",
+      "durationMs": 6122
+    },
+    {
+      "name": "17-crisis",
+      "route": "/pages/crisis/index",
+      "expectedPath": "pages/crisis/index",
+      "actualPath": "pages/crisis/index",
+      "outcome": "captured",
+      "error": "",
+      "durationMs": 6132
+    },
+    {
+      "name": "21-workbench-fail-closed",
+      "route": "/pages/companion/workbench/index",
+      "expectedPath": "pages/companion/workbench/index",
+      "actualPath": "pages/companion/workbench/index",
+      "outcome": "captured",
+      "error": "",
+      "durationMs": 5937
+    },
+    {
+      "name": "30-voice-text-only",
+      "route": "/pages/voice/index?orderId=ui4-no-real-order",
+      "expectedPath": "pages/voice/index",
+      "actualPath": "pages/voice/index",
+      "outcome": "captured",
+      "error": "",
+      "durationMs": 6073
+    }
+  ],
+  "updatedAt": "2026-08-31T15:40:27.913Z",
+  "remediation": {
+    "companionDetail": {
+      "evidence": {
+        "captured": true,
+        "route": "/pages/companion/detail?id=c1",
+        "expectedPath": "pages/companion/detail",
+        "actualPath": "pages/companion/detail",
+        "routeMatched": true,
+        "screenshot": "artifacts/ui4-visual-evidence/representative/20-companion-detail-light-390.png",
+        "fixture": "ui4-local-visual-fixture",
+        "durationMs": 5617,
+        "simulator": {
+          "model": "iPhone 12/13 (Pro)",
+          "SDKVersion": "3.17.2",
+          "theme": "light",
+          "windowWidth": 390,
+          "windowHeight": 753,
+          "pixelRatio": 3
+        },
+        "sha256": "cb2770e93b0c5e8e8674c77a1922be9b4f816738ce4937b532c4f76cab5045fa",
+        "dimensions": {
+          "width": 780,
+          "height": 1506
+        }
+      },
+      "result": "stable M0 error card with retry, back and safety recovery; no fake profile data"
+    }
+  }
+}

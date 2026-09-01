@@ -1,0 +1,16 @@
+{
+  "kind": "ui4-local-visual-fixture",
+  "description": "Legal consent only. No user identity, credential, token, order, payment or role data.",
+  "storage": {
+    "talkandtalk.legalConsent": {
+      "version": "2.2-2026-08-01",
+      "acceptedAt": "2026-08-31T14:00:00.000Z",
+      "privacyAccepted": true,
+      "termsAccepted": true,
+      "adultConfirmed": true,
+      "privacyUrl": "http://127.0.0.1:3000/legal/privacy.html",
+      "termsUrl": "http://127.0.0.1:3000/legal/terms.html",
+      "source": "wechatMiniProgram"
+    }
+  }
+}

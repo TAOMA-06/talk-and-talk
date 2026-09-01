@@ -1,0 +1,120 @@
+{
+  "passed": true,
+  "verifiedAt": "2026-09-01T04:43:40.630Z",
+  "representative": {
+    "screenshots": 10,
+    "uniqueImages": 10,
+    "routeMatches": "10/10",
+    "files": [
+      {
+        "file": "01-consent-empty-light-390.png",
+        "sha256": "5ecb6d4a7cc1b7d6a8cbfb2ab14a8e29ca9d2e04322a966fcc49b7436bb55fe2",
+        "dimensions": {
+          "width": 780,
+          "height": 1506
+        }
+      },
+      {
+        "file": "02-home-listening-lounge-light-390.png",
+        "sha256": "12b228301664fd05341c4052ef063d9583b4e8a2be5bbc3896f83b5bff54a1a9",
+        "dimensions": {
+          "width": 780,
+          "height": 1342
+        }
+      },
+      {
+        "file": "03-discover-garden-light-390.png",
+        "sha256": "409e594b10f4c5876fead057a2efaa152251dee49217502c1006fb458864f440",
+        "dimensions": {
+          "width": 780,
+          "height": 1342
+        }
+      },
+      {
+        "file": "07-payment-fail-closed-light-390.png",
+        "sha256": "0ff75834e15c556818682d113a2bea0cf58a928b328a0fb3e3043ae03e5bed0b",
+        "dimensions": {
+          "width": 780,
+          "height": 1506
+        }
+      },
+      {
+        "file": "10-messages-post-office-light-390.png",
+        "sha256": "fa7773277863b51766e0e2a50cd94bc48bd0b98974778fd83df0198e6cb44096",
+        "dimensions": {
+          "width": 780,
+          "height": 1342
+        }
+      },
+      {
+        "file": "16-safety-light-390.png",
+        "sha256": "b7ccbfb29c59314d60aa06eff2577d4e748e8b72ae086d167b942cb964e4f902",
+        "dimensions": {
+          "width": 780,
+          "height": 1506
+        }
+      },
+      {
+        "file": "17-crisis-light-390.png",
+        "sha256": "d33ad9059d224e25cc6f63999c796a7c611a8ff44d2e65da0e2cce0d58ee4ecf",
+        "dimensions": {
+          "width": 780,
+          "height": 1506
+        }
+      },
+      {
+        "file": "20-companion-detail-light-390.png",
+        "sha256": "cb2770e93b0c5e8e8674c77a1922be9b4f816738ce4937b532c4f76cab5045fa",
+        "dimensions": {
+          "width": 780,
+          "height": 1506
+        }
+      },
+      {
+        "file": "21-workbench-fail-closed-light-390.png",
+        "sha256": "fd16975a98436565b885c6a5944ed93e9b4de7db5fcb173df4f00e7bea245bf4",
+        "dimensions": {
+          "width": 780,
+          "height": 1506
+        }
+      },
+      {
+        "file": "30-voice-text-only-light-390.png",
+        "sha256": "1c903588d751cc4b9cb2099b9c8428ddabeba28dc1c3bd28459e8687b22498bf",
+        "dimensions": {
+          "width": 780,
+          "height": 1506
+        }
+      }
+    ]
+  },
+  "matrix390Light": {
+    "screenshots": 31,
+    "routeMatches": "31/31",
+    "uniqueImages": 30
+  },
+  "dynamic": [
+    {
+      "name": "home-scene-deal",
+      "actualPath": "pages/home/index",
+      "uniqueEntranceFrames": 5,
+      "settledIdentical": true
+    },
+    {
+      "name": "discover-stage",
+      "actualPath": "pages/discover/index",
+      "uniqueEntranceFrames": 3,
+      "settledIdentical": true
+    }
+  ],
+  "localCopy": {
+    "comparedFiles": 275,
+    "digest": "aaf718cd943eb3bbedd433aa16495bd22665b2ceface2a9db88fe026906de638",
+    "noStoredAppId": true,
+    "localOnlyMarker": true
+  },
+  "validationScope": "Representative/390-light/dynamic/local-copy sample verifier. The canonical full matrix and interaction summary is generated only by build-final-summary.mjs.",
+  "externalGaps": [
+    "no real identity, role, order, payment, API, preview, upload or device flow"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "generatedAt": "2026-09-01T04:24:05.788Z",
+  "runtime": {
+    "route": "pages/home/index",
+    "motionOff": true
+  },
+  "first": {
+    "path": "artifacts/ui4-visual-evidence/interaction/motion-off/home-motion-off-a.png",
+    "sha256": "ccbdd914cb9a8eac3a787d23334c5f50635f41ae7e1a435e65c5ed97f3ef6a49"
+  },
+  "second": {
+    "path": "artifacts/ui4-visual-evidence/interaction/motion-off/home-motion-off-b.png",
+    "sha256": "ccbdd914cb9a8eac3a787d23334c5f50635f41ae7e1a435e65c5ed97f3ef6a49"
+  },
+  "byteIdenticalAfter1200Ms": true,
+  "interpretation": "motionOff was set in the live AppService page; both captures show the immediate final state and remain stable"
+}

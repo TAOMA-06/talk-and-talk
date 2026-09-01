@@ -1,0 +1,18 @@
+{
+  "captured": true,
+  "route": "/pages/home/index",
+  "expectedPath": "pages/home/index",
+  "actualPath": "pages/home/index",
+  "routeMatched": true,
+  "screenshot": "artifacts/ui4-visual-evidence/representative/home-listening-lounge-light-390.png",
+  "fixture": "legal-only-no-identity",
+  "durationMs": 7137,
+  "simulator": {
+    "model": "iPhone 12/13 (Pro)",
+    "SDKVersion": "3.17.2",
+    "theme": "light",
+    "windowWidth": 390,
+    "windowHeight": 753,
+    "pixelRatio": 3
+  }
+}
