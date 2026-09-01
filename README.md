@@ -1,78 +1,46 @@
-# Talk&Talk v0.1 · 浅彩卡牌剧场
+# Talk&Talk v0.1
 
-微信小程序优先的女性友好线上陪伴产品。v0.1 以低饱和多彩卡片、正向叠层、有限动效和少文字界面，连接发现、预约、订单、沟通与支持。
+Talk&Talk 是一款微信小程序优先的线上陪伴产品。v0.1 已将小程序、公开 Web、API、Admin 和 Independent Review 统一到浅彩卡牌剧场风格。
 
-`Mini Program first` · `UI4` · `本地验证完成` · `尚未发布`
+`main` 是当前 v0.1 的主发行代码分支。
 
 ![Talk&Talk v0.1 UI4 总览](./artifacts/v0.1/ui4-overview.png)
 
-[v0.1 更新说明](./docs/releases/v0.1.md) · [最终本地验收](./docs/2026-09-01-ui4-final-validation.md) · [UI4 设计系统](./frontend/miniprogram/UI4_DESIGN_SYSTEM.md)
+[v0.1 更新说明](./docs/releases/v0.1.md) · [本地验收](./docs/2026-09-01-ui4-final-validation.md) · [UI4 设计系统](./frontend/miniprogram/UI4_DESIGN_SYSTEM.md)
 
-> 当前结论：UI4 本地目标通过并已合并 `main`。尚未创建 tag / GitHub Release、上传小程序或部署生产。
+## 产品方向
 
-## v0.1 有什么不同
+v0.1 的核心是浅色、低饱和、多元卡牌：用叠卡制造空间感，用克制动效完成反馈，用更少文字保留当前事实和下一步动作。支付、退款、身份、审核、安全和用户协议等内容放在对应的政策或运营界面里，不挤占主界面。
 
-| 方向 | 表现 |
-| --- | --- |
-| 浅彩卡牌 | 蓝、杏、薄荷、薰衣草、奶油黄与玫瑰低饱和组合 |
-| 立体层次 | 卡牌正向叠放，后层仍可命中；不使用负层级制造假深度 |
-| 流畅动效 | 有限入场与交互反馈，稳定后停止；支持关闭动效 |
-| 克制卡通 | 台灯、杯子、信封、文件夹等安静小物只出现在低风险场景 |
-| 少文字 | 主界面只保留当前事实、下一步和关键边界；完整规则回到协议页 |
-| 安全优先 | 支付、退款、身份、危机、证据与审核保持稳定 M0/M1 表达 |
+![Talk&Talk v0.1 动效预览](./artifacts/v0.1/ui4-motion-demo.gif)
 
-![Talk&Talk v0.1 有限动效预览](./artifacts/v0.1/ui4-motion-demo.gif)
+[播放 MP4](./artifacts/v0.1/talktalk-v0.1-motion-demo.mp4) · [查看小程序截图](./artifacts/v0.1/screens/README.md) · [媒体清单](./artifacts/v0.1/manifest.json)
 
-[播放 MP4](./artifacts/v0.1/talktalk-v0.1-motion-demo.mp4) · [查看 31 页截图](./artifacts/v0.1/screens/README.md) · [媒体清单](./artifacts/v0.1/manifest.json)
-
-GIF 和 MP4 均由真实微信开发者工具的确定性采样帧组成，只展示有限入场过渡；它们不是连续录屏，也不证明 FPS、真机性能或业务成功。
-
-v0.1 媒体包已生成；来源、尺寸、SHA-256 与证据边界见[媒体清单](./artifacts/v0.1/manifest.json)，完整本地验收见[证据汇总](./artifacts/ui4-visual-evidence/evidence-summary.json)。
-
-## 产品表面
+## 发行范围
 
 | 表面 | v0.1 范围 |
 | --- | --- |
-| 微信小程序 | 首发产品面；普通用户与陪伴者的 31 个页面、18 个共享组件 |
+| 微信小程序 | 31 个用户与陪伴者页面，18 个共享组件 |
 | 公开 Web | `/`、`/how-it-works`、`/safety`、`/about`、`/partners` |
-| API | NestJS + PostgreSQL + Redis，冻结 `/api/v1` 契约 |
-| Admin / Review | 分离身份域的商业运营台与独立审核台 |
-| iOS | 历史/后续工程，不在 v0.1 发行范围 |
+| API | NestJS `/api/v1`，PostgreSQL 与 Redis |
+| Admin | 商业运营后台 |
+| Independent Review | 独立审核台与独立身份域 |
+
+## 仓库结构
 
 ```text
-frontend/miniprogram/  微信小程序
-frontend/web/          五个公开 Web 路由
-backend/api/           API、Admin、Review、法律页
-shared/contracts/      OpenAPI v1
+frontend/miniprogram/  微信小程序正式源
+frontend/web/          公开 Web 路由
+backend/api/           API、Admin、Review 与法律页
+shared/contracts/      OpenAPI v1 契约
 infra/                 本地与部署参考
-docs/                  设计、验收与运行手册
+docs/                  发布说明、验收与运行手册
+artifacts/v0.1/        v0.1 精简媒体包
 ```
-
-## 本地证据
-
-- 小程序：31 页 × 3 宽度 × 2 主题，共 186/186 张微信开发者工具截图。
-- 动效：首页 5 个不同入场帧、发现页 3 个不同过渡帧；稳定帧一致，无无限动画。
-- 交互：后层卡命中、发现筛选、`motionOff=true` 终态已本地验证。
-- 修复后 DevTools：最终隔离副本的组件 WXSS 源选择器警告为 0；`motionOff` 已重跑。
-- 运行门：TypeScript、31 页结构、18 组件 UI4 审计与 894 次 API smoke 通过。
-- 文案减法：小程序可见文字 -48.7%；五个公开 Web 路由 -64.1%。
-- Web：完整 `npm run check` 通过；五路由 390/1280 本地浏览器无横向溢出。
-- Admin / Review：静态预检 95/95；390/1280 登录页与身份域分离通过。
-
-证据入口：
-
-- [最终验收结论](./docs/2026-09-01-ui4-final-validation.md)
-- [证据汇总 JSON](./artifacts/ui4-visual-evidence/evidence-summary.json)
-- [186 张截图矩阵](./artifacts/ui4-visual-evidence/matrix/)
-- [有限动效序列](./artifacts/ui4-visual-evidence/dynamic/)
-- [交互与 motion-off](./artifacts/ui4-visual-evidence/interaction/)
-- [截图后修复记录](./artifacts/ui4-visual-evidence/post-capture-remediation.json)
 
 ## 快速开始
 
-需要 Node.js 22+、PostgreSQL、Redis，以及微信开发者工具。
-
-### 1. 启动 API
+需要 Node.js 22+、PostgreSQL、Redis 和微信开发者工具。
 
 ```bash
 cd backend/api
@@ -82,17 +50,13 @@ npm run prisma:migrate
 npm run start:dev
 ```
 
-### 2. 打开小程序本地副本
-
 ```bash
 npm --prefix frontend/miniprogram install
 node frontend/miniprogram/scripts/create-local-copy.mjs \
   --api-base-url http://127.0.0.1:3000/api/v1
 ```
 
-在微信开发者工具中导入 `frontend/miniprogram-local`。它是无 AppID、不可上传的本地副本；正式源仍是 `frontend/miniprogram`。
-
-### 3. 可选：运行公开 Web
+在微信开发者工具中导入 `frontend/miniprogram-local` 做本地测试。可上传的正式源仍是 `frontend/miniprogram`。
 
 ```bash
 cd frontend/web
@@ -120,17 +84,6 @@ npm --prefix backend/api run test:preflight:static
 npm --prefix backend/api run verify:prod-artifacts
 ```
 
-PostgreSQL preflight、E2E、真实微信与生产操作需要获授权的隔离环境；不要把本地 smoke 当作商用验收。
+当前 v0.1 证据属于本地验收证据。创建 Git tag / GitHub Release、微信 Preview / Upload / 审核、真实微信登录、支付回调与退款、真机性能、生产基础设施、监控和合规审批，都需要单独授权和独立证据。
 
-## 发布边界
-
-本仓库当前只能准确声称“v0.1 UI4 已实现、完成本地验证，并已合并 `main`”。提交集已在独立 clean worktree 复验；原开发工作区仍保留未纳入 `main` 的历史与中间文件。尚未完成：
-
-- 冻结 Git tag 或创建 GitHub Release；
-- 微信 Preview、体验版 Upload、审核或生产部署；
-- 真实客户/陪伴者/Admin/Review 全角色流程；
-- 真实微信登录、身份授权、小额支付、服务端回调与退款；
-- 微信真机性能、系统字体、长列表与触控验收；
-- staging/生产域名、CDN、监控及外部合规/独立审核。
-
-更多入口：[项目指南](./docs/GUIDE.md) · [小程序开发](./frontend/miniprogram/README.md) · [部署与回滚](./docs/deploy-rollback.md) · [后续范围](./NEXT_PHASE.md)
+更多入口：[项目指南](./docs/GUIDE.md) · [小程序开发](./frontend/miniprogram/README.md) · [部署与回滚](./docs/deploy-rollback.md) · [下一阶段](./NEXT_PHASE.md)
