@@ -1,19 +1,18 @@
-<view class="consent-page">
-  <view class="brand-row"><view class="brand-mark"><view></view><view></view></view><view class="brand">{{brandName}}</view></view>
-  <view class="title">在开始之前，先确认三件事</view>
-  <view class="summary">身份、交易与站内文字沟通都由平台保护；你随时可以查看规则和行使账号权利。</view>
+<view class="consent-page {{motionOff ? 'tt-motion-off' : ''}}">
+  <view class="consent-document-stage" aria-label="开始使用前的服务与隐私确认">
+  <view class="consent-paper-edge consent-paper-back" aria-hidden="true"></view>
+  <view class="consent-paper-edge consent-paper-middle" aria-hidden="true"></view>
+  <view class="consent-hero">
+    <view class="brand-row"><view class="brand-mark"><view></view><view></view></view><view class="brand">{{brandName}}</view></view>
+    <view class="title">开始前确认</view>
+    <view class="summary">阅读协议，并确认年龄。</view>
+  </view>
+  </view>
 
-  <view class="notice tt-animate-in">
-    <view class="notice-item"><view class="notice-index">01</view><view><view class="notice-title">只在平台内完成服务</view><view class="notice-copy">订单、支付和文字沟通都留在 {{brandName}} 内。</view></view></view>
-    <view class="notice-item"><view class="notice-index">02</view><view><view class="notice-title">不把原文发送给外部生成式 AI</view><view class="notice-copy">本版本使用本地规则与经授权人员人工复核。</view></view></view>
-    <view class="notice-item"><view class="notice-index">03</view><view><view class="notice-title">首发仅提供文字陪伴</view><view class="notice-copy">首发为文字陪伴：不开放媒体上传、实时语音或 TRTC。</view></view></view>
-    <button class="details-toggle" bindtap="toggleDetails">{{detailsExpanded ? '收起详细说明' : '查看详细说明'}}</button>
-    <view wx:if="{{detailsExpanded}}" class="details" aria-live="polite">
-      <view>必要信息包括微信登录标识、订单和支付交易标识、文字聊天及举报记录。</view>
-      <view>同意后会记录协议版本、同意时间和文档地址，用于合规审计与版本校验。</view>
-      <view>公开发帖与即时消息前，服务端会校验已登记的身份信号；未通过时将提示恢复路径，不会完成写入。</view>
-      <view>不勾选并进入时不会触发微信登录或业务 API 请求，但无法使用平台服务。</view>
-    </view>
+  <view class="notice">
+    <view class="notice-item notice-blue"><view class="notice-index">01</view><view class="notice-title">服务、支付与沟通留在平台内</view></view>
+    <view class="notice-item notice-apricot"><view class="notice-index">02</view><view class="notice-title">原文不发送给外部生成式 AI</view></view>
+    <view class="notice-item notice-mint"><view class="notice-index">03</view><view class="notice-title">首发为文字陪伴：不开放媒体上传、实时语音或 TRTC。</view></view>
   </view>
 
   <view class="document-links">
@@ -22,13 +21,13 @@
   </view>
 
   <view class="consent-surface">
-    <checkbox-group bindchange="setAgreement"><label class="agreement"><checkbox value="accepted" checked="{{agreed}}" color="#C65345" />我已阅读并同意《用户协议》和《隐私政策》</label></checkbox-group>
-    <checkbox-group bindchange="setAdultConfirmation"><label class="agreement"><checkbox value="adult" checked="{{adultConfirmed}}" color="#C65345" />我确认本人已年满 18 周岁</label></checkbox-group>
+    <checkbox-group bindchange="setAgreement"><label class="agreement"><checkbox value="accepted" checked="{{agreed}}" color="#292724" />我已阅读并同意《用户协议》和《隐私政策》</label></checkbox-group>
+    <checkbox-group bindchange="setAdultConfirmation"><label class="agreement"><checkbox value="adult" checked="{{adultConfirmed}}" color="#292724" />我确认本人已年满 18 周岁</label></checkbox-group>
     <button class="primary-button accept" loading="{{submitting}}" disabled="{{!agreed || !adultConfirmed || submitting}}" bindtap="accept">同意并进入</button>
   </view>
   <view class="rights-recovery">
     <view class="rights-title">不同意或已撤回同意？</view>
-    <view class="rights-copy">仍可使用微信身份核验进入受限自助中心，查看账号处置与申诉、提交个人信息权利请求或申请账号注销。此操作不会重新同意平台协议，也不会开放订单、聊天、推荐或其他业务功能。</view>
+    <view class="rights-copy">仍可进入受限自助中心处理账号权利、申诉与注销；不会开通其他功能。</view>
     <button class="recovery-button" loading="{{submitting}}" disabled="{{submitting}}" bindtap="enterAccountRights">仅进入账号权利与申诉</button>
   </view>
   <button class="document-link customer-service" open-type="contact">联系客服或行使隐私权利</button>

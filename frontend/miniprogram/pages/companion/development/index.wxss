@@ -1,10 +1,15 @@
+.development-page { padding-top: 24rpx; }
 .hero {
+  position: relative;
   padding: 32rpx;
   border-radius: 28rpx;
-  background: var(--tt-accent-soft);
+  background: var(--tt-color-pastel-mint-bg);
   box-shadow: none;
-  border: 1rpx solid var(--tt-border);
+  border: 1rpx solid var(--tt-color-pastel-mint-stroke);
 }
+
+.development-ledger { display: flex; align-items: center; justify-content: space-between; gap: 18rpx; margin-bottom: 24rpx; color: var(--tt-color-pastel-mint-fg); font-size: 18rpx; font-weight: 800; letter-spacing: 1.6rpx; }
+.growth-prop { position: absolute; right: 18rpx; bottom: 12rpx; pointer-events: none; }
 
 .eyebrow {
   color: var(--tt-accent);
@@ -37,10 +42,14 @@
 }
 
 .section-title {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
   margin: 34rpx 4rpx 16rpx;
   font-size: 30rpx;
   font-weight: 700;
 }
+.section-index { display: inline-flex; width: 42rpx; height: 42rpx; align-items: center; justify-content: center; border: 1rpx solid var(--tt-border-strong); border-radius: 50%; color: var(--tt-text-secondary); font-size: 18rpx; }
 
 .inline-error {
   margin-top: 20rpx;
@@ -53,8 +62,9 @@
 }
 
 .module-card {
-  padding: 28rpx;
+  padding: 0;
 }
+.module-item { margin-bottom: 20rpx; }
 
 .module-head, .action-head {
   display: flex;
@@ -139,11 +149,9 @@
 }
 
 .quality-card {
-  padding: 24rpx;
-  border-radius: 22rpx;
-  background: var(--tt-surface);
-  box-shadow: none;
+  padding: 0;
 }
+.quality-item { min-width: 0; }
 
 .quality-label {
   color: var(--tt-text-secondary);
@@ -240,7 +248,7 @@
   inset: 0;
   display: flex;
   align-items: flex-end;
-  background: rgba(32, 33, 36, 0.48);
+  background: var(--tt-overlay-scrim-strong);
 }
 
 .modal {
@@ -330,3 +338,11 @@
 .primary-button[disabled], .secondary-button[disabled] {
   opacity: 0.52;
 }
+
+.module-card { border-color: var(--tt-color-pastel-lavender-stroke); background: var(--tt-color-pastel-lavender-bg); }
+.quality-card:nth-child(1) { border-color: var(--tt-color-pastel-mint-stroke); background: var(--tt-color-pastel-mint-bg); }
+.quality-card:nth-child(2) { border-color: var(--tt-color-pastel-blue-stroke); background: var(--tt-color-pastel-blue-bg); }
+.quality-card:nth-child(3) { border-color: var(--tt-color-pastel-butter-stroke); background: var(--tt-color-pastel-butter-bg); }
+.quality-card:nth-child(4) { border-color: var(--tt-color-pastel-rose-stroke); background: var(--tt-color-pastel-rose-bg); }
+
+.module-card,.quality-card { border: 0; border-radius: 0; background: transparent; box-shadow: none; }

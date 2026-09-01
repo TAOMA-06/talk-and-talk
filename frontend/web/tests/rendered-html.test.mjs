@@ -119,18 +119,19 @@ test("server-renders the Talk&Talk official marketing home", async () => {
   assert.match(html, /有边界的线上陪伴/);
   assert.match(html, /被认真听见/);
   assert.match(html, /女性友好的线上陪伴/);
-  assert.match(html, /连接空泡/);
+  assert.match(html, /theatre-stage-listening/);
   assert.match(html, /微信小程序/);
   assert.match(html, /了解服务路径/);
-  assert.match(html, /先认识规则，再进入小程序/);
+  assert.match(html, /此刻想聊什么/);
+  assert.match(html, /选择入口/);
+  assert.match(html, /用户协议与平台规则/);
+  assert.match(html, /隐私政策/);
   assert.match(html, /hero-trust-strip/);
-  assert.match(html, /文字互动/);
   assert.match(html, /身份核验通道完成前不开放新预约、支付或聊天/);
   assert.doesNotMatch(html, /App 即将到来/);
-  assert.match(html, /bubble-hero|icon-orbit|app-icon/);
+  assert.match(html, /bubble-hero|theatre-stage|app-icon/);
   assert.match(html, /非医疗|非急救|年满 18/);
-  // Brand signature retained (symbol section + orbit caption).
-  assert.match(html, /两枚对话相遇|形成一颗温柔的心/);
+  // Brand signature is now carried by the UI4 listening theatre, not a prose-heavy symbol section.
   // next/image may encode the path as /brand/app-icon.png or %2Fbrand%2Fapp-icon.png
   assert.match(html, /app-icon\.png/);
   assert.doesNotMatch(html, /style="[^"]*opacity:0(?:[;"])/);
@@ -258,16 +259,18 @@ test("keeps the official shell usable without a Web-account entry", async () => 
   assert.doesNotMatch(shell, /miniprogramEntryUrl/);
   assert.match(home, /bubble-hero/);
   assert.match(home, /hero-trust-strip/);
-  assert.match(home, /IconOrbit/);
+  assert.match(home, /TheatreStage/);
   assert.match(home, /MiniprogramCta/);
   assert.doesNotMatch(home, /showAppComingSoon/);
   assert.match(home, /secondaryHref="\/how-it-works"/);
   assert.match(home, /\/brand\/app-icon\.png/);
   assert.match(home, /有边界的线上陪伴/);
   assert.match(home, /被认真听见/);
-  assert.match(home, /home-values|home-trust|home-moment/);
+  assert.match(home, /home-moment/);
+  assert.match(home, /PublicRuleLinks/);
+  assert.doesNotMatch(home, /home-values|home-trust|bubble-symbol|bubble-closing/);
   assert.match(shell, /BrandMark|app-icon\.png/);
-  assert.match(cta, /复制名称并在微信搜索/);
+  assert.match(cta, /复制小程序名称/);
   assert.match(cta, /resolveMiniprogramEntry/);
   assert.match(cta, /resolveMiniprogramQr/);
   assert.doesNotMatch(cta, /miniprogramEntryUrl|miniprogramQrUrl|showAppComingSoon/);
@@ -312,10 +315,10 @@ test("safety page keeps evidence-bounded support paths and miniprogram CTA", asy
   assert.equal(response.status, 200);
   const html = await response.text();
   assert.match(safetySource, /MiniprogramCta/);
-  assert.match(safetySource, /safety-closing-cta/);
+  assert.doesNotMatch(safetySource, /safety-closing-cta/);
   assert.match(safetySource, /site-safety-page|marketing-detail-page/);
-  assert.match(html, /选择正确的入口/);
-  assert.match(html, /进入小程序后使用对应页面的举报与售后入口/);
+  assert.match(html, /选择入口/);
+  assert.match(html, /打开小程序订单/);
   assert.match(html, /不能提供紧急响应/);
   assert.match(html, /举报是线索，不是结论/);
   assert.doesNotMatch(html, /用户数|GMV|融资/);
@@ -366,6 +369,80 @@ test("keeps marketing motion causal and performant", async () => {
   assert.match(signal, /visibilitychange/);
   assert.match(signal, /requestAnimationFrame/);
   assert.match(signal, /isSignalTraveling/);
+});
+
+test("UI4 card theatre stays scoped, finite, responsive, and out of urgent safety UI", async () => {
+  const [layout, styles, stage, reveal, home, how, about, partners, safety] = await Promise.all([
+    readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/styles/ui4-theatre.css", import.meta.url), "utf8"),
+    readFile(new URL("../components/motion/TheatreStage.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/motion/Reveal.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/MarketingHomeScreen.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/HowItWorksScreen.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/AboutScreen.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/PartnersScreen.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/SafetyScreen.tsx", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(layout, /styles\/ui4-theatre\.css/);
+  assert.match(styles, /\.marketing-shell/);
+  assert.match(styles, /@media \(max-width: 560px\)/);
+  assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/);
+  assert.match(styles, /\.site-safety-page \.urgent-card/);
+  assert.doesNotMatch(styles, /animation[^;{]*infinite/i);
+  assert.match(stage, /from "framer-motion"/);
+  assert.match(stage, /useInView/);
+  assert.match(stage, /once: true/);
+  assert.match(reveal, /useAnimationControls/);
+  assert.match(reveal, /initial=\{false\}/);
+  for (const source of [home, how, about, partners]) assert.match(source, /TheatreStage/);
+  assert.doesNotMatch(safety, /TheatreStage|quiet-prop|theatre-stage/);
+});
+
+test("public UI is action-first while full rules retain displaced general guidance", async () => {
+  const [home, how, safety, about, partners, cta, shell, stage, ruleLinks, legalController] = await Promise.all([
+    readFile(new URL("../components/MarketingHomeScreen.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/HowItWorksScreen.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/SafetyScreen.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/AboutScreen.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/PartnersScreen.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/MiniprogramCta.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/AppShell.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/motion/TheatreStage.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../components/PublicRuleLinks.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../../../backend/api/src/legal/legal.controller.ts", import.meta.url), "utf8"),
+  ]);
+
+  const hanCopyCount = (source) => (source.match(/[\p{Script=Han}，。；：、“”《》（）·！？—]+/gu) ?? []).join("").length;
+  const routeCopy = [home, how, safety, about, partners].reduce((total, source) => total + hanCopyCount(source), 0);
+  assert.ok(routeCopy <= 1_600, `public route copy exceeds UI4 budget: ${routeCopy}`);
+  assert.ok(hanCopyCount(cta) <= 70, "Mini Program CTA must stay concise");
+  assert.ok(hanCopyCount(shell) <= 230, "public shell/footer must stay concise");
+  assert.ok(hanCopyCount(stage) <= 75, "decorative theatre copy must stay concise");
+
+  for (const source of [home, how, about, partners]) assert.match(source, /PublicRuleLinks/);
+  assert.match(ruleLinks, /TERMS_URL/);
+  assert.match(ruleLinks, /PRIVACY_URL/);
+  assert.match(ruleLinks, /用户协议与平台规则/);
+  assert.doesNotMatch([home, how, safety, about, partners].join("\n"), /ui4-visually-hidden/);
+  assert.doesNotMatch(home, /品牌符号|我们用结构说明产品|先认识规则/);
+  assert.doesNotMatch(how, /const faqs|faq-section|marketing-detail-cta/);
+  assert.doesNotMatch(about, /about-boundary-list|MiniprogramCta/);
+  assert.doesNotMatch(stage, /SCENE|LAYERED LISTENING|TRUST PATH|OPEN WORKTABLE/);
+
+  // Current blockers and urgent safety stay inline instead of moving to legal copy.
+  assert.match(home, /身份核验通道完成前不开放新预约、支付或聊天/);
+  assert.match(how, /金额与退款以订单和微信支付结果为准/);
+  assert.match(safety, /不能提供紧急响应/);
+  assert.match(safety, /回执只表示已收到，不代表已经处罚或风险解除/);
+  assert.match(about, /新预约、支付与聊天暂不开放/);
+
+  // General education removed from pages remains covered by the canonical legal documents.
+  assert.match(legalController, /平台角色与适用范围/);
+  assert.match(legalController, /预约、履约、支付与退款/);
+  assert.match(legalController, /平台内沟通与内容规范/);
+  assert.match(legalController, /你的权利/);
+  assert.match(legalController, /平台规则/);
 });
 
 test("public HTML never promotes private product routes or unsafe Mini Program config", async () => {

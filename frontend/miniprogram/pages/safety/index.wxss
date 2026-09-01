@@ -1,17 +1,20 @@
 .safety-page {
+  padding-top: 24rpx;
   padding-bottom: 56rpx;
 }
 
 .safety-hero {
-  margin: 8rpx 0 28rpx;
+  margin: 0 0 28rpx;
   padding: 32rpx;
-  border-radius: 28rpx;
-  background: var(--tt-accent-soft);
-  border: 1rpx solid var(--tt-border);
+  border-radius: 24rpx;
+  background: var(--tt-surface);
+  border: 2rpx solid var(--tt-border-strong);
 }
 
+.safety-ledger { display: flex; align-items: center; justify-content: space-between; gap: 18rpx; margin-bottom: 24rpx; color: var(--tt-text-tertiary); font-size: 18rpx; font-weight: 800; letter-spacing: 1.6rpx; }
+
 .safety-eyebrow {
-  color: var(--tt-accent);
+  color: var(--tt-color-pastel-lavender-fg);
   font-size: 23rpx;
   font-weight: 700;
   letter-spacing: 2rpx;
@@ -19,17 +22,22 @@
 
 .safety-title {
   margin-top: 10rpx;
-  color: var(--tt-accent);
+  color: var(--tt-color-pastel-lavender-fg);
   font-size: 42rpx;
   font-weight: 700;
 }
 
 .safety-copy {
   margin-top: 14rpx;
-  color: var(--tt-text);
+  color: var(--tt-color-pastel-lavender-fg);
   font-size: 26rpx;
   line-height: 1.65;
 }
+
+.safety-map { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8rpx; margin-top: 24rpx; }
+.safety-map > view { display: flex; min-width: 0; flex-direction: column; gap: 6rpx; padding: 14rpx; border: 1rpx solid var(--tt-border); border-radius: 14rpx; background: var(--tt-surface-alt); color: var(--tt-text-secondary); font-size: 19rpx; line-height: 1.35; }
+.safety-map text:first-child { color: var(--tt-text-tertiary); font-size: 17rpx; font-weight: 800; }
+.card-index { margin-bottom: 18rpx; color: var(--tt-text-tertiary); font-size: 18rpx; font-weight: 800; letter-spacing: 1.5rpx; }
 
 .section-title {
   color: var(--tt-accent);
@@ -320,3 +328,17 @@
 .leave-button[disabled], .primary-action[disabled], .appeal-submit[disabled] {
   opacity: 0.52;
 }
+
+.safety-hero .safety-title,
+.safety-hero .safety-copy { color: var(--tt-text); }
+.verification-card { border-color: var(--tt-color-pastel-blue-stroke); background: var(--tt-color-pastel-blue-bg); }
+.verification-card .section-title,
+.verification-card .section-copy { color: var(--tt-color-pastel-blue-fg); }
+.boundary-card { border-color: var(--tt-color-pastel-butter-stroke); background: var(--tt-color-pastel-butter-bg); }
+.boundary-card .section-title,
+.boundary-card .section-copy { color: var(--tt-color-pastel-butter-fg); }
+.report-card { border-left: 6rpx solid var(--tt-color-pastel-rose-fg); background: var(--tt-surface); }
+.support-card { border-left: 6rpx solid var(--tt-color-pastel-mint-fg); background: var(--tt-surface); }
+.rules-card { border-color: var(--tt-color-pastel-apricot-stroke); background: var(--tt-color-pastel-apricot-bg); }
+.rules-card .section-title,
+.rules-card .section-copy { color: var(--tt-color-pastel-apricot-fg); }

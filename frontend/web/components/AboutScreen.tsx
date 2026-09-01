@@ -1,45 +1,38 @@
 "use client";
 
-import { ArrowRight, FileCheck2, HeartHandshake, Mail, ShieldCheck, Smartphone } from "lucide-react";
+import { ArrowRight, HeartHandshake, Mail, ShieldCheck, Smartphone } from "lucide-react";
 import Link from "next/link";
 
-import MiniprogramCta from "./MiniprogramCta";
+import { PublicRuleLinks } from "./PublicRuleLinks";
 import { Reveal } from "./motion/Reveal";
+import { TheatreStage } from "./motion/TheatreStage";
 import { PageHeading } from "./ui";
 import { hasVerifiedPublicDisclosure, publicDisclosure } from "../lib/public-disclosure";
 
 export default function AboutScreen() {
   return (
     <div className="content-page about-page">
-      <PageHeading
-        eyebrow="关于我们"
-        title="认真听你说，也认真守住边界"
-        description="Talk&Talk 是女性友好的线上陪伴平台。发现、预约、支付、沟通与支持放在同一套可治理的产品结构里；服务入口以微信小程序页面状态为准。"
-      />
-
-      <Reveal as="section" className="about-section">
-        <h2>我们相信什么</h2>
-        <p>
-          陪伴不是诊断，也不是说教。人们需要被听见，同时也需要清晰的边界：谁可以联系、钱怎么走、出了问题如何留痕。
-          Talk&amp;Talk 选择把这些约束写进产品，而不是只写在口号里。
-        </p>
-      </Reveal>
+      <section className="about-theatre-hero" aria-label="关于 Talk&Talk">
+        <div>
+          <PageHeading
+            eyebrow="关于我们"
+            title="认真听你说，也认真守住边界"
+            description="女性友好的线上陪伴平台。当前服务状态以微信小程序为准。"
+          />
+        </div>
+        <TheatreStage variant="worktable" />
+      </section>
 
       <Reveal as="section" className="about-section about-grid" delay={0.06}>
         <article>
           <span><HeartHandshake size={22} /></span>
-          <h3>以陪伴为核心</h3>
-          <p>不承诺治疗结果，不替代专业医疗或紧急救援。</p>
+          <h3>陪伴，不是治疗</h3>
+          <p>不承诺疗效，不替代医疗或急救。</p>
         </article>
         <article>
           <span><ShieldCheck size={22} /></span>
-          <h3>信任有支持路径</h3>
-          <p>资料审核、平台内沟通、订单与售后记录构成基本治理闭环。</p>
-        </article>
-        <article>
-          <span><Smartphone size={22} /></span>
-          <h3>发行面清晰</h3>
-          <p>服务开放状态以微信小程序页面与正式公告为准；身份核验通道完成前不开放新预约、支付或聊天。本站用于官方说明、规则与公示。</p>
+          <h3>重要过程留在平台内</h3>
+          <p>预约、沟通、订单与售后可回看。</p>
         </article>
       </Reveal>
 
@@ -48,21 +41,21 @@ export default function AboutScreen() {
           <p className="eyebrow">公开信息</p>
           <h2>
             {hasVerifiedPublicDisclosure
-              ? "公开信息应当可以被核对，而不只是被写出来。"
-              : "一间负责任的公司，应该清楚说明什么已经具备，什么仍待核验。"}
+              ? "已核验的主体与联系信息"
+              : "未核验的信息不展示"}
           </h2>
           <p>
             {hasVerifiedPublicDisclosure
-              ? "主体、投诉渠道和联系信息由发布配置驱动展示；小程序服务可用性仍以实际页面状态为准。"
-              : "我们不会用未验证的规模、资质或经营成果填满官网。主体、备案及运营信息会在具备可公开证据后补充公示。"}
+              ? "以下信息由发布配置提供。"
+              : "主体、备案与运营信息待证据具备后公示。"}
           </p>
         </div>
         <div className="about-public-info-grid">
           <article>
-            <span><FileCheck2 size={20} /></span>
-            <small>当前可说明</small>
-            <strong>产品与规则</strong>
-            <p>官网、服务路径、安全边界及联系渠道持续对外说明。</p>
+            <span><Smartphone size={20} /></span>
+            <small>当前状态</small>
+            <strong>身份核验通道待完成</strong>
+            <p>新预约、支付与聊天暂不开放。</p>
           </article>
           <article>
             <span><ShieldCheck size={20} /></span>
@@ -71,7 +64,7 @@ export default function AboutScreen() {
             <p>
               {hasVerifiedPublicDisclosure
                 ? `${publicDisclosure.complaintChannel} · ${publicDisclosure.contactEmail} · ${publicDisclosure.contactPhone}`
-                : "公司主体、备案和运营信息将在具备可公开证据后展示。"}
+                : "待具备可公开证据后展示。"}
             </p>
             {publicDisclosure.icpRecord && (
               publicDisclosure.icpRecordUrl ? (
@@ -82,25 +75,12 @@ export default function AboutScreen() {
         </div>
       </Reveal>
 
-      <Reveal as="section" className="about-section" delay={0.08}>
-        <h2>产品边界</h2>
-        <ul className="about-boundary-list">
-          <li>服务对象为年满 18 周岁的成年人。</li>
-          <li>平台内陪伴不等于心理咨询、精神科诊疗或危机干预。</li>
-          <li>不鼓励交换私人联系方式、私下转账或线下邀约。</li>
-          <li>遇紧急情况请立即联系当地紧急服务，而不是等待平台响应。</li>
-        </ul>
-        <Link href="/safety" className="text-link">
-          阅读完整安全与支持说明 <ArrowRight size={16} />
-        </Link>
-      </Reveal>
+      <PublicRuleLinks />
 
       <Reveal as="section" className="about-section about-contact" delay={0.1}>
         <div>
-          <h2>合作与联系</h2>
-          <p>
-            媒体、合作或陪伴者入驻相关事务，请通过邮件联系。我们不会在官网上展示未经核验的用户量或融资数据。
-          </p>
+          <h2>联系 Talk&amp;Talk</h2>
+          <p>合作、媒体或陪伴者事务。</p>
           <div className="about-contact-actions">
             <a className="button button-secondary" href="mailto:hello@talkandtalk.app">
               <Mail size={17} aria-hidden="true" /> hello@talkandtalk.app
@@ -110,7 +90,6 @@ export default function AboutScreen() {
             </Link>
           </div>
         </div>
-        <MiniprogramCta variant="panel" secondaryHref="/how-it-works" secondaryLabel="了解服务路径" />
       </Reveal>
     </div>
   );

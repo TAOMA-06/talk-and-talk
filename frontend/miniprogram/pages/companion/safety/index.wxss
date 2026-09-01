@@ -1,10 +1,15 @@
+.companion-safety-page { padding-top: 24rpx; }
 .hero {
   padding: 32rpx;
-  border-radius: 28rpx;
-  background: var(--tt-accent-soft);
+  border-radius: 24rpx;
+  background: var(--tt-surface);
   box-shadow: none;
-  border: 1rpx solid var(--tt-border);
+  border: 2rpx solid var(--tt-color-status-danger-stroke);
 }
+
+.safety-ledger { display: flex; align-items: center; justify-content: space-between; gap: 18rpx; margin-bottom: 24rpx; color: var(--tt-danger); font-size: 18rpx; font-weight: 800; letter-spacing: 1.6rpx; }
+.decision-boundary { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8rpx; margin-top: 24rpx; }
+.decision-boundary > view { min-width: 0; padding: 14rpx 10rpx; border: 1rpx solid var(--tt-border); border-radius: 13rpx; background: var(--tt-surface-alt); color: var(--tt-text-secondary); font-size: 18rpx; font-weight: 700; line-height: 1.35; text-align: center; }
 
 .eyebrow {
   color: var(--tt-accent);
@@ -47,10 +52,14 @@
 }
 
 .section-title {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
   margin: 34rpx 4rpx 16rpx;
   font-size: 30rpx;
   font-weight: 700;
 }
+.section-index { display: inline-flex; width: 42rpx; height: 42rpx; align-items: center; justify-content: center; border: 1rpx solid var(--tt-border-strong); border-radius: 50%; color: var(--tt-text-secondary); font-size: 18rpx; }
 
 .form-card {
   padding: 28rpx;
@@ -62,10 +71,10 @@
   min-height: 78rpx;
   margin-bottom: 16rpx;
   padding: 19rpx 20rpx;
-  border: 2rpx solid var(--tt-warning-soft);
+  border: 2rpx solid var(--tt-border-strong);
   border-radius: 15rpx;
-  background: var(--tt-warning-soft);
-  color: var(--tt-warning);
+  background: var(--tt-surface);
+  color: var(--tt-text);
   font-size: 25rpx;
 }
 
@@ -75,9 +84,9 @@
   min-height: 210rpx;
   margin-bottom: 16rpx;
   padding: 20rpx;
-  border: 2rpx solid var(--tt-warning-soft);
+  border: 2rpx solid var(--tt-border-strong);
   border-radius: 15rpx;
-  background: var(--tt-warning-soft);
+  background: var(--tt-surface);
   font-size: 25rpx;
   line-height: 1.55;
 }
@@ -176,7 +185,7 @@
   inset: 0;
   display: flex;
   align-items: flex-end;
-  background: rgba(32, 33, 36, 0.48);
+  background: var(--tt-overlay-scrim-strong);
 }
 
 .modal {
@@ -280,3 +289,7 @@
 .primary-button[disabled], .secondary-button[disabled] {
   opacity: 0.52;
 }
+
+.hero .eyebrow { color: var(--tt-danger); }
+.hero .hero-title { color: var(--tt-text); }
+.hero .hero-copy { color: var(--tt-text-secondary); }

@@ -22,6 +22,7 @@ type DisplayCompanion = CatalogDisplay<Companion | RecommendedCompanion> & {
   avatarUrl: string;
   availabilityText: string;
   metaText: string;
+  cardTone: "blue" | "apricot" | "mint" | "lavender" | "butter" | "rose";
 };
 type TopicLoadState = "loading" | "available" | "error";
 type DiscoveryIntent = {
@@ -77,6 +78,7 @@ const PUBLIC_SPECIALTIES: Array<Omit<TrustFacetFilter, "selected">> = [
   { value: "兴趣聊天", label: "兴趣聊天" },
   { value: "运动鼓励", label: "运动鼓励" }
 ];
+const RESULT_TONES: DisplayCompanion["cardTone"][] = ["blue", "apricot", "mint", "lavender", "butter", "rose"];
 
 function displayTopics(topics: RecommendationTopic[], selectedTopicId: string): DisplayTopic[] {
   return topics.map((topic) => ({ ...topic, selected: topic.id === selectedTopicId }));
@@ -137,16 +139,18 @@ function normalizeKeyword(value: unknown): string {
 }
 
 function displayCompanions(items: Array<Companion | RecommendedCompanion>): DisplayCompanion[] {
-  return withCatalogDisplays(items).map((item) => ({
+  return withCatalogDisplays(items).map((item, index) => ({
     ...item,
     avatarUrl: companionAvatarUrl(item),
     availabilityText: companionAvailabilityText(item.availability),
-    metaText: companionMetaText(item.nextAvailableText, item)
+    metaText: companionMetaText(item.nextAvailableText, item),
+    cardTone: RESULT_TONES[index % RESULT_TONES.length]
   }));
 }
 
 Page({
   data: {
+    motionOff: false,
     companions: [] as DisplayCompanion[],
     topicFilters: [] as DisplayTopic[],
     deliveryModeFilters: displayDeliveryModes(""),

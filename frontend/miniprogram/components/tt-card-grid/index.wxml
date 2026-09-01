@@ -1,0 +1,1 @@
+<view class="card-grid layout-{{layout}} gap-{{gap}} motion-{{motionLevel}} risk-{{risk}} {{active ? 'is-active' : ''}} {{motionOff ? 'motion-off' : ''}}"><slot /></view>

@@ -1,0 +1,209 @@
+/* Talk&Talk UI 3.0 — scoped to the five public marketing routes through AppShell. */
+.marketing-shell {
+  --bg: #f6f4f1;
+  --bg-soft: #faf8f5;
+  --surface: #fffefc;
+  --surface-soft: #efeeea;
+  --surface-muted: #efeeea;
+  --ink: #232220;
+  --ink-soft: #45413d;
+  --muted: #5c5954;
+  --subtle: #706c66;
+  --line: #dcd8d2;
+  --line-strong: #979189;
+  --brand: #292724;
+  --brand-deep: #171614;
+  --brand-soft: #f1ded5;
+  --brand-pale: #f6eee9;
+  --brand-mint: #ddece3;
+  --brand-glow: transparent;
+  --rose: #292724;
+  --rose-deep: #171614;
+  --rose-soft: #f1ded5;
+  --rose-pale: #f6eee9;
+  --peach: #f1ded5;
+  --blue: #314f67;
+  --blue-soft: #dde8f2;
+  --green: #315447;
+  --green-soft: #ddece3;
+  --amber: #67551f;
+  --amber-soft: #f3eacd;
+  --danger: #7a393d;
+  --disabled: #c9c5bf;
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+  color: var(--ink);
+  background: var(--bg);
+}
+
+.marketing-shell h1,
+.marketing-shell h2,
+.marketing-shell h3 { font-family: var(--font-sans); font-weight: 700; letter-spacing: -.045em; }
+.marketing-shell .bubble-site h1,
+.marketing-shell .bubble-site h2,
+.marketing-shell .bubble-site h3,
+.marketing-shell .marketing-detail-page h1,
+.marketing-shell .marketing-detail-page h2,
+.marketing-shell .marketing-detail-page h3,
+.marketing-shell .content-page h1,
+.marketing-shell .content-page h2,
+.marketing-shell .content-page h3 { font-family: var(--font-sans) !important; }
+.marketing-shell .site-header { border-bottom: 1px solid var(--line); background: rgba(246,244,241,.96); box-shadow: none; }
+.marketing-shell .brand-wordmark strong,
+.marketing-shell .brand-wordmark small,
+.marketing-shell .nav-link,
+.marketing-shell .marketing-mobile-link { color: var(--ink); }
+.marketing-shell .nav-link.active,
+.marketing-shell .marketing-mobile-link.active { background: #e9e1f0; color: #574668; }
+.marketing-shell .button-primary { border-color: #292724; background: #292724; color: #fff; box-shadow: none; }
+.marketing-shell .button-primary:hover { border-color: #171614; background: #171614; }
+.marketing-shell .button-secondary { border-color: var(--line-strong); background: var(--surface); color: var(--ink); box-shadow: none; }
+.marketing-shell .button:focus-visible,
+.marketing-shell a:focus-visible,
+.marketing-shell summary:focus-visible { outline: 3px solid #315c73; outline-offset: 3px; box-shadow: none; }
+.marketing-shell .site-main { background: var(--bg); }
+.marketing-shell .site-footer { border-top: 1px solid var(--line); background: #efeeea; }
+.marketing-shell .brand-mark-image,
+.marketing-shell .icon-orbit-image,
+.marketing-shell .bubble-symbol-image,
+.marketing-shell .channel-app-icon { filter: saturate(.74) brightness(1.02); }
+.marketing-shell .icon-orbit-ring { border-color: rgba(49,79,103,.18); background: transparent; box-shadow: none; }
+
+/* Shared public-page skeleton */
+.marketing-shell .bubble-site,
+.marketing-shell .marketing-detail-page,
+.marketing-shell .content-page { width: min(calc(100% - 40px), 1180px); margin-inline: auto; color: var(--ink); }
+.marketing-shell .marketing-detail-hero,
+.marketing-shell .bubble-hero { margin-top: 24px; overflow: hidden; border: 1px solid #bdd0e0; border-radius: 30px; background: #dde8f2; box-shadow: none; }
+.marketing-shell .marketing-detail-hero::before,
+.marketing-shell .marketing-detail-hero::after,
+.marketing-shell .bubble-hero::before,
+.marketing-shell .bubble-hero::after,
+.marketing-shell .hero-surface { display: none; background-image: none; }
+.marketing-shell .marketing-detail-hero-copy,
+.marketing-shell .bubble-hero-grid { position: relative; z-index: 1; }
+.marketing-shell .marketing-detail-hero h1,
+.marketing-shell .bubble-hero h1 { color: #314f67; font-size: clamp(44px, 7vw, 86px); line-height: 1.02; text-wrap: balance; }
+.marketing-shell .marketing-detail-hero h1 span,
+.marketing-shell .bubble-hero h1 span { color: #314f67; }
+.marketing-shell .hero-brand,
+.marketing-shell .hero-lead { color: #314f67; }
+.marketing-shell .hero-brand i { background: currentColor; }
+.marketing-shell .eyebrow { color: var(--muted); }
+.marketing-shell .bubble-heading h2,
+.marketing-shell .editorial-heading h2,
+.marketing-shell .site-heading h2 { color: var(--ink); }
+.marketing-shell .bubble-heading > p:last-child,
+.marketing-shell .editorial-heading > p:last-child,
+.marketing-shell .site-heading > p:last-child { color: var(--muted); }
+
+/* Home: one large stage plus varied flat cards. */
+.marketing-shell .hero-trust-strip { gap: 10px; }
+.marketing-shell .hero-trust-strip li { border: 1px solid #bdd0e0; border-radius: 18px; background: var(--surface); box-shadow: none; }
+.marketing-shell .hero-trust-strip li:nth-child(1) { border-color: #dfc0b2; background: #f1ded5; color: #6b4237; }
+.marketing-shell .hero-trust-strip li:nth-child(2) { border-color: #bed4c7; background: #ddece3; color: #315447; }
+.marketing-shell .hero-trust-strip li:nth-child(3) { border-color: #ded09f; background: #f3eacd; color: #67551f; }
+.marketing-shell .home-values,
+.marketing-shell .bubble-moments,
+.marketing-shell .home-trust,
+.marketing-shell .bubble-channels,
+.marketing-shell .bubble-symbol { padding-inline: 0; }
+.marketing-shell .home-value-grid,
+.marketing-shell .home-trust-grid,
+.marketing-shell .bubble-channel-grid { gap: 16px; }
+.marketing-shell .home-value-card,
+.marketing-shell .home-trust-card,
+.marketing-shell .bubble-channel-card { border: 1px solid var(--line); border-radius: 22px; background: var(--surface); box-shadow: none; }
+.marketing-shell .home-value-grid > *:nth-child(1) .home-value-card { border-color: #dfc0b2; background: #f1ded5; color: #6b4237; }
+.marketing-shell .home-value-grid > *:nth-child(2) .home-value-card { border-color: #bed4c7; background: #ddece3; color: #315447; }
+.marketing-shell .home-value-grid > *:nth-child(3) .home-value-card { border-color: #d3c4e0; background: #e9e1f0; color: #574668; }
+.marketing-shell .home-value-card h3,
+.marketing-shell .home-value-card p { color: currentColor; }
+.marketing-shell .home-value-card p { opacity: .86; }
+.marketing-shell .home-moment-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
+.marketing-shell .home-moment-row { height: 100%; border: 1px solid #bdd0e0; border-radius: 22px; background: #dde8f2; box-shadow: none; }
+.marketing-shell .home-moment-list > *:nth-child(2n) .home-moment-row { border-color: #ddbfca; background: #f0dfe5; }
+.marketing-shell .home-moment-row::before,
+.marketing-shell .home-moment-row::after { display: none; }
+.marketing-shell .home-path { border: 1px solid #d3c4e0; border-radius: 28px; background: #e9e1f0; color: #574668; box-shadow: none; }
+.marketing-shell .home-path .bubble-heading-light h2,
+.marketing-shell .home-path .bubble-heading-light p,
+.marketing-shell .home-path .bubble-path-steps strong,
+.marketing-shell .home-path .bubble-path-steps p { color: #574668; }
+.marketing-shell .home-trust-grid > *:nth-child(1) .home-trust-card { border-color: #bed4c7; background: #ddece3; }
+.marketing-shell .home-trust-grid > *:nth-child(2) .home-trust-card { border-color: #ded09f; background: #f3eacd; }
+.marketing-shell .home-trust-grid > *:nth-child(3) .home-trust-card { border-color: #bdd0e0; background: #dde8f2; }
+.marketing-shell .bubble-channel-card.primary { border-color: #dfc0b2; background: #f1ded5; color: #6b4237; }
+.marketing-shell .bubble-channel-card:nth-child(2) { border-color: #bdd0e0; background: #dde8f2; }
+.marketing-shell .bubble-channel-card:nth-child(3) { border-color: #ded09f; background: #f3eacd; }
+.marketing-shell .mint-symbol-panel { border: 1px solid #ddbfca; border-radius: 28px; background: #f0dfe5; box-shadow: none; }
+.marketing-shell .mint-icon-stage { background: var(--surface); }
+.marketing-shell .mint-icon-glow { display: none; }
+.marketing-shell .mint-closing { border: 1px solid #bed4c7; border-radius: 28px; background: #ddece3; box-shadow: none; }
+
+/* How it works / shared detail pages */
+.marketing-shell .how-hero-map,
+.marketing-shell .partner-hero-frame,
+.marketing-shell .site-safety-aside { border: 1px solid #dfc0b2; border-radius: 24px; background: #f1ded5; box-shadow: none; }
+.marketing-shell .journey-explainer-grid,
+.marketing-shell .partner-path-grid,
+.marketing-shell .safety-grid,
+.marketing-shell .help-cards { gap: 16px; }
+.marketing-shell .journey-explainer-card,
+.marketing-shell .partner-path-card,
+.marketing-shell .safety-grid > *,
+.marketing-shell .help-cards > * { border: 1px solid var(--line); border-radius: 20px; background: var(--surface); box-shadow: none; }
+.marketing-shell .journey-explainer-grid > *:nth-child(1) .journey-explainer-card,
+.marketing-shell .partner-path-grid > *:nth-child(1) .partner-path-card,
+.marketing-shell .safety-grid > *:nth-child(1) { border-color: #bdd0e0; background: #dde8f2; }
+.marketing-shell .journey-explainer-grid > *:nth-child(2) .journey-explainer-card,
+.marketing-shell .partner-path-grid > *:nth-child(2) .partner-path-card,
+.marketing-shell .safety-grid > *:nth-child(2) { border-color: #dfc0b2; background: #f1ded5; }
+.marketing-shell .journey-explainer-grid > *:nth-child(3) .journey-explainer-card,
+.marketing-shell .partner-path-grid > *:nth-child(3) .partner-path-card,
+.marketing-shell .safety-grid > *:nth-child(3) { border-color: #bed4c7; background: #ddece3; }
+.marketing-shell .marketing-boundary-callout,
+.marketing-shell .boundary-section,
+.marketing-shell .partner-principles { border: 1px solid #ded09f; border-radius: 24px; background: #f3eacd; box-shadow: none; }
+.marketing-shell .faq-item { border: 1px solid var(--line); border-radius: 16px; background: var(--surface); box-shadow: none; }
+.marketing-shell .marketing-detail-cta,
+.marketing-shell .safety-closing-cta,
+.marketing-shell .partner-contact-card { border: 1px solid #d3c4e0; border-radius: 24px; background: #e9e1f0; color: #574668; box-shadow: none; }
+.marketing-shell .urgent-card { border: 1px solid #dfbdbf; border-radius: 22px; background: #f3e2e2; color: #7a393d; box-shadow: none; }
+.marketing-shell .help-cards > *:nth-child(1) { border-color: #bdd0e0; background: #dde8f2; }
+.marketing-shell .help-cards > *:nth-child(2) { border-color: #bed4c7; background: #ddece3; }
+.marketing-shell .help-cards > *:nth-child(3) { border-color: #ded09f; background: #f3eacd; }
+
+/* About uses editorial cards without changing public facts. */
+.marketing-shell .about-page { padding-top: 28px; }
+.marketing-shell .about-section { border: 1px solid var(--line); border-radius: 24px; background: var(--surface); box-shadow: none; }
+.marketing-shell .about-section:first-child { border-color: #bdd0e0; background: #dde8f2; color: #314f67; }
+.marketing-shell .about-grid > *:nth-child(1) { border-color: #dfc0b2; background: #f1ded5; }
+.marketing-shell .about-grid > *:nth-child(2) { border-color: #bed4c7; background: #ddece3; }
+.marketing-shell .about-public-info { border-color: #d3c4e0; background: #e9e1f0; }
+.marketing-shell .about-public-info-grid > * { border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+.marketing-shell .about-contact { border-color: #ddbfca; background: #f0dfe5; }
+
+/* Partners */
+.marketing-shell .partners-hero { border-color: #dfc0b2; background: #f1ded5; }
+.marketing-shell .partners-hero h1,
+.marketing-shell .partners-hero .hero-brand,
+.marketing-shell .partners-hero .marketing-detail-hero-copy > p { color: #6b4237; }
+.marketing-shell .partner-hero-frame { border-color: #bed4c7; background: #ddece3; }
+.marketing-shell .partner-boundary-note { border: 1px solid #dfbdbf; border-radius: 20px; background: #f3e2e2; color: #7a393d; }
+
+@media (max-width: 820px) {
+  .marketing-shell .bubble-site,
+  .marketing-shell .marketing-detail-page,
+  .marketing-shell .content-page { width: min(calc(100% - 28px), 680px); }
+  .marketing-shell .home-moment-list { grid-template-columns: 1fr; }
+  .marketing-shell .marketing-detail-hero,
+  .marketing-shell .bubble-hero { border-radius: 24px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marketing-shell *,
+  .marketing-shell *::before,
+  .marketing-shell *::after { scroll-behavior: auto !important; animation: none !important; transition-duration: .01ms !important; }
+}

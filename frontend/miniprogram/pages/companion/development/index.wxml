@@ -1,4 +1,4 @@
-<view class="page">
+<view class="page development-page {{motionOff ? 'tt-motion-off' : ''}}">
   <view wx:if="{{loading}}" class="empty">正在同步培训、质量和账号状态…</view>
 
   <view wx:elif="{{error && !modules.length}}" class="empty">
@@ -9,17 +9,19 @@
 
   <block wx:else>
     <view class="hero">
-      <view class="eyebrow">能力与账号健康</view>
+      <view class="development-ledger"><text>培训与质量</text><text>服务端成绩</text></view>
       <view class="hero-title">{{trainingComplete ? '必修培训有效' : '还有培训未通过或已到期'}}</view>
-      <view class="hero-copy">成绩由服务端根据当前课程版本计算；客户端提交的分数不会被采信。</view>
-      <view wx:if="{{activeRestriction}}" class="restriction">账号存在有效限制。限制解除前，平台会关闭公开供给，不会把页面操作当作恢复服务。</view>
+      <view wx:if="{{!error && trainingComplete && !activeRestriction}}" class="growth-prop"><tt-cartoon-prop kind="sprout" tone="mint" size="md" motion-off="{{motionOff}}" risk="standard" /></view>
+      <view wx:if="{{activeRestriction}}" class="restriction">账号限制生效中，公开供给保持关闭。</view>
     </view>
 
     <view wx:if="{{error}}" class="inline-error">{{error}}</view>
 
-    <view class="section-title">培训与考试</view>
-    <view wx:if="{{!modules.length}}" class="card empty-card">当前没有可用课程。商用资格不会因此自动通过，请联系平台核对培训目录。</view>
-    <view wx:for="{{modules}}" wx:key="code" wx:for-item="module" class="card module-card">
+    <view class="section-title"><text class="section-index">01</text><text>培训与考试</text></view>
+    <view wx:if="{{!modules.length}}" class="card empty-card">暂无课程；商用资格不会自动通过。</view>
+    <view wx:for="{{modules}}" wx:key="code" wx:for-item="module" class="module-item">
+      <tt-card-shell tone="{{index % 2 === 0 ? 'lavender' : 'mint'}}" size="standard" depth="mid" motion-level="{{!error && index < 3 ? 'm2' : 'm1'}}" entrance="{{!error && index < 3 ? 'rise' : 'none'}}" stagger="{{!error && index < 3 ? index : 0}}" motion-off="{{motionOff}}" risk="standard">
+      <view class="module-card">
       <view class="module-head" data-code="{{module.code}}" bindtap="toggleModule" aria-role="button" aria-expanded="{{module.expanded}}" aria-label="{{module.expanded ? '收起' : '展开'}}培训模块：{{module.title}}" tabindex="0">
         <view class="module-main">
           <view class="module-title">{{module.title}}</view>
@@ -35,7 +37,7 @@
           <view class="question-title">{{questionIndex + 1}}. {{question.prompt}}</view>
           <radio-group data-code="{{module.code}}" data-question-index="{{questionIndex}}" bindchange="selectAnswer">
             <label wx:for="{{question.options}}" wx:key="value" wx:for-item="option" class="option">
-              <radio value="{{option.value}}" checked="{{module.answers[questionIndex] === option.value}}" color="#C65345" />
+              <radio value="{{option.value}}" checked="{{module.answers[questionIndex] === option.value}}" color="#292724" />
               <text>{{option.label}}</text>
             </label>
           </radio-group>
@@ -44,14 +46,20 @@
           提交本次考试
         </button>
       </view>
+      </view>
+      </tt-card-shell>
     </view>
 
-    <view class="section-title">质量指标</view>
+    <view class="section-title"><text class="section-index">02</text><text>质量指标</text></view>
     <view wx:if="{{quality}}" class="quality-grid">
-      <view wx:for="{{qualityCards}}" wx:key="label" class="quality-card">
+      <view wx:for="{{qualityCards}}" wx:key="label" class="quality-item">
+        <tt-card-shell tone="{{index % 4 === 0 ? 'mint' : index % 4 === 1 ? 'blue' : index % 4 === 2 ? 'butter' : 'rose'}}" size="compact" depth="low" motion-level="m1" entrance="none" motion-off="{{motionOff}}" risk="standard">
+        <view class="quality-card">
         <view class="quality-label">{{item.label}}</view>
         <view class="quality-value">{{item.value}}</view>
         <view class="quality-note">{{item.note}}</view>
+        </view>
+        </tt-card-shell>
       </view>
     </view>
     <view wx:if="{{quality}}" class="card quality-detail">
@@ -62,7 +70,7 @@
       <view wx:for="{{quality.limitations}}" wx:key="*this" class="limitation">· {{item}}</view>
     </view>
 
-    <view class="section-title">警告、限制与申诉</view>
+    <view class="section-title"><text class="section-index">03</text><text>警告、限制与申诉</text></view>
     <view wx:if="{{focusActionId || focusAppealId}}" class="card limitation">
       正在显示这条通知对应的账号处置。
       <button class="secondary-button" bindtap="clearActionFocus">查看全部记录</button>
@@ -77,9 +85,9 @@
       <view class="action-message">{{action.message}}</view>
       <view class="action-time">开始：{{action.startsAt}}<text wx:if="{{action.endsAt}}"> · 结束：{{action.endsAt}}</text></view>
       <view class="action-time">申诉提交截止：{{action.appealDeadlineAt}}</view>
-      <view wx:if="{{action.reactivation.nextAction === 'awaitExpiryReactivationMaterialization'}}" class="limitation">临时暂停已到期，系统正在登记独立恢复复核；当前仍不会自动恢复商业资格或公开上架。</view>
-      <view wx:elif="{{action.reactivation.status === 'required'}}" class="limitation">临时暂停已到期，正在等待另一名运营人员复核当前资格；公开状态仍保持关闭。</view>
-      <view wx:elif="{{action.reactivation.nextAction === 'awaitExplicitPublicationDecision'}}" class="limitation">本次限制已经结束；平台不会自动恢复公开上架，运营仍须按当前资格显式决定是否发布。<text wx:if="{{action.reactivation.resolution}}"> {{action.reactivation.resolution}}</text></view>
+      <view wx:if="{{action.reactivation.nextAction === 'awaitExpiryReactivationMaterialization'}}" class="limitation">限制已到期，等待独立恢复复核；不会自动恢复。</view>
+      <view wx:elif="{{action.reactivation.status === 'required'}}" class="limitation">等待资格复核，公开状态仍关闭。</view>
+      <view wx:elif="{{action.reactivation.nextAction === 'awaitExplicitPublicationDecision'}}" class="limitation">限制已结束，仍需显式发布决定。<text wx:if="{{action.reactivation.resolution}}"> {{action.reactivation.resolution}}</text></view>
       <view wx:if="{{action.appeals.length}}" class="appeal-result">
         <view wx:for="{{action.appeals}}" wx:key="id" wx:for-item="appeal">
           申诉状态：{{appeal.status}} · 平台处理时限：{{appeal.reviewDueAt}}
@@ -96,12 +104,12 @@
               bindtap="openAppealEvidence"
             >查看{{attachment.kind === 'image' ? '图片' : '音频'}}证据</button>
           </view>
-          <view wx:if="{{appeal.reactivation.status === 'required'}}" class="limitation">原处置已撤销，但商业资格和公开上架不会自动恢复；正在等待另一名运营人员完成当前资格复核。</view>
-          <view wx:elif="{{appeal.reactivation.status === 'completed'}}" class="limitation">资格恢复复核已完成；平台仍未自动公开上架，是否重新上架由运营另行确认。<text wx:if="{{appeal.reactivation.resolution}}"> {{appeal.reactivation.resolution}}</text></view>
+          <view wx:if="{{appeal.reactivation.status === 'required'}}" class="limitation">处置已撤销，等待资格复核；不会自动恢复。</view>
+          <view wx:elif="{{appeal.reactivation.status === 'completed'}}" class="limitation">资格复核完成，仍需显式上架决定。<text wx:if="{{appeal.reactivation.resolution}}"> {{appeal.reactivation.resolution}}</text></view>
         </view>
       </view>
       <button wx:if="{{!action.appeals.length && action.appealWindowOpen}}" class="secondary-button" data-id="{{action.id}}" bindtap="openAppeal">在期限内提交一次申诉</button>
-      <view wx:elif="{{!action.appeals.length && action.reactivation.nextAction === 'none'}}" class="limitation">申诉提交期限已结束；如涉及法定权利或新证据，请通过公开客服渠道联系平台。</view>
+      <view wx:elif="{{!action.appeals.length && action.reactivation.nextAction === 'none'}}" class="limitation">申诉期限已结束；新证据请联系平台客服。</view>
     </view>
     <view wx:if="{{actionsTotalPages > 1}}" class="card">
       <button class="secondary-button" disabled="{{actionsPage <= 1}}" bindtap="previousActionsPage">上一页</button>
@@ -113,9 +121,9 @@
   <view wx:if="{{appealActionId}}" class="modal-mask">
     <view class="modal">
       <view class="modal-title">提交账号处置申诉</view>
-      <view class="modal-copy">只写可核验事实。图片或音频须先上传到平台受控存储并通过安全审核；不要粘贴证件、联系方式或无关聊天隐私。</view>
+      <view class="modal-copy">只写可核验事实；勿提交证件、联系方式或无关隐私。</view>
       <textarea class="textarea" value="{{appealStatement}}" bindinput="setAppealStatement" maxlength="1000" placeholder="说明事实、时间和希望复核的结论" />
-      <view wx:if="{{appealTextOnly}}" class="modal-copy">当前首发版本仅接收文字申诉；图片、音频证据尚未开放。</view>
+      <view wx:if="{{appealTextOnly}}" class="modal-copy">当前仅接收文字。</view>
       <block wx:else>
         <view class="evidence-toolbar">
           <button class="secondary-button" size="mini" disabled="{{appealEvidenceUploading || appealEvidenceDrafts.length >= 3}}" bindtap="addAppealEvidenceImage">添加图片</button>

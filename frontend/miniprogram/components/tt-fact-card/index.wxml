@@ -1,0 +1,6 @@
+<tt-card-shell tone="{{tone}}" size="compact" depth="{{depth}}" motion-level="{{motionLevel}}" entrance="{{entrance}}" motion-off="{{motionOff}}" risk="{{risk}}" aria-label="{{label}}：{{value}}">
+  <view class="fact-head"><view class="fact-label">{{label}}</view><tt-status wx:if="{{statusText}}" text="{{statusText}}" tone="{{statusTone}}" /></view>
+  <view wx:if="{{value}}" class="fact-value">{{value}}</view>
+  <view wx:if="{{description}}" class="fact-description">{{description}}</view>
+  <view wx:if="{{meta}}" class="fact-meta">{{meta}}</view>
+</tt-card-shell>

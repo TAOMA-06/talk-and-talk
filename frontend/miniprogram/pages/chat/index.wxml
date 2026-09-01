@@ -1,31 +1,32 @@
-<view class="page chat-page">
-  <view class="notice">请在平台内完成沟通，勿交换私人联系方式、线下见面或私下转账。</view>
-  <view wx:if="{{!publicInteractionIdentityAvailable}}" class="identity-unavailable-notice">身份核验授权通道尚未开放，消息记录仍可查看，但当前不能发送新消息。订单、退款、客服和安全入口不受影响。</view>
-  <view wx:if="{{textOnly}}" class="notice">当前首发版本仅支持文字消息；图片和语音消息暂未开放。</view>
-  <view class="conversation-tools-trigger" bindtap="toggleConversationControls" aria-role="button" aria-label="{{conversationControlsOpen ? '收起' : '展开'}}会话设置与安全" aria-expanded="{{conversationControlsOpen}}" tabindex="0"><view><view class="conversation-tools-title">会话设置与安全</view><view class="conversation-tools-copy">提醒、未来预约、举报、拉黑与紧急帮助</view></view><text>{{conversationControlsOpen ? '收起' : '查看'}}</text></view>
+<view class="page chat-page {{motionOff ? 'tt-motion-off' : ''}}">
+  <view class="chat-boundary-stack" aria-label="文字会话与平台边界">
+  <view class="chat-room-label"><text>文字会话</text></view>
+  <view class="notice boundary-notice">平台内沟通 · 勿私联或私下转账</view>
+  <view wx:if="{{!publicInteractionIdentityAvailable}}" class="identity-unavailable-notice">身份核验授权未开放；消息可查看，暂不能发送。</view>
+  <view wx:if="{{textOnly}}" class="notice text-only-notice">当前仅支持文字消息。</view>
+  </view>
+  <view class="conversation-tools-trigger" bindtap="toggleConversationControls" aria-role="button" aria-label="{{conversationControlsOpen ? '收起' : '展开'}}会话设置与安全" aria-expanded="{{conversationControlsOpen}}" tabindex="0"><view class="conversation-tools-title">设置与安全</view><text>{{conversationControlsOpen ? '收起' : '查看'}}</text></view>
   <view wx:if="{{conversationControlsOpen}}" class="conversation-tools-panel">
   <view wx:if="{{hasConversation && messageInteractionAvailable}}" class="message-notification-setting">
     <view class="message-notification-copy">
       <view class="message-notification-title">本会话消息提醒</view>
-      <view wx:if="{{messageNotificationsMuted}}" class="message-notification-description">仅你已静音。新消息仍会显示在会话和未读列表，对方不会收到提示。</view>
-      <view wx:else class="message-notification-description">当前未静音。微信订阅是否送达取决于你的主动授权。</view>
+      <view class="message-notification-description">{{messageNotificationsMuted ? '已静音' : '未静音'}}</view>
     </view>
     <button class="message-notification-action" loading="{{messageNotificationUpdating}}" bindtap="toggleMessageNotifications">{{messageNotificationsMuted ? '恢复提醒' : '静音本会话'}}</button>
   </view>
   <view wx:if="{{hasConversation && viewerCanManageFutureBookingBoundary}}" class="future-booking-setting">
     <view class="future-booking-copy">
       <view class="future-booking-title">此客户的未来预约</view>
-      <view wx:if="{{futureBookingsDeclinedByYou}}" class="future-booking-description">你的私密设置已生效：只停止此客户向你发起新订单及在推荐中看到你。客户不会收到原因或被处罚，现有订单与聊天不变。</view>
-      <view wx:else class="future-booking-description">当前允许未来新预约。这不是拉黑、举报或取消订单；你可以单独停止此客户之后的新交易。</view>
+          <view wx:if="{{futureBookingsDeclinedByYou}}" class="future-booking-description">已停止新订单；客户不会收到原因或被处罚，现有订单与聊天不变。</view>
+      <view wx:else class="future-booking-description">当前允许新预约。</view>
     </view>
     <button class="future-booking-action" loading="{{futureBookingBoundaryUpdating}}" bindtap="toggleFutureBookingBoundary">{{futureBookingsDeclinedByYou ? '恢复未来预约' : '停止未来新预约'}}</button>
   </view>
   <view class="safety-exit">
-    <view class="safety-exit-title">感到不适或不安全？</view>
-    <view class="safety-exit-copy">可以先停止回复、离开会话或查看安全说明。出现即时危险时，请联系当地紧急服务或身边可信的人；平台不提供报警或紧急救援。</view>
-    <view class="safety-exit-copy">需要举报具体内容可长按消息；举报会话仍需你自己填写原因后提交。</view>
+    <view class="safety-exit-title">不适或不安全？</view>
+    <view class="safety-exit-copy">先离开会话；即时危险请联系紧急服务。长按消息可举报内容。</view>
     <view class="safety-exit-actions">
-      <button class="safety-exit-action safety-exit-emergency" bindtap="openEmergencyHelp">紧急帮助与拨号</button>
+      <button class="safety-exit-action safety-exit-emergency" bindtap="openEmergencyHelp">紧急帮助</button>
       <button class="safety-exit-action" bindtap="openSafetyCenter">安全与支持</button>
       <button class="safety-exit-action" bindtap="leaveConversation">离开会话</button>
       <button wx:if="{{hasConversation}}" class="safety-exit-action safety-exit-report" bindtap="report">举报会话</button>
@@ -38,24 +39,23 @@
     <text>严重处置可申请一次人工复核。</text>
     <button size="mini" bindtap="appeal">申请复核</button>
   </view>
-  <tt-skeleton wx:if="{{loading}}" rows="3" />
-  <tt-state wx:elif="{{error}}" type="error" title="消息暂时无法加载" description="{{error}}" action-text="重新加载消息" bindaction="retryInitial" />
+  <tt-skeleton wx:if="{{loading}}" rows="3" motion-off="{{motionOff}}" />
+  <tt-state wx:elif="{{error}}" type="error" title="消息暂时无法加载" description="{{error}}" action-text="重新加载消息" motion-off="{{motionOff}}" bindaction="retryInitial" />
   <view wx:elif="{{conversationBlockedByYou}}" class="conversation-boundary">
-    <view class="conversation-boundary-title">你已为自己拉黑本会话</view>
-    <view class="conversation-boundary-copy">消息记录暂不展示，双方不能继续在这里收发消息。拉黑不取消订单，也不代表举报、客服、退款或安全处置已经完成；需要时仍可使用上方入口。</view>
+    <view class="conversation-boundary-title">本会话已拉黑</view>
+    <view class="conversation-boundary-copy">消息隐藏且无法收发；订单和案件状态不变。</view>
   </view>
   <view wx:elif="{{!messageHistoryAvailable}}" class="conversation-boundary">
-    <view class="conversation-boundary-title">当前会话暂不能继续收发消息</view>
-    <view class="conversation-boundary-copy">消息记录暂不展示。订单、退款、举报、客服和安全入口不受影响；页面不会说明是哪一方设置了关系边界。</view>
+    <view class="conversation-boundary-title">当前无法收发消息</view>
+    <view class="conversation-boundary-copy">消息记录隐藏；订单、退款与案件入口仍可用。</view>
   </view>
   <view wx:else class="messages">
     <view wx:if="{{!messageInteractionAvailable}}" class="conversation-boundary conversation-read-only">
-      <view class="conversation-boundary-title">订单服务已结束，消息记录仅供查看</view>
-      <view class="conversation-boundary-copy">订单、退款、举报、客服和安全入口不受影响。如需帮助，请从订单或安全入口发起处理。</view>
+      <view class="conversation-boundary-title">服务已结束 · 仅查看</view>
     </view>
-    <view wx:if="{{loadingOlder}}" class="history-status">正在加载更早消息…</view>
-    <view wx:elif="{{hasMore}}" class="history-status">上拉加载更早消息</view>
-    <view wx:elif="{{messages.length}}" class="history-status">已显示全部消息</view>
+    <view wx:if="{{loadingOlder}}" class="history-status">正在加载…</view>
+    <view wx:elif="{{hasMore}}" class="history-status">上拉加载更多</view>
+    <view wx:elif="{{messages.length}}" class="history-status">已全部加载</view>
     <view wx:for="{{messages}}" wx:key="id" class="message {{item.senderId === currentUserId ? 'mine' : 'theirs'}} {{item.type === 'system' || item.type === 'safety' ? 'system' : ''}} {{item.moderationStatus !== 'published' ? 'held' : ''}}">
       <view class="sender">{{item.senderName || item.senderId}}</view>
       <view class="bubble" bindlongpress="reportMessage" data-message-id="{{item.id}}">

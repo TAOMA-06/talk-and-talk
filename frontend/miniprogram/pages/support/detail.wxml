@@ -1,4 +1,4 @@
-<view class="page case-detail-page">
+<view class="page case-detail-page {{motionOff ? 'tt-motion-off' : ''}}">
   <view wx:if="{{loading}}" class="empty">正在读取案件详情…</view>
   <view wx:elif="{{error}}" class="empty">
     <view>{{error}}</view>
@@ -6,25 +6,25 @@
   </view>
 
   <view wx:elif="{{kind === 'safety' && safetyCase}}">
-    <view class="case-hero safety-hero">
+    <view class="case-hero safety-hero tt-state-transition">
       <view class="hero-kicker">安全举报 · {{safetyCase.id}}</view>
       <view class="hero-title">{{statusText}}</view>
       <view class="hero-copy">{{safetyCase.outcomeSummary}}</view>
     </view>
-    <view class="card">
+    <view class="card case-authority-card case-record-card">
       <view class="section-title">处理信息</view>
       <view class="submitted-summary">
         <view class="detail-label">你提交的原始说明</view>
         <view wx:if="{{safetyCase.submittedSummary}}" class="submitted-summary-copy">{{safetyCase.submittedSummary}}</view>
-        <view wx:else class="privacy-note">这是一条历史案件，原始说明没有保留为可展示摘要；后续补充仍按下方记录展示。</view>
+        <view wx:else class="privacy-note">历史原始说明未保留为可展示摘要。</view>
       </view>
       <view class="detail-row"><text>提交时间</text><text>{{createdText}}</text></view>
       <view class="detail-row"><text>预计时限</text><text>{{safetyCase.dueAt ? dueText : '由审核队列动态确定'}}</text></view>
       <view wx:if="{{safetyCase.resolvedAt}}" class="detail-row"><text>完成时间</text><text>{{resolvedText}}</text></view>
-      <view class="privacy-note">为保护双方隐私，本页不会展示被举报人账号、内部规则、模型判断、审核员身份或具体处罚细节。</view>
+      <navigator class="privacy-note" url="/pages/legal/index?type=privacy">查看隐私政策</navigator>
     </view>
-    <view class="card">
-      <view class="section-title">你补充的信息</view>
+    <view class="card case-authority-card case-followup-card">
+      <view class="section-title">补充事实</view>
       <block wx:if="{{safetyCase.followUps.length}}">
         <view class="follow-up" wx:for="{{safetyCase.followUps}}" wx:key="id">
           <view class="follow-up-text">{{item.statement}}</view>
@@ -36,30 +36,30 @@
         <textarea class="follow-up-input" value="{{followUp}}" maxlength="500" placeholder="补充与安全判断直接相关的事实（5–500 字）" bindinput="setFollowUp"></textarea>
         <button class="primary-button full-button" loading="{{submitting}}" bindtap="addFollowUp">补充安全事实</button>
       </view>
-      <view wx:else class="closed-note">案件已结束或补充次数已达上限。新的独立事件请返回案件中心重新提交。</view>
+      <view wx:else class="closed-note">案件已结束或达到补充上限。</view>
     </view>
   </view>
 
   <view wx:elif="{{kind === 'support' && ticket}}">
-    <view class="case-hero support-hero">
+    <view class="case-hero support-hero tt-state-transition">
       <view class="hero-kicker">客服案件 · {{ticket.id}}</view>
       <view class="hero-title">{{statusText}}</view>
       <view class="hero-copy">{{ticket.subject}}</view>
     </view>
-    <view class="card">
+    <view class="card case-authority-card case-record-card">
       <view class="section-title">你的问题</view>
       <view class="case-body">{{ticket.body}}</view>
       <view class="detail-row"><text>更新时间</text><text>{{createdText}}</text></view>
       <view class="detail-row"><text>预计时限</text><text>{{ticket.dueAt ? dueText : '等待客服受理后确认'}}</text></view>
       <button wx:if="{{ticket.orderId}}" class="order-button" bindtap="openOrder">查看关联订单</button>
     </view>
-    <view wx:if="{{ticket.resolution}}" class="card resolution-card">
-      <view class="section-title">平台处理结果</view>
+    <view wx:if="{{ticket.resolution}}" class="card case-authority-card resolution-card tt-state-transition">
+      <view class="section-title">处理结果</view>
       <view class="case-body">{{ticket.resolution}}</view>
       <view wx:if="{{ticket.resolutionCode}}" class="resolution-code">结果代码：{{ticket.resolutionCode}}</view>
     </view>
-    <view class="card">
-      <view class="section-title">你补充的订单事实</view>
+    <view class="card case-authority-card case-followup-card">
+      <view class="section-title">订单事实</view>
       <block wx:if="{{ticket.orderFacts.length}}">
         <view class="follow-up" wx:for="{{ticket.orderFacts}}" wx:key="id">
           <view class="follow-up-text">{{item.statement}}</view>
@@ -72,7 +72,7 @@
       <view wx:else class="empty compact">暂未补充订单事实</view>
       <view wx:if="{{canAdd}}">
         <textarea class="follow-up-input" value="{{followUp}}" maxlength="1200" placeholder="只写你亲历的时间、履约或支付事实；不要填写证件、联系方式、银行卡或健康材料" bindinput="setFollowUp"></textarea>
-        <view wx:if="{{textOnly}}" class="privacy-note">当前首发版本只接收文字订单事实；图片和音频证据暂未开放。</view>
+        <view wx:if="{{textOnly}}" class="privacy-note">当前仅接收文字；图片和音频未开放。</view>
         <block wx:if="{{!textOnly}}">
           <view class="evidence-toolbar">
             <button class="evidence-action" size="mini" disabled="{{evidenceUploading || evidenceDrafts.length >= 3}}" bindtap="addEvidenceImage">添加图片</button>
@@ -83,13 +83,13 @@
             <text>{{item.kind === 'image' ? '图片' : '音频'}} · {{item.statusText}}</text>
             <button class="evidence-remove" size="mini" data-id="{{item.assetId}}" bindtap="removeEvidence">移除</button>
           </view>
-          <view class="privacy-note">最多 3 个文件。文件先直传受控存储并完成安全审核，只有“可随陈述提交”的文件才会绑定；客服和本工单请求方按权限查看。</view>
+          <view class="privacy-note">最多 3 个审核通过的附件</view>
         </block>
         <button class="primary-button full-button" loading="{{submitting}}" bindtap="addFollowUp">补充订单事实</button>
       </view>
-      <view wx:else class="closed-note">仅进行中的订单/退款客服案件可以补充订单事实。</view>
+      <view wx:else class="closed-note">当前案件不可补充事实。</view>
     </view>
   </view>
 
-  <button wx:if="{{!loading}}" class="center-button" bindtap="openCenter">返回案件中心</button>
+  <button wx:if="{{!loading}}" class="center-button" bindtap="openCenter">返回案件</button>
 </view>

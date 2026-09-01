@@ -4,7 +4,6 @@ import { ArrowRight, Check, Copy, QrCode, Smartphone } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import {
-  miniprogramCtaCopy,
   miniprogramSearchName,
   resolveMiniprogramEntry,
   resolveMiniprogramQr,
@@ -25,7 +24,6 @@ export default function MiniprogramCta({
 }: MiniprogramCtaProps) {
   const entry = resolveMiniprogramEntry();
   const qr = resolveMiniprogramQr();
-  const copy = miniprogramCtaCopy(entry);
   const hasQr = qr.kind === "qr";
   const searchName = entry.kind === "fallback" ? entry.searchName : miniprogramSearchName;
   const [copyState, setCopyState] = useState<"idle" | "copied" | "manual">("idle");
@@ -46,7 +44,7 @@ export default function MiniprogramCta({
       className={`button button-primary${large ? " button-large" : ""}`}
       onClick={() => void copySearchTerm()}
     >
-      {copyState === "copied" ? `已复制 ${searchName}` : "复制名称并在微信搜索"}
+      {copyState === "copied" ? `已复制 ${searchName}` : "复制小程序名称"}
       {copyState === "copied" ? <Check size={large ? 18 : 17} /> : <Copy size={large ? 18 : 17} />}
     </button>
   );
@@ -67,7 +65,7 @@ export default function MiniprogramCta({
     ? null
     : (
       <span className="miniprogram-copy-status" aria-live="polite">
-        {copyState === "copied" ? "已复制，可在微信中粘贴搜索。" : "请在微信中搜索「Talk&Talk」。"}
+        {copyState === "copied" ? "已复制。" : "请在微信搜索「Talk&Talk」。"}
       </span>
     );
 
@@ -104,12 +102,8 @@ export default function MiniprogramCta({
           </div>
         )}
         <div>
-          <strong>微信小程序服务入口</strong>
-          <p>
-            {hasQr
-              ? "扫码后请以小程序页面展示的文本服务范围与可用状态为准。"
-              : copy.secondary}
-          </p>
+          <strong>微信小程序</strong>
+          <p>{hasQr ? "扫码打开" : "微信搜索 Talk&Talk"}</p>
         </div>
       </aside>
     </div>

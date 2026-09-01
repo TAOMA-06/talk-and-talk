@@ -1,5 +1,5 @@
 <root-portal enable="{{true}}" wx:if="{{show}}">
-  <view class="filter-root" aria-role="dialog" aria-modal="true">
+  <view class="filter-root motion-{{motionLevel}} {{motionOff ? 'motion-off' : ''}}" aria-role="dialog" aria-modal="true">
     <view class="filter-mask" bindtap="close" catchtouchmove="noop"></view>
     <view class="filter-sheet">
       <view class="filter-handle"></view>

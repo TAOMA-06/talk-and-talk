@@ -3,12 +3,13 @@ import { spawnSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const [adminHtml, adminScript, reviewHtml, reviewScript, mainSource] = await Promise.all([
+const [adminHtml, adminScript, reviewHtml, reviewScript, mainSource, opsStyles] = await Promise.all([
   readFile("public/admin/index.html", "utf8"),
   readFile("public/admin/assets/app.js", "utf8"),
   readFile("public/review/index.html", "utf8"),
   readFile("public/review/assets/app.js", "utf8"),
-  readFile("src/main.ts", "utf8")
+  readFile("src/main.ts", "utf8"),
+  readFile("public/ops-foundation.css", "utf8")
 ]);
 
 function assertNoInlineExecutableHtml(html, label) {
@@ -34,6 +35,52 @@ test("static HTML is compatible with the same-origin script CSP", () => {
   assert.match(mainSource, /scriptSrc:\s*\["'self'"\]/);
   assert.match(adminHtml, /<script src="\/admin\/assets\/app\.js" defer><\/script>/);
   assert.match(reviewHtml, /<script src="\/review\/assets\/app\.js" defer><\/script>/);
+  assert.match(adminHtml, /<link rel="stylesheet" href="\/ops-foundation\.css" \/>/);
+  assert.match(reviewHtml, /<link rel="stylesheet" href="\/ops-foundation\.css" \/>/);
+});
+
+test("UI4 ops theatre stays login-only while authenticated evidence surfaces remain restrained", () => {
+  assert.match(adminHtml, /ops-login-theatre ops-admin-theatre/);
+  assert.match(reviewHtml, /ops-login-theatre ops-review-theatre/);
+  assert.ok(
+    adminHtml.indexOf("ops-login-theatre") < adminHtml.indexOf('id="portalView"'),
+    "admin theatre must remain before the authenticated portal"
+  );
+  assert.ok(
+    reviewHtml.indexOf("ops-login-theatre") < reviewHtml.indexOf('id="portalView"'),
+    "review theatre must remain before the authenticated portal"
+  );
+  assert.match(opsStyles, /UI 4\.0/);
+  assert.match(opsStyles, /\.ops-login-theatre/);
+  assert.match(opsStyles, /@keyframes ops-paper-arrive/);
+  assert.match(opsStyles, /@media \(prefers-reduced-motion: reduce\)/);
+  assert.match(opsStyles, /Authenticated workbenches: restrained M0\/M1 surfaces only/);
+  assert.match(opsStyles, /\.portal \.button[\s\S]*?transform:\s*none/);
+  assert.doesNotMatch(opsStyles, /animation[^;{]*infinite/i);
+});
+
+test("ops UI copy is concise without removing permission, evidence, identity, payment, or unknown-state facts", () => {
+  const hanCopyCount = (source) => (source.match(/[\p{Script=Han}，。；：、“”《》（）·！？—]+/gu) ?? []).join("").length;
+  assert.ok(hanCopyCount(adminHtml) <= 3_550, "admin static copy exceeds the action-first budget");
+  assert.ok(hanCopyCount(reviewHtml) <= 660, "review static copy exceeds the action-first budget");
+
+  assert.doesNotMatch(adminHtml, /这是交易、客服、供给与财务的受控运营入口/);
+  assert.doesNotMatch(reviewHtml, /这是面向审核团队的受控工作台/);
+  assert.doesNotMatch(reviewHtml, /将模型判断与人工结论沉淀为可复盘样本/);
+
+  for (const critical of [
+    "新实名授权 No-Go",
+    "状态未知，正在检查",
+    "无账单不等于已核对",
+    "以微信渠道状态为准",
+    "资料年龄不等于服务资格",
+    "外部法律政策 + 双人复核",
+    "停权不可自动恢复"
+  ]) assert.match(adminHtml, new RegExp(critical.replace(/[+]/g, "\\+")));
+  assert.match(reviewHtml, /独立账号、会话与审计轨迹/);
+  assert.match(reviewHtml, /禁止自停用/);
+  assert.match(reviewHtml, /禁止停用最后一名 active lead/);
+  assert.match(reviewHtml, /不删除 ReviewAuditLog \/ ModerationActionLog/);
 });
 
 test("commercial admin exposes real queues and controlled mutation safeguards", () => {

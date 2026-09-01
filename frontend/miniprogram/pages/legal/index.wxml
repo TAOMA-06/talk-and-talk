@@ -1,1 +1,1 @@
-<web-view src="{{src}}"></web-view>
+<web-view class="legal-page {{motionOff ? 'tt-motion-off' : ''}}" src="{{src}}"></web-view>

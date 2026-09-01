@@ -1,29 +1,59 @@
-<view class="page workbench-page">
-  <tt-skeleton wx:if="{{loading}}" rows="3" />
+<view class="page workbench-page {{motionOff ? 'tt-motion-off' : ''}}">
+  <tt-skeleton wx:if="{{loading}}" rows="3" motion-off="{{motionOff}}" />
 
   <view wx:elif="{{accessState === 'ineligible'}}" class="empty access-empty">
     <view class="access-title">暂不能进入陪伴者工作台</view>
     <view>{{loadError}}</view>
-    <view class="muted">工作台仅向已完成身份与资料审核的陪伴者本人开放。</view>
-    <button class="primary-button retry-button" bindtap="openOnboarding">查看入驻与审核状态</button>
+    <view class="muted">身份或资料审核未完成。</view>
+    <button class="primary-button retry-button" bindtap="openOnboarding">查看审核状态</button>
     <button class="plain-button retry-button" bindtap="retry">重新检查</button>
   </view>
 
-  <tt-state wx:elif="{{accessState === 'error'}}" type="error" title="工作台加载失败" description="{{loadError}}" action-text="重新加载" bindaction="retry" />
+  <tt-state wx:elif="{{accessState === 'error'}}" type="error" title="工作台加载失败" description="{{loadError}}" action-text="重新加载" motion-off="{{motionOff}}" bindaction="retry" />
 
-  <view wx:else>
-    <view class="hero-card">
+  <view wx:else class="workbench-ready">
+    <view wx:if="{{!lifecycleUnavailable}}" class="studio-stage tt-motion-m3">
+      <view class="studio-sign"><text>工作台</text><text class="studio-live">本人可见</text></view>
+      <tt-card-stage layout="assemble" min-height="450" motion-level="m3" entrance="assemble" active motion-off="{{motionOff}}" risk="standard" aria-label="工作台任务、经营与资格卡组">
+        <view slot="back" class="studio-layer" bindtap="openServiceOfferings" aria-role="button" aria-label="管理服务商品，共 {{totalOfferingCount}} 项" tabindex="0">
+          <view class="studio-card studio-card-service">
+            <view class="studio-index">01</view>
+            <view class="studio-card-title">{{activeOfferingCount}} 项服务已上架</view>
+            <view class="studio-card-copy">共 {{totalOfferingCount}} 项</view>
+          </view>
+        </view>
+        <view slot="middle" class="studio-layer" bindtap="openOnboarding" aria-role="button" aria-label="查看入驻与资格状态" tabindex="0">
+          <view class="studio-card studio-card-growth">
+            <view class="studio-index">02</view>
+            <view class="studio-card-title">{{lifecycleUnavailable ? '资格状态暂无法同步' : commercialStatusText}}</view>
+            <view class="studio-card-copy">{{lifecycleUnavailable ? '缺失状态不视为审核通过' : trainingStatusText}}</view>
+          </view>
+        </view>
+        <view slot="front" class="studio-layer">
+          <view class="hero-card">
+            <view class="tt-kicker">今日</view>
+            <view class="hero-title">待办与经营</view>
+            <view class="updated-at">更新于 {{updatedAtText}}（北京时间）</view>
+          </view>
+        </view>
+        <view slot="prop" class="studio-props">
+          <tt-cartoon-prop kind="folder" tone="apricot" size="lg" expressive motion-off="{{motionOff}}" risk="standard" />
+          <tt-cartoon-prop kind="sprout" tone="mint" size="md" expressive motion-off="{{motionOff}}" risk="standard" />
+        </view>
+      </tt-card-stage>
+    </view>
+    <view wx:else class="hero-card studio-fallback">
       <view class="tt-kicker">陪伴者工作台</view>
-      <view class="hero-title">今天需要处理什么</view>
-      <view class="hero-copy">管理服务、开放时段和履约安排；客户侧只会看到你已经上架和开放的内容。</view>
+      <view class="hero-title">部分资格状态暂无法同步</view>
+      <view class="hero-copy">缺失状态不视为通过或零。</view>
       <view class="updated-at">更新于 {{updatedAtText}}（北京时间）</view>
     </view>
 
-    <view class="profile-media-card">
+    <view wx:if="{{profileMediaEnabled}}" class="profile-media-card">
       <image class="profile-media-cover" src="{{profileCoverUrl}}" mode="aspectFill" aria-label="陪伴者资料封面" />
-      <view class="profile-media-main"><tt-avatar src="{{profileAvatarUrl}}" fallback="{{profileInitials}}" alt="陪伴者公开头像" size="lg" shape="rounded" /><view class="profile-media-copy"><view class="profile-media-title">公开头像与封面</view><view class="profile-media-note">{{profileMediaEnabled ? '图片审核通过后才会替换公开资料。' : '当前 text-only 发行面保持关闭；演示素材仅用于本地界面。'}}</view></view></view>
-      <view class="profile-media-actions"><button disabled="{{!profileMediaEnabled || profileMediaBusy}}" loading="{{profileMediaBusy}}" bindtap="chooseAvatar">更新头像</button><button disabled="{{!profileMediaEnabled || profileMediaBusy}}" loading="{{profileMediaBusy}}" bindtap="chooseCover">更新封面</button></view>
-      <view wx:if="{{profileMediaEnabled}}" class="profile-media-remove"><button disabled="{{profileMediaBusy}}" bindtap="removeAvatar">移除头像</button><button disabled="{{profileMediaBusy}}" bindtap="removeCover">移除封面</button></view>
+      <view class="profile-media-main"><tt-avatar src="{{profileAvatarUrl}}" fallback="{{profileInitials}}" alt="陪伴者公开头像" size="lg" shape="rounded" /><view class="profile-media-copy"><view class="profile-media-title">头像与封面</view><view class="profile-media-note">审核通过后公开</view></view></view>
+      <view class="profile-media-actions"><button disabled="{{profileMediaBusy}}" loading="{{profileMediaBusy}}" bindtap="chooseAvatar">更新头像</button><button disabled="{{profileMediaBusy}}" loading="{{profileMediaBusy}}" bindtap="chooseCover">更新封面</button></view>
+      <view class="profile-media-remove"><button disabled="{{profileMediaBusy}}" bindtap="removeAvatar">移除头像</button><button disabled="{{profileMediaBusy}}" bindtap="removeCover">移除封面</button></view>
       <view wx:if="{{profileMediaMessage}}" class="profile-media-message" aria-live="polite">{{profileMediaMessage}}</view>
     </view>
 
@@ -31,7 +61,6 @@
       <view class="attention-icon">!</view>
       <view class="attention-body">
         <view class="attention-title">有 {{pendingConfirmationCount}} 个预约等待你确认</view>
-        <view class="attention-copy">确认后客户才能继续支付；请在订单页查看预约时间与处理时限。</view>
       </view>
       <view class="attention-link">去处理 ›</view>
     </view>
@@ -41,7 +70,7 @@
       <view class="overview-card" bindtap="openServiceOfferings" hover-class="card-hover" aria-role="button" aria-label="管理服务商品" tabindex="0">
         <view class="overview-label">服务商品</view>
         <view class="overview-value">{{activeOfferingCount}}<text class="overview-unit"> 项已上架</text></view>
-        <view class="overview-note">共 {{totalOfferingCount}} 项 · 管理商品 ›</view>
+        <view class="overview-note">共 {{totalOfferingCount}} 项 ›</view>
       </view>
       <view class="overview-card" bindtap="openAvailabilityWindows" hover-class="card-hover" aria-role="button" aria-label="管理可约时段" tabindex="0">
         <view class="overview-label">可约时段</view>
@@ -53,7 +82,6 @@
         <view wx:if="{{earningsUnavailable}}" class="overview-unavailable">暂无法获取</view>
         <view wx:else class="overview-value earnings-value">{{availableEarningsText}}</view>
         <view wx:if="{{!earningsUnavailable}}" class="overview-note">{{availableEarningCount}} 笔已处于可结算状态 · 查看明细 ›</view>
-        <view wx:else class="overview-note">不会影响订单和时段管理</view>
       </view>
     </view>
 
@@ -62,30 +90,29 @@
       <view class="lifecycle-card" bindtap="openOnboarding" hover-class="card-hover" aria-role="button" aria-label="打开入驻与认证" tabindex="0">
         <view class="lifecycle-title">入驻与公开资料</view>
         <view class="lifecycle-state">{{commercialStatusText}}</view>
-        <view class="lifecycle-link">KYC、协议、语音介绍 ›</view>
+        <view class="lifecycle-link">查看 ›</view>
       </view>
       <view class="lifecycle-card" bindtap="openDevelopment" hover-class="card-hover" aria-role="button" aria-label="打开培训与质量" tabindex="0">
         <view class="lifecycle-title">培训与账号健康</view>
         <view class="lifecycle-state">{{trainingStatusText}}</view>
-        <view class="lifecycle-link">{{activeAccountActions}} 项有效处置 ›</view>
+        <view class="lifecycle-link">{{lifecycleUnavailable ? '处置数量暂无法同步' : activeAccountActions + ' 项有效处置'}} ›</view>
       </view>
       <view class="lifecycle-card" bindtap="openSchedule" hover-class="card-hover" aria-role="button" aria-label="打开周期排班" tabindex="0">
         <view class="lifecycle-title">周期排班与休假</view>
-        <view class="lifecycle-state">规则先生成私有草稿</view>
-        <view class="lifecycle-link">逐个确认开放 ›</view>
+        <view class="lifecycle-state">私有草稿</view>
+        <view class="lifecycle-link">查看 ›</view>
       </view>
       <view class="lifecycle-card" bindtap="openSafety" hover-class="card-hover" aria-role="button" aria-label="打开安全、处罚与申诉" tabindex="0">
         <view class="lifecycle-title">异常与安全支持</view>
-        <view class="lifecycle-state">{{openIncidentCount}} 个事件待处理</view>
-        <view class="lifecycle-link">举证、工单与结论 ›</view>
+        <view class="lifecycle-state">{{lifecycleUnavailable ? '事件数量暂无法同步' : openIncidentCount + ' 个事件待处理'}}</view>
+        <view class="lifecycle-link">查看 ›</view>
       </view>
     </view>
-    <view wx:if="{{lifecycleUnavailable}}" class="workbench-tip">生命周期状态暂时无法同步；服务商品和现有排班仍可查看，但请勿把缺失状态当作审核通过。</view>
+    <view wx:if="{{lifecycleUnavailable}}" class="workbench-tip">生命周期状态未知，不视为通过。</view>
 
     <view class="section-heading">今天的服务 · {{todayServiceDateText}}</view>
     <view wx:if="{{todayServiceOrdersUnavailable}}" class="card schedule-card">
-      <view class="schedule-title">今日服务暂时无法同步</view>
-      <view class="muted">服务商品和可约时段仍可正常管理。请稍后下拉刷新，或前往订单页查看。</view>
+      <view class="schedule-title">今日服务无法同步</view>
       <button class="plain-button schedule-action" bindtap="openOrders">打开订单页</button>
     </view>
     <block wx:elif="{{todayServiceOrders.length}}">
@@ -97,14 +124,13 @@
       </view>
     </block>
     <view wx:else class="card schedule-card empty-schedule">
-      <view class="schedule-title">今天暂时没有服务安排</view>
-      <view class="muted">可先检查已上架服务和开放时段，让客户能找到并预约你。</view>
+      <view class="schedule-title">今天暂无服务</view>
       <view class="empty-actions">
         <button class="plain-button schedule-action" bindtap="openServiceOfferings">管理服务</button>
         <button class="plain-button schedule-action" bindtap="openAvailabilityWindows">开放时段</button>
       </view>
     </view>
 
-    <view class="workbench-tip">今日清单只按预约开始时间落在北京时间当天排列；订单确认、支付、开始、完成和资金状态仍以订单页实时记录为准，工作台不会在此处变更任何状态。</view>
+    <navigator class="workbench-tip" url="/pages/legal/index?type=terms">查看完整规则</navigator>
   </view>
 </view>

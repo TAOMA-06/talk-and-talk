@@ -1,15 +1,39 @@
-<view class="page home-page">
-  <view class="home-intro tt-animate-in">
-    <view class="eyebrow">{{brandName}} · 此刻的陪伴</view>
-    <view class="hero-title">先说说，你现在需要什么</view>
-    <view class="hero-copy">一句话就好。它只在本页帮助识别场景，不会被保存为聊天内容。</view>
+<view class="page home-page {{motionOff ? 'tt-motion-off' : ''}}">
+  <view class="lounge-intro tt-motion-m4" aria-label="Talk and Talk 倾听客厅">
+    <view class="lounge-label"><text class="lounge-dot"></text><text>{{brandName}}</text></view>
+    <tt-card-stage layout="deck" min-height="430" motion-level="{{riskDetected ? 'm0' : 'm4'}}" entrance="deal" active="{{!riskDetected}}" motion-off="{{motionOff}}" risk="{{riskDetected ? 'high' : 'standard'}}" aria-label="三张可选择的陪伴场景卡片">
+      <view slot="back" class="lounge-layer lounge-layer-work tt-pressable" bindtap="selectScenario" data-id="work" aria-role="button" aria-label="选择工作压力场景" tabindex="0">
+        <view class="lounge-card lounge-card-apricot">
+          <view class="lounge-card-number">02</view>
+          <view class="lounge-mini-title">工作压力</view>
+        </view>
+      </view>
+      <view slot="middle" class="lounge-layer lounge-layer-night tt-pressable" bindtap="selectScenario" data-id="sleep" aria-role="button" aria-label="选择睡前陪伴场景" tabindex="0">
+        <view class="lounge-card lounge-card-lavender">
+          <view class="lounge-card-number">03</view>
+          <view class="lounge-mini-title">睡前陪伴</view>
+        </view>
+      </view>
+      <view slot="front" class="lounge-layer lounge-layer-listen tt-pressable" bindtap="selectScenario" data-id="emotion" aria-role="button" aria-label="选择情绪倾听场景" tabindex="0">
+        <view class="lounge-card lounge-card-blue {{selectedScenarioId === 'emotion' ? 'is-selected' : ''}}">
+          <view class="eyebrow">01</view>
+          <view class="hero-title">现在需要什么？</view>
+          <view class="lounge-card-action">{{selectedScenarioId === 'emotion' ? '已选择 ✓' : '选择倾听 →'}}</view>
+        </view>
+      </view>
+      <view slot="prop" class="lounge-props">
+        <tt-cartoon-prop kind="lamp" tone="butter" size="lg" motion="breathe" active="{{heroPropsActive && !riskDetected}}" motion-off="{{motionOff}}" expressive risk="{{riskDetected ? 'high' : 'standard'}}" />
+        <tt-cartoon-prop kind="cup" tone="rose" size="md" motion="peek" active="{{heroPropsActive && !riskDetected}}" motion-off="{{motionOff}}" expressive risk="{{riskDetected ? 'high' : 'standard'}}" />
+      </view>
+    </tt-card-stage>
   </view>
 
-  <image class="hero-visual tt-animate-in" src="{{homeHeroAsset}}" mode="aspectFill" aria-label="安静的线上陪伴空间插画" />
-
-  <view class="intent-card tt-animate-in">
-    <textarea class="intent-input" value="{{intentInput}}" maxlength="120" placeholder="例如：今天工作很累，只想找人听我说一会儿" bindinput="setIntent"></textarea>
-    <view class="intent-foot"><text>最多 120 字</text><text>{{intentInput.length}} / 120</text></view>
+  <view class="intent-shell">
+    <tt-card-shell tone="surface" size="standard" depth="mid" motion-level="m1" entrance="none" motion-off="{{motionOff}}" risk="standard">
+      <view class="intent-label">想说什么？</view>
+      <textarea class="intent-input" value="{{intentInput}}" maxlength="120" placeholder="写一句此刻的需要" bindinput="setIntent"></textarea>
+      <view class="intent-foot"><text></text><text>{{intentInput.length}} / 120</text></view>
+    </tt-card-shell>
   </view>
 
   <view wx:if="{{riskDetected}}" class="risk-card">
@@ -22,55 +46,42 @@
     <view wx:if="{{riskAcknowledged}}" class="risk-acknowledged">已确认。平台仍只提供非紧急线上陪伴。</view>
   </view>
 
-  <view class="section-heading scenes-heading">
-    <view>
-      <view class="section-title">也可以直接选一个场景</view>
-      <view class="section-subtitle">选择后会优先展示未来 3 天较早可约的服务</view>
-    </view>
-  </view>
+  <tt-section-heading class="scenes-heading" title="选择场景" motion-off="{{motionOff}}" />
   <scroll-view class="scenario-scroll" scroll-x enhanced show-scrollbar="{{false}}">
-  <view class="scenario-grid">
-    <view wx:for="{{scenarios}}" wx:key="id" class="scenario {{item.selected ? 'selected' : ''}}" data-id="{{item.id}}" bindtap="selectScenario" aria-role="radio" aria-checked="{{item.selected}}" aria-label="选择陪伴场景：{{item.title}}" tabindex="0">
-      <view class="scenario-title">{{item.title}}</view>
-      <view class="scenario-description">{{item.description}}</view>
+    <view class="scenario-grid">
+      <view wx:for="{{scenarios}}" wx:key="id" class="scenario-item scenario-item-{{index % 3}}">
+        <tt-scene-card title="{{item.title}}" description="{{item.description}}" label="{{item.label}}" tone="{{item.tone}}" tilt="{{item.tilt}}" selected="{{item.selected}}" depth="mid" motion-level="m2" entrance="none" motion-off="{{motionOff}}" risk="standard" data-id="{{item.id}}" bindtap="selectScenario" />
+      </view>
     </view>
-  </view>
   </scroll-view>
 
   <button class="primary-button match-button" bindtap="continueDiscovery">{{selectedTopicId ? '查看适合这个场景的人' : '查看最近可约的人'}}</button>
   <button class="browse-all" bindtap="browseAll">浏览全部陪伴者</button>
 
-  <view class="boundary-strip" aria-label="平台服务边界">
-    <view class="boundary-item"><text class="boundary-mark">18+</text><text>仅成年人</text></view>
-    <view class="boundary-item"><text class="boundary-mark">内</text><text>平台内支付沟通</text></view>
-    <view class="boundary-item"><text class="boundary-mark">止</text><text>不适可随时停止</text></view>
-  </view>
-
   <view class="emergency-entry" bindtap="openDirectEmergencyHelp" aria-role="button" aria-label="查看紧急帮助与官方电话号码" tabindex="0">
     <view>
       <view class="emergency-title">正处在即时危险中？</view>
-      <view class="emergency-copy">查看110、120等官方资源并一键拨号；普通工单不是紧急服务</view>
+      <view class="emergency-copy">110、120 等官方资源</view>
     </view>
     <view class="community-arrow">›</view>
   </view>
 
-  <view class="section-heading recommendations-heading">
-    <view>
-      <view class="section-title">可以先看看</view>
-      <view class="section-subtitle">当前真实商品与可约时间以详情页为准</view>
-    </view>
-  </view>
+  <tt-section-heading class="recommendations-heading" title="可约陪伴者" motion-off="{{motionOff}}" />
   <view class="recommendations-surface">
-  <tt-skeleton wx:if="{{loading || recommendationsState === 'loading'}}" rows="3" />
-  <tt-state wx:elif="{{error}}" type="error" title="首页暂时无法加载" description="{{error}}" action-text="重新加载首页" bindaction="load" />
-  <tt-state wx:elif="{{recommendationsState === 'error'}}" type="error" title="推荐暂时不可用" description="{{recommendationsError}}" action-text="重新读取推荐" bindaction="retryRecommendations" />
-  <tt-state wx:elif="{{recommendationsState === 'empty'}}" type="empty" title="暂时没有推荐" description="仍可进入发现页，按场景和时间筛选当前可约服务。" />
+  <tt-skeleton wx:if="{{loading || recommendationsState === 'loading'}}" rows="3" motion-off="{{motionOff}}" />
+  <tt-state wx:elif="{{error}}" type="error" title="首页暂时无法加载" description="{{error}}" action-text="重新加载首页" motion-off="{{motionOff}}" bindaction="load" />
+  <tt-state wx:elif="{{recommendationsState === 'error'}}" type="error" title="推荐暂时不可用" description="{{recommendationsError}}" action-text="重新读取推荐" motion-off="{{motionOff}}" bindaction="retryRecommendations" />
+  <tt-state wx:elif="{{recommendationsState === 'empty'}}" type="empty" title="暂无推荐" description="可前往发现页筛选。" motion-off="{{motionOff}}" />
   <block wx:elif="{{recommendationsState === 'available'}}">
-    <tt-media-card wx:for="{{recommendations}}" wx:key="impressionId" avatar="{{item.avatarUrl}}" initials="{{item.initials}}" title="{{item.name}}" subtitle="{{item.role}} · {{item.availabilityText}}" description="{{item.reasonText || '基于当前服务状态展示'}}" price="{{item.catalogPriceText}}" meta="{{item.metaText}}" badge="{{item.isVerified ? '当前可约' : '暂不可约'}}" badge-tone="{{item.isVerified ? 'success' : 'warning'}}" online="{{item.isOnline}}" bindtap="openCompanion" data-id="{{item.id}}" data-impression-id="{{item.impressionId}}" data-theme-id="{{item.topicIds[0]}}" />
+    <tt-media-card wx:for="{{recommendations}}" wx:key="impressionId" variant="card" tone="{{item.cardTone}}" avatar="{{item.avatarUrl}}" initials="{{item.initials}}" title="{{item.name}}" subtitle="{{item.role}} · {{item.availabilityText}}" description="{{item.reasonText || '基于当前服务状态展示'}}" price="{{item.catalogPriceText}}" meta="{{item.metaText}}" badge="{{item.isVerified ? '当前可约' : '暂不可约'}}" badge-tone="{{item.isVerified ? 'success' : 'warning'}}" online="{{item.isOnline}}" motion-off="{{motionOff}}" bindtap="openCompanion" data-id="{{item.id}}" data-impression-id="{{item.impressionId}}" data-theme-id="{{item.topicIds[0]}}" />
   </block>
   </view>
 
   <view class="safety-surface">
-    <tt-list-cell title="平台边界与安全支持" subtitle="陪伴不替代医疗、心理治疗或紧急帮助" bindtap="openSafetyCenter" />
+    <tt-card-shell tone="butter" size="wide" interactive motion-off="{{motionOff}}" aria-label="查看平台边界与安全支持" bindtap="openSafetyCenter">
+      <view class="safety-card-title">安全与支持</view>
+      <view class="safety-card-action">查看 →</view>
+    </tt-card-shell>
   </view>
+  <navigator class="browse-all" url="/pages/legal/index?type=terms">查看完整规则</navigator>
 </view>

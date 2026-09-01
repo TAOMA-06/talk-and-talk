@@ -1,11 +1,19 @@
 .state { display: flex; flex-direction: column; align-items: center; padding: 72rpx 32rpx; text-align: center; }
-.state-mark { display: flex; width: 80rpx; height: 80rpx; align-items: center; justify-content: center; margin-bottom: 24rpx; border-radius: 28rpx; background: var(--tt-surface-alt); }
+.state-mark { display: flex; width: 80rpx; height: 80rpx; align-items: center; justify-content: center; margin-bottom: 24rpx; border: 1rpx solid var(--tt-border); border-radius: 28rpx; background: var(--tt-surface-alt); }
 .state-mark-inner { width: 26rpx; height: 26rpx; border: 4rpx solid var(--tt-text-tertiary); border-radius: 999rpx; }
-.state-error .state-mark { background: var(--tt-danger-soft); }
+.state-error .state-mark { border-color: var(--tt-color-status-danger-stroke); background: var(--tt-danger-soft); }
 .state-error .state-mark-inner { border-color: var(--tt-danger); border-radius: 8rpx; transform: rotate(45deg); }
-.state-loading .state-mark-inner { border-color: var(--tt-accent-soft); border-top-color: var(--tt-accent); animation: spin 800ms linear infinite; }
+.state-success .state-mark { border-color: var(--tt-color-status-success-stroke); background: var(--tt-success-soft); }
+.state-success .state-mark-inner { border-color: var(--tt-success); border-radius: 8rpx; }
+.state-info .state-mark { border-color: var(--tt-color-status-info-stroke); background: var(--tt-info-soft); }
+.state-warning .state-mark { border-color: var(--tt-color-status-warning-stroke); background: var(--tt-warning-soft); }
+.state-unknown .state-mark { border-color: var(--tt-color-status-unknown-stroke); background: var(--tt-color-status-unknown-bg); }
+.state-loading .state-mark-inner { border-color: var(--tt-accent-soft); border-top-color: var(--tt-accent); }
+.state-loading.motion-m1:not(.motion-off) .state-mark-inner { animation: state-spin var(--tt-motion-hero) linear 2; }
 .state-title { color: var(--tt-text); font-size: 30rpx; font-weight: 700; line-height: 1.35; }
 .state-copy { max-width: 560rpx; margin-top: 12rpx; color: var(--tt-text-secondary); font-size: 25rpx; line-height: 1.6; }
 .state-action { min-width: 220rpx; margin-top: 28rpx; border-color: var(--tt-border-strong); background: var(--tt-surface); color: var(--tt-accent); }
-@keyframes spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .state-loading .state-mark-inner { animation: none; } }
+.state-action:focus { outline: 3rpx solid var(--tt-color-focus-ring); outline-offset: 3rpx; }
+@keyframes state-spin { to { transform: rotate(360deg); } }
+.motion-off .state-mark-inner { animation: none; }
+@media (prefers-reduced-motion: reduce) { .state-mark-inner { animation: none !important; transition: none; } }

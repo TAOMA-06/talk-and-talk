@@ -1,4 +1,4 @@
-<view class="skeleton" aria-label="正在加载">
+<view class="skeleton {{animated ? 'is-animated' : ''}} {{motionOff ? 'motion-off' : ''}}" aria-label="正在加载" aria-busy="true">
   <view wx:if="{{avatar}}" class="skeleton-avatar shimmer"></view>
   <view class="skeleton-copy">
     <view wx:for="{{lineItems}}" wx:key="*this" class="skeleton-line shimmer skeleton-line-{{index}}"></view>

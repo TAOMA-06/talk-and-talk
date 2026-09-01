@@ -254,6 +254,7 @@ function timelineItem(event: OrderTimelineEvent): TimelineItem {
 
 Page({
   data: {
+    motionOff: false,
     order: null as Order | null,
     view: null as OrderView | null,
     timeline: [] as TimelineItem[],

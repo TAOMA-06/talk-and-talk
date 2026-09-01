@@ -2,3 +2,7 @@
 .action-bar-fixed { position: fixed; z-index: 30; right: 0; bottom: 0; left: 0; }
 .action-secondary { min-width: 180rpx; border-color: var(--tt-border-strong); background: var(--tt-surface); color: var(--tt-text-secondary); }
 .action-primary { min-width: 0; flex: 1; border-color: var(--tt-accent); background: var(--tt-accent); color: var(--tt-on-accent); font-weight: 700; }
+.action-secondary:focus,
+.action-primary:focus { outline: 3rpx solid var(--tt-color-focus-ring); outline-offset: 3rpx; }
+.motion-off .action-secondary,
+.motion-off .action-primary { animation: none; transition: none; transform: none; }

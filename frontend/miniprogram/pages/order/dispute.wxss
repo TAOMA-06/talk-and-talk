@@ -11,11 +11,37 @@
   border: 1rpx solid var(--tt-border);
 }
 
+.authority-card {
+  position: relative;
+  overflow: hidden;
+  box-shadow: none;
+  transform: none;
+}
+
+.authority-label {
+  display: inline-flex;
+  min-height: 38rpx;
+  align-items: center;
+  margin-bottom: 14rpx;
+  padding: 0 12rpx;
+  border: 1rpx solid var(--tt-border);
+  border-radius: 999rpx;
+  background: var(--tt-surface-alt);
+  color: var(--tt-text-tertiary);
+  font-size: 19rpx;
+  font-weight: 700;
+  letter-spacing: .4rpx;
+}
+
 .policy-card {
   background: var(--tt-accent-soft);
   border-color: var(--tt-border);
   border-left: 8rpx solid var(--tt-accent);
 }
+
+.intake-card { border-top: 5rpx solid var(--tt-color-pastel-butter-stroke); }
+.attendance-card { border-top: 5rpx solid var(--tt-color-pastel-blue-stroke); }
+.statements-card { border-top: 5rpx solid var(--tt-color-pastel-lavender-stroke); }
 
 .eyebrow {
   color: var(--tt-accent);
@@ -49,6 +75,8 @@
   line-height: 1.65;
   border-left-color: var(--tt-danger);
 }
+
+.eligibility-lock { border: 1rpx solid var(--tt-color-status-danger-stroke); border-left-width: 5rpx; }
 
 .section-title {
   color: var(--tt-accent);
@@ -94,6 +122,7 @@
   line-height: 1.6;
   border-color: var(--tt-border);
   overflow-wrap: anywhere;
+  transition: opacity var(--tt-motion-press) var(--tt-ease-standard), transform var(--tt-motion-standard) var(--tt-ease-standard);
 }
 
 .primary, .secondary, .retry {
@@ -237,6 +266,12 @@
   background: var(--tt-info-soft);
 }
 
+.status-card,
+.decision-card,
+.policy-error,
+.trusted,
+.warning { transition: opacity var(--tt-motion-press) var(--tt-ease-standard), transform var(--tt-motion-standard) var(--tt-ease-standard); }
+
 .decision {
   margin-top: 12rpx;
   color: var(--tt-accent);
@@ -307,4 +342,26 @@
 .statement-copy, .decision {
   color: var(--tt-text);
   overflow-wrap: anywhere;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .authority-card,
+  .statement,
+  .status-card,
+  .decision-card,
+  .policy-error,
+  .trusted,
+  .warning { animation: none !important; transition: none !important; transform: none !important; }
+}
+
+.dispute-page.tt-motion-off .authority-card,
+.dispute-page.tt-motion-off .statement,
+.dispute-page.tt-motion-off .status-card,
+.dispute-page.tt-motion-off .decision-card,
+.dispute-page.tt-motion-off .policy-error,
+.dispute-page.tt-motion-off .trusted,
+.dispute-page.tt-motion-off .warning {
+  animation: none !important;
+  transition: none !important;
+  transform: none !important;
 }

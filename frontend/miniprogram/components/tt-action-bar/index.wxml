@@ -1,4 +1,4 @@
-<view class="action-bar {{fixed ? 'action-bar-fixed' : ''}}">
+<view class="action-bar {{fixed ? 'action-bar-fixed' : ''}} {{motionOff ? 'motion-off' : ''}}">
   <button wx:if="{{secondaryText}}" class="action-secondary" bindtap="secondary">{{secondaryText}}</button>
   <button class="action-primary" disabled="{{disabled}}" loading="{{loading}}" bindtap="primary">{{primaryText}}</button>
 </view>

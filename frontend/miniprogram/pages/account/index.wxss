@@ -7,15 +7,17 @@
   align-items: center;
   gap: 16rpx;
   padding: 32rpx;
-  border: 1rpx solid var(--tt-border);
+  border: 1rpx solid var(--tt-color-pastel-blue-stroke);
   border-radius: 28rpx;
-  background: var(--tt-accent-soft);
+  background: var(--tt-color-pastel-blue-bg);
+  color: var(--tt-color-pastel-blue-fg);
 }
 
 .locked-hero {
   margin-bottom: 20rpx;
   border-color: var(--tt-danger-soft);
   background: var(--tt-danger-soft);
+  color: var(--tt-danger);
 }
 
 .locked-avatar {
@@ -44,7 +46,7 @@
 }
 
 .identity-name {
-  color: var(--tt-text);
+  color: var(--tt-color-pastel-blue-fg);
   font-size: 34rpx;
   font-weight: 700;
   line-height: 1.35;
@@ -53,10 +55,13 @@
 
 .identity-meta {
   margin-top: 8rpx;
-  color: var(--tt-text-secondary);
+  color: var(--tt-color-pastel-blue-fg);
   font-size: 22rpx;
   line-height: 1.55;
 }
+
+.locked-hero .identity-name,
+.locked-hero .identity-meta { color: var(--tt-danger); }
 
 .edit-button {
   flex: 0 0 auto;
@@ -75,6 +80,8 @@
   display: block;
   margin: 20rpx 0;
   padding: 4rpx 24rpx;
+  border-color: var(--tt-color-pastel-lavender-stroke);
+  background: var(--tt-color-pastel-lavender-bg);
 }
 
 .quick-card {
@@ -704,4 +711,79 @@
   margin-top: 8rpx;
   color: var(--tt-danger);
   line-height: 1.55;
+}
+
+.legal-recovery-card { border-color: var(--tt-color-pastel-butter-stroke); background: var(--tt-color-pastel-butter-bg); color: var(--tt-color-pastel-butter-fg); }
+.legal-recovery-card .section-title,
+.legal-recovery-card .section-copy { color: var(--tt-color-pastel-butter-fg); }
+.session-card { border-color: var(--tt-color-pastel-blue-stroke); }
+.data-rights-card { border-color: var(--tt-color-pastel-mint-stroke); }
+.billing-card { border-color: var(--tt-color-pastel-apricot-stroke); }
+.blocked-card { border-color: var(--tt-color-pastel-lavender-stroke); }
+.danger-zone { border-color: var(--tt-color-status-danger-stroke); }
+
+/* UI4 file-folder information architecture: each authority domain stays separate. */
+.account-index-card { border-radius: 22rpx; }
+
+.account-folder {
+  position: relative;
+  overflow: hidden;
+  border: 1rpx solid var(--tt-border);
+  border-top-width: 6rpx;
+  background: var(--tt-surface);
+  transform: none;
+}
+
+.folder-label {
+  display: inline-flex;
+  min-height: 40rpx;
+  align-items: center;
+  margin: -4rpx 0 16rpx;
+  padding: 0 14rpx;
+  border: 1rpx solid var(--tt-border);
+  border-radius: 12rpx 12rpx 6rpx 6rpx;
+  background: var(--tt-surface-alt);
+  color: var(--tt-text-tertiary);
+  font-size: 19rpx;
+  font-weight: 700;
+  letter-spacing: .6rpx;
+}
+
+.folder-recovery { border-top-color: var(--tt-color-pastel-butter-stroke); }
+.folder-recovery .folder-label { background: var(--tt-color-pastel-butter-bg); color: var(--tt-color-pastel-butter-fg); }
+.folder-appeals { border-top-color: var(--tt-color-pastel-lavender-stroke); }
+.folder-appeals .folder-label { background: var(--tt-color-pastel-lavender-bg); color: var(--tt-color-pastel-lavender-fg); }
+.folder-security { border-top-color: var(--tt-color-pastel-blue-stroke); }
+.folder-security .folder-label { background: var(--tt-color-pastel-blue-bg); color: var(--tt-color-pastel-blue-fg); }
+.folder-rights { border-top-color: var(--tt-color-pastel-mint-stroke); }
+.folder-rights .folder-label { background: var(--tt-color-pastel-mint-bg); color: var(--tt-color-pastel-mint-fg); }
+.folder-billing { border-top-color: var(--tt-color-pastel-apricot-stroke); }
+.folder-billing .folder-label { background: var(--tt-color-pastel-apricot-bg); color: var(--tt-color-pastel-apricot-fg); }
+.folder-conversations { border-top-color: var(--tt-color-pastel-lavender-stroke); }
+.folder-conversations .folder-label { background: var(--tt-color-pastel-lavender-bg); color: var(--tt-color-pastel-lavender-fg); }
+.folder-deletion { border-top-color: var(--tt-color-status-danger-stroke); }
+.folder-deletion .folder-label { background: var(--tt-danger-soft); color: var(--tt-danger); }
+
+.inline-form { transform-origin: center top; }
+
+.row-button {
+  transition: opacity var(--tt-motion-press) var(--tt-ease-standard), transform var(--tt-motion-press) var(--tt-ease-standard);
+}
+
+.row-button:active { opacity: .88; transform: translateX(4rpx); }
+
+@media (prefers-reduced-motion: reduce) {
+  .account-hero,
+  .account-folder,
+  .inline-form,
+  .row-button { animation: none !important; transition: none !important; transform: none !important; }
+}
+
+.account-page.tt-motion-off .account-hero,
+.account-page.tt-motion-off .account-folder,
+.account-page.tt-motion-off .inline-form,
+.account-page.tt-motion-off .row-button {
+  animation: none !important;
+  transition: none !important;
+  transform: none !important;
 }

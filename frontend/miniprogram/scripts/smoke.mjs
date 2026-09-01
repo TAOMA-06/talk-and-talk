@@ -103,7 +103,7 @@ assert.match(
 );
 assert.match(
   communityTemplate,
-  /wx:if="\{\{publicInteractionIdentityAvailable\}\}" class="card compose"/,
+  /wx:if="\{\{publicInteractionIdentityAvailable\}\}" class="[^"]*\bcompose\b[^"]*"/,
   "the community composer must stay hidden while the first-release identity authority is frozen"
 );
 assert.match(
@@ -123,13 +123,25 @@ assert.match(
 );
 assert.match(
   ordersTemplate,
-  /publicInteractionIdentityAvailable && \(item\.status === 'pending' \|\| item\.status === 'paying'\)[\s\S]*?去支付/,
+  /publicInteractionIdentityAvailable && \(item\.status === 'pending' \|\| item\.status === 'paying'\) && item\.companionConfirmedAt[\s\S]*?进入安全支付与结果页[\s\S]*?去支付/,
   "the order list must hide payment while the identity authority is frozen"
 );
+const ordersPayHandler = /\n  pay\(event: any\) \{([\s\S]*?)\n  \},\n  async cancel/.exec(ordersSource)?.[1] || "";
+assert.ok(ordersPayHandler, "the order list must keep a dedicated payment navigation handler");
 assert.match(
-  ordersSource,
-  /async pay\(event: any\)[\s\S]*?!clientPublicInteractionIdentityGrantsAvailable\(\)[\s\S]*?return;[\s\S]*?wx\.showModal/,
-  "the order list must refuse before confirmation, subscription grants, or prepay"
+  ordersPayHandler,
+  /!clientPublicInteractionIdentityGrantsAvailable\(\)[\s\S]*?return;[\s\S]*?!\["pending", "paying"\]\.includes\(order\.status\) \|\| !order\.companionConfirmedAt[\s\S]*?return;[\s\S]*?wx\.navigateTo\(\{ url: `\/pages\/order\/payment\?orderId=\$\{encodeURIComponent\(id\)\}` \}\)/,
+  "the order list must preserve identity and payable-state gates before navigating to the dedicated payment page"
+);
+assert.equal(
+  [...ordersPayHandler.matchAll(/wx\.navigateTo/g)].length,
+  1,
+  "the order-list payment handler must contain exactly one navigation"
+);
+assert.doesNotMatch(
+  ordersPayHandler,
+  /wx\.showModal|requestTransactionalSubscriptions|api\.prepay|wx\.requestPayment|api\.syncPayment|api\.mockNotify/,
+  "the order list must not confirm, subscribe, prepay, invoke WeChat Pay, notify, or sync payment"
 );
 assert.match(
   orderDetailTemplate,
@@ -314,6 +326,7 @@ let futureBookingsDeclinedByYou = false;
 let conversationMessageWindowOpen = true;
 let communityReportSubmissionCount = 0;
 let communityWriteRateLimited = false;
+let refundResponseStatus = "pendingReview";
 let failModerationAppealsLoad = false;
 let failModerationAppealableCasesLoad = false;
 let failPaymentDisputesLoad = false;
@@ -1610,7 +1623,7 @@ function responseFor(path, method, data, query = new URLSearchParams()) {
     assert.equal(typeof data.reason, "string", "refund requests must include the customer-provided reason");
     assert.ok(data.reason.trim().length >= 2 && data.reason.trim().length <= 200, "refund reasons must stay within the user-facing limit");
     order.refund = {
-      id: "refund-1", outRefundNo: "R100", amountCents: order.amountCents, status: "pendingReview",
+      id: "refund-1", outRefundNo: "R100", amountCents: order.amountCents, status: refundResponseStatus,
       reason: data.reason.trim(), reviewNote: null, failureReason: null
     };
     return {
@@ -3625,18 +3638,43 @@ assert.deepEqual(companionSubscriptionGrants, [
   "rescheduleExpired", "rescheduleCancelled"
 ]);
 assert.match(modalInvocations.at(-1).content, /新订单/);
+const listNavigationBeforeUnconfirmedPayment = navigations.length;
 await orders.pay({ currentTarget: { dataset: { id: order.id } } });
-assert.match(modalInvocations.at(-1).content, /服务对象/);
-assert.match(modalInvocations.at(-1).content, /预约前 5 分钟/);
-assert.match(modalInvocations.at(-1).content, /全额原路退款/);
-assert.ok(calls.some((call) => call.path === "/payments/wechat/mock-notify"));
-paymentIsMock = false;
+assert.equal(navigations.length, listNavigationBeforeUnconfirmedPayment,
+  "an unconfirmed order must not navigate from the list to payment");
+assert.equal(toasts.at(-1).icon, "none", "an unpayable list order must fail closed with a neutral notice");
+
+const originalListCompanionConfirmation = order.companionConfirmedAt;
+order.companionConfirmedAt = new Date().toISOString();
+await orders.load();
+const listPaymentSideEffectsBefore = {
+  navigations: navigations.length,
+  modals: modalInvocations.length,
+  subscriptions: subscriptionRequests.length,
+  prepay: calls.filter((call) => call.path === `/orders/${order.id}/prepay` && call.method === "POST").length,
+  requestPayment: paymentInvocations.length,
+  sync: calls.filter((call) => call.path === `/orders/${order.id}/payment/sync` && call.method === "POST").length,
+  mockNotify: calls.filter((call) => call.path === "/payments/wechat/mock-notify" && call.method === "POST").length
+};
 await orders.pay({ currentTarget: { dataset: { id: order.id } } });
-assert.equal(paymentInvocations.length, 1, "real payment branch must invoke wx.requestPayment exactly once");
-assert.equal(paymentInvocations[0].package, "prepay_id=mock");
-assert.equal(paymentInvocations[0].signType, "RSA");
-assert.ok(calls.some((call) => call.path === `/orders/${order.id}/payment/sync` && call.method === "POST"),
-  "real payment branch must reconcile the payment with the backend");
+assert.equal(navigations.length, listPaymentSideEffectsBefore.navigations + 1,
+  "a payable order must navigate exactly once from the list");
+assert.equal(navigations.at(-1), `/pages/order/payment?orderId=${encodeURIComponent(order.id)}`,
+  "the order list must navigate only to the dedicated payment page");
+assert.equal(modalInvocations.length, listPaymentSideEffectsBefore.modals,
+  "the order list must not open a payment confirmation modal");
+assert.equal(subscriptionRequests.length, listPaymentSideEffectsBefore.subscriptions,
+  "the order list must not request payment subscription authorization");
+assert.equal(calls.filter((call) => call.path === `/orders/${order.id}/prepay` && call.method === "POST").length,
+  listPaymentSideEffectsBefore.prepay, "the order list must not create prepay");
+assert.equal(paymentInvocations.length, listPaymentSideEffectsBefore.requestPayment,
+  "the order list must not invoke wx.requestPayment");
+assert.equal(calls.filter((call) => call.path === `/orders/${order.id}/payment/sync` && call.method === "POST").length,
+  listPaymentSideEffectsBefore.sync, "the order list must not sync payment");
+assert.equal(calls.filter((call) => call.path === "/payments/wechat/mock-notify" && call.method === "POST").length,
+  listPaymentSideEffectsBefore.mockNotify, "the order list must not trigger a mock payment notification");
+if (originalListCompanionConfirmation === undefined) delete order.companionConfirmedAt;
+else order.companionConfirmedAt = originalListCompanionConfirmation;
 
 const serviceScheduleBeforeFulfillment = serviceOrder.scheduledAt;
 order.status = "paid";
@@ -3828,9 +3866,35 @@ const refundRequest = calls.filter((call) => call.path === `/orders/${order.id}/
 assert.equal(refundRequest.data.reason, modalContent, "the API must receive the reason entered by the customer, not a generic placeholder");
 assert.match(modalInvocations.at(-1).content, /人工审核/, "service-in-progress refund copy must explain the review path before submission");
 assert.equal(modalInvocations.at(-1).editable, true, "refund application must collect the customer's explanation");
+assert.deepEqual(
+  { title: toasts.at(-1).title, icon: toasts.at(-1).icon },
+  { title: "售后申请已提交", icon: "none" },
+  "pendingReview must use a neutral refund toast rather than a success icon"
+);
 assert.equal(orders.data.orders[0].refundStatusText, "售后审核中");
 assert.match(orders.data.orders[0].refundStatusExplanation, /显示在订单中/);
 assert.equal(orders.data.orders[0].canRequestRefund, false, "a live refund application must hide duplicate self-service submission");
+
+order.refund = null;
+refundResponseStatus = "pending";
+await orders.load();
+await orders.refund({ currentTarget: { dataset: { id: order.id } } });
+assert.deepEqual(
+  { title: toasts.at(-1).title, icon: toasts.at(-1).icon },
+  { title: "退款申请已受理", icon: "none" },
+  "pending must use a neutral refund toast rather than a success icon"
+);
+
+order.refund = null;
+refundResponseStatus = "success";
+await orders.load();
+await orders.refund({ currentTarget: { dataset: { id: order.id } } });
+assert.deepEqual(
+  { title: toasts.at(-1).title, icon: toasts.at(-1).icon },
+  { title: "退款已完成", icon: "success" },
+  "only an authoritative success refund response may use the success icon"
+);
+refundResponseStatus = "pendingReview";
 
 order.refund = {
   ...order.refund,
@@ -4640,6 +4704,11 @@ const frozenListPrepayCalls = calls.filter((call) =>
 ).length;
 const frozenListSubscriptionRequests = subscriptionRequests.length;
 const frozenListModals = modalInvocations.length;
+const frozenListNavigations = navigations.length;
+const frozenListPaymentInvocations = paymentInvocations.length;
+const frozenListPaymentSyncCalls = calls.filter((call) =>
+  call.path === `/orders/${order.id}/payment/sync` && call.method === "POST"
+).length;
 await orders.pay({ currentTarget: { dataset: { id: order.id } } });
 assert.equal(calls.filter((call) =>
   call.path === `/orders/${order.id}/prepay` && call.method === "POST"
@@ -4648,6 +4717,13 @@ assert.equal(subscriptionRequests.length, frozenListSubscriptionRequests,
   "a frozen order list must not request subscription authorization before refusing payment");
 assert.equal(modalInvocations.length, frozenListModals,
   "a frozen order list must refuse before opening payment confirmation");
+assert.equal(navigations.length, frozenListNavigations,
+  "a frozen order list must refuse before navigating to the payment page");
+assert.equal(paymentInvocations.length, frozenListPaymentInvocations,
+  "a frozen order list must not invoke wx.requestPayment");
+assert.equal(calls.filter((call) =>
+  call.path === `/orders/${order.id}/payment/sync` && call.method === "POST"
+).length, frozenListPaymentSyncCalls, "a frozen order list must not sync payment");
 
 await orderDetail.load();
 assert.equal(orderDetail.data.view.canPay, false, "release order detail must hide payment");
@@ -4709,6 +4785,32 @@ assert.match(payment.data.stateMessage, /请勿支付并联系平台客服/);
 assert.equal(payment.data.paymentState, "success", "payment success must be based on backend synchronization");
 assert.ok(calls.some((call) => call.path === `/orders/${order.id}/payment/sync` && call.method === "POST"));
 assert.ok(calls.some((call) => call.path === "/payments/wechat/mock-notify" && call.method === "POST"));
+const realPaymentInvocationsBefore = paymentInvocations.length;
+const realPaymentSyncCallsBefore = calls.filter((call) =>
+  call.path === `/orders/${order.id}/payment/sync` && call.method === "POST"
+).length;
+const mockNotificationsBeforeRealPayment = calls.filter((call) =>
+  call.path === "/payments/wechat/mock-notify" && call.method === "POST"
+).length;
+paymentIsMock = false;
+await payment.load();
+payment.setData({ termsConfirmed: true });
+await payment.pay();
+assert.equal(paymentInvocations.length, realPaymentInvocationsBefore + 1,
+  "the dedicated payment page must invoke wx.requestPayment exactly once for a real prepay response");
+assert.equal(paymentInvocations.at(-1).package, "prepay_id=mock");
+assert.equal(paymentInvocations.at(-1).signType, "RSA");
+assert.equal(calls.filter((call) =>
+  call.path === "/payments/wechat/mock-notify" && call.method === "POST"
+).length, mockNotificationsBeforeRealPayment,
+"a real payment response must not use the mock notification endpoint");
+assert.ok(calls.filter((call) =>
+  call.path === `/orders/${order.id}/payment/sync` && call.method === "POST"
+).length > realPaymentSyncCallsBefore,
+"the dedicated payment page must reconcile the real WeChat invocation with the backend");
+assert.equal(payment.data.paymentState, "success",
+  "a successful WeChat invocation must still wait for service-authoritative synchronization");
+paymentIsMock = true;
 payment.openOrderDetail();
 assert.equal(navigations.at(-1), `/pages/order/detail?id=${order.id}`);
 order.status = previousOrderStatus;
@@ -5363,8 +5465,26 @@ serviceRescheduleRequest = historicalVoiceRequestOriginal;
 environmentVersion = historicalVoiceEnvironmentOriginal;
 
 modalConfirm = true;
+const deletionRequestsBeforeProfileEntry = calls.filter((call) =>
+  call.path === "/me/deletion-request" && call.method === "POST"
+).length;
+const deletionNavigationsBeforeProfileEntry = navigations.length;
 await profile.requestDeletion();
-assert.ok(calls.some((call) => call.path === "/me/deletion-request"));
+assert.equal(navigations.length, deletionNavigationsBeforeProfileEntry + 1,
+  "the profile deletion entry must navigate exactly once to the authoritative account center");
+assert.equal(navigations.at(-1), "/pages/account/index");
+assert.equal(calls.filter((call) =>
+  call.path === "/me/deletion-request" && call.method === "POST"
+).length, deletionRequestsBeforeProfileEntry,
+"the profile shortcut must not bypass the account center's live deletion policy and status");
+await accountCenter.loadDeletionRequest();
+assert.equal(accountCenter.data.deletionState, "empty");
+assert.equal(accountCenter.data.deletionCanRequest, true);
+await accountCenter.requestDeletion();
+assert.equal(calls.filter((call) =>
+  call.path === "/me/deletion-request" && call.method === "POST"
+).length, deletionRequestsBeforeProfileEntry + 1,
+"the authoritative account center must submit the deletion request exactly once");
 await accountCenter.loadDeletionRequest();
 assert.equal(accountCenter.data.deletionRequest.status, "pending");
 assert.equal(accountCenter.data.deletionRequest.canCancel, true, "a pending deletion must expose the caller-owned cancellation entry");

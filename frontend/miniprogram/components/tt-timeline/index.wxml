@@ -1,0 +1,10 @@
+<view class="timeline" aria-role="list">
+  <view wx:for="{{items}}" wx:key="id" class="timeline-item" aria-role="listitem">
+    <view class="timeline-rail"><view class="timeline-dot"></view><view wx:if="{{index < items.length - 1}}" class="timeline-line"></view></view>
+    <view class="timeline-card">
+      <view class="timeline-top"><text class="timeline-time">{{item.time}}</text><tt-status wx:if="{{item.statusText}}" text="{{item.statusText}}" tone="{{item.statusTone || 'neutral'}}" /></view>
+      <view class="timeline-title">{{item.title}}</view>
+      <view wx:if="{{item.description}}" class="timeline-description">{{item.description}}</view>
+    </view>
+  </view>
+</view>

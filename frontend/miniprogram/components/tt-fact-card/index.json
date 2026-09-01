@@ -1,0 +1,1 @@
+{ "component": true, "usingComponents": { "tt-card-shell": "../tt-card-shell/index", "tt-status": "../tt-status/index" } }

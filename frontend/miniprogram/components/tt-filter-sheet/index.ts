@@ -5,7 +5,9 @@ Component({
     title: { type: String, value: "筛选" },
     summary: { type: String, value: "" },
     applyText: { type: String, value: "查看结果" },
-    resetText: { type: String, value: "重置" }
+    resetText: { type: String, value: "重置" },
+    motionLevel: { type: String, value: "m1" },
+    motionOff: { type: Boolean, value: false }
   },
   methods: {
     close() { this.triggerEvent("close"); },

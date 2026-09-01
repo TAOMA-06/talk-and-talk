@@ -1,0 +1,1496 @@
+/*
+ * Talk&Talk UI 4.0 — Pastel Card Theatre
+ * Scope is intentionally limited to AppShell's five public marketing routes.
+ * Product/private routes never receive `.marketing-shell`.
+ */
+
+.marketing-shell {
+  --ui4-blue: #dce8f2;
+  --ui4-blue-line: #b7ccdc;
+  --ui4-blue-ink: #2f4c62;
+  --ui4-apricot: #f2dfd4;
+  --ui4-apricot-line: #ddbcab;
+  --ui4-apricot-ink: #674337;
+  --ui4-mint: #ddebe2;
+  --ui4-mint-line: #b9d0c2;
+  --ui4-mint-ink: #305346;
+  --ui4-lavender: #e9e1ef;
+  --ui4-lavender-line: #cec0d9;
+  --ui4-lavender-ink: #544564;
+  --ui4-butter: #f3ebcf;
+  --ui4-butter-line: #dacd9e;
+  --ui4-butter-ink: #65541e;
+  --ui4-rose: #f0e0e6;
+  --ui4-rose-line: #dabec8;
+  --ui4-rose-ink: #69444f;
+  --ui4-paper: #fffdfa;
+  --ui4-ink: #272521;
+  --ui4-shadow-low: 0 1px 0 rgba(255, 255, 255, 0.86) inset,
+    0 10px 26px rgba(59, 52, 45, 0.08);
+  --ui4-shadow-card: 0 1px 0 rgba(255, 255, 255, 0.88) inset,
+    0 18px 38px rgba(59, 52, 45, 0.12),
+    0 4px 9px rgba(59, 52, 45, 0.06);
+  --ui4-shadow-float: 0 2px 0 rgba(255, 255, 255, 0.9) inset,
+    0 28px 58px rgba(59, 52, 45, 0.16),
+    0 8px 16px rgba(59, 52, 45, 0.08);
+  --ui4-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --ui4-ease-snap: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --radius-lg: 22px;
+  --radius-xl: 30px;
+  background:
+    radial-gradient(circle at 6% 8%, rgba(233, 225, 239, 0.72), transparent 24rem),
+    radial-gradient(circle at 96% 20%, rgba(221, 235, 226, 0.68), transparent 27rem),
+    #f6f4f1;
+}
+
+.marketing-shell .site-main {
+  overflow: clip;
+  background: transparent;
+}
+
+.marketing-shell .marketing-header {
+  border-bottom-color: rgba(79, 72, 65, 0.12);
+  background: rgba(250, 248, 245, 0.88);
+  box-shadow: 0 8px 30px rgba(61, 55, 49, 0.045);
+  backdrop-filter: blur(18px) saturate(1.08);
+}
+
+.marketing-shell .header-inner {
+  min-height: 76px;
+}
+
+.marketing-shell .brand-lockup,
+.marketing-shell .nav-link,
+.marketing-shell .marketing-mobile-link,
+.marketing-shell .button,
+.marketing-shell .text-link,
+.marketing-shell .bubble-text-link,
+.marketing-shell summary {
+  min-height: 44px;
+}
+
+.marketing-shell .nav-link {
+  display: inline-flex;
+  padding: 11px 10px;
+  align-items: center;
+  border-radius: 12px;
+  transition:
+    color 180ms ease,
+    background-color 180ms ease,
+    transform 180ms var(--ui4-ease-snap);
+}
+
+.marketing-shell .nav-link:hover {
+  background: rgba(255, 255, 255, 0.72);
+  transform: translateY(-1px);
+}
+
+.marketing-shell .nav-link.active {
+  background: var(--ui4-lavender);
+  color: var(--ui4-lavender-ink);
+}
+
+.marketing-shell .nav-link::after {
+  display: none;
+}
+
+.marketing-shell .button {
+  border-radius: 14px;
+  transition:
+    transform 180ms var(--ui4-ease-snap),
+    box-shadow 180ms ease,
+    background-color 180ms ease,
+    border-color 180ms ease;
+}
+
+.marketing-shell .button:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+.marketing-shell .button:active:not(:disabled) {
+  transform: translateY(0) scale(0.985);
+  transition-duration: 90ms;
+}
+
+.marketing-shell .button-primary {
+  border-color: #292724;
+  background: #292724;
+  box-shadow: 0 7px 0 rgba(41, 39, 36, 0.13);
+  color: #fff;
+}
+
+.marketing-shell .button-primary:hover:not(:disabled) {
+  border-color: #171614;
+  background: #171614;
+  box-shadow: 0 10px 18px rgba(41, 39, 36, 0.16);
+}
+
+.marketing-shell .button-secondary {
+  border-color: rgba(74, 68, 61, 0.28);
+  background: rgba(255, 253, 250, 0.9);
+  box-shadow: 0 5px 0 rgba(74, 68, 61, 0.07);
+}
+
+.marketing-shell .site-footer {
+  border-top-color: rgba(79, 72, 65, 0.12);
+  background:
+    linear-gradient(105deg, rgba(233, 225, 239, 0.55), rgba(221, 235, 226, 0.58)),
+    #efeeea;
+}
+
+.marketing-shell .bubble-site,
+.marketing-shell .marketing-detail-page,
+.marketing-shell .content-page {
+  width: min(calc(100% - 48px), 1180px);
+}
+
+.marketing-shell .bubble-site,
+.marketing-shell .marketing-detail-page {
+  padding-bottom: 132px;
+}
+
+.marketing-shell .eyebrow,
+.marketing-shell .hero-brand,
+.theatre-stage small {
+  font-weight: 760;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.marketing-shell h1,
+.marketing-shell h2,
+.marketing-shell h3 {
+  text-wrap: balance;
+}
+
+.marketing-shell p {
+  text-wrap: pretty;
+}
+
+.marketing-shell .public-rule-links {
+  display: flex;
+  width: min(100%, 760px);
+  margin-top: 34px;
+  padding-top: 18px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 18px;
+  border-top: 1px solid rgba(79, 72, 65, .14);
+}
+
+.marketing-shell .public-rule-links a {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 720;
+  text-decoration: underline;
+  text-decoration-color: rgba(69, 65, 61, .28);
+  text-underline-offset: 4px;
+  transition: color 160ms ease, text-decoration-color 160ms ease;
+}
+
+.marketing-shell .public-rule-links a:hover {
+  color: var(--ink);
+  text-decoration-color: currentColor;
+}
+
+.marketing-shell .public-rule-links-on-pastel {
+  border-top-color: rgba(84, 69, 100, .18);
+}
+
+.marketing-shell .public-rule-links-on-pastel a {
+  color: var(--ui4-lavender-ink);
+}
+
+/* ── Shared three-dimensional theatre stage ───────────────────── */
+
+.theatre-stage {
+  position: relative;
+  width: min(100%, 520px);
+  min-height: 520px;
+  margin-left: auto;
+  overflow: hidden;
+  border: 1px solid rgba(77, 70, 63, 0.14);
+  border-radius: 30px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.82), rgba(255, 253, 250, 0.38)),
+    var(--ui4-apricot);
+  box-shadow: var(--ui4-shadow-card);
+  perspective: 1200px;
+  transform-style: preserve-3d;
+  isolation: isolate;
+}
+
+.theatre-stage::before {
+  position: absolute;
+  right: -10%;
+  bottom: -12%;
+  left: -10%;
+  height: 34%;
+  border-radius: 50%;
+  background: rgba(84, 75, 67, 0.09);
+  filter: blur(25px);
+  content: "";
+  transform: rotate(-3deg);
+}
+
+.theatre-stage-grid {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    linear-gradient(rgba(91, 83, 74, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(91, 83, 74, 0.055) 1px, transparent 1px);
+  background-size: 34px 34px;
+  mask-image: linear-gradient(to bottom, transparent, #000 20%, #000 82%, transparent);
+  pointer-events: none;
+}
+
+.theatre-card,
+.work-note,
+.partner-paper,
+.path-card-stack,
+.theatre-stage-note {
+  position: absolute;
+  z-index: 2;
+  border: 1px solid rgba(69, 63, 57, 0.14);
+  border-radius: 24px;
+  box-shadow: var(--ui4-shadow-card);
+  backface-visibility: hidden;
+  transform-style: preserve-3d;
+  transition:
+    translate 520ms var(--ui4-ease),
+    rotate 520ms var(--ui4-ease),
+    box-shadow 520ms var(--ui4-ease),
+    filter 360ms ease;
+}
+
+.theatre-card {
+  display: flex;
+  width: 240px;
+  min-height: 305px;
+  padding: 30px 26px 26px;
+  flex-direction: column;
+}
+
+.theatre-card small,
+.work-note small,
+.partner-paper small,
+.theatre-stage-note small {
+  color: currentColor;
+  font-size: 9px;
+  opacity: 0.68;
+}
+
+.theatre-card strong {
+  margin-top: auto;
+  font-size: 29px;
+  letter-spacing: -0.05em;
+  line-height: 1.05;
+}
+
+.theatre-card > span:last-child {
+  margin-top: 15px;
+  font-size: 12px;
+  line-height: 1.6;
+  opacity: 0.76;
+}
+
+.theatre-card-mark {
+  display: grid;
+  width: 45px;
+  height: 39px;
+  margin: -4px 0 18px auto;
+  place-items: center;
+  border: 2px solid currentColor;
+  border-radius: 13px 13px 13px 4px;
+  font-size: 14px;
+  letter-spacing: 0.12em;
+}
+
+.theatre-card-back {
+  top: 116px;
+  right: 18px;
+  rotate: 8deg;
+  background: var(--ui4-rose);
+  color: var(--ui4-rose-ink);
+}
+
+.theatre-card-mid {
+  top: 130px;
+  right: 126px;
+  rotate: -6deg;
+  background: var(--ui4-mint);
+  color: var(--ui4-mint-ink);
+}
+
+.theatre-card-front {
+  top: 68px;
+  right: 66px;
+  z-index: 4;
+  rotate: 1.5deg;
+  background: var(--ui4-blue);
+  color: var(--ui4-blue-ink);
+  box-shadow: var(--ui4-shadow-float);
+}
+
+.theatre-stage-listening:hover .theatre-card-front {
+  translate: -8px -13px;
+  rotate: -1deg;
+  box-shadow: 0 34px 68px rgba(59, 52, 45, 0.19);
+}
+
+.theatre-stage-listening:hover .theatre-card-mid {
+  translate: -14px 5px;
+  rotate: -8deg;
+}
+
+.theatre-stage-listening:hover .theatre-card-back {
+  translate: 12px 3px;
+  rotate: 10deg;
+}
+
+.quiet-prop {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  transform-origin: 50% 100%;
+}
+
+.quiet-prop svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  fill: none;
+  stroke: #393631;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.2;
+}
+
+.quiet-prop .prop-fill-apricot { fill: #f3e5ce; }
+.quiet-prop .prop-fill-lavender { fill: #ede1e8; }
+.quiet-prop .prop-fill-blue { fill: #dce8f2; }
+.quiet-prop .prop-fill-mint { fill: #ddebe2; }
+.quiet-prop .prop-fill-rose { fill: #f0e0e6; }
+.quiet-prop .prop-fill-butter { fill: #f3ebcf; }
+
+.quiet-lamp {
+  bottom: 17px;
+  left: 12px;
+  width: 118px;
+}
+
+.quiet-lamp i {
+  position: absolute;
+  top: 8px;
+  left: 20px;
+  z-index: -1;
+  width: 78px;
+  height: 78px;
+  border-radius: 50%;
+  background: rgba(243, 235, 207, 0.75);
+  filter: blur(3px);
+}
+
+.quiet-cup {
+  bottom: 12px;
+  left: 108px;
+  width: 76px;
+}
+
+.theatre-stage-note {
+  bottom: 24px;
+  left: 24px;
+  z-index: 6;
+  width: min(58%, 258px);
+  padding: 15px 17px;
+  border-radius: 17px;
+  background: rgba(255, 253, 250, 0.9);
+  color: var(--ui4-ink);
+  box-shadow: var(--ui4-shadow-low);
+  backdrop-filter: blur(12px);
+}
+
+.theatre-stage-note strong {
+  display: block;
+  margin-top: 5px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/* Path assembly */
+.theatre-stage-path {
+  min-height: 470px;
+  background:
+    radial-gradient(circle at 17% 25%, rgba(255, 255, 255, 0.82), transparent 27%),
+    var(--ui4-mint);
+}
+
+.quiet-thread {
+  top: 28px;
+  left: 24px;
+  width: 168px;
+}
+
+.quiet-thread .thread-line {
+  stroke-dasharray: 4 6;
+}
+
+.path-paper {
+  position: absolute;
+  top: 92px;
+  right: 39px;
+  width: 76%;
+  height: 292px;
+  border: 1px solid rgba(69, 63, 57, 0.12);
+  border-radius: 26px;
+  background: rgba(255, 253, 250, 0.58);
+  box-shadow: var(--ui4-shadow-card);
+  rotate: 5deg;
+}
+
+.path-card-stack {
+  top: 79px;
+  right: 55px;
+  display: grid;
+  width: 74%;
+  margin: 0;
+  padding: 18px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  list-style: none;
+  background: rgba(255, 253, 250, 0.94);
+  rotate: -2.5deg;
+}
+
+.path-card-stack li {
+  display: grid;
+  min-height: 112px;
+  padding: 15px;
+  align-content: start;
+  border: 1px solid rgba(69, 63, 57, 0.1);
+  border-radius: 16px;
+}
+
+.path-card-stack li:nth-child(1) { background: var(--ui4-blue); color: var(--ui4-blue-ink); }
+.path-card-stack li:nth-child(2) { background: var(--ui4-apricot); color: var(--ui4-apricot-ink); }
+.path-card-stack li:nth-child(3) { background: var(--ui4-lavender); color: var(--ui4-lavender-ink); }
+.path-card-stack li:nth-child(4) { background: var(--ui4-butter); color: var(--ui4-butter-ink); }
+.path-card-stack span { font-size: 9px; font-weight: 780; letter-spacing: 0.09em; }
+.path-card-stack strong { margin-top: 15px; font-size: 17px; }
+.path-card-stack small { margin-top: 4px; font-size: 10px; }
+
+.path-stage-note {
+  right: 22px;
+  bottom: 21px;
+  left: auto;
+}
+
+.theatre-stage-path:hover .path-card-stack {
+  translate: -8px -10px;
+  rotate: -4deg;
+}
+
+.theatre-stage-path:hover .path-paper {
+  translate: 9px 7px;
+  rotate: 7deg;
+}
+
+/* Open worktable */
+.theatre-stage-worktable {
+  min-height: 470px;
+  background: var(--ui4-butter);
+}
+
+.work-grid-paper {
+  position: absolute;
+  top: 62px;
+  right: 34px;
+  width: 76%;
+  height: 330px;
+  border: 1px solid rgba(69, 63, 57, 0.12);
+  border-radius: 24px;
+  background-color: #e8eef1;
+  background-image:
+    linear-gradient(rgba(67, 89, 105, 0.085) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(67, 89, 105, 0.085) 1px, transparent 1px);
+  background-size: 21px 21px;
+  box-shadow: var(--ui4-shadow-card);
+  rotate: 2deg;
+}
+
+.work-note {
+  padding: 24px;
+}
+
+.work-note-main {
+  top: 80px;
+  left: 34px;
+  width: 64%;
+  min-height: 246px;
+  background: var(--ui4-mint);
+  color: var(--ui4-mint-ink);
+  rotate: -3deg;
+}
+
+.work-note-main strong {
+  display: block;
+  margin-top: 34px;
+  font-size: 25px;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+}
+
+.work-note-main span {
+  display: block;
+  margin-top: 15px;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.work-note-pin {
+  top: 55px;
+  right: 24px;
+  z-index: 4;
+  width: 39%;
+  min-height: 198px;
+  background: var(--ui4-rose);
+  color: var(--ui4-rose-ink);
+  rotate: 5deg;
+}
+
+.work-note-pin i {
+  display: block;
+  width: 10px;
+  height: 10px;
+  margin: -9px 0 12px auto;
+  border: 3px solid rgba(255, 255, 255, 0.64);
+  border-radius: 50%;
+  background: #3c3833;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.work-note-pin strong {
+  display: block;
+  margin-top: 24px;
+  font-size: 17px;
+  line-height: 1.3;
+}
+
+.work-stage-note {
+  right: 24px;
+  bottom: 22px;
+  left: auto;
+}
+
+.theatre-stage-worktable .quiet-folder {
+  bottom: 4px;
+  left: 4px;
+  width: 124px;
+}
+
+.theatre-stage-worktable:hover .work-note-main { translate: -6px -10px; rotate: -4deg; }
+.theatre-stage-worktable:hover .work-note-pin { translate: 8px -12px; rotate: 7deg; }
+
+/* Partner folder desk */
+.theatre-stage-partners {
+  min-height: 470px;
+  background: var(--ui4-apricot);
+}
+
+.theatre-stage-partners .quiet-folder {
+  top: 20px;
+  left: 18px;
+  width: 142px;
+}
+
+.partner-paper {
+  top: 80px;
+  right: 42px;
+  width: 70%;
+  min-height: 290px;
+  padding: 28px;
+}
+
+.partner-paper-back {
+  background: var(--ui4-mint);
+  rotate: 6deg;
+}
+
+.partner-paper-main {
+  z-index: 3;
+  background: var(--ui4-paper);
+  color: var(--ui4-ink);
+  rotate: -2.5deg;
+}
+
+.partner-paper-main strong {
+  display: block;
+  margin-top: 38px;
+  font-size: 27px;
+  letter-spacing: -0.045em;
+}
+
+.partner-paper-main ul {
+  display: grid;
+  margin: 25px 0 0;
+  padding: 0;
+  gap: 0;
+  list-style: none;
+}
+
+.partner-paper-main li {
+  padding: 9px 0;
+  border-top: 1px solid rgba(69, 63, 57, 0.13);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.partner-stamp {
+  position: absolute;
+  right: 20px;
+  bottom: 24px;
+  z-index: 5;
+  display: grid;
+  padding: 13px 16px;
+  grid-template-columns: 25px auto;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--ui4-lavender-line);
+  border-radius: 15px;
+  background: var(--ui4-lavender);
+  box-shadow: var(--ui4-shadow-low);
+  color: var(--ui4-lavender-ink);
+  rotate: 3deg;
+}
+
+.partner-stamp span {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  place-items: center;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+}
+
+.partner-stamp strong { font-size: 11px; }
+.theatre-stage-partners:hover .partner-paper-main { translate: -8px -10px; rotate: -4deg; }
+.theatre-stage-partners:hover .partner-paper-back { translate: 8px 7px; rotate: 8deg; }
+
+/* ── Home: Listening Lounge / layered card theatre ───────────── */
+
+.marketing-shell .bubble-hero {
+  position: relative;
+  margin-top: 28px;
+  overflow: visible;
+  border: 0;
+  border-radius: 34px;
+  background:
+    linear-gradient(125deg, rgba(220, 232, 242, 0.96), rgba(242, 223, 212, 0.9) 56%, rgba(221, 235, 226, 0.94));
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 26px 64px rgba(63, 56, 49, 0.12);
+}
+
+.marketing-shell .bubble-hero::before,
+.marketing-shell .bubble-hero::after {
+  display: block;
+  position: absolute;
+  z-index: -1;
+  border: 1px solid rgba(82, 74, 66, 0.1);
+  border-radius: 34px;
+  background: rgba(255, 253, 250, 0.72);
+  content: "";
+  pointer-events: none;
+}
+
+.marketing-shell .bubble-hero::before {
+  inset: 13px -10px -13px 16px;
+  rotate: 0.8deg;
+}
+
+.marketing-shell .bubble-hero::after {
+  inset: 24px 13px -24px -9px;
+  z-index: -2;
+  rotate: -0.7deg;
+  opacity: 0.62;
+}
+
+.marketing-shell .bubble-hero-grid {
+  display: grid;
+  min-height: 680px;
+  padding: clamp(40px, 5vw, 70px);
+  grid-template-columns: minmax(0, 0.94fr) minmax(430px, 1.06fr);
+  align-items: center;
+  gap: clamp(34px, 5vw, 70px);
+}
+
+.marketing-shell .bubble-hero h1 {
+  max-width: 10ch;
+  color: var(--ui4-ink);
+  font-size: clamp(48px, 6vw, 78px);
+  line-height: 0.99;
+}
+
+.marketing-shell .bubble-hero h1 span {
+  color: var(--ui4-blue-ink);
+}
+
+.marketing-shell .bubble-hero .hero-brand,
+.marketing-shell .bubble-hero .hero-lead {
+  color: #3d4850;
+}
+
+.marketing-shell .hero-trust-strip {
+  border: 0;
+  border-radius: 18px;
+  background: rgba(255, 253, 250, 0.58);
+  box-shadow: 0 0 0 1px rgba(79, 72, 65, 0.12), 0 9px 0 rgba(79, 72, 65, 0.05);
+  backdrop-filter: blur(12px);
+}
+
+.marketing-shell .hero-trust-strip li {
+  min-height: 74px;
+  border: 0;
+  border-right: 1px solid rgba(79, 72, 65, 0.11);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ui4-ink);
+}
+
+.marketing-shell .hero-trust-strip li:nth-child(n) {
+  border-color: rgba(79, 72, 65, 0.11);
+  background: transparent;
+  color: var(--ui4-ink);
+}
+
+.marketing-shell .hero-trust-strip li:last-child { border-right: 0; }
+
+.marketing-shell .home-values,
+.marketing-shell .bubble-moments,
+.marketing-shell .home-path,
+.marketing-shell .home-trust,
+.marketing-shell .bubble-channels,
+.marketing-shell .bubble-symbol,
+.marketing-shell .bubble-closing {
+  margin-top: clamp(78px, 10vw, 124px);
+}
+
+.marketing-shell .bubble-heading,
+.marketing-shell .editorial-heading,
+.marketing-shell .site-heading {
+  max-width: 760px;
+  margin-bottom: 34px;
+}
+
+.marketing-shell .bubble-heading .eyebrow,
+.marketing-shell .editorial-heading .eyebrow,
+.marketing-shell .site-heading .eyebrow {
+  display: inline-flex;
+  min-height: 31px;
+  margin-bottom: 14px;
+  padding: 7px 11px;
+  align-items: center;
+  border: 1px solid rgba(79, 72, 65, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 253, 250, 0.76);
+}
+
+.marketing-shell .bubble-heading h2,
+.marketing-shell .editorial-heading h2,
+.marketing-shell .site-heading h2 {
+  font-size: clamp(34px, 4.4vw, 56px);
+  line-height: 1.08;
+}
+
+.marketing-shell .home-value-grid {
+  overflow: visible;
+  border: 0;
+  background: transparent;
+  gap: 20px;
+  perspective: 1000px;
+}
+
+.marketing-shell .home-value-grid > * {
+  min-width: 0;
+  perspective: 900px;
+}
+
+.marketing-shell .home-value-card,
+.marketing-shell .home-trust-card,
+.marketing-shell .bubble-channel-card,
+.marketing-shell .journey-explainer-card,
+.marketing-shell .partner-path-card {
+  position: relative;
+  z-index: 1;
+  border-radius: 24px;
+  box-shadow:
+    5px 7px 0 rgba(76, 69, 62, 0.075),
+    10px 14px 0 rgba(76, 69, 62, 0.035),
+    var(--ui4-shadow-low);
+  transform-origin: 50% 84%;
+  transition:
+    transform 420ms var(--ui4-ease),
+    box-shadow 420ms var(--ui4-ease),
+    filter 240ms ease;
+}
+
+.marketing-shell .home-value-grid > *:nth-child(1) .home-value-card { rotate: -1.2deg; }
+.marketing-shell .home-value-grid > *:nth-child(2) .home-value-card { translate: 0 -9px; rotate: 0.5deg; }
+.marketing-shell .home-value-grid > *:nth-child(3) .home-value-card { rotate: 1.1deg; }
+
+.marketing-shell .home-value-card:hover,
+.marketing-shell .home-trust-card:hover,
+.marketing-shell .bubble-channel-card:hover,
+.marketing-shell .journey-explainer-card:hover,
+.marketing-shell .partner-path-card:hover {
+  z-index: 5;
+  transform: translate3d(0, -9px, 28px) rotateX(1.4deg);
+  box-shadow:
+    7px 10px 0 rgba(76, 69, 62, 0.06),
+    16px 22px 0 rgba(76, 69, 62, 0.025),
+    var(--ui4-shadow-float);
+}
+
+.marketing-shell .home-value-card::after,
+.marketing-shell .home-trust-card::after,
+.marketing-shell .bubble-channel-card::after,
+.marketing-shell .journey-explainer-card::after,
+.marketing-shell .partner-path-card::after {
+  position: absolute;
+  top: 16px;
+  right: 17px;
+  width: 16px;
+  height: 16px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  content: "";
+  opacity: 0.16;
+  pointer-events: none;
+}
+
+.marketing-shell .home-value-card { min-height: 255px; padding: 30px; }
+
+.marketing-shell .home-moment-list {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.marketing-shell .home-moment-list > *:nth-child(1) { grid-column: span 7; }
+.marketing-shell .home-moment-list > *:nth-child(2) { grid-column: span 5; }
+.marketing-shell .home-moment-list > *:nth-child(3) { grid-column: 3 / span 8; }
+
+.marketing-shell .home-moment-row {
+  position: relative;
+  min-height: 180px;
+  padding: 30px;
+  align-content: end;
+  border: 1px solid rgba(79, 72, 65, 0.12);
+  border-radius: 26px;
+  box-shadow: var(--ui4-shadow-card);
+  transition: transform 420ms var(--ui4-ease), box-shadow 420ms var(--ui4-ease);
+}
+
+.marketing-shell .home-moment-list > *:nth-child(1) .home-moment-row { background: var(--ui4-blue); }
+.marketing-shell .home-moment-list > *:nth-child(2) .home-moment-row { background: var(--ui4-rose); }
+.marketing-shell .home-moment-list > *:nth-child(3) .home-moment-row { background: var(--ui4-butter); }
+
+.marketing-shell .home-moment-row::before {
+  display: block;
+  position: absolute;
+  top: 22px;
+  right: 24px;
+  width: 50px;
+  height: 42px;
+  border: 2px solid currentColor;
+  border-radius: 15px 15px 15px 5px;
+  content: "•••";
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  line-height: 36px;
+  text-align: center;
+  opacity: 0.45;
+}
+
+.marketing-shell .home-moment-row::after {
+  display: block;
+  position: absolute;
+  inset: 9px -8px -9px 10px;
+  z-index: -1;
+  border: 1px solid rgba(79, 72, 65, 0.09);
+  border-radius: 26px;
+  background: rgba(255, 253, 250, 0.74);
+  content: "";
+  rotate: 0.8deg;
+}
+
+.marketing-shell .home-moment-row:hover {
+  transform: translateY(-7px) rotate(-0.45deg);
+  box-shadow: var(--ui4-shadow-float);
+}
+
+.marketing-shell .home-path {
+  overflow: visible;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.marketing-shell .home-path .bubble-path-inner {
+  overflow: hidden;
+  border: 1px solid var(--ui4-lavender-line);
+  border-radius: 30px;
+  background: var(--ui4-lavender);
+  box-shadow: 10px 13px 0 rgba(84, 69, 100, 0.08), var(--ui4-shadow-card);
+  color: var(--ui4-lavender-ink);
+}
+
+.marketing-shell .home-path .bubble-heading-light,
+.marketing-shell .home-path .bubble-heading-light .eyebrow,
+.marketing-shell .home-path .bubble-heading-light h2,
+.marketing-shell .home-path .bubble-heading-light p,
+.marketing-shell .home-path .bubble-path-steps strong,
+.marketing-shell .home-path .bubble-path-steps p {
+  color: var(--ui4-lavender-ink);
+}
+
+.marketing-shell .home-path .bubble-path-steps li {
+  border-color: rgba(84, 69, 100, 0.18);
+  background: rgba(255, 253, 250, 0.55);
+  box-shadow: 4px 6px 0 rgba(84, 69, 100, 0.07);
+  transition: transform 320ms var(--ui4-ease), background-color 220ms ease;
+}
+
+.marketing-shell .home-path .bubble-path-steps li:hover {
+  transform: translateY(-5px);
+  background: rgba(255, 253, 250, 0.78);
+}
+
+.marketing-shell .home-path .bubble-path-actions .button-primary {
+  background: #292724;
+  color: #fff;
+}
+
+.marketing-shell .home-path .bubble-path-actions .button-secondary {
+  border-color: rgba(84, 69, 100, 0.3);
+  background: rgba(255, 253, 250, 0.7);
+  color: var(--ui4-lavender-ink);
+}
+
+.marketing-shell .home-trust-grid,
+.marketing-shell .bubble-channel-grid { gap: 22px; }
+
+.marketing-shell .home-trust-card { min-height: 230px; }
+
+.marketing-shell .home-trust-grid > *:nth-child(1) .home-trust-card { rotate: -0.7deg; }
+.marketing-shell .home-trust-grid > *:nth-child(2) .home-trust-card { translate: 0 8px; rotate: 0.7deg; }
+.marketing-shell .home-trust-grid > *:nth-child(3) .home-trust-card { rotate: 0.5deg; }
+.marketing-shell .home-trust-grid > *:nth-child(4) .home-trust-card { translate: 0 8px; rotate: -0.5deg; }
+
+.marketing-shell .bubble-channel-card { min-height: 265px; }
+.marketing-shell .bubble-channel-card.primary,
+.marketing-shell .bubble-channel-card:nth-child(1) {
+  border-color: var(--ui4-apricot-line);
+  background: var(--ui4-apricot) !important;
+  color: var(--ui4-apricot-ink);
+}
+.marketing-shell .bubble-channel-card:nth-child(2) { background: var(--ui4-blue); }
+.marketing-shell .bubble-channel-card:nth-child(3) { background: var(--ui4-butter); }
+.marketing-shell .bubble-channel-card.primary .eyebrow,
+.marketing-shell .bubble-channel-card.primary p:not(.eyebrow) { color: var(--ui4-apricot-ink); }
+.marketing-shell .bubble-channel-card.primary .bubble-channel-icon { background: rgba(255, 253, 250, 0.72); }
+.marketing-shell .bubble-channel-card.primary .button-secondary { border-color: rgba(103, 67, 55, 0.3); background: rgba(255,253,250,.7); color: var(--ui4-apricot-ink); }
+.marketing-shell .bubble-channel-card.primary .button-primary { background: #292724; color: #fff; }
+
+.marketing-shell .mint-symbol-panel {
+  position: relative;
+  overflow: visible;
+  border-color: var(--ui4-rose-line);
+  background: var(--ui4-rose);
+  box-shadow: 11px 14px 0 rgba(105, 68, 79, 0.075), var(--ui4-shadow-card);
+}
+
+.marketing-shell .mint-icon-stage {
+  border: 1px solid rgba(105, 68, 79, 0.14);
+  border-radius: 28px;
+  background: rgba(255, 253, 250, 0.62);
+  rotate: 1.4deg;
+}
+
+.marketing-shell .mint-icon-image {
+  filter: saturate(0.7) brightness(1.02);
+  box-shadow: var(--ui4-shadow-card);
+  transition: transform 520ms var(--ui4-ease), filter 320ms ease;
+}
+
+.marketing-shell .mint-icon-stage:hover .mint-icon-image {
+  transform: translateY(-8px) rotate(-1.5deg) scale(1.015);
+  filter: saturate(0.82) brightness(1.03);
+}
+
+.marketing-shell .mint-closing {
+  border-color: var(--ui4-mint-line);
+  background: var(--ui4-mint);
+  box-shadow: 10px 13px 0 rgba(48, 83, 70, 0.075), var(--ui4-shadow-card);
+  color: var(--ui4-mint-ink);
+}
+
+.marketing-shell .mint-closing .eyebrow,
+.marketing-shell .mint-closing h2,
+.marketing-shell .mint-closing > .bubble-closing-inner > div > p:not(.eyebrow) {
+  color: var(--ui4-mint-ink);
+}
+
+/* ── How it works: cards assemble along a real, non-progress path ─ */
+
+.marketing-shell .marketing-detail-hero {
+  max-width: none;
+  margin-top: 28px;
+  padding: clamp(38px, 5vw, 64px);
+  border: 0;
+  border-radius: 32px;
+  background: var(--ui4-blue);
+  box-shadow: 11px 14px 0 rgba(47, 76, 98, 0.07), var(--ui4-shadow-card);
+}
+
+.marketing-shell .marketing-detail-hero-split {
+  grid-template-columns: minmax(0, 0.95fr) minmax(420px, 1.05fr);
+  gap: clamp(38px, 5vw, 72px);
+}
+
+.marketing-shell .marketing-detail-hero h1 {
+  color: var(--ui4-blue-ink);
+  font-size: clamp(42px, 5.3vw, 68px);
+  line-height: 1.03;
+}
+
+.marketing-shell .marketing-detail-hero-copy > p:not(.hero-brand),
+.marketing-shell .marketing-detail-hero .hero-brand {
+  color: var(--ui4-blue-ink);
+}
+
+.marketing-shell .marketing-detail-section {
+  margin-top: clamp(82px, 9vw, 116px);
+}
+
+.marketing-shell .journey-explainer-grid {
+  overflow: visible;
+  gap: 19px;
+  perspective: 1100px;
+}
+
+.marketing-shell .journey-explainer-grid > *:nth-child(1) .journey-explainer-card { rotate: -1.3deg; }
+.marketing-shell .journey-explainer-grid > *:nth-child(2) .journey-explainer-card { translate: 0 -9px; rotate: 0.7deg; }
+.marketing-shell .journey-explainer-grid > *:nth-child(3) .journey-explainer-card { translate: 0 7px; rotate: -0.4deg; }
+.marketing-shell .journey-explainer-grid > *:nth-child(4) .journey-explainer-card { rotate: 1.2deg; background: var(--ui4-butter); color: var(--ui4-butter-ink); }
+
+.marketing-shell .journey-explainer-card {
+  min-height: 270px;
+  padding: 26px;
+}
+
+.marketing-shell .marketing-boundary-callout {
+  margin-top: clamp(82px, 9vw, 116px);
+  border-color: var(--ui4-butter-line);
+  border-radius: 28px;
+  background: var(--ui4-butter);
+  box-shadow: 9px 11px 0 rgba(101, 84, 30, 0.065), var(--ui4-shadow-low);
+}
+
+.marketing-shell .faq-item {
+  overflow: hidden;
+  border-color: rgba(79, 72, 65, 0.14);
+  border-radius: 18px;
+  background: rgba(255, 253, 250, 0.82);
+  box-shadow: 4px 5px 0 rgba(79, 72, 65, 0.05);
+  transition: background-color 220ms ease, transform 260ms var(--ui4-ease);
+}
+
+.marketing-shell .faq-item:hover { transform: translateX(4px); }
+.marketing-shell .faq-item[open] { background: var(--ui4-lavender); }
+
+.marketing-shell .marketing-detail-cta {
+  border-color: var(--ui4-lavender-line);
+  border-radius: 28px;
+  background: var(--ui4-lavender);
+  box-shadow: 9px 11px 0 rgba(84, 69, 100, 0.065), var(--ui4-shadow-low);
+}
+
+/* ── About: open worktable ───────────────────────────────────── */
+
+.marketing-shell .about-page {
+  padding-top: 28px;
+}
+
+.marketing-shell .about-theatre-hero {
+  display: grid;
+  padding: clamp(38px, 5vw, 62px);
+  grid-template-columns: minmax(0, 0.92fr) minmax(420px, 1.08fr);
+  align-items: center;
+  gap: clamp(38px, 5vw, 72px);
+  border-radius: 32px;
+  background: var(--ui4-butter);
+  box-shadow: 11px 14px 0 rgba(101, 84, 30, 0.07), var(--ui4-shadow-card);
+}
+
+.marketing-shell .about-theatre-hero .page-heading {
+  margin: 0;
+  padding: 0;
+}
+
+.marketing-shell .about-theatre-hero .page-heading h1 {
+  color: var(--ui4-butter-ink);
+  font-size: clamp(42px, 5.3vw, 68px);
+  line-height: 1.03;
+}
+
+.marketing-shell .about-theatre-hero .page-heading p {
+  color: var(--ui4-butter-ink);
+}
+
+.marketing-shell .about-section {
+  margin-top: clamp(62px, 7vw, 92px);
+  border-radius: 26px;
+  box-shadow: 7px 9px 0 rgba(79, 72, 65, 0.055), var(--ui4-shadow-low);
+}
+
+.marketing-shell .about-section:first-of-type {
+  border-color: var(--ui4-blue-line);
+  background: var(--ui4-blue);
+  color: var(--ui4-blue-ink);
+}
+
+.marketing-shell .about-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  overflow: visible;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  gap: 18px;
+}
+
+.marketing-shell .about-grid article {
+  position: relative;
+  min-height: 190px;
+  border: 1px solid rgba(79, 72, 65, 0.13);
+  border-radius: 23px;
+  box-shadow: 5px 7px 0 rgba(79, 72, 65, 0.06), var(--ui4-shadow-low);
+  transition: transform 360ms var(--ui4-ease), box-shadow 360ms var(--ui4-ease);
+}
+
+.marketing-shell .about-grid article:nth-child(1) { rotate: -1deg; }
+.marketing-shell .about-grid article:nth-child(2) { translate: 0 -8px; rotate: 0.8deg; }
+.marketing-shell .about-grid article:nth-child(3) { rotate: 1deg; background: var(--ui4-lavender); }
+.marketing-shell .about-grid article:hover { transform: translateY(-8px); box-shadow: var(--ui4-shadow-float); }
+
+.marketing-shell .about-public-info {
+  border-color: var(--ui4-lavender-line);
+  background: var(--ui4-lavender);
+}
+
+.marketing-shell .about-public-info-grid article {
+  box-shadow: 4px 6px 0 rgba(84, 69, 100, 0.055);
+}
+
+.marketing-shell .about-contact {
+  grid-template-columns: 1fr;
+  border-color: var(--ui4-rose-line);
+  background: var(--ui4-rose);
+}
+
+/* ── Partners: adult paper-and-folder theatre ─────────────────── */
+
+.marketing-shell .partners-hero {
+  background: var(--ui4-apricot);
+  box-shadow: 11px 14px 0 rgba(103, 67, 55, 0.07), var(--ui4-shadow-card);
+}
+
+.marketing-shell .partners-hero h1,
+.marketing-shell .partners-hero .hero-brand,
+.marketing-shell .partners-hero .marketing-detail-hero-copy > p {
+  color: var(--ui4-apricot-ink);
+}
+
+.marketing-shell .partner-path-grid {
+  gap: 22px;
+  perspective: 1000px;
+}
+
+.marketing-shell .partner-path-grid > *:nth-child(1) .partner-path-card { rotate: -1deg; }
+.marketing-shell .partner-path-grid > *:nth-child(2) .partner-path-card { translate: 0 -9px; rotate: 0.8deg; }
+.marketing-shell .partner-path-grid > *:nth-child(3) .partner-path-card { rotate: 1deg; }
+.marketing-shell .partner-path-card { min-height: 280px; padding: 29px; }
+
+.marketing-shell .partner-principles {
+  border-color: var(--ui4-butter-line);
+  border-radius: 28px;
+  background: var(--ui4-butter);
+  box-shadow: 9px 11px 0 rgba(101, 84, 30, 0.065), var(--ui4-shadow-low);
+}
+
+.marketing-shell .partner-principles li {
+  transition: transform 260ms var(--ui4-ease), background-color 180ms ease;
+}
+
+.marketing-shell .partner-principles li:hover {
+  transform: translateX(5px);
+  background: rgba(255, 253, 250, 0.36);
+}
+
+.marketing-shell .partner-contact-card {
+  border-color: var(--ui4-lavender-line);
+  border-radius: 28px;
+  background: var(--ui4-lavender);
+  box-shadow: 9px 11px 0 rgba(84, 69, 100, 0.065), var(--ui4-shadow-low);
+}
+
+.marketing-shell .partner-boundary-note {
+  border: 1px solid rgba(122, 57, 61, 0.28);
+  border-radius: 20px;
+  background: #f3e2e2;
+  box-shadow: none;
+}
+
+/* ── Safety: deliberately stable M0/M1, no playful theatre ───── */
+
+.marketing-shell .site-safety-page .marketing-detail-hero {
+  border: 1px solid var(--ui4-blue-line);
+  background: var(--ui4-blue);
+  box-shadow: none;
+}
+
+.marketing-shell .site-safety-aside {
+  border-color: rgba(47, 76, 98, 0.22);
+  background: rgba(255, 253, 250, 0.82);
+  box-shadow: none;
+}
+
+.marketing-shell .site-safety-page .safety-grid article,
+.marketing-shell .site-safety-page .help-cards a {
+  border-radius: 18px;
+  box-shadow: none;
+  transform: none;
+}
+
+.marketing-shell .site-safety-page .safety-grid article::after,
+.marketing-shell .site-safety-page .help-cards a::after {
+  display: none;
+}
+
+.marketing-shell .site-safety-page .boundary-section {
+  border-color: var(--ui4-butter-line);
+  background: var(--ui4-butter);
+  box-shadow: none;
+}
+
+.marketing-shell .site-safety-page .urgent-card {
+  border: 2px solid #a85a5f;
+  background: #f7e6e6;
+  box-shadow: none;
+  color: #74353a;
+}
+
+.marketing-shell .site-safety-page .urgent-card,
+.marketing-shell .site-safety-page .boundary-section,
+.marketing-shell .site-safety-page .safety-closing-cta {
+  transform: none !important;
+  transition: none !important;
+}
+
+.marketing-shell .site-safety-page .safety-closing-cta {
+  border-color: var(--ui4-lavender-line);
+  background: var(--ui4-lavender);
+  box-shadow: none;
+}
+
+/* Framer's reveal wrappers remain paint-stable; only their compositor state changes. */
+.marketing-shell [data-reveal-state="entering"] {
+  will-change: transform, opacity;
+}
+
+.marketing-shell [data-reveal-state="complete"],
+.marketing-shell [data-reveal-state="static"] {
+  will-change: auto;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .marketing-shell .bubble-text-link:hover svg,
+  .marketing-shell .text-link:hover svg {
+    transform: translateX(4px);
+  }
+
+  .marketing-shell .bubble-text-link svg,
+  .marketing-shell .text-link svg {
+    transition: transform 180ms var(--ui4-ease-snap);
+  }
+}
+
+@media (max-width: 1080px) {
+  .marketing-shell .bubble-hero-grid,
+  .marketing-shell .marketing-detail-hero-split,
+  .marketing-shell .about-theatre-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .theatre-stage {
+    width: min(100%, 620px);
+    margin-inline: auto;
+  }
+
+  .marketing-shell .bubble-hero h1 {
+    max-width: 12ch;
+  }
+}
+
+@media (max-width: 820px) {
+  .marketing-shell .bubble-site,
+  .marketing-shell .marketing-detail-page,
+  .marketing-shell .content-page {
+    width: min(calc(100% - 28px), 680px);
+  }
+
+  .marketing-shell .bubble-hero,
+  .marketing-shell .marketing-detail-hero,
+  .marketing-shell .about-theatre-hero {
+    border-radius: 26px;
+  }
+
+  .marketing-shell .bubble-hero-grid,
+  .marketing-shell .marketing-detail-hero,
+  .marketing-shell .about-theatre-hero {
+    padding: 30px 22px;
+  }
+
+  .marketing-shell .home-moment-list > *:nth-child(n) {
+    grid-column: 1 / -1;
+  }
+
+  .marketing-shell .journey-explainer-grid,
+  .marketing-shell .partner-path-grid,
+  .marketing-shell .about-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .marketing-shell .journey-explainer-grid > *:nth-child(n) .journey-explainer-card,
+  .marketing-shell .partner-path-grid > *:nth-child(n) .partner-path-card,
+  .marketing-shell .about-grid article:nth-child(n),
+  .marketing-shell .home-value-grid > *:nth-child(n) .home-value-card,
+  .marketing-shell .home-trust-grid > *:nth-child(n) .home-trust-card {
+    translate: none;
+    rotate: none;
+  }
+
+  .marketing-shell .marketing-boundary-callout {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .marketing-shell .marketing-boundary-callout .text-link {
+    grid-column: 2;
+  }
+}
+
+@media (max-width: 560px) {
+  .marketing-shell .bubble-site,
+  .marketing-shell .marketing-detail-page,
+  .marketing-shell .content-page {
+    width: min(calc(100% - 22px), 680px);
+  }
+
+  .marketing-shell .bubble-hero-grid {
+    min-height: auto;
+    padding: 30px 19px;
+    gap: 36px;
+  }
+
+  .marketing-shell .bubble-hero h1,
+  .marketing-shell .marketing-detail-hero h1,
+  .marketing-shell .about-theatre-hero .page-heading h1 {
+    font-size: clamp(36px, 11.2vw, 48px);
+  }
+
+  .theatre-stage {
+    min-height: 400px;
+    border-radius: 23px;
+  }
+
+  .theatre-stage-listening { min-height: 430px; }
+
+  .theatre-card {
+    width: 176px;
+    min-height: 235px;
+    padding: 20px 18px;
+    border-radius: 19px;
+  }
+
+  .theatre-card strong { margin-top: auto; font-size: 22px; }
+  .theatre-card-front { top: 55px; right: 39px; }
+  .theatre-card-mid { top: 100px; right: 112px; }
+  .theatre-card-back { top: 105px; right: -5px; }
+  .theatre-card-mark { width: 36px; height: 32px; margin-bottom: 9px; line-height: 28px; }
+  .quiet-lamp { width: 86px; left: 4px; }
+  .quiet-cup { width: 58px; left: 77px; }
+  .theatre-stage-note { bottom: 15px; left: 15px; width: 66%; }
+
+  .theatre-stage-path,
+  .theatre-stage-worktable,
+  .theatre-stage-partners { min-height: 410px; }
+
+  .path-card-stack { top: 80px; right: 19px; width: 82%; padding: 12px; }
+  .path-paper { top: 91px; right: 10px; width: 84%; }
+  .quiet-thread { top: 12px; left: 8px; width: 132px; }
+  .path-stage-note { right: 13px; bottom: 14px; left: auto; }
+
+  .work-grid-paper { right: 14px; width: 83%; }
+  .work-note-main { top: 78px; left: 17px; width: 72%; min-height: 225px; padding: 20px; }
+  .work-note-pin { top: 50px; right: 9px; width: 44%; padding: 18px; }
+  .work-note-main strong { font-size: 21px; }
+  .work-stage-note { right: 13px; bottom: 14px; left: auto; }
+
+  .partner-paper { top: 80px; right: 18px; width: 78%; padding: 22px; }
+  .partner-paper-main strong { font-size: 23px; }
+  .theatre-stage-partners .quiet-folder { top: 10px; left: 2px; width: 112px; }
+  .partner-stamp { right: 10px; bottom: 14px; }
+
+  .marketing-shell .hero-trust-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .marketing-shell .hero-trust-strip li:nth-child(2) { border-right: 0; }
+  .marketing-shell .hero-trust-strip li:nth-child(-n + 2) { border-bottom: 1px solid rgba(79, 72, 65, 0.11); }
+
+  .marketing-shell .home-moment-row { min-height: 195px; padding: 25px 22px; }
+  .marketing-shell .home-moment-row::after { inset: 7px -5px -7px 7px; }
+
+  .marketing-shell .marketing-boundary-callout {
+    display: block;
+  }
+
+  .marketing-shell .marketing-boundary-callout > span { margin-bottom: 18px; }
+  .marketing-shell .marketing-boundary-callout .text-link { margin-top: 22px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marketing-shell .theatre-card,
+  .marketing-shell .work-note,
+  .marketing-shell .partner-paper,
+  .marketing-shell .path-card-stack,
+  .marketing-shell .theatre-stage-note,
+  .marketing-shell .home-value-card,
+  .marketing-shell .home-trust-card,
+  .marketing-shell .bubble-channel-card,
+  .marketing-shell .journey-explainer-card,
+  .marketing-shell .partner-path-card,
+  .marketing-shell .home-moment-row,
+  .marketing-shell .mint-icon-image,
+  .marketing-shell .button,
+  .marketing-shell .nav-link {
+    translate: none !important;
+    rotate: none !important;
+    transform: none !important;
+  }
+}

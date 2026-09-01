@@ -42,7 +42,15 @@
     "tt-action-bar": "/components/tt-action-bar/index",
     "tt-sheet": "/components/tt-sheet/index",
     "tt-filter-sheet": "/components/tt-filter-sheet/index",
-    "tt-media-card": "/components/tt-media-card/index"
+    "tt-media-card": "/components/tt-media-card/index",
+    "tt-card-shell": "/components/tt-card-shell/index",
+    "tt-card-grid": "/components/tt-card-grid/index",
+    "tt-section-heading": "/components/tt-section-heading/index",
+    "tt-scene-card": "/components/tt-scene-card/index",
+    "tt-fact-card": "/components/tt-fact-card/index",
+    "tt-card-stage": "/components/tt-card-stage/index",
+    "tt-cartoon-prop": "/components/tt-cartoon-prop/index",
+    "tt-timeline": "/components/tt-timeline/index"
   },
   "window": {
     "navigationBarBackgroundColor": "@navigationBarBackgroundColor",

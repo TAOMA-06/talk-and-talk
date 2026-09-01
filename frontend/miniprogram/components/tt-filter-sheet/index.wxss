@@ -1,17 +1,23 @@
 .filter-root {
-  --filter-surface: #fffcf9;
-  --filter-surface-alt: #f0eeeb;
-  --filter-text: #171717;
-  --filter-text-secondary: #64615d;
-  --filter-border: #e2dfda;
-  --filter-border-strong: #cbc6c0;
-  --filter-accent: #c65345;
+  --filter-surface: #fffefc;
+  --filter-surface-alt: #efeeea;
+  --filter-text: #232220;
+  --filter-text-secondary: #5c5954;
+  --filter-border: #dcd8d2;
+  --filter-border-strong: #979189;
+  --filter-accent: #292724;
   --filter-on-accent: #ffffff;
+  --filter-focus-ring: var(--filter-text);
+  --tt-overlay-scrim: rgba(14,15,16,.46);
+  --tt-motion-standard: 260ms;
+  --tt-motion-emphasis: 420ms;
+  --tt-ease-standard: cubic-bezier(.2, .72, .24, 1);
+  --tt-ease-emphasis: cubic-bezier(.16, 1, .3, 1);
   position: fixed;
   z-index: 100;
   inset: 0;
 }
-.filter-mask { position: absolute; inset: 0; background: rgba(14,15,16,.46); }
+.filter-mask { position: absolute; inset: 0; background: var(--tt-overlay-scrim); }
 .filter-sheet { position: absolute; right: 0; bottom: 0; left: 0; display: flex; width: 100%; height: 88vh; max-height: 88vh; flex-direction: column; overflow: hidden; border-radius: 32rpx 32rpx 0 0; background: var(--filter-surface); color: var(--filter-text); }
 .filter-handle { width: 72rpx; height: 8rpx; margin: 14rpx auto 4rpx; flex: 0 0 auto; border-radius: 999rpx; background: var(--filter-border-strong); }
 .filter-header { display: flex; flex: 0 0 auto; align-items: flex-start; justify-content: space-between; gap: 20rpx; padding: 20rpx 28rpx; }
@@ -30,19 +36,32 @@
 .filter-options { display: flex; align-items: flex-start; justify-content: flex-start; flex-wrap: wrap; gap: 12rpx; }
 .filter-chip { width: auto; min-height: 64rpx; margin: 0; padding: 10rpx 20rpx; flex: 0 0 auto; border: 1rpx solid var(--filter-border); border-radius: 999rpx; background: var(--filter-surface); color: var(--filter-text-secondary); font-size: 22rpx; }
 .filter-chip-selected { border-color: var(--filter-accent); background: var(--filter-surface-alt); color: var(--filter-accent); }
+.filter-close:focus,
+.filter-reset:focus,
+.filter-apply:focus,
+.filter-chip:focus,
+.filter-resource-retry:focus { outline: 3rpx solid var(--filter-focus-ring); outline-offset: 3rpx; }
 .sort-copy { margin-top: 12rpx; color: var(--filter-text-secondary); font-size: 21rpx; line-height: 1.5; }
 .filter-resource-state { color: var(--filter-text-secondary); font-size: 23rpx; }
 .filter-resource-error { display: flex; align-items: center; justify-content: space-between; gap: 12rpx; padding: 16rpx; border-radius: 16rpx; background: var(--filter-surface-alt); color: var(--filter-accent); font-size: 22rpx; }
 .filter-resource-retry { min-height: 60rpx; padding: 8rpx 18rpx; border-color: var(--filter-accent); background: var(--filter-surface); color: var(--filter-accent); font-size: 21rpx; }
+.filter-root.motion-m1:not(.motion-off) .filter-mask { animation: filter-fade var(--tt-motion-standard) var(--tt-ease-standard) both; }
+.filter-root.motion-m1:not(.motion-off) .filter-sheet { animation: filter-rise var(--tt-motion-emphasis) var(--tt-ease-emphasis) both; }
+@keyframes filter-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes filter-rise { from { opacity: .76; transform: translateY(42rpx); } to { opacity: 1; transform: translateY(0); } }
+.motion-off .filter-mask,
+.motion-off .filter-sheet { animation: none; transition: none; }
+@media (prefers-reduced-motion: reduce) { .filter-mask,.filter-sheet { animation: none !important; transition: none; } }
 @media (prefers-color-scheme: dark) {
   .filter-root {
-    --filter-surface: #1d2022;
-    --filter-surface-alt: #202326;
-    --filter-text: #f5f3f0;
-    --filter-text-secondary: #a6a29d;
-    --filter-border: #2b2e31;
-    --filter-border-strong: #3b3f43;
-    --filter-accent: #ff8a78;
-    --filter-on-accent: #23100d;
+    --filter-surface: #1b1c1a;
+    --filter-surface-alt: #232521;
+    --filter-text: #f3f1ed;
+    --filter-text-secondary: #b9b4ac;
+    --filter-border: #343630;
+    --filter-border-strong: #6b6f67;
+    --filter-accent: #f3f1ed;
+    --filter-on-accent: #151618;
+    --filter-focus-ring: var(--filter-text);
   }
 }

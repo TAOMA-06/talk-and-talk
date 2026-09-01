@@ -1,26 +1,27 @@
-<view class="page support-page">
+<view class="page support-page {{motionOff ? 'tt-motion-off' : ''}}">
+  <view class="support-hero-stack">
+    <view class="support-stack-card support-stack-safety" aria-hidden="true">安全</view>
+    <view class="support-stack-card support-stack-service" aria-hidden="true">客服</view>
   <view class="support-hero">
-    <view class="hero-kicker">一个入口，两类案件</view>
-    <view class="hero-title">安全举报与客服处理</view>
-    <view class="hero-copy">安全举报进入独立审核部门；订单、退款、隐私和一般问题进入客服队列。两类案件不会相互冒充。</view>
+    <view class="hero-kicker">案件中心</view>
+    <view class="hero-title">安全与客服</view>
     <view class="hero-actions">
-      <button class="hero-button" bindtap="toggleForm">{{formOpen ? '收起提交表单' : '提交新案件'}}</button>
-      <button class="hero-link" bindtap="openSafetyCenter">查看安全边界</button>
+      <button class="hero-button" bindtap="toggleForm">{{formOpen ? '收起' : '新建案件'}}</button>
+      <button class="hero-link" bindtap="openSafetyCenter">安全说明</button>
     </view>
+  </view>
   </view>
 
   <view class="card public-support-card">
     <view class="public-support-heading">
       <view>
-        <view class="section-title">无需登录的客服渠道</view>
-        <view class="public-support-copy">登录、协议或接口异常时，也可使用以下公示渠道联系平台。</view>
+        <view class="section-title">公开客服</view>
       </view>
-      <view class="public-badge">公开兜底</view>
     </view>
-    <view wx:if="{{publicInfoState === 'loading'}}" class="public-support-copy">正在读取公开客服信息…</view>
+    <view wx:if="{{publicInfoState === 'loading'}}" class="public-support-copy">正在读取…</view>
     <view wx:elif="{{publicInfoState === 'error'}}" class="public-support-error">
       <view>{{publicInfoError}}</view>
-      <button class="retry-button" bindtap="loadPublicInfo">重新读取公开渠道</button>
+      <button class="retry-button" bindtap="loadPublicInfo">重试</button>
     </view>
     <view wx:else>
       <view class="public-operator">{{publicInfo.operatorName}}</view>
@@ -28,24 +29,24 @@
       <view class="public-meta">服务时间：{{publicInfo.serviceHours}}</view>
       <view class="public-meta">预计首次响应：{{publicInfo.expectedFirstResponseHours}} 小时内</view>
       <view class="public-actions">
-        <button class="public-action" bindtap="callPublicSupport">拨打客服电话</button>
-        <button class="public-action" bindtap="copyPublicSupportEmail">复制客服邮箱</button>
-        <button wx:if="{{publicInfo.statusUrl}}" class="public-action" bindtap="copyPublicStatusUrl">复制服务状态页</button>
+        <button class="public-action" bindtap="callPublicSupport">拨打电话</button>
+        <button class="public-action" bindtap="copyPublicSupportEmail">复制邮箱</button>
+        <button wx:if="{{publicInfo.statusUrl}}" class="public-action" bindtap="copyPublicStatusUrl">复制状态页</button>
       </view>
       <view class="emergency-boundary">{{publicInfo.emergencyBoundary}}</view>
     </view>
   </view>
 
   <view class="card wechat-complaint-card">
-    <view class="wechat-complaint-heading"><text>微信支付投诉</text><text>入口边界</text></view>
-    <view class="wechat-complaint-copy">正式发起入口在微信的「我 → 服务 → 钱包 → 账单」。找到对应支付后选择「对订单有疑惑」，并按微信页面提交。</view>
-    <view class="wechat-complaint-boundary">这里创建的客服案件可以协助平台核对订单，但不等于微信支付投诉，也不会替你向微信提交。已关联的只读同步状态可在对应订单详情查看。</view>
-    <view wx:if="{{paymentDisputeState === 'loading'}}" class="wechat-complaint-state">正在读取本人已关联的微信支付投诉状态…</view>
+    <view class="wechat-complaint-heading"><text>微信支付投诉</text></view>
+    <view class="wechat-complaint-copy">正式发起入口在微信的：我 → 服务 → 钱包 → 账单。</view>
+    <view class="wechat-complaint-boundary">客服案件不等于微信投诉，也不会代为提交。</view>
+    <view wx:if="{{paymentDisputeState === 'loading'}}" class="wechat-complaint-state">正在读取…</view>
     <view wx:elif="{{paymentDisputeState === 'error'}}" class="wechat-complaint-state wechat-complaint-error">
-      <view>投诉状态暂时无法读取，这不代表没有投诉。请以微信账单为准并稍后重试。</view>
-      <button class="wechat-complaint-retry" bindtap="load">重新读取投诉状态</button>
+      <view>状态未知；以微信账单为准。</view>
+      <button class="wechat-complaint-retry" bindtap="load">重试</button>
     </view>
-    <view wx:elif="{{paymentDisputeState === 'none'}}" class="wechat-complaint-state">暂未发现与本人订单关联的微信支付投诉状态。若已在微信发起但这里尚未显示，请以微信账单为准并稍后刷新。</view>
+    <view wx:elif="{{paymentDisputeState === 'none'}}" class="wechat-complaint-state">暂无关联记录；以微信账单为准。</view>
     <view wx:else class="wechat-complaint-list">
       <view class="wechat-complaint-item" wx:for="{{paymentDisputes}}" wx:key="id">
         <view class="wechat-complaint-item-top">
@@ -68,7 +69,7 @@
       </view>
       <view class="pagination-row">
         <button size="mini" disabled="{{paymentDisputePage <= 1}}" bindtap="previousPaymentDisputePage">上一页</button>
-        <text>第 {{paymentDisputePage}} / {{paymentDisputeTotalPages}} 页 · 共 {{paymentDisputeTotal}} 条</text>
+        <text>{{paymentDisputePage}} / {{paymentDisputeTotalPages}}</text>
         <button size="mini" disabled="{{paymentDisputePage >= paymentDisputeTotalPages}}" bindtap="nextPaymentDisputePage">下一页</button>
       </view>
     </view>
@@ -82,18 +83,18 @@
     <input wx:if="{{category !== 'safety'}}" class="form-input" value="{{subject}}" maxlength="120" placeholder="问题标题（2–120 字）" bindinput="setSubject" />
     <view wx:if="{{orderId}}" class="order-link">关联订单：{{orderId}}</view>
     <textarea class="form-textarea" value="{{body}}" maxlength="{{category === 'safety' ? 500 : 3000}}" placeholder="{{category === 'safety' ? '请说明发生了什么、当前是否仍有风险（5–500 字）' : '请说明发生了什么和希望平台核对的内容（5–3000 字）'}}" bindinput="setBody"></textarea>
-    <view class="form-boundary">{{category === 'safety' ? '安全举报会进入独立审核，不在此处公开对方账号、内部规则或审核员信息。' : '客服案件不会自动取消订单、批准退款或改变支付状态。'}}</view>
+    <view class="form-boundary">{{category === 'safety' ? '安全举报进入独立审核。' : '客服案件不自动取消订单、退款或改变支付状态。'}}</view>
     <button class="primary-button submit-button" loading="{{submitting}}" disabled="{{submitting}}" bindtap="submit">{{category === 'safety' ? '提交安全举报' : '创建客服案件'}}</button>
   </view>
 
-  <view class="section-heading"><view class="section-title">我的处理记录</view><view class="section-hint">下拉刷新</view></view>
+  <view class="section-heading"><view class="section-title">我的案件</view></view>
   <view wx:if="{{partialWarning}}" class="partial-warning">{{partialWarning}}</view>
-  <view wx:if="{{loading}}" class="empty compact">正在读取案件状态…</view>
+  <view wx:if="{{loading}}" class="empty compact">正在读取…</view>
   <view wx:elif="{{error}}" class="empty compact">
     <view>{{error}}</view>
-    <button class="retry-button" bindtap="load">重新读取案件</button>
+    <button class="retry-button" bindtap="load">重试</button>
   </view>
-  <view wx:elif="{{!cases.length && !safetyCases.length}}" class="empty compact">还没有安全举报或客服案件。</view>
+  <view wx:elif="{{!cases.length && !safetyCases.length}}" class="empty compact">暂无案件</view>
   <block wx:else>
   <view wx:if="{{safetyCases.length}}" class="section-heading"><view class="section-title">安全举报</view></view>
   <view wx:for="{{safetyCases}}" wx:key="id" class="case-card case-{{item.tone}}" bindtap="openCase" data-id="{{item.id}}" data-kind="safety" aria-role="button" aria-label="查看安全举报：{{item.title}}，状态 {{item.statusText}}" tabindex="0">
@@ -104,7 +105,7 @@
   </view>
   <view wx:if="{{safetyTotalPages > 1}}" class="pagination-row">
     <button size="mini" disabled="{{safetyPage <= 1}}" bindtap="previousSafetyPage">上一页</button>
-    <text>安全举报第 {{safetyPage}} / {{safetyTotalPages}} 页 · 共 {{safetyTotal}} 条</text>
+    <text>{{safetyPage}} / {{safetyTotalPages}}</text>
     <button size="mini" disabled="{{safetyPage >= safetyTotalPages}}" bindtap="nextSafetyPage">下一页</button>
   </view>
   <view wx:if="{{cases.length}}" class="section-heading"><view class="section-title">客服工单</view></view>
@@ -116,17 +117,9 @@
   </view>
   <view wx:if="{{supportTotalPages > 1}}" class="pagination-row">
     <button size="mini" disabled="{{supportPage <= 1}}" bindtap="previousSupportPage">上一页</button>
-    <text>客服工单第 {{supportPage}} / {{supportTotalPages}} 页 · 共 {{supportTotal}} 条</text>
+    <text>{{supportPage}} / {{supportTotalPages}}</text>
     <button size="mini" disabled="{{supportPage >= supportTotalPages}}" bindtap="nextSupportPage">下一页</button>
   </view>
   </block>
 
-  <view wx:if="{{communityReceipts.length}}" class="community-receipts">
-    <view class="section-heading"><view class="section-title">广场举报收件回执</view></view>
-    <view class="receipt-note">这里是最近 20 条摘要，只提供“已收到”回执，尚不等于独立审核案件结果。{{communityReceiptsTruncated ? '更多历史请进入广场继续按页查看。' : ''}}</view>
-    <view wx:for="{{communityReceipts}}" wx:key="id" class="receipt-row">
-      <text>回执 {{item.id}}</text><text>{{item.submittedAt}}</text>
-    </view>
-    <button class="community-button" bindtap="openCommunity">返回广场</button>
-  </view>
 </view>

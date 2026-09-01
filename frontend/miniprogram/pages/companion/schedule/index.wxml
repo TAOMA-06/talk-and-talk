@@ -1,4 +1,4 @@
-<view class="page">
+<view class="page schedule-page {{motionOff ? 'tt-motion-off' : ''}}">
   <view wx:if="{{loading}}" class="empty">正在读取周期规则、休假和待确认草稿…</view>
 
   <view wx:elif="{{error && !rules.length && !blackouts.length && !drafts.length}}" class="empty">
@@ -8,12 +8,27 @@
   </view>
 
   <block wx:else>
-    <view class="hero">
-      <view class="eyebrow">北京时间 · 未来14天</view>
-      <view class="hero-title">周期排班不会自动公开</view>
-      <view class="hero-copy">规则先生成私有草稿；每个草稿仍需你明确确认。休假只阻止新草稿，不会取消既有订单。</view>
-      <view wx:if="{{eligibilityWarning}}" class="suspended">{{eligibilityWarning}}</view>
+    <view wx:if="{{!eligibilityWarning}}" class="schedule-studio tt-motion-m3">
+      <view class="schedule-sign"><text>周期排班</text><text class="schedule-zone">Asia/Shanghai</text></view>
+      <tt-card-stage layout="deck" min-height="430" motion-level="m3" entrance="assemble" active motion-off="{{motionOff}}" risk="standard" aria-label="周期规则、休假与私有草稿卡组">
+        <view slot="back" class="schedule-layer"><view class="schedule-stage-card schedule-stage-rule"><view class="stage-index">02</view><view class="stage-title">每周规则</view></view></view>
+        <view slot="middle" class="schedule-layer"><view class="schedule-stage-card schedule-stage-draft"><view class="stage-index">03</view><view class="stage-title">私有草稿</view></view></view>
+        <view slot="front" class="schedule-layer">
+          <view class="hero">
+            <view class="eyebrow">北京时间 · 未来14天</view>
+            <view class="hero-title">周期排班</view>
+            <view class="hero-copy">草稿需逐个确认；休假不取消已有订单。</view>
+          </view>
+        </view>
+        <view slot="prop" class="schedule-props"><tt-cartoon-prop kind="calendar" tone="butter" size="lg" expressive motion-off="{{motionOff}}" risk="standard" /><tt-cartoon-prop kind="folder" tone="blue" size="md" expressive motion-off="{{motionOff}}" risk="standard" /></view>
+      </tt-card-stage>
     </view>
+    <view wx:else class="hero schedule-warning-hero">
+      <view class="eyebrow">北京时间 · 排班写入关闭</view>
+      <view class="hero-title">先完成当前资格核验</view>
+      <view class="hero-copy">核验完成前禁止排班写入；已有记录仍可查看。</view>
+    </view>
+    <view wx:if="{{eligibilityWarning}}" class="suspended">{{eligibilityWarning}}</view>
 
     <view wx:if="{{error}}" class="inline-error">{{error}}</view>
 
@@ -33,15 +48,19 @@
       </view>
       <button class="primary-button" loading="{{saving}}" disabled="{{saving || scheduleMutationBlocked}}" bindtap="createRule">保存周期规则</button>
     </view>
-    <view wx:if="{{!rules.length}}" class="card empty-card">还没有周期规则。一次性时段仍可在原“可约时段”页面管理。</view>
-    <view wx:for="{{rules}}" wx:key="id" wx:for-item="rule" class="card row-card">
+    <view wx:if="{{!rules.length}}" class="card empty-card">暂无周期规则</view>
+    <view wx:for="{{rules}}" wx:key="id" wx:for-item="rule" class="schedule-row-item">
+      <tt-card-shell tone="blue" size="standard" depth="low" motion-level="m1" entrance="none" motion-off="{{motionOff}}" risk="standard">
+      <view class="row-card">
       <view class="row-main">
         <view class="row-title">{{rule.title}}</view>
         <view class="row-note">{{rule.capacityText}} · {{rule.isActive ? '有效' : '已停用'}}</view>
       </view>
       <button wx:if="{{rule.isActive}}" class="small-button" data-id="{{rule.id}}" loading="{{actionId === rule.id}}" bindtap="deactivateRule">停用</button>
+      </view>
+      </tt-card-shell>
     </view>
-    <button wx:if="{{rulePage < ruleTotalPages}}" class="secondary-button" loading="{{loadingMoreKind === 'rules'}}" disabled="{{!!loadingMoreKind}}" bindtap="loadMoreRules">加载更多规则（已显示 {{rules.length}} / {{ruleTotal}}）</button>
+    <button wx:if="{{rulePage < ruleTotalPages}}" class="secondary-button" loading="{{loadingMoreKind === 'rules'}}" disabled="{{!!loadingMoreKind}}" bindtap="loadMoreRules">加载更多（{{rules.length}} / {{ruleTotal}}）</button>
 
     <view class="section-title">休假与例外</view>
     <view class="card form-card">
@@ -58,30 +77,38 @@
       </view>
       <button class="primary-button" loading="{{saving}}" disabled="{{saving || scheduleMutationBlocked}}" bindtap="createBlackout">添加休假例外</button>
     </view>
-    <view wx:if="{{!blackouts.length}}" class="card empty-card">当前没有休假例外。</view>
-    <view wx:for="{{blackouts}}" wx:key="id" wx:for-item="blackout" class="card row-card">
+    <view wx:if="{{!blackouts.length}}" class="card empty-card">暂无休假例外</view>
+    <view wx:for="{{blackouts}}" wx:key="id" wx:for-item="blackout" class="schedule-row-item">
+      <tt-card-shell tone="lavender" size="standard" depth="low" motion-level="m1" entrance="none" motion-off="{{motionOff}}" risk="standard">
+      <view class="row-card">
       <view class="row-main">
         <view class="row-title">{{blackout.rangeText}}</view>
         <view class="row-note">{{blackout.isActive ? '会阻止重叠草稿' : '已停用'}}</view>
       </view>
       <button wx:if="{{blackout.isActive}}" class="small-button" data-id="{{blackout.id}}" loading="{{actionId === blackout.id}}" bindtap="deactivateBlackout">停用</button>
+      </view>
+      </tt-card-shell>
     </view>
-    <button wx:if="{{blackoutPage < blackoutTotalPages}}" class="secondary-button" loading="{{loadingMoreKind === 'blackouts'}}" disabled="{{!!loadingMoreKind}}" bindtap="loadMoreBlackouts">加载更多休假记录（已显示 {{blackouts.length}} / {{blackoutTotal}}）</button>
+    <button wx:if="{{blackoutPage < blackoutTotalPages}}" class="secondary-button" loading="{{loadingMoreKind === 'blackouts'}}" disabled="{{!!loadingMoreKind}}" bindtap="loadMoreBlackouts">加载更多（{{blackouts.length}} / {{blackoutTotal}}）</button>
 
     <view class="section-title">待确认草稿</view>
     <view class="card draft-control">
       <view class="row-title">计算到 {{horizonText || '未来14天'}}</view>
-      <view class="row-note">重新计算只创建未激活草稿，不会自动开放、发送提醒或改写订单。</view>
+      <view class="row-note">仅生成未激活草稿</view>
       <button class="secondary-button" loading="{{generating}}" disabled="{{generating || scheduleMutationBlocked}}" bindtap="generateDrafts">重新生成草稿</button>
     </view>
-    <view wx:if="{{!drafts.length}}" class="card empty-card">当前没有待确认草稿。先保存有效周期规则，再点击“重新生成草稿”。</view>
-    <view wx:for="{{drafts}}" wx:key="id" wx:for-item="draft" class="card row-card">
+    <view wx:if="{{!drafts.length}}" class="card empty-card">暂无待确认草稿</view>
+    <view wx:for="{{drafts}}" wx:key="id" wx:for-item="draft" class="schedule-row-item draft-row-item">
+      <tt-card-shell tone="butter" size="standard" depth="mid" motion-level="m1" entrance="none" motion-off="{{motionOff}}" risk="standard">
+      <view class="row-card">
       <view class="row-main">
         <view class="row-title">{{draft.rangeText}}</view>
         <view class="row-note">容量 {{draft.capacity}} · 尚未公开</view>
       </view>
       <button class="small-button approve" data-id="{{draft.id}}" loading="{{actionId === draft.id}}" disabled="{{scheduleMutationBlocked}}" bindtap="activateDraft">确认开放</button>
+      </view>
+      </tt-card-shell>
     </view>
-    <button wx:if="{{draftPage < draftTotalPages}}" class="secondary-button" loading="{{loadingMoreKind === 'drafts'}}" disabled="{{!!loadingMoreKind}}" bindtap="loadMoreDrafts">加载更多草稿（已显示 {{drafts.length}} / {{draftTotal}}）</button>
+    <button wx:if="{{draftPage < draftTotalPages}}" class="secondary-button" loading="{{loadingMoreKind === 'drafts'}}" disabled="{{!!loadingMoreKind}}" bindtap="loadMoreDrafts">加载更多（{{drafts.length}} / {{draftTotal}}）</button>
   </block>
 </view>

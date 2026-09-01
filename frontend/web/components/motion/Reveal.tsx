@@ -9,10 +9,11 @@ import {
   useRef,
   type ReactNode,
 } from "react";
+import { motion, useAnimationControls } from "framer-motion";
 
 import { motionDuration, usePrefersReducedMotion } from "./usePrefersReducedMotion";
 
-const revealEasing = "cubic-bezier(0.22, 1, 0.36, 1)";
+const revealEasing = [0.16, 1, 0.3, 1] as const;
 
 type RevealProps = {
   children: ReactNode;
@@ -39,6 +40,7 @@ type RevealItemProps = {
  */
 function useScrollEntrance(delay: number, once: boolean) {
   const reducedMotion = usePrefersReducedMotion();
+  const controls = useAnimationControls();
   const nodeRef = useRef<HTMLElement | null>(null);
   const attachRef = useCallback((node: HTMLElement | null) => {
     nodeRef.current = node;
@@ -56,23 +58,20 @@ function useScrollEntrance(delay: number, once: boolean) {
       return;
     }
 
-    let activeAnimation: Animation | null = null;
     const reveal = () => {
-      activeAnimation?.cancel();
       node.dataset.revealState = "entering";
-      activeAnimation = node.animate(
-        [
-          { opacity: 0, transform: "translate3d(0, 22px, 0)" },
-          { opacity: 1, transform: "translate3d(0, 0, 0)" },
-        ],
-        {
-          duration: Math.round(motionDuration * 1_000),
-          delay: Math.max(0, Math.round(delay * 1_000)),
-          easing: revealEasing,
-          fill: "both",
-        },
-      );
-      activeAnimation.finished
+      controls.set({ opacity: 0, y: 22, rotateX: 2.5 });
+      controls
+        .start({
+          opacity: 1,
+          y: 0,
+          rotateX: 0,
+          transition: {
+            duration: motionDuration,
+            delay: Math.max(0, delay),
+            ease: revealEasing,
+          },
+        })
         .then(() => {
           node.dataset.revealState = "complete";
         })
@@ -91,11 +90,11 @@ function useScrollEntrance(delay: number, once: boolean) {
     observer.observe(node);
     return () => {
       observer.disconnect();
-      activeAnimation?.cancel();
+      controls.stop();
     };
-  }, [delay, once, reducedMotion]);
+  }, [controls, delay, once, reducedMotion]);
 
-  return attachRef;
+  return [attachRef, controls] as const;
 }
 
 export function Reveal({
@@ -105,12 +104,12 @@ export function Reveal({
   once = true,
   as = "div",
 }: RevealProps) {
-  const ref = useScrollEntrance(delay, once);
+  const [ref, controls] = useScrollEntrance(delay, once);
 
-  if (as === "section") return <section ref={ref} className={className}>{children}</section>;
-  if (as === "article") return <article ref={ref} className={className}>{children}</article>;
-  if (as === "header") return <header ref={ref} className={className}>{children}</header>;
-  return <div ref={ref} className={className}>{children}</div>;
+  if (as === "section") return <motion.section ref={ref} className={className} initial={false} animate={controls}>{children}</motion.section>;
+  if (as === "article") return <motion.article ref={ref} className={className} initial={false} animate={controls}>{children}</motion.article>;
+  if (as === "header") return <motion.header ref={ref} className={className} initial={false} animate={controls}>{children}</motion.header>;
+  return <motion.div ref={ref} className={className} initial={false} animate={controls}>{children}</motion.div>;
 }
 
 type RevealStaggerProps = {
@@ -131,6 +130,6 @@ export function RevealStagger({ children, className, stagger = 0.08 }: RevealSta
 }
 
 export function RevealItem({ children, className, delay = 0 }: RevealItemProps) {
-  const ref = useScrollEntrance(delay, true);
-  return <div ref={ref} className={className}>{children}</div>;
+  const [ref, controls] = useScrollEntrance(delay, true);
+  return <motion.div ref={ref} className={className} initial={false} animate={controls}>{children}</motion.div>;
 }

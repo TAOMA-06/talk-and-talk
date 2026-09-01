@@ -7,6 +7,7 @@ type DisplayConversation = Conversation & { name: string; preview: string; updat
 
 Page({
   data: {
+    motionOff: false,
     conversations: [] as DisplayConversation[],
     unreadNotificationCount: 0,
     activeSupportCount: null as number | null,

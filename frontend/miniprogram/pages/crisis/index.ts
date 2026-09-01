@@ -63,6 +63,7 @@ const FALLBACK_CATALOG: CrisisResourceCatalog = {
 
 Page({
   data: {
+    motionOff: false,
     region: "CN",
     coverageStatement: FALLBACK_CATALOG.coverageStatement,
     approved: false,

@@ -1,0 +1,99 @@
+:host { display: inline-flex; }
+.cartoon-prop {
+  --prop-bg: var(--tt-color-pastel-blue-bg);
+  --prop-fg: var(--tt-color-pastel-blue-fg);
+  --prop-stroke: var(--tt-color-pastel-blue-stroke);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  color: var(--prop-fg);
+  transform-origin: center bottom;
+}
+.size-sm { width: 72rpx; height: 72rpx; }
+.size-md { width: 104rpx; height: 104rpx; }
+.size-lg { width: 140rpx; height: 140rpx; }
+.tone-blue { --prop-bg: var(--tt-color-pastel-blue-bg); --prop-fg: var(--tt-color-pastel-blue-fg); --prop-stroke: var(--tt-color-pastel-blue-stroke); }
+.tone-apricot { --prop-bg: var(--tt-color-pastel-apricot-bg); --prop-fg: var(--tt-color-pastel-apricot-fg); --prop-stroke: var(--tt-color-pastel-apricot-stroke); }
+.tone-mint { --prop-bg: var(--tt-color-pastel-mint-bg); --prop-fg: var(--tt-color-pastel-mint-fg); --prop-stroke: var(--tt-color-pastel-mint-stroke); }
+.tone-lavender { --prop-bg: var(--tt-color-pastel-lavender-bg); --prop-fg: var(--tt-color-pastel-lavender-fg); --prop-stroke: var(--tt-color-pastel-lavender-stroke); }
+.tone-butter { --prop-bg: var(--tt-color-pastel-butter-bg); --prop-fg: var(--tt-color-pastel-butter-fg); --prop-stroke: var(--tt-color-pastel-butter-stroke); }
+.tone-rose { --prop-bg: var(--tt-color-pastel-rose-bg); --prop-fg: var(--tt-color-pastel-rose-fg); --prop-stroke: var(--tt-color-pastel-rose-stroke); }
+.prop-shape { position: absolute; inset: 10%; }
+
+.bubble-shape { border: 3rpx solid currentColor; border-radius: 34% 34% 34% 15%; background: var(--prop-bg); }
+.bubble-tail { position: absolute; left: 8%; bottom: -14%; width: 24%; height: 28%; border-left: 3rpx solid currentColor; transform: skew(-28deg); }
+.bubble-dot { position: absolute; top: 46%; width: 7%; height: 7%; border-radius: 999rpx; background: currentColor; }
+.dot-one { left: 27%; }.dot-two { left: 47%; }.dot-three { left: 67%; }
+
+.lamp-glow { position: absolute; z-index: 1; top: 4%; left: 16%; width: 68%; height: 48%; border-radius: 50%; background: var(--prop-bg); opacity: .72; }
+.lamp-shade { position: absolute; z-index: 3; top: 12%; left: 22%; width: 56%; height: 34%; border: 3rpx solid currentColor; border-radius: 44% 44% 18% 18%; background: var(--prop-bg); }
+.lamp-stem { position: absolute; z-index: 2; top: 43%; left: 48%; width: 4%; height: 38%; border-radius: 999rpx; background: currentColor; }
+.lamp-base { position: absolute; z-index: 3; left: 26%; bottom: 7%; width: 48%; height: 10%; border-radius: 999rpx; background: currentColor; }
+
+.cup-body { position: absolute; z-index: 3; left: 16%; bottom: 9%; width: 60%; height: 58%; border: 3rpx solid currentColor; border-radius: 10% 10% 26% 26%; background: var(--prop-bg); }
+.cup-handle { position: absolute; z-index: 2; right: 7%; bottom: 24%; width: 30%; height: 30%; border: 3rpx solid currentColor; border-left: 0; border-radius: 0 50% 50% 0; }
+.cup-steam { position: absolute; z-index: 4; top: 3%; width: 4%; height: 28%; border-radius: 999rpx; background: currentColor; opacity: .5; transform-origin: center bottom; }
+.steam-one { left: 38%; }.steam-two { left: 57%; height: 22%; top: 9%; }
+
+.magnifier-glass { position: absolute; z-index: 3; top: 8%; left: 8%; width: 58%; height: 58%; border: 4rpx solid currentColor; border-radius: 50%; background: var(--prop-bg); }
+.magnifier-handle { position: absolute; z-index: 2; right: 13%; bottom: 12%; width: 42%; height: 8%; border-radius: 999rpx; background: currentColor; transform: rotate(45deg); transform-origin: right center; }
+
+.envelope-body { position: absolute; z-index: 1; inset: 20% 5% 8%; border: 3rpx solid currentColor; border-radius: 12%; background: var(--prop-bg); }
+.envelope-fold { position: absolute; z-index: 2; bottom: 18%; width: 52%; height: 3rpx; background: currentColor; }
+.fold-left { left: 8%; transform: rotate(28deg); }.fold-right { right: 8%; transform: rotate(-28deg); }
+.envelope-flap { position: absolute; z-index: 3; top: 22%; left: 13%; width: 72%; height: 45%; border-right: 3rpx solid currentColor; border-bottom: 3rpx solid currentColor; background: var(--prop-bg); transform: rotate(45deg); }
+
+.calendar-body { position: absolute; z-index: 1; inset: 16% 8% 6%; border: 3rpx solid currentColor; border-radius: 15%; background: var(--prop-bg); }
+.calendar-head { position: absolute; z-index: 2; top: 17%; left: 10%; width: 80%; height: 24%; border-bottom: 3rpx solid currentColor; background: var(--prop-stroke); border-radius: 14% 14% 0 0; }
+.calendar-ring { position: absolute; z-index: 3; top: 8%; width: 7%; height: 26%; border-radius: 999rpx; background: currentColor; }
+.ring-left { left: 29%; }.ring-right { right: 29%; }
+.calendar-line { position: absolute; z-index: 3; left: 25%; right: 25%; height: 3rpx; background: currentColor; opacity: .66; }
+.line-one { top: 56%; }.line-two { top: 72%; }
+
+.folder-back { position: absolute; z-index: 1; inset: 19% 5% 9%; border: 3rpx solid currentColor; border-radius: 10%; background: var(--prop-stroke); }
+.folder-tab { position: absolute; z-index: 2; top: 10%; left: 10%; width: 40%; height: 23%; border: 3rpx solid currentColor; border-bottom: 0; border-radius: 16% 16% 0 0; background: var(--prop-stroke); }
+.folder-front { position: absolute; z-index: 3; right: 2%; bottom: 8%; left: 2%; height: 54%; border: 3rpx solid currentColor; border-radius: 9% 9% 14% 14%; background: var(--prop-bg); transform: skew(-5deg); }
+
+.sprout-stem { position: absolute; z-index: 2; left: 48%; bottom: 20%; width: 4%; height: 48%; border-radius: 999rpx; background: currentColor; }
+.sprout-leaf { position: absolute; z-index: 3; top: 24%; width: 38%; height: 25%; border: 3rpx solid currentColor; background: var(--prop-bg); }
+.leaf-left { left: 12%; border-radius: 70% 20% 70% 20%; transform: rotate(24deg); transform-origin: right bottom; }
+.leaf-right { right: 12%; border-radius: 20% 70% 20% 70%; transform: rotate(-24deg); transform-origin: left bottom; }
+.sprout-soil { position: absolute; z-index: 3; right: 13%; bottom: 10%; left: 13%; height: 13%; border-radius: 50%; background: var(--prop-stroke); }
+
+.prop-face { position: absolute; z-index: 8; left: 34%; top: 44%; width: 32%; height: 22%; pointer-events: none; }
+.face-eye { position: absolute; top: 4%; width: 7rpx; height: 7rpx; border-radius: 999rpx; background: currentColor; }
+.eye-left { left: 8%; }.eye-right { right: 8%; }
+.face-mouth { position: absolute; left: 38%; bottom: 2%; width: 24%; height: 20%; border-bottom: 3rpx solid currentColor; border-radius: 50%; }
+
+.is-active.risk-standard.motion-peek:not(.motion-off) { animation: prop-peek var(--tt-motion-emphasis) var(--tt-ease-playful) both; }
+.is-active.risk-standard.motion-nod:not(.motion-off) { animation: prop-nod var(--tt-motion-emphasis) var(--tt-ease-playful) both; }
+.is-active.risk-standard.motion-breathe:not(.motion-off) { animation: prop-breathe var(--tt-motion-hero) var(--tt-ease-emphasis) 2; }
+.is-active.risk-standard.motion-breathe:not(.motion-off) .prop-accent { animation: prop-accent-breathe var(--tt-motion-hero) var(--tt-ease-emphasis) 2; }
+@keyframes prop-peek {
+  from { opacity: 0; transform: translateY(30rpx) rotate(4deg) scale(.9); }
+  to { opacity: 1; transform: translateY(0) rotate(0) scale(1); }
+}
+@keyframes prop-nod {
+  0% { transform: rotate(0) translateY(0); }
+  45% { transform: rotate(-4deg) translateY(-5rpx); }
+  72% { transform: rotate(2deg) translateY(0); }
+  100% { transform: rotate(0) translateY(0); }
+}
+@keyframes prop-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.035); }
+}
+@keyframes prop-accent-breathe {
+  0%, 100% { opacity: .55; transform: scale(.96); }
+  50% { opacity: .86; transform: scale(1.06); }
+}
+.risk-high,
+.risk-high .prop-accent,
+.motion-off,
+.motion-off .prop-accent { animation: none !important; transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .cartoon-prop,
+  .prop-accent { animation: none !important; transition: none; }
+}

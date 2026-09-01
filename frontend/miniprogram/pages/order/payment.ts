@@ -61,6 +61,7 @@ function paymentView(order: Order): PaymentView {
 
 Page({
   data: {
+    motionOff: false,
     order: null as Order | null,
     view: null as PaymentView | null,
     paymentState: "loading" as PaymentState,

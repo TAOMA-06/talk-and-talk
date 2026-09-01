@@ -56,6 +56,7 @@ function toAppealableCaseView(item: ModerationAppealableCase): ModerationAppeala
 
 Page({
   data: {
+    motionOff: false,
     appeals: [] as ModerationAppealView[],
     appealsLoading: false,
     appealsLoaded: false,

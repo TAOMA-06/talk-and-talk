@@ -1,10 +1,22 @@
+.services-page { padding-top: 22rpx; overflow-x: hidden; }
+.service-studio { position: relative; margin: 0 -8rpx 22rpx; padding: 8rpx 8rpx 0; }
+.service-studio::before { content: ""; position: absolute; top: 80rpx; left: -112rpx; width: 320rpx; height: 320rpx; border: 1rpx solid var(--tt-color-pastel-apricot-stroke); border-radius: 50%; opacity: .4; pointer-events: none; }
+.service-sign { position: relative; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 16rpx; margin: 0 10rpx 2rpx; color: var(--tt-text-tertiary); font-size: 19rpx; font-weight: 800; letter-spacing: 1.8rpx; }
+.service-count { flex: none; padding: 6rpx 13rpx; border: 1rpx solid var(--tt-color-pastel-blue-stroke); border-radius: 999rpx; background: var(--tt-color-pastel-blue-bg); color: var(--tt-color-pastel-blue-fg); letter-spacing: 0; }
+.service-layer { width: 100%; }
+.service-stage-card,.intro-card { box-sizing: border-box; min-height: 320rpx; padding: 32rpx; border: 1rpx solid; border-radius: 32rpx; overflow: hidden; }
+.service-stage-card { position: relative; display: flex; flex-direction: column; justify-content: flex-end; }
+.service-stage-draft { border-color: var(--tt-color-pastel-mint-stroke); background: var(--tt-color-pastel-mint-bg); color: var(--tt-color-pastel-mint-fg); }
+.service-stage-calendar { border-color: var(--tt-color-pastel-butter-stroke); background: var(--tt-color-pastel-butter-bg); color: var(--tt-color-pastel-butter-fg); }
+.stage-index { position: absolute; top: 28rpx; right: 30rpx; font-size: 19rpx; font-weight: 800; letter-spacing: 1.6rpx; }
+.stage-title { width: 68%; font-size: 29rpx; font-weight: 750; line-height: 1.34; }
+.stage-copy { width: 68%; margin-top: 10rpx; font-size: 21rpx; }
+.service-props { display: flex; align-items: flex-end; gap: 2rpx; }
 .intro-card {
-  margin-bottom: 20rpx;
   padding: 32rpx;
-  border-radius: 28rpx;
-  background: var(--tt-accent-soft);
-  box-shadow: none;
-  border: 1rpx solid var(--tt-border);
+  background: var(--tt-color-pastel-blue-bg);
+  border: 1rpx solid var(--tt-color-pastel-blue-stroke);
+  color: var(--tt-color-pastel-blue-fg);
 }
 
 .create-button {
@@ -50,10 +62,9 @@
 }
 
 .offering-card {
-  margin-bottom: 18rpx;
-  border: 1rpx solid var(--tt-border);
-  background: var(--tt-surface);
+  min-width: 0;
 }
+.offering-item { margin-bottom: 20rpx; }
 
 .offering-head {
   display: flex;
@@ -67,7 +78,7 @@
 }
 
 .offering-title {
-  color: var(--tt-danger);
+  color: currentColor;
   font-size: 33rpx;
   font-weight: 700;
   word-break: break-all;
@@ -92,7 +103,7 @@
 
 .description {
   margin-top: 18rpx;
-  color: var(--tt-text);
+  color: currentColor;
   font-size: 28rpx;
   line-height: 1.65;
   white-space: pre-wrap;
@@ -100,10 +111,11 @@
 
 .topic-line {
   margin-top: 16rpx;
-  color: var(--tt-text-secondary);
+  color: currentColor;
   font-size: 25rpx;
   line-height: 1.5;
 }
+.offering-card .muted,.offering-card .topic-line,.offering-card .description { color: currentColor; }
 
 .offering-actions {
   display: flex;
@@ -161,7 +173,7 @@
   inset: 0;
   display: flex;
   align-items: flex-end;
-  background: rgba(32, 33, 36, 0.48);
+  background: var(--tt-overlay-scrim);
 }
 
 .editor-sheet {
@@ -394,4 +406,10 @@ textarea {
 
 .save-button[disabled], .primary-button[disabled], .plain-button[disabled] {
   opacity: 0.52;
+}
+
+.intro-card .tt-kicker,.intro-card .title,.intro-card .muted { color: currentColor; }
+
+@media (prefers-reduced-motion: reduce) {
+  .service-studio::before { display: none; }
 }

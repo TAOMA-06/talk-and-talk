@@ -2,3 +2,4 @@ page {
   background: var(--tt-bg);
   color: var(--tt-text);
 }
+.legal-page.tt-motion-off { animation: none; transition: none; transform: none; }

@@ -1,0 +1,134 @@
+:host { display: block; min-width: 0; }
+
+.card-shell {
+  --card-bg: var(--tt-surface);
+  --card-fg: var(--tt-text);
+  --card-stroke: var(--tt-border);
+  --card-depth-near: var(--tt-color-depth-neutral-near);
+  --card-depth-far: var(--tt-color-depth-neutral-far);
+  --depth-x: 0rpx;
+  --depth-y: 0rpx;
+  --depth-near-x: 0rpx;
+  --depth-near-y: 0rpx;
+  --depth-far-x: 0rpx;
+  --depth-far-y: 0rpx;
+  position: relative;
+  min-width: 0;
+  padding-right: var(--depth-x);
+  padding-bottom: var(--depth-y);
+  isolation: isolate;
+  color: var(--card-fg);
+  overflow-wrap: anywhere;
+}
+
+.card-depth-plane {
+  position: absolute;
+  top: 0;
+  right: var(--depth-x);
+  bottom: var(--depth-y);
+  left: 0;
+  border: 1rpx solid var(--card-stroke);
+  border-radius: inherit;
+  pointer-events: none;
+}
+.card-depth-far { z-index: 1; background: var(--card-depth-far); transform: translate(var(--depth-far-x), var(--depth-far-y)); }
+.card-depth-near { z-index: 2; background: var(--card-depth-near); transform: translate(var(--depth-near-x), var(--depth-near-y)); }
+.card-surface {
+  position: relative;
+  z-index: 3;
+  min-width: 0;
+  overflow: hidden;
+  border: 1rpx solid var(--card-stroke);
+  border-radius: inherit;
+  background: var(--card-bg);
+  color: var(--card-fg);
+  transform: translateY(0);
+}
+
+.size-compact,
+.size-standard { border-radius: 22rpx; }
+.size-feature { border-radius: 30rpx; }
+.size-wide { border-radius: 24rpx; }
+.size-compact .card-surface { padding: 22rpx; }
+.size-standard .card-surface { padding: 28rpx; }
+.size-feature .card-surface { min-height: 220rpx; padding: 36rpx; }
+.size-wide .card-surface { padding: 30rpx 32rpx; }
+
+.tone-surface { --card-bg: var(--tt-surface); --card-fg: var(--tt-text); --card-stroke: var(--tt-border); }
+.tone-neutral { --card-bg: var(--tt-surface-alt); --card-fg: var(--tt-text); --card-stroke: var(--tt-border); }
+.tone-blue { --card-bg: var(--tt-color-pastel-blue-bg); --card-fg: var(--tt-color-pastel-blue-fg); --card-stroke: var(--tt-color-pastel-blue-stroke); --card-depth-near: var(--tt-color-pastel-blue-bg); --card-depth-far: var(--tt-color-pastel-blue-stroke); }
+.tone-apricot { --card-bg: var(--tt-color-pastel-apricot-bg); --card-fg: var(--tt-color-pastel-apricot-fg); --card-stroke: var(--tt-color-pastel-apricot-stroke); --card-depth-near: var(--tt-color-pastel-apricot-bg); --card-depth-far: var(--tt-color-pastel-apricot-stroke); }
+.tone-mint { --card-bg: var(--tt-color-pastel-mint-bg); --card-fg: var(--tt-color-pastel-mint-fg); --card-stroke: var(--tt-color-pastel-mint-stroke); --card-depth-near: var(--tt-color-pastel-mint-bg); --card-depth-far: var(--tt-color-pastel-mint-stroke); }
+.tone-lavender { --card-bg: var(--tt-color-pastel-lavender-bg); --card-fg: var(--tt-color-pastel-lavender-fg); --card-stroke: var(--tt-color-pastel-lavender-stroke); --card-depth-near: var(--tt-color-pastel-lavender-bg); --card-depth-far: var(--tt-color-pastel-lavender-stroke); }
+.tone-butter { --card-bg: var(--tt-color-pastel-butter-bg); --card-fg: var(--tt-color-pastel-butter-fg); --card-stroke: var(--tt-color-pastel-butter-stroke); --card-depth-near: var(--tt-color-pastel-butter-bg); --card-depth-far: var(--tt-color-pastel-butter-stroke); }
+.tone-rose { --card-bg: var(--tt-color-pastel-rose-bg); --card-fg: var(--tt-color-pastel-rose-fg); --card-stroke: var(--tt-color-pastel-rose-stroke); --card-depth-near: var(--tt-color-pastel-rose-bg); --card-depth-far: var(--tt-color-pastel-rose-stroke); }
+
+.depth-low { --depth-x: 6rpx; --depth-y: 8rpx; --depth-near-x: 3rpx; --depth-near-y: 4rpx; --depth-far-x: 6rpx; --depth-far-y: 8rpx; }
+.depth-mid { --depth-x: 12rpx; --depth-y: 16rpx; --depth-near-x: 6rpx; --depth-near-y: 8rpx; --depth-far-x: 12rpx; --depth-far-y: 16rpx; }
+.depth-high { --depth-x: 18rpx; --depth-y: 24rpx; --depth-near-x: 9rpx; --depth-near-y: 12rpx; --depth-far-x: 18rpx; --depth-far-y: 24rpx; }
+.depth-low .card-surface { box-shadow: var(--tt-shadow-card-low); }
+.depth-mid .card-surface { box-shadow: var(--tt-shadow-card-mid); }
+.depth-high .card-surface { box-shadow: var(--tt-shadow-card-high); }
+
+.interactive .card-surface { min-height: 88rpx; }
+.card-shell:focus { outline: 3rpx solid var(--tt-color-focus-ring); outline-offset: 3rpx; }
+.interactive:not(.disabled):not(.motion-off) { transition: transform var(--tt-motion-press) var(--tt-ease-standard), opacity var(--tt-motion-press) var(--tt-ease-standard); }
+.interactive.card-shell-pressed:not(.disabled):not(.motion-off) { opacity: .92; transform: scale(.985); }
+.selected .card-surface { border-width: 3rpx; border-color: var(--tt-color-action-primary-bg); }
+.selected.motion-m2:not(.risk-high):not(.motion-off) .card-surface,
+.selected.motion-m3:not(.risk-high):not(.motion-off) .card-surface,
+.selected.motion-m4:not(.risk-high):not(.motion-off) .card-surface { transform: translateY(-6rpx); transition: transform var(--tt-motion-standard) var(--tt-ease-playful); }
+.disabled { opacity: .58; }
+.tilt-left { transform: rotate(-1.6deg); }
+.tilt-right { transform: rotate(1.6deg); }
+.tilt-left.interactive.card-shell-pressed { transform: rotate(-1.6deg) scale(.985); }
+.tilt-right.interactive.card-shell-pressed { transform: rotate(1.6deg) scale(.985); }
+
+.motion-m2.entrance-rise:not(.motion-off):not(.risk-high) { animation: card-rise var(--tt-motion-standard) var(--tt-ease-emphasis) both; }
+.motion-m3.entrance-rise:not(.motion-off):not(.risk-high) { animation: card-rise var(--tt-motion-emphasis) var(--tt-ease-emphasis) both; }
+.motion-m3.entrance-deal-left:not(.motion-off):not(.risk-high),
+.motion-m4.entrance-deal-left:not(.motion-off):not(.risk-high) { animation: card-deal-left var(--tt-motion-hero) var(--tt-ease-playful) both; }
+.motion-m3.entrance-deal-center:not(.motion-off):not(.risk-high),
+.motion-m4.entrance-deal-center:not(.motion-off):not(.risk-high) { animation: card-deal-center var(--tt-motion-hero) var(--tt-ease-playful) both; }
+.motion-m3.entrance-deal-right:not(.motion-off):not(.risk-high),
+.motion-m4.entrance-deal-right:not(.motion-off):not(.risk-high) { animation: card-deal-right var(--tt-motion-hero) var(--tt-ease-playful) both; }
+.stagger-1 { animation-delay: var(--tt-motion-delay-1) !important; }
+.stagger-2 { animation-delay: var(--tt-motion-delay-2) !important; }
+.stagger-3 { animation-delay: var(--tt-motion-delay-3) !important; }
+.stagger-4 { animation-delay: var(--tt-motion-delay-4) !important; }
+.stagger-5 { animation-delay: var(--tt-motion-delay-5) !important; }
+.risk-high { animation: none !important; }
+
+@keyframes card-rise {
+  from { opacity: 0; transform: translateY(22rpx) scale(.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes card-deal-left {
+  from { opacity: 0; transform: translateX(-92rpx) translateY(44rpx) rotate(-4deg) scale(.93); }
+  to { opacity: 1; transform: translateX(0) translateY(0) rotate(0) scale(1); }
+}
+@keyframes card-deal-center {
+  from { opacity: 0; transform: translateY(104rpx) scale(.93); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes card-deal-right {
+  from { opacity: 0; transform: translateX(92rpx) translateY(48rpx) rotate(4deg) scale(.93); }
+  to { opacity: 1; transform: translateX(0) translateY(0) rotate(0) scale(1); }
+}
+
+.motion-off,
+.motion-off .card-surface,
+.motion-off.interactive,
+.motion-off.interactive.card-shell-pressed { animation: none; transition: none; }
+.motion-off.interactive.card-shell-pressed { opacity: 1; transform: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .card-shell,
+  .card-surface,
+  .interactive,
+  .interactive.card-shell-pressed,
+  .tilt-left,
+  .tilt-right,
+  .tilt-left.interactive.card-shell-pressed,
+  .tilt-right.interactive.card-shell-pressed { animation: none; transition: none; transform: none; }
+}

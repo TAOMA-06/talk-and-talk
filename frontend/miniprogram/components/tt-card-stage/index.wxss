@@ -1,0 +1,110 @@
+:host { display: block; min-width: 0; }
+.card-stage {
+  position: relative;
+  min-width: 0;
+  isolation: isolate;
+  perspective: 1200rpx;
+  transform-style: preserve-3d;
+}
+.stage-layer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  transform-style: preserve-3d;
+}
+.stage-back { z-index: 1; }
+.stage-middle { z-index: 2; }
+.stage-front { z-index: 3; }
+.stage-motion { width: 86%; max-width: 640rpx; pointer-events: none; transform-origin: center; }
+.stage-hit { width: 100%; pointer-events: auto; }
+.stage-prop { position: absolute; z-index: 4; right: 8rpx; bottom: 4rpx; pointer-events: none; }
+
+.layout-stack .stage-back { transform: translate(-7%, 9%) rotate(-3deg) scale(.92); }
+.layout-stack .stage-middle { transform: translate(7%, 4%) rotate(3deg) scale(.96); }
+.layout-stack .stage-front { transform: translate(0, -4%) scale(1); }
+.layout-fan .stage-back { transform: translate(-18%, 12%) rotate(-7deg) scale(.9); }
+.layout-fan .stage-middle { transform: translate(18%, 12%) rotate(7deg) scale(.92); }
+.layout-fan .stage-front { transform: translate(0, -4%) scale(1); }
+.layout-deck .stage-back { transform: translate(-5%, 9%) rotate(-4deg) scale(.94); }
+.layout-deck .stage-middle { transform: translate(5%, 5%) rotate(3deg) scale(.97); }
+.layout-deck .stage-front { transform: translate(0, 0) scale(1); }
+.layout-assemble .stage-back { transform: translate(-8%, -8%) rotate(-3deg) scale(.94); }
+.layout-assemble .stage-middle { transform: translate(9%, -3%) rotate(4deg) scale(.96); }
+.layout-assemble .stage-front { transform: translate(0, 10%) rotate(1deg) scale(1); }
+
+.is-active.motion-m2.entrance-rise:not(.motion-off):not(.risk-high) .stage-motion,
+.is-active.motion-m3.entrance-rise:not(.motion-off):not(.risk-high) .stage-motion,
+.is-active.motion-m4.entrance-rise:not(.motion-off):not(.risk-high) .stage-motion {
+  animation: stage-rise var(--tt-motion-emphasis) var(--tt-ease-emphasis) both;
+}
+.is-active.motion-m3.entrance-deal:not(.motion-off):not(.risk-high) .stage-back .stage-motion,
+.is-active.motion-m4.entrance-deal:not(.motion-off):not(.risk-high) .stage-back .stage-motion,
+.is-active.motion-m3.entrance-fan:not(.motion-off):not(.risk-high) .stage-back .stage-motion,
+.is-active.motion-m4.entrance-fan:not(.motion-off):not(.risk-high) .stage-back .stage-motion {
+  animation: stage-deal-left var(--tt-motion-hero) var(--tt-ease-playful) both;
+}
+.is-active.motion-m3.entrance-deal:not(.motion-off):not(.risk-high) .stage-middle .stage-motion,
+.is-active.motion-m4.entrance-deal:not(.motion-off):not(.risk-high) .stage-middle .stage-motion,
+.is-active.motion-m3.entrance-fan:not(.motion-off):not(.risk-high) .stage-middle .stage-motion,
+.is-active.motion-m4.entrance-fan:not(.motion-off):not(.risk-high) .stage-middle .stage-motion {
+  animation: stage-deal-center var(--tt-motion-hero) var(--tt-ease-playful) var(--tt-motion-delay-1) both;
+}
+.is-active.motion-m3.entrance-deal:not(.motion-off):not(.risk-high) .stage-front .stage-motion,
+.is-active.motion-m4.entrance-deal:not(.motion-off):not(.risk-high) .stage-front .stage-motion,
+.is-active.motion-m3.entrance-fan:not(.motion-off):not(.risk-high) .stage-front .stage-motion,
+.is-active.motion-m4.entrance-fan:not(.motion-off):not(.risk-high) .stage-front .stage-motion {
+  animation: stage-deal-right var(--tt-motion-hero) var(--tt-ease-playful) var(--tt-motion-delay-2) both;
+}
+.is-active.motion-m3.entrance-assemble:not(.motion-off):not(.risk-high) .stage-back .stage-motion,
+.is-active.motion-m4.entrance-assemble:not(.motion-off):not(.risk-high) .stage-back .stage-motion {
+  animation: stage-assemble-left var(--tt-motion-hero) var(--tt-ease-emphasis) both;
+}
+.is-active.motion-m3.entrance-assemble:not(.motion-off):not(.risk-high) .stage-middle .stage-motion,
+.is-active.motion-m4.entrance-assemble:not(.motion-off):not(.risk-high) .stage-middle .stage-motion {
+  animation: stage-assemble-right var(--tt-motion-hero) var(--tt-ease-emphasis) var(--tt-motion-delay-1) both;
+}
+.is-active.motion-m3.entrance-assemble:not(.motion-off):not(.risk-high) .stage-front .stage-motion,
+.is-active.motion-m4.entrance-assemble:not(.motion-off):not(.risk-high) .stage-front .stage-motion {
+  animation: stage-assemble-front var(--tt-motion-hero) var(--tt-ease-emphasis) var(--tt-motion-delay-2) both;
+}
+
+@keyframes stage-rise {
+  from { opacity: 0; transform: translateY(42rpx) scale(.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes stage-deal-left {
+  from { opacity: 0; transform: translateX(-132rpx) translateY(70rpx) rotate(-5deg) scale(.9); }
+  to { opacity: 1; transform: translateX(0) translateY(0) rotate(0) scale(1); }
+}
+@keyframes stage-deal-center {
+  from { opacity: 0; transform: translateY(142rpx) scale(.9); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes stage-deal-right {
+  from { opacity: 0; transform: translateX(132rpx) translateY(76rpx) rotate(5deg) scale(.9); }
+  to { opacity: 1; transform: translateX(0) translateY(0) rotate(0) scale(1); }
+}
+@keyframes stage-assemble-left {
+  from { opacity: 0; transform: translateX(-92rpx) translateY(-46rpx) scale(.92); }
+  to { opacity: 1; transform: translateX(0) translateY(0) scale(1); }
+}
+@keyframes stage-assemble-right {
+  from { opacity: 0; transform: translateX(92rpx) translateY(-46rpx) scale(.92); }
+  to { opacity: 1; transform: translateX(0) translateY(0) scale(1); }
+}
+@keyframes stage-assemble-front {
+  from { opacity: 0; transform: translateY(112rpx) scale(.92); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.risk-high .stage-motion,
+.motion-off .stage-motion { animation: none !important; transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .stage-motion { animation: none !important; transition: none; transform: none; }
+}

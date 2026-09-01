@@ -1,12 +1,24 @@
-.profile-page { padding-top: 34rpx; }
-.profile-hero { display: flex; align-items: center; gap: 26rpx; padding: 16rpx 6rpx 32rpx; }
+.profile-page { padding-top: 22rpx; overflow-x: hidden; }
+.personal-desk { position: relative; margin: 0 -8rpx 10rpx; padding: 6rpx 8rpx 0; }
+.personal-desk::before { content: ""; position: absolute; top: 84rpx; right: -96rpx; width: 310rpx; height: 310rpx; border: 1rpx solid var(--tt-color-pastel-lavender-stroke); border-radius: 50%; opacity: .4; pointer-events: none; }
+.desk-sign { position: relative; z-index: 5; display: flex; align-items: center; justify-content: space-between; min-height: 72rpx; padding: 0 10rpx; color: var(--tt-text-tertiary); font-size: 19rpx; font-weight: 800; letter-spacing: 2rpx; }
+.desk-stage-layer { width: 100%; }
+.desk-context-card { display: flex; min-height: 270rpx; flex-direction: column; justify-content: flex-end; padding: 32rpx; border: 1rpx solid; border-radius: 30rpx; }
+.desk-context-card view { color: currentColor; font-size: 20rpx; font-weight: 800; letter-spacing: 2rpx; }
+.desk-context-card text { width: 62%; margin-top: 14rpx; font-size: 27rpx; font-weight: 700; line-height: 1.38; }
+.desk-private-card { border-color: var(--tt-color-pastel-blue-stroke); background: var(--tt-color-pastel-blue-bg); color: var(--tt-color-pastel-blue-fg); }
+.desk-account-card { border-color: var(--tt-color-pastel-mint-stroke); background: var(--tt-color-pastel-mint-bg); color: var(--tt-color-pastel-mint-fg); }
+.profile-hero { display: flex; min-height: 270rpx; align-items: center; gap: 24rpx; margin: 0; padding: 32rpx; border: 1rpx solid var(--tt-color-pastel-rose-stroke); border-radius: 30rpx; background: var(--tt-color-pastel-rose-bg); color: var(--tt-color-pastel-rose-fg); }
+.profile-hero .title,
+.profile-hero .muted { color: currentColor; }
+.profile-hero .muted { color: var(--tt-color-pastel-rose-fg); }
 .profile-identity { display: flex; min-width: 0; flex: 1; flex-direction: column; align-items: flex-start; gap: 8rpx; }
-.profile-editor { margin-bottom: 20rpx; }
+.profile-editor { margin-bottom: 20rpx; border-radius: 26rpx; }
 input,textarea,.picker { width: 100%; margin-top: 14rpx; padding: 16rpx 18rpx; }
 textarea { min-height: 160rpx; }
 .profile-field-copy { margin-top: 8rpx; color: var(--tt-text-tertiary); font-size: 21rpx; line-height: 1.5; }
 .small { font-size: 31rpx; }
-.profile-hub { padding: 4rpx 24rpx; }
+.profile-hub { padding: 4rpx 24rpx; border-radius: 26rpx; }
 .title.section-title,.section-title { margin: 40rpx 4rpx 16rpx; font-size: 32rpx; }
 .text-button,.legal { min-height: 64rpx; padding: 10rpx 14rpx; border: 0; background: transparent; color: var(--tt-accent); font-size: 23rpx; }
 .notification-header,.recommendation-header,.favorites-heading,.recent-views-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16rpx; }
@@ -24,7 +36,29 @@ textarea { min-height: 160rpx; }
 .choice.selected { border-color: var(--tt-accent); background: var(--tt-accent-soft); color: var(--tt-accent); }
 .behavior-tag { border-color: var(--tt-warning); background: var(--tt-warning-soft); color: var(--tt-warning); }
 .recommendation-off,.behavior-tags { margin-top: 18rpx; }
-.recommendation-exclusions,.favorites-card,.recent-views-card,.safety-entry,.companion-workbench { background: var(--tt-surface); }
+.recommendation-exclusions,.favorites-card,.recent-views-card,.safety-entry,.companion-workbench,.companion-onboarding-card { position: relative; isolation: isolate; border-radius: 26rpx; background: var(--tt-surface); }
+.recommendation-exclusions::before,.favorites-card::before,.recent-views-card::before,.safety-entry::before,.companion-workbench::before,.companion-onboarding-card::before { content: ""; position: absolute; z-index: 0; right: 14rpx; bottom: -7rpx; left: 14rpx; height: 50rpx; border: 1rpx solid var(--tt-border); border-radius: 20rpx; background: var(--tt-color-depth-neutral-near); opacity: .64; }
+.recommendation-exclusions .title,
+.recommendation-exclusions .muted,
+.recommendation-exclusions .recommendation-exclusion-empty,
+.recommendation-exclusions .recommendation-exclusion-list,
+.favorites-card .favorites-heading,
+.favorites-card .private-resource-error,
+.favorites-card .favorite-list,
+.favorites-card .favorites-empty,
+.recent-views-card .recent-views-heading,
+.recent-views-card .private-resource-error,
+.recent-views-card .recent-views-list,
+.recent-views-card .recent-views-empty,
+.safety-entry .title,
+.safety-entry .muted,
+.safety-entry .safety-entry-button,
+.companion-workbench .title,
+.companion-workbench .muted,
+.companion-workbench .workbench-button,
+.companion-onboarding-card .title,
+.companion-onboarding-card .muted,
+.companion-onboarding-card .workbench-button { position: relative; z-index: 1; }
 .recommendation-exclusion-list,.favorite-list,.recent-views-list { margin-top: 16rpx; padding-top: 4rpx; border-top: 1rpx solid var(--tt-border); }
 .recommendation-exclusion-item,.favorite-item,.recent-view-item { margin-top: 12rpx; padding: 16rpx 18rpx; border: 1rpx solid var(--tt-border); border-radius: 16rpx; background: var(--tt-surface-alt); }
 .recommendation-exclusion-main,.favorite-item-main,.recent-view-item-main { display: flex; align-items: center; justify-content: space-between; gap: 14rpx; }
@@ -56,3 +90,25 @@ textarea { min-height: 160rpx; }
 .legal { color: var(--tt-text-secondary); text-align: center; }
 .account-actions { display: flex; flex-direction: column; gap: 6rpx; margin-top: 18rpx; padding-top: 18rpx; border-top: 1rpx solid var(--tt-border); }
 .danger { color: var(--tt-danger); }
+.profile-hub { border-color: var(--tt-color-pastel-lavender-stroke); background: var(--tt-color-pastel-lavender-bg); }
+.public-identity-card { border-color: var(--tt-color-status-warning-stroke); background: var(--tt-color-status-warning-bg); color: var(--tt-color-status-warning-fg); }
+.public-identity-card .title,
+.public-identity-card .muted { color: currentColor; }
+.public-identity-card .muted { color: var(--tt-color-status-warning-fg); }
+.favorites-card { border-color: var(--tt-color-pastel-rose-stroke); background: var(--tt-color-pastel-rose-bg); }
+.recent-views-card { border-color: var(--tt-color-pastel-blue-stroke); background: var(--tt-color-pastel-blue-bg); }
+.safety-entry { border-color: var(--tt-color-pastel-butter-stroke); background: var(--tt-color-pastel-butter-bg); }
+.companion-workbench { border-color: var(--tt-color-pastel-mint-stroke); background: var(--tt-color-pastel-mint-bg); }
+.companion-onboarding-card { border-color: var(--tt-color-pastel-apricot-stroke); background: var(--tt-color-pastel-apricot-bg); }
+.notification.unread { border-left-color: var(--tt-color-status-info-fg); background: var(--tt-color-status-info-bg); }
+.unread-marker { color: var(--tt-color-status-info-fg); }
+.profile-page.tt-motion-off .desk-sign,
+.profile-page.tt-motion-off .profile-editor,
+.profile-page.tt-motion-off .profile-hub,
+.profile-page.tt-motion-off .choice,
+.profile-page.tt-motion-off .favorite-item,
+.profile-page.tt-motion-off .recent-view-item,
+.profile-page.tt-motion-off .notification { animation: none; transition: none; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  .personal-desk::before { display: none; }
+}

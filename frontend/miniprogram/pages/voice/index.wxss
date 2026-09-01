@@ -15,12 +15,24 @@
   pointer-events: none;
 }
 
+.voice-unavailable-card { padding: 34rpx; border: 2rpx solid var(--tt-border-strong); border-radius: 24rpx; background: var(--tt-surface); color: var(--tt-text); }
+.voice-unavailable-ledger { display: flex; align-items: center; justify-content: space-between; gap: 18rpx; margin-bottom: 30rpx; color: var(--tt-text-tertiary); font-size: 18rpx; font-weight: 800; letter-spacing: 1.7rpx; }
+.voice-unavailable-ledger text:last-child { padding: 6rpx 13rpx; border: 1rpx solid var(--tt-border); border-radius: 999rpx; background: var(--tt-surface-alt); letter-spacing: 0; }
+.voice-unavailable-card .eyebrow { color: var(--tt-text-secondary); }
+.voice-unavailable-title { margin-top: 26rpx; font-size: 42rpx; font-weight: 700; letter-spacing: -1rpx; line-height: 1.16; }
+.voice-unavailable-copy { margin-top: 14rpx; color: var(--tt-text-secondary); font-size: 25rpx; line-height: 1.65; }
+.voice-contract { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8rpx; margin-top: 26rpx; }
+.voice-contract > view { display: flex; min-width: 0; flex-direction: column; gap: 7rpx; padding: 14rpx 10rpx; border: 1rpx solid var(--tt-border); border-radius: 13rpx; background: var(--tt-surface-alt); color: var(--tt-text-tertiary); font-size: 18rpx; line-height: 1.35; text-align: center; }
+.voice-contract text:last-child { color: var(--tt-text); font-size: 20rpx; font-weight: 700; }
+.voice-unavailable-boundary { margin-top: 22rpx; padding: 18rpx; border-left: 5rpx solid var(--tt-border-strong); background: var(--tt-surface-alt); color: var(--tt-text-secondary); font-size: 22rpx; line-height: 1.6; }
+.voice-unavailable-back { width: 100%; margin-top: 24rpx; }
+
 .preflight-card {
   box-sizing: border-box;
   padding: 32rpx;
   border: 1rpx solid var(--tt-accent-soft);
   border-radius: 30rpx;
-  background: rgba(255, 255, 255, 0.97);
+  background: var(--tt-surface);
   box-shadow: none;
 }
 
@@ -132,7 +144,7 @@
   padding: 48rpx 32rpx;
   border: 1rpx solid var(--tt-accent-soft);
   border-radius: 32rpx;
-  background: rgba(255, 255, 255, 0.96);
+  background: var(--tt-surface);
   text-align: center;
   box-shadow: none;
 }

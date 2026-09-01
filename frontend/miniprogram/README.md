@@ -41,9 +41,10 @@ node frontend/miniprogram/scripts/validate.mjs
 backend/api/node_modules/.bin/tsc -p frontend/miniprogram/tsconfig.json --noEmit
 node frontend/miniprogram/scripts/smoke.mjs
 node frontend/miniprogram/scripts/ui2-audit.mjs
+node frontend/miniprogram/scripts/ui3-contrast-audit.mjs
 ```
 
-第一条检查页面注册、首次协议门槛、WXML 事件绑定、跳转目标、法律文件入口、前后端性别枚举、HTTPS/云托管传输和客户端密钥泄露；第二条检查全部 TypeScript；第三条会加载编译后的页面，模拟首次同意、微信登录、正式 API envelope、预约下单、订单、会话/消息、mock 与真实 `wx.requestPayment` 分支，并验证 `wx.request` 与 `wx.cloud.callContainer` 两条入口；第四条验证 UI 2.0 的亮暗主题、共享组件、Tab 图标、语义令牌和图片预算。开发环境缺少 AppID 只警告；发行门禁使用 `MINIPROGRAM_RELEASE=1`，缺少有效的外部 AppID 会失败。CI 会执行相同门禁。
+第一条检查页面注册、首次协议门槛、WXML 事件绑定、跳转目标、法律文件入口、前后端性别枚举、HTTPS/云托管传输和客户端密钥泄露；第二条检查全部 TypeScript；第三条会加载编译后的页面，模拟首次同意、微信登录、正式 API envelope、预约下单、订单、会话/消息、mock 与真实 `wx.requestPayment` 分支，并验证 `wx.request` 与 `wx.cloud.callContainer` 两条入口；第四条验证 UI 4.0 的亮暗主题、共享组件、卡牌正向层级、动效关闭、安全默认值、语义令牌和图片预算，并拒绝无限动画、`transition: all`、负层级命中风险和页面局部颜色。开发环境缺少 AppID 只警告；发行门禁使用 `MINIPROGRAM_RELEASE=1`，缺少有效的外部 AppID 会失败。CI 会执行相同门禁。
 
 生成副本的隔离与反向发行校验可单独验证：
 
@@ -65,7 +66,7 @@ node frontend/miniprogram/scripts/test-local-build.mjs
 
 ## 设计约束
 
-- UI 2.0 的亮暗令牌、共享组件、合成素材边界与视觉矩阵见 [`UI2_DESIGN_SYSTEM.md`](./UI2_DESIGN_SYSTEM.md)。
+- 当前浅彩卡牌剧场、正向叠层、动效等级、卡通小物和页面迁移契约见 [`UI4_DESIGN_SYSTEM.md`](./UI4_DESIGN_SYSTEM.md)；UI 3.0 的颜色与状态基线保留在 [`UI3_DESIGN_SYSTEM.md`](./UI3_DESIGN_SYSTEM.md)，历史 UI 2.0 证据边界仍保留在 [`UI2_DESIGN_SYSTEM.md`](./UI2_DESIGN_SYSTEM.md)。
 - 微信账户首发独立于 Apple 账户；服务端不会按昵称、手机号或 UnionID 自动合并。
 - 客户端不保存 AppSecret、微信支付商户私钥或任何支付签名原文之外的调起参数。
 - 支付成功以微信服务端回调更新订单为准；小程序支付完成后只刷新订单状态。

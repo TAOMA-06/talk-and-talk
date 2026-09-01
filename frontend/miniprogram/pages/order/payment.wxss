@@ -9,6 +9,29 @@
   text-align: left;
   border: 1rpx solid var(--tt-accent-soft);
   border-left: 8rpx solid var(--tt-accent);
+  transition: opacity var(--tt-motion-press) var(--tt-ease-standard), transform var(--tt-motion-standard) var(--tt-ease-standard);
+}
+
+.authority-flat {
+  border: 1rpx solid var(--tt-border);
+  background: var(--tt-surface);
+  box-shadow: none;
+  transform: none;
+}
+
+.authority-label,
+.authority-note-label {
+  display: inline-flex;
+  min-height: 38rpx;
+  align-items: center;
+  margin-bottom: 14rpx;
+  padding: 0 12rpx;
+  border: 1rpx solid var(--tt-border);
+  border-radius: 999rpx;
+  background: var(--tt-surface-alt);
+  color: var(--tt-text-tertiary);
+  font-size: 19rpx;
+  font-weight: 700;
 }
 
 .state-success {
@@ -17,16 +40,40 @@
   border-left-color: var(--tt-success);
 }
 
-.state-error, .state-cancelled {
+.state-error {
   background: var(--tt-danger-soft);
   border-color: var(--tt-border);
   border-left-color: var(--tt-danger);
 }
 
-.state-pending, .state-processing {
+.state-cancelled {
+  background: var(--tt-surface-alt);
+  border-color: var(--tt-border);
+  border-left-color: var(--tt-text-tertiary);
+}
+
+.state-processing {
   background: var(--tt-warning-soft);
   border-color: var(--tt-border);
   border-left-color: var(--tt-warning);
+}
+
+.state-pending {
+  background: var(--tt-color-pastel-lavender-bg);
+  border-color: var(--tt-color-pastel-lavender-stroke);
+  border-left-color: var(--tt-info);
+}
+
+.state-loading {
+  background: var(--tt-surface-alt);
+  border-color: var(--tt-border);
+  border-left-color: var(--tt-info);
+}
+
+.state-ready {
+  background: var(--tt-color-pastel-blue-bg);
+  border-color: var(--tt-color-pastel-blue-stroke);
+  border-left-color: var(--tt-info);
 }
 
 .state-symbol {
@@ -70,6 +117,7 @@
 .order-summary {
   margin-top: 24rpx;
   border-color: var(--tt-border);
+  border-top: 5rpx solid var(--tt-color-pastel-blue-stroke);
 }
 
 .summary-title {
@@ -200,6 +248,14 @@
   overflow-wrap: anywhere;
 }
 
+.authority-note-label {
+  margin: 0 12rpx 0 0;
+  border-color: var(--tt-color-status-info-stroke);
+  background: var(--tt-surface);
+  color: var(--tt-info);
+  vertical-align: middle;
+}
+
 .terms-check::after, .support-button::after, .policy-link::after {
   border: 0;
 }
@@ -210,9 +266,14 @@
   background: var(--tt-info-soft);
 }
 
-.state-error .state-symbol, .state-cancelled .state-symbol {
+.state-error .state-symbol {
   border-color: var(--tt-border);
   color: var(--tt-danger);
+}
+
+.state-cancelled .state-symbol {
+  border-color: var(--tt-border);
+  color: var(--tt-text-secondary);
 }
 
 .state-pending .state-symbol, .state-processing .state-symbol {
@@ -228,5 +289,21 @@
 
 .rules-card {
   border-color: var(--tt-border);
-  border-left: 6rpx solid var(--tt-accent);
+  border-top: 5rpx solid var(--tt-color-pastel-butter-stroke);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .payment-state,
+  .rules-card,
+  .state-symbol,
+  .terms-check { animation: none !important; transition: none !important; transform: none !important; }
+}
+
+.payment-page.tt-motion-off .payment-state,
+.payment-page.tt-motion-off .rules-card,
+.payment-page.tt-motion-off .state-symbol,
+.payment-page.tt-motion-off .terms-check {
+  animation: none !important;
+  transition: none !important;
+  transform: none !important;
 }

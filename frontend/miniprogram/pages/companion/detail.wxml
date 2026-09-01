@@ -1,35 +1,48 @@
-<view class="page companion-page" wx:if="{{companion}}">
+<view class="page companion-page {{motionOff ? 'tt-motion-off' : ''}}" wx:if="{{companion}}">
   <view class="emergency-entry" bindtap="openEmergencyHelp" aria-role="button" aria-label="查看紧急帮助与官方电话号码" tabindex="0">
     <view>
-      <view class="emergency-title">即时危险不适合继续预约</view>
-      <view class="emergency-copy">先查看官方紧急资源并一键拨号；平台不会代你报警或救援</view>
+      <view class="emergency-title">即时危险？</view>
+      <view class="emergency-copy">查看官方紧急资源</view>
     </view>
     <view class="emergency-arrow">›</view>
   </view>
   <view class="profile">
-    <image class="profile-cover" src="{{coverUrl}}" mode="aspectFill" aria-label="{{companion.name}}的资料封面" />
-    <view class="profile-main">
-      <tt-avatar src="{{avatarUrl}}" fallback="{{companion.initials}}" alt="{{companion.name}}的头像" size="xl" shape="rounded" online="{{companion.isOnline}}" />
-      <view class="profile-copy"><view class="profile-name-row"><view class="title">{{companion.name}}</view><tt-status wx:if="{{companion.isVerified}}" text="已认证" tone="success" /></view><view class="muted">{{companion.role}} · {{availabilityText}} · {{ratingText}}</view></view>
+    <view class="profile-theatre tt-motion-m4">
+      <view class="profile-theatre-label"><text>公开资料</text><tt-cartoon-prop kind="bubble" tone="mint" size="sm" motion="none" motion-off="{{motionOff}}" expressive risk="standard" /></view>
+      <tt-card-stage layout="stack" min-height="610" motion-level="m4" entrance="deal" active motion-off="{{motionOff}}" risk="standard" aria-label="{{companion.name}}的公开资料卡组">
+        <view slot="back" class="profile-stage-layer">
+          <view class="profile-context-card profile-context-trust">
+            <view class="context-index">03</view>
+            <view class="context-title">信任资料</view>
+          </view>
+        </view>
+        <view slot="middle" class="profile-stage-layer">
+          <view class="profile-context-card profile-context-service">
+            <view class="context-index">02</view>
+            <view class="context-title">{{availabilityText}}</view>
+          </view>
+        </view>
+        <view slot="front" class="profile-stage-layer">
+          <view class="profile-person-card">
+            <image class="profile-cover" src="{{coverUrl}}" mode="aspectFill" aria-label="{{companion.name}}的资料封面" />
+            <view class="profile-main">
+              <tt-avatar src="{{avatarUrl}}" fallback="{{companion.initials}}" alt="{{companion.name}}的头像" size="xl" shape="rounded" online="{{companion.isOnline}}" />
+              <view class="profile-copy"><view class="profile-name-row"><view class="title">{{companion.name}}</view><tt-status wx:if="{{companion.isVerified}}" text="已认证" tone="success" /></view><view class="muted">{{companion.role}} · {{availabilityText}} · {{ratingText}}</view></view>
+            </view>
+            <view class="bio">{{companion.bio}}</view>
+          </view>
+        </view>
+      </tt-card-stage>
     </view>
-    <view class="bio">{{companion.bio}}</view>
     <view wx:if="{{publicProfile}}" class="public-profile-section" aria-role="group" aria-label="陪伴者公开信任资料">
       <view class="public-profile-heading">
         <view>
-          <view class="public-profile-kicker">公开信任资料</view>
-          <view class="public-profile-title" aria-role="heading" aria-level="2">先了解，再决定是否预约</view>
+          <view class="public-profile-title" aria-role="heading" aria-level="2">公开资料</view>
         </view>
-        <view class="public-profile-safe">不展示证件或审核备注</view>
       </view>
       <view class="public-profile-metrics">
-        <view class="public-profile-metric">
-          <view class="public-profile-metric-value">{{publicProfile.completedOrdersText}}</view>
-          <view class="public-profile-metric-label">平台履约记录</view>
-        </view>
-        <view class="public-profile-metric">
-          <view class="public-profile-metric-value">{{publicProfile.responseTimeText}}</view>
-          <view class="public-profile-metric-label">公开响应表现</view>
-        </view>
+        <tt-fact-card tone="apricot" label="完成订单" value="{{publicProfile.completedOrdersText}}" motion-off="{{motionOff}}" />
+        <tt-fact-card tone="mint" label="响应" value="{{publicProfile.responseTimeText}}" motion-off="{{motionOff}}" />
       </view>
       <view class="public-profile-group">
         <view class="public-profile-label">沟通语言</view>
@@ -56,17 +69,11 @@
             <text class="boundary-marker"></text><text>{{item}}</text>
           </view>
         </view>
-        <view wx:else class="public-profile-empty">除平台通用边界外，暂未填写个性化边界。</view>
+        <view wx:else class="public-profile-empty">暂未填写</view>
       </view>
       <view class="public-status-grid">
-        <view class="public-status-card {{publicProfile.trainingCurrent ? 'is-current' : 'is-due'}}" aria-label="{{publicProfile.trainingStatusText}}，{{publicProfile.trainingDetailText}}">
-          <view class="public-status-title">{{publicProfile.trainingStatusText}}</view>
-          <view class="public-status-detail">{{publicProfile.trainingDetailText}}</view>
-        </view>
-        <view class="public-status-card {{publicProfile.reviewCurrent ? 'is-current' : 'is-due'}}" aria-label="{{publicProfile.reviewStatusText}}，{{publicProfile.reviewDetailText}}">
-          <view class="public-status-title">{{publicProfile.reviewStatusText}}</view>
-          <view class="public-status-detail">{{publicProfile.reviewDetailText}}</view>
-        </view>
+        <tt-fact-card tone="blue" label="培训状态" value="{{publicProfile.trainingStatusText}}" description="{{publicProfile.trainingDetailText}}" status-text="{{publicProfile.trainingCurrent ? '当前有效' : '需要续期'}}" status-tone="{{publicProfile.trainingCurrent ? 'success' : 'warning'}}" motion-off="{{motionOff}}" />
+        <tt-fact-card tone="lavender" label="平台复审" value="{{publicProfile.reviewStatusText}}" description="{{publicProfile.reviewDetailText}}" status-text="{{publicProfile.reviewCurrent ? '当前有效' : '需要复审'}}" status-tone="{{publicProfile.reviewCurrent ? 'success' : 'warning'}}" motion-off="{{motionOff}}" />
       </view>
       <view wx:if="{{publicProfile.voiceIntroPlayable}}" class="voice-intro-card is-approved" bindtap="playVoiceIntro" aria-role="button" tabindex="0" aria-label="语音介绍，{{publicProfile.voiceIntroMetaText}}，{{publicProfile.voiceIntroPlaybackText}}">
         <view class="voice-intro-icon">声</view>
@@ -77,7 +84,7 @@
       </view>
     </view>
     <view wx:if="{{trustFacts.length}}" class="trust-section">
-      <view class="trust-heading"><text>下单前确认</text><text>当前规则</text></view>
+      <view class="trust-heading"><text>下单规则</text><navigator url="/pages/legal/index?type=terms">完整规则</navigator></view>
       <view wx:for="{{trustFacts}}" wx:key="tone" class="trust-fact trust-fact-{{item.tone}}">
         <view class="trust-marker"></view>
         <view class="trust-copy">
@@ -94,7 +101,7 @@
       </view>
       <block wx:else>
         <button class="favorite-toggle {{isFavorite ? 'favorite-toggle-saved' : ''}}" loading="{{favoriteSaving}}" disabled="{{favoriteSaving}}" bindtap="toggleFavorite">{{isFavorite ? '已保存到我的书签' : '保存到我的书签'}}</button>
-        <view class="favorite-privacy">仅你可见；不会通知陪伴者，也不会改变订单或推荐排序。</view>
+        <view class="favorite-privacy">仅你可见</view>
       </block>
     </view>
     <view wx:if="{{canManageFavorites && recommendationExclusionAvailable}}" class="recommendation-control {{isRecommendationExcluded ? 'recommendation-control-excluded' : ''}}">
@@ -105,7 +112,7 @@
         disabled="{{recommendationExclusionSaving}}"
         bindtap="restoreToRecommendations"
         aria-label="恢复向我推荐这位陪伴者"
-      >已停止推荐 · 点击恢复</button>
+      >已停止推荐 · 恢复</button>
       <button
         wx:else
         class="recommendation-toggle"
@@ -113,28 +120,26 @@
         disabled="{{recommendationExclusionSaving}}"
         bindtap="excludeFromRecommendations"
         aria-label="不再向我推荐这位陪伴者"
-      >不再向我推荐这位陪伴者</button>
-      <view class="recommendation-privacy">只影响推荐和匹配；不等于拉黑或举报，也不影响订单、书签与公开搜索。</view>
+      >停止推荐</button>
+      <view class="recommendation-privacy">不等于拉黑或举报</view>
     </view>
     <view wx:elif="{{canManageFavorites}}" class="recommendation-control recommendation-control-unavailable">
-      <view class="recommendation-unavailable-title">推荐偏好暂时无法读取</view>
-      <view class="recommendation-privacy">请稍后刷新；当前不会据此改变拉黑、举报、订单、书签或公开资料。</view>
+      <view class="recommendation-unavailable-title">推荐偏好无法读取，状态未知</view>
     </view>
     <view wx:if="{{rebookingNotice}}" class="rebooking-notice">
       <view class="rebooking-notice-heading"><text>再次预约</text><text>重新核对</text></view>
       <view class="rebooking-notice-copy">{{rebookingNotice}}</view>
     </view>
-    <view class="service-section">
+    <view class="service-section service-deck-section">
       <view class="service-heading">
         <view>选择服务</view>
-        <view class="service-lock">下单时锁定价格、时长与时段</view>
       </view>
       <view wx:if="{{serviceCatalogStatus === 'loading'}}" class="service-state">正在加载可预约服务…</view>
       <view wx:elif="{{serviceCatalogStatus === 'available'}}" class="service-list">
         <view
           wx:for="{{serviceOfferings}}"
           wx:key="id"
-          class="service-offering {{selectedServiceOfferingId === item.id ? 'is-selected' : ''}}"
+          class="service-offering service-offering-{{index % 3}} {{selectedServiceOfferingId === item.id ? 'is-selected' : ''}}"
           data-id="{{item.id}}"
           bindtap="selectServiceOffering"
           aria-role="radio"
@@ -152,7 +157,7 @@
             <view wx:if="{{item.description}}" class="service-description">{{item.description}}</view>
           </view>
         </view>
-        <view class="service-catalog-pagination">已显示 {{serviceOfferings.length}} / {{serviceCatalogTotal}} 项服务</view>
+        <view class="service-catalog-pagination">{{serviceOfferings.length}} / {{serviceCatalogTotal}}</view>
         <view wx:if="{{serviceCatalogLoadMoreError}}" class="service-catalog-pagination-error" aria-live="polite">{{serviceCatalogLoadMoreError}}</view>
         <button wx:if="{{serviceCatalogPage < serviceCatalogTotalPages}}" class="service-catalog-load-more" loading="{{serviceCatalogLoadingMore}}" disabled="{{serviceCatalogLoadingMore}}" bindtap="loadMoreServiceOfferings">{{serviceCatalogLoadMoreError ? '重试加载更多' : '加载更多服务'}}</button>
       </view>
@@ -162,9 +167,7 @@
     <view wx:if="{{serviceCatalogStatus === 'available'}}" class="service-intent-section" aria-role="radiogroup" aria-label="选择本次希望的陪伴方式">
       <view class="service-heading">
         <view>本次希望怎样聊</view>
-        <view class="service-lock">会锁定到订单</view>
       </view>
-      <view class="service-intent-note">请选择最接近的一项，帮助双方提前对齐；这不是诊断，也不保证特定结果。</view>
       <view class="service-intent-list">
         <view
           wx:for="{{serviceIntentOptions}}"
@@ -219,21 +222,22 @@
       <view wx:else class="availability-state availability-unavailable">{{availabilityMessage}}</view>
     </view>
     <view wx:if="{{selectedAvailabilityCandidate}}" class="booking-summary booking-slot-summary">已选时段：{{selectedAvailabilityCandidate.dateLabel}} {{selectedAvailabilityCandidate.timeLabel}}–{{selectedAvailabilityCandidate.endTimeLabel}}（北京时间）</view>
-    <view wx:if="{{!publicInteractionIdentityAvailable}}" class="availability-state availability-unavailable">身份核验授权通道尚未开放，新预约和支付暂不可用；可前往账号页查看说明与客服入口。</view>
-    <tt-action-bar primary-text="{{bookingButtonText}}" disabled="{{!canBook || booking}}" loading="{{booking}}" bindprimary="book" />
+    <view wx:if="{{!publicInteractionIdentityAvailable}}" class="availability-state availability-unavailable">身份核验授权未开放，新预约和支付暂不可用。</view>
+    <tt-action-bar primary-text="{{bookingButtonText}}" disabled="{{!canBook || booking}}" loading="{{booking}}" motion-off="{{motionOff}}" bindprimary="book" />
   </view>
-  <view class="title section-title">用户评价</view>
-  <view wx:if="{{!reviews.length}}" class="empty">暂时还没有评价</view>
-  <view class="card" wx:for="{{reviews}}" wx:key="id">
+  <view class="reviews-heading"><tt-section-heading title="评价" motion-off="{{motionOff}}" /></view>
+  <view wx:if="{{!reviews.length}}" class="empty">暂无评价</view>
+  <view class="review-deck">
+    <view class="card review-card review-card-{{index % 3}}" wx:for="{{reviews}}" wx:key="id">
     <view class="row"><text>{{item.userName}}</text><text class="rating">★ {{item.rating}}</text></view>
     <view class="review">{{item.content}}</view>
+    </view>
   </view>
   <view wx:if="{{reviewsError}}" class="empty">{{reviewsError}}</view>
-  <button wx:if="{{reviewPage < reviewTotalPages}}" class="plain-button" loading="{{reviewsLoadingMore}}" disabled="{{reviewsLoadingMore}}" bindtap="loadMoreReviews">加载更多评价（已显示 {{reviews.length}} / {{reviewTotal}}）</button>
+  <button wx:if="{{reviewPage < reviewTotalPages}}" class="plain-button" loading="{{reviewsLoadingMore}}" disabled="{{reviewsLoadingMore}}" bindtap="loadMoreReviews">加载更多（{{reviews.length}} / {{reviewTotal}}）</button>
   <view wx:if="{{bookingConfirmationVisible && bookingPreview}}" class="booking-overlay">
     <view class="booking-confirmation" aria-role="dialog" aria-modal="true">
-      <view class="confirmation-kicker">创建订单前最后确认</view>
-      <view class="confirmation-title">请核对这次预约</view>
+      <view class="confirmation-title">确认预约</view>
       <view class="confirmation-row"><text>服务对象</text><text>{{bookingPreview.companionName}}</text></view>
       <view class="confirmation-row"><text>服务商品</text><text>{{bookingPreview.serviceTitle}}</text></view>
       <view class="confirmation-row"><text>本次意图</text><text>{{bookingPreview.serviceIntentText}}</text></view>
@@ -241,7 +245,7 @@
       <view class="confirmation-row"><text>预约时间</text><text>{{bookingPreview.scheduleText}}</text></view>
       <view class="confirmation-row"><text>时长</text><text>{{bookingPreview.durationText}}</text></view>
       <view class="confirmation-row total"><text>订单金额</text><text>{{bookingPreview.priceText}}</text></view>
-      <view class="confirmation-note">本次操作只创建待确认订单，不会立即扣款。陪伴者确认后，你仍需在订单中主动完成微信支付。</view>
+      <view class="confirmation-note">仅创建待确认订单，不会扣款；确认后仍需主动支付。</view>
       <button class="confirmation-check {{bookingAccuracyConfirmed ? 'checked' : ''}}" bindtap="toggleBookingAccuracy">{{bookingAccuracyConfirmed ? '已确认 · ' : '待确认 · '}}我已核对对象、商品、金额和北京时间</button>
       <button class="confirmation-check {{bookingBoundaryConfirmed ? 'checked' : ''}}" bindtap="toggleBookingBoundary">{{bookingBoundaryConfirmed ? '已确认 · ' : '待确认 · '}}我理解仅限平台内沟通，不含医疗、治疗或紧急救助</button>
       <view class="confirmation-actions">
@@ -251,5 +255,16 @@
     </view>
   </view>
 </view>
-<view wx:elif="{{loading}}" class="empty">正在加载…</view>
-<view wx:else class="empty">{{error}}</view>
+<view wx:elif="{{loading}}" class="empty {{motionOff ? 'tt-motion-off' : ''}}">正在加载…</view>
+<view wx:else class="page companion-fail-page {{motionOff ? 'tt-motion-off' : ''}}">
+  <view class="companion-error-card" aria-live="polite" aria-role="group" aria-label="陪伴者资料暂时无法打开">
+    <view class="companion-error-title">暂时无法打开这份资料</view>
+    <view class="companion-error-copy">{{error || '资料状态暂时无法核对，请稍后重试。'}}</view>
+    <view class="companion-error-boundary">未读取到真实资料，不展示姓名、认证、价格或可约状态。</view>
+    <view class="companion-error-actions">
+      <button class="companion-error-retry" bindtap="load">重新加载资料</button>
+      <navigator class="companion-error-back" open-type="navigateBack" delta="1" aria-role="button" aria-label="返回上一页">返回上一页</navigator>
+    </view>
+    <button class="companion-error-safety" bindtap="openEmergencyHelp">需要安全或紧急帮助</button>
+  </view>
+</view>

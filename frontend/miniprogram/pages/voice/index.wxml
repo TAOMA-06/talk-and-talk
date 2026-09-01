@@ -1,4 +1,12 @@
-<view class="voice-page">
+<view class="voice-page {{motionOff ? 'tt-motion-off' : ''}}">
+  <view wx:if="{{!voiceFeatureAvailable}}" class="voice-unavailable-card">
+    <view class="eyebrow">能力关闭</view>
+    <view class="voice-unavailable-title">实时语音未开放</view>
+    <view class="voice-unavailable-copy">{{statusText}}</view>
+    <view class="voice-unavailable-boundary">不加载 RTC、不请求麦克风、不连接语音网络。订单与账号权利不受影响。</view>
+    <button class="secondary voice-unavailable-back" bindtap="leaveVoice">返回订单</button>
+  </view>
+  <block wx:else>
   <!-- Native RTC components must remain mounted for audio transport. They are
        visually hidden because this service is deliberately audio-only. -->
   <live-pusher
@@ -36,17 +44,17 @@
 
   <view wx:if="{{preflightVisible}}" class="preflight-card">
     <view class="eyebrow">通话前检查</view>
-    <view class="preflight-title">准备好，再打开麦克风</view>
-    <view class="preflight-copy">完成以下确认后才会签发短效语音凭证、初始化腾讯实时音视频 TRTC SDK 并请求麦克风；停留在本页不会加载 SDK 或自动收音。</view>
+    <view class="preflight-title">通话前确认</view>
+    <view class="preflight-copy">完成确认后才会初始化 TRTC 并请求麦克风。</view>
     <view class="device-status">
       <view class="device-status-row"><text>网络</text><text class="network-{{networkTone}}">{{networkTypeText}}</text></view>
       <view class="device-status-row"><text>麦克风</text><text>{{microphoneStatusText}}</text></view>
     </view>
-    <button class="preflight-check {{environmentConfirmed ? 'checked' : ''}}" bindtap="toggleEnvironmentConfirmation">{{environmentConfirmed ? '已确认 · ' : '待确认 · '}}我在适合通话的环境，并已关闭外放或注意周围隐私</button>
-    <button class="preflight-check {{boundaryConfirmed ? 'checked' : ''}}" bindtap="toggleBoundaryConfirmation">{{boundaryConfirmed ? '已确认 · ' : '待确认 · '}}我理解仅限本次订单，不录音、不私下转账，不提供医疗或紧急救助</button>
-    <button class="preflight-check {{trtcDisclosureConfirmed ? 'checked' : ''}}" bindtap="toggleTrtcDisclosureConfirmation">{{trtcDisclosureConfirmed ? '已确认 · ' : '待确认 · '}}我知悉深圳市腾讯计算机系统有限公司提供的 TRTC 会在进入时处理麦克风音频、IP、网络及设备系统基础信息，用于实时音频传输和连接保障</button>
-    <view class="trtc-boundary">本通话为纯音频，不启用摄像头；平台默认不录音、不启用云端录制或 AI 转写。拒绝不会影响订单历史、客服和账号权利。</view>
-    <button class="disclosure-link" bindtap="openPrivacyPolicy">查看《隐私政策》中的第三方处理说明</button>
+    <button class="preflight-check {{environmentConfirmed ? 'checked' : ''}}" bindtap="toggleEnvironmentConfirmation">{{environmentConfirmed ? '已确认 · ' : '待确认 · '}}环境适合通话并注意周围隐私</button>
+    <button class="preflight-check {{boundaryConfirmed ? 'checked' : ''}}" bindtap="toggleBoundaryConfirmation">{{boundaryConfirmed ? '已确认 · ' : '待确认 · '}}仅限本单，不录音、不私下转账，不提供医疗或紧急救助</button>
+    <button class="preflight-check {{trtcDisclosureConfirmed ? 'checked' : ''}}" bindtap="toggleTrtcDisclosureConfirmation">{{trtcDisclosureConfirmed ? '已确认 · ' : '待确认 · '}}深圳市腾讯计算机系统有限公司提供的 TRTC 将处理麦克风音频、IP、网络及设备系统基础信息，用于实时音频传输和连接保障</button>
+    <view class="trtc-boundary">纯音频，不启用摄像头、云端录制或 AI 转写。</view>
+    <button class="disclosure-link" bindtap="openPrivacyPolicy">查看隐私政策</button>
     <button class="primary enter-button" disabled="{{!environmentConfirmed || !boundaryConfirmed || !trtcDisclosureConfirmed || preflightChecking}}" loading="{{preflightChecking}}" bindtap="confirmPreflight">检查权限并进入</button>
     <button class="secondary preflight-back" bindtap="leaveVoice">暂不进入</button>
   </view>
@@ -60,7 +68,7 @@
     <view wx:if="{{serviceEndsAtText}}" class="service-end">本次服务预计于 {{serviceEndsAtText}} 结束</view>
     <view wx:if="{{serviceRemainingText}}" class="remaining-time"><text>剩余服务时间</text><text>{{serviceRemainingText}}</text></view>
     <view class="network-status network-{{networkTone}}"><text>网络状态</text><text>{{networkQualityText}}</text></view>
-    <view class="boundary">仅限本次订单双方在服务时间内使用。平台不会录制这次通话；如需为安全或争议保留事实，请在退出后通过案件中心文字补充。</view>
+    <view class="boundary">仅限本单服务时间；平台不录音。安全或争议事实请退出后以文字提交。</view>
 
     <view wx:if="{{roomState === 'connected'}}" class="voice-actions">
       <button class="secondary" bindtap="toggleMute">{{muted ? '打开麦克风' : '静音麦克风'}}</button>
@@ -68,9 +76,10 @@
     </view>
     <view wx:if="{{roomState === 'connected' || roomState === 'error'}}" class="safety-actions">
       <button class="safety-report" bindtap="leaveAndReport">安全退出并举报</button>
-      <button class="support-link" bindtap="leaveAndOpenSupport">连接或履约问题</button>
+      <button class="support-link" bindtap="leaveAndOpenSupport">连接或履约帮助</button>
     </view>
     <button wx:elif="{{canRetry}}" class="primary" bindtap="retry">重新连接</button>
     <button wx:elif="{{roomState === 'ended'}}" class="secondary" bindtap="leaveVoice">返回订单</button>
   </view>
+  </block>
 </view>

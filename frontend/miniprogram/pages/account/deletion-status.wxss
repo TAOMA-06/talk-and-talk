@@ -7,13 +7,15 @@
   text-align: center;
 }
 
+.status-eyebrow { margin-bottom: 28rpx; color: var(--tt-text-tertiary); font-size: 20rpx; font-weight: 800; letter-spacing: 2rpx; }
+
 .status-mark {
   width: 104rpx;
   height: 104rpx;
   margin: 0 auto 36rpx;
   border-radius: 999rpx;
-  background: var(--tt-accent-soft);
-  color: var(--tt-accent);
+  background: var(--tt-color-status-warning-bg);
+  color: var(--tt-color-status-warning-fg);
   font-size: 58rpx;
   line-height: 104rpx;
   font-weight: 600;
@@ -38,22 +40,24 @@
 .privacy-card {
   margin: 48rpx 0 40rpx;
   padding: 32rpx;
-  border: 1rpx solid var(--tt-border);
+  border: 1rpx solid var(--tt-color-pastel-blue-stroke);
   border-radius: 20rpx;
-  background: var(--tt-surface);
+  background: var(--tt-color-pastel-blue-bg);
+  color: var(--tt-color-pastel-blue-fg);
   text-align: left;
-  border-color: var(--tt-border);
+  border-color: var(--tt-color-pastel-blue-stroke);
+  box-shadow: none;
 }
 
 .privacy-title {
   font-size: 28rpx;
   font-weight: 700;
-  color: var(--tt-text);
+  color: currentColor;
 }
 
 .privacy-copy {
   margin-top: 14rpx;
-  color: var(--tt-text-secondary);
+  color: currentColor;
   font-size: 26rpx;
   line-height: 1.65;
 }
@@ -96,3 +100,8 @@
 .secondary-button.button-hover {
   background: var(--tt-surface-alt);
 }
+
+.privacy-card .privacy-title,
+.privacy-card .privacy-copy { color: var(--tt-color-pastel-blue-fg); }
+.unavailable-page.tt-motion-off .privacy-card,
+.unavailable-page.tt-motion-off button { animation: none; transition: none; transform: none; }

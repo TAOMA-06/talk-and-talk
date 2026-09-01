@@ -1,29 +1,33 @@
-<view class="discover-root">
+<view class="discover-root {{motionOff ? 'tt-motion-off' : ''}}">
 <view class="page discover-page">
-  <view class="discover-heading tt-animate-in">
-    <view class="tt-kicker">发现陪伴者</view>
-    <view class="hero-title">找到适合此刻的那个人</view>
-    <view class="hero-copy">公开资料、真实商品和当前可约时间，会在进入详情与下单时再次校验。</view>
+  <view class="discovery-garden tt-motion-m4">
+    <view class="garden-label"><text>发现</text><tt-cartoon-prop kind="magnifier" tone="blue" size="sm" motion="none" motion-off="{{motionOff}}" expressive risk="standard" /></view>
+    <tt-card-stage layout="fan" min-height="360" motion-level="{{loading || error ? 'm0' : 'm4'}}" entrance="fan" active="{{!loading && !error}}" motion-off="{{motionOff}}" risk="{{loading || error ? 'high' : 'standard'}}" aria-label="发现花园卡片舞台">
+      <view slot="back" class="garden-layer"><view class="garden-card garden-card-mint"><view class="garden-card-mark">公开资料</view></view></view>
+      <view slot="middle" class="garden-layer"><view class="garden-card garden-card-apricot"><view class="garden-card-mark">当前服务</view></view></view>
+      <view slot="front" class="garden-layer">
+        <view class="garden-card garden-card-lavender">
+          <view class="tt-kicker">陪伴者</view>
+          <view class="hero-title">找到适合的人</view>
+        </view>
+      </view>
+    </tt-card-stage>
   </view>
 
-  <view class="search-surface">
+  <view class="search-surface tt-enter-rise tt-stagger-3">
     <view class="search-row">
       <input class="search-input" value="{{searchInput}}" maxlength="40" confirm-type="search" placeholder="搜索名称、角色、服务或标签" bindinput="setSearchInput" bindconfirm="submitSearch" />
       <button class="search-submit" bindtap="submitSearch">搜索</button>
     </view>
-    <view class="search-copy">只检索当前公开资料，不保存搜索历史。</view>
   </view>
 
-  <view class="discover-toolbar">
-    <view>
-      <view class="result-title">{{isFiltering ? '筛选结果' : '为你推荐'}}</view>
-      <view class="result-meta">{{loading ? '正在读取' : companions.length + ' 位当前可展示'}}</view>
-    </view>
+  <view class="discover-toolbar tt-enter-rise tt-stagger-4">
+    <view class="result-heading"><tt-section-heading title="{{isFiltering ? '筛选结果' : '为你推荐'}}" description="{{loading ? '正在读取' : companions.length + ' 位当前可展示'}}" motion-off="{{motionOff}}" /></view>
     <button class="filter-trigger" bindtap="openFilters" aria-label="打开服务筛选">
       <text>筛选</text><text wx:if="{{isFiltering}}" class="filter-count">●</text>
     </button>
   </view>
-  <view wx:if="{{isFiltering}}" class="active-filter">
+  <view wx:if="{{isFiltering}}" class="active-filter tt-state-transition">
     <text>{{activeFilterSummary || '已选择服务条件'}}</text>
     <button bindtap="clearFilters">清除</button>
   </view>
@@ -33,24 +37,28 @@
     <view class="recovery-copy">{{recoveryNotice}}</view>
   </view>
 
-  <tt-skeleton wx:if="{{loading}}" rows="3" />
-  <tt-state wx:elif="{{error}}" type="error" title="发现页暂时不可用" description="{{error}}" action-text="重新加载" bindaction="load" />
+  <tt-skeleton wx:if="{{loading}}" rows="3" motion-off="{{motionOff}}" />
+  <tt-state wx:elif="{{error}}" type="error" title="发现页暂时不可用" description="{{error}}" action-text="重新加载" motion-off="{{motionOff}}" bindaction="load" />
   <tt-state wx:elif="{{!companions.length}}" type="empty" title="暂时没有合适结果"
     description="可以调整筛选条件，或稍后再查看当前公开可约服务。"
-    action-text="{{isFiltering ? '清除筛选' : ''}}" bindaction="clearFilters" />
-  <view wx:else class="results-surface">
-    <view class="filter-result-note" wx:if="{{selectedSortBy === 'soonestAvailable'}}">{{activeFilterSummary || '最早可约'}} · 只按本次读取的结构化剩余容量排序，不保留时段</view>
-    <view class="filter-result-note" wx:elif="{{isFiltering}}">{{activeFilterSummary || '当前条件'}} · 仅显示仍公开、商品上架且有真实可约容量的结果</view>
-    <view class="recommendation-note" wx:if="{{!recommendationFallback && !isFiltering}}">根据当前场景与服务状态推荐；可在“我的”中关闭个性化设置。</view>
-    <tt-media-card id="discover-recommendation-{{item.impressionId}}" wx:for="{{companions}}" wx:key="id"
-      avatar="{{item.avatarUrl}}" initials="{{item.initials}}" title="{{item.name}}" subtitle="{{item.role}} · {{item.availabilityText}}"
-      description="{{item.reasonText || item.bio}}" price="{{item.catalogPriceText}}" meta="{{item.metaText}}"
-      badge="{{item.isVerified ? '已认证' : ''}}" badge-tone="success" online="{{item.isOnline}}"
-      bindtap="openCompanion" data-id="{{item.id}}" data-impression-id="{{item.impressionId}}" data-theme-id="{{selectedTopicId || item.topicIds[0]}}" />
+    action-text="{{isFiltering ? '清除筛选' : ''}}" motion-off="{{motionOff}}" bindaction="clearFilters" />
+  <view wx:else class="results-surface tt-state-transition {{isFiltering ? 'results-filtered' : 'results-recommended'}}">
+    <view class="filter-result-note" wx:if="{{selectedSortBy === 'soonestAvailable'}}">{{activeFilterSummary || '最早可约'}}</view>
+    <view class="filter-result-note" wx:elif="{{isFiltering}}">{{activeFilterSummary || '当前条件'}}</view>
+    <view wx:for="{{companions}}" wx:key="id" class="result-deck-card result-deck-{{index % 3}}">
+      <view class="result-motion {{index < 3 ? 'tt-enter-rise' : ''}} tt-stagger-{{index < 3 ? index + 1 : 0}}">
+      <tt-media-card id="discover-recommendation-{{item.impressionId}}"
+        variant="card" tone="{{item.cardTone}}"
+        avatar="{{item.avatarUrl}}" initials="{{item.initials}}" title="{{item.name}}" subtitle="{{item.role}} · {{item.availabilityText}}"
+        description="{{item.reasonText || item.bio}}" price="{{item.catalogPriceText}}" meta="{{item.metaText}}"
+        badge="{{item.isVerified ? '已认证' : ''}}" badge-tone="success" online="{{item.isOnline}}"
+        motion-off="{{motionOff}}" bindtap="openCompanion" data-id="{{item.id}}" data-impression-id="{{item.impressionId}}" data-theme-id="{{selectedTopicId || item.topicIds[0]}}" />
+      </view>
+    </view>
   </view>
 
   <view class="emergency-entry" bindtap="openEmergencyHelp" aria-role="button" aria-label="查看紧急帮助与官方电话号码" tabindex="0">
-    <view><view class="emergency-title">正处在即时危险中？</view><view class="emergency-copy">先查看 110、120 等官方紧急资源；普通客服不是紧急服务。</view></view>
+    <view><view class="emergency-title">正处在即时危险中？</view><view class="emergency-copy">查看 110、120 等官方资源</view></view>
     <view class="emergency-arrow">›</view>
   </view>
 </view>
@@ -61,7 +69,6 @@
         <view class="filter-handle"></view>
         <view class="filter-header"><view class="filter-heading"><view class="filter-title">筛选当前服务</view><view class="filter-summary">{{activeFilterSummary || '默认显示未来 7 天内真实可约服务'}}</view></view><button class="filter-close" bindtap="closeFilters" aria-label="关闭">×</button></view>
         <scroll-view class="filter-body" scroll-y enhanced show-scrollbar="{{false}}">
-    <view class="filter-copy">价格按单次服务总价；详情页和下单都会重新确认商品与剩余容量。</view>
     <view class="filter-group">
       <view class="filter-label">主题</view>
       <view wx:if="{{topicsState === 'loading'}}" class="filter-resource-state" aria-live="polite">正在读取主题…</view>
@@ -75,7 +82,6 @@
     <view class="filter-group">
       <view class="filter-label">擅长方向</view>
       <view class="filter-options"><button class="filter-chip {{!selectedSpecialty ? 'filter-chip-selected' : ''}}" bindtap="selectSpecialty" data-value="">全部类型</button><button wx:for="{{specialtyFilters}}" wx:key="value" class="filter-chip {{item.selected ? 'filter-chip-selected' : ''}}" bindtap="selectSpecialty" data-value="{{item.value}}">{{item.label}}</button></view>
-      <view class="sort-copy">只匹配公开资料，不读取申请材料、审核备注或用户行为。</view>
     </view>
     <view class="filter-group">
       <view class="filter-label">服务方式</view>
@@ -92,7 +98,6 @@
     <view class="filter-group filter-group-last">
       <view class="filter-label">公开排序</view>
       <view class="filter-options"><button class="filter-chip {{!selectedSortBy ? 'filter-chip-selected' : ''}}" bindtap="selectPublicSort" data-value="">默认推荐</button><button wx:for="{{publicSortFilters}}" wx:key="value" class="filter-chip {{item.selected ? 'filter-chip-selected' : ''}}" bindtap="selectPublicSort" data-value="{{item.value}}">{{item.label}}</button></view>
-      <view class="sort-copy">主动选择后只按公开信息排序，不会保留时段。</view>
     </view>
         </scroll-view>
         <view class="filter-footer"><button class="filter-reset" bindtap="resetFilters">重置</button><button class="filter-apply" bindtap="applyFilters">查看结果</button></view>

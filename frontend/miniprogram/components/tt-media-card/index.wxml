@@ -1,9 +1,13 @@
-<view class="media-card" aria-role="button" tabindex="0" bindtap="onTap">
-  <tt-avatar src="{{avatar}}" fallback="{{initials}}" alt="{{title}}的头像" size="lg" shape="rounded" online="{{online}}" />
-  <view class="media-copy">
-    <view class="media-top"><view class="media-title">{{title}}</view><tt-status wx:if="{{badge}}" text="{{badge}}" tone="{{badgeTone}}" /></view>
-    <view wx:if="{{subtitle}}" class="media-subtitle">{{subtitle}}</view>
-    <view wx:if="{{description}}" class="media-description">{{description}}</view>
-    <view class="media-bottom"><view class="media-price-row"><text wx:if="{{price}}" class="media-price">{{price}}</text><text class="media-arrow">›</text></view><text wx:if="{{meta}}" class="media-meta">{{meta}}</text></view>
+<view class="media-frame tone-{{tone}} depth-{{depth}} motion-{{motionLevel}} entrance-{{entrance}} stagger-{{stagger}} risk-{{risk}} {{selected ? 'selected' : ''}} {{motionOff ? 'motion-off' : ''}}" hover-class="{{motionOff ? 'none' : 'media-pressed'}}" hover-stay-time="80" aria-role="button" aria-label="查看{{title}}：{{subtitle}}，{{price}}" aria-pressed="{{selected}}" tabindex="0" bindtap="onTap">
+  <view wx:if="{{depth !== 'flat'}}" class="media-depth media-depth-far" aria-hidden="true"></view>
+  <view wx:if="{{depth !== 'flat'}}" class="media-depth media-depth-near" aria-hidden="true"></view>
+  <view class="media-card variant-{{variant}}">
+    <tt-avatar src="{{avatar}}" fallback="{{initials}}" alt="{{title}}的头像" size="lg" shape="rounded" online="{{online}}" />
+    <view class="media-copy">
+      <view class="media-top"><view class="media-title">{{title}}</view><tt-status wx:if="{{badge}}" text="{{badge}}" tone="{{badgeTone}}" /></view>
+      <view wx:if="{{subtitle}}" class="media-subtitle">{{subtitle}}</view>
+      <view wx:if="{{description}}" class="media-description">{{description}}</view>
+      <view class="media-bottom"><view class="media-price-row"><text wx:if="{{price}}" class="media-price">{{price}}</text><text class="media-arrow">›</text></view><text wx:if="{{meta}}" class="media-meta">{{meta}}</text></view>
+    </view>
   </view>
 </view>

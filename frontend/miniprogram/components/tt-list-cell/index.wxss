@@ -1,4 +1,5 @@
 .cell { display: flex; min-height: 104rpx; align-items: center; gap: 20rpx; padding: 20rpx 0; border-bottom: 1rpx solid var(--tt-border); }
+.cell:focus { outline: 3rpx solid var(--tt-color-focus-ring); outline-offset: 3rpx; }
 .cell:last-child { border-bottom: 0; }
 .cell-copy { min-width: 0; flex: 1; }
 .cell-title { color: var(--tt-text); font-size: 28rpx; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
@@ -6,4 +7,7 @@
 .cell-trailing { display: flex; flex: none; align-items: center; gap: 10rpx; }
 .cell-meta { color: var(--tt-text-tertiary); font-size: 23rpx; }
 .cell-arrow { color: var(--tt-text-tertiary); font-size: 36rpx; font-weight: 300; line-height: 1; }
-.cell-disabled { opacity: .5; }
+.cell-disabled .cell-title,
+.cell-disabled .cell-subtitle,
+.cell-disabled .cell-meta,
+.cell-disabled .cell-arrow { color: var(--tt-text-tertiary); }

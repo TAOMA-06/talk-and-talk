@@ -68,6 +68,7 @@ function displayModule(module: TrainingModule): DisplayTrainingModule {
 
 Page({
   data: {
+    motionOff: false,
     loading: true,
     error: "",
     modules: [] as DisplayTrainingModule[],

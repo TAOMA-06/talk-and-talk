@@ -33,6 +33,7 @@ const OUTCOME_STATUS: Record<string, string> = {
 
 Page({
   data: {
+    motionOff: false,
     kind: "support" as "support" | "safety",
     ticket: null as SupportTicket | null,
     safetyCase: null as ReporterCase | null,

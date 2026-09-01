@@ -58,6 +58,7 @@ function viewModel(status: CustomerAdultEligibilityStatus) {
 
 Page({
   data: {
+    motionOff: false,
     state: "loading" as LoadState,
     error: "",
     status: null as ReturnType<typeof viewModel> | null,

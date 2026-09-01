@@ -1,23 +1,31 @@
-<view class="page messages-page">
-  <view class="message-hero">
-    <view class="tt-kicker">消息中心</view>
-    <view class="hero-title">保持联系，也保持边界</view>
-    <view class="hero-copy">会话、事务通知和客服案件彼此独立，集中从这里进入。</view>
-    <view class="quick-actions">
-      <view class="quick-action" bindtap="openNotifications" aria-role="button" aria-label="打开通知中心，{{unreadNotificationCount}} 条未读" tabindex="0"><view class="quick-value">{{unreadNotificationCount}}</view><view class="quick-label">未读通知</view></view>
-      <view class="quick-action" bindtap="openSupport" aria-role="button" aria-label="打开案件中心，{{activeSupportCountUnknown ? '处理中数量暂时未知' : activeSupportCount + ' 个处理中案件'}}" tabindex="0"><view class="quick-value">{{activeSupportCountText}}</view><view class="quick-label">{{activeSupportCountUnknown ? '案件数未知' : '处理中案件'}}</view></view>
-      <view class="quick-action" bindtap="openOrders" aria-role="button" aria-label="打开订单履约状态" tabindex="0"><view class="quick-value">订单</view><view class="quick-label">履约状态</view></view>
-    </view>
+<view class="page messages-page {{motionOff ? 'tt-motion-off' : ''}}">
+  <view class="post-office tt-motion-m3">
+    <view class="post-office-sign"><text>消息</text><tt-cartoon-prop kind="envelope" tone="rose" size="sm" motion="none" motion-off="{{motionOff}}" expressive risk="standard" /></view>
+    <tt-card-stage layout="deck" min-height="390" motion-level="{{loading || error ? 'm0' : 'm3'}}" entrance="assemble" active="{{!loading && !error}}" motion-off="{{motionOff}}" risk="{{loading || error ? 'high' : 'standard'}}" aria-label="消息、案件与订单入口卡组">
+      <view slot="back" class="post-layer"><view class="post-card post-card-case"><view class="post-index">02</view><view class="post-note">案件</view></view></view>
+      <view slot="middle" class="post-layer"><view class="post-card post-card-order"><view class="post-index">03</view><view class="post-note">订单</view></view></view>
+      <view slot="front" class="post-layer">
+        <view class="post-card post-card-main">
+          <view class="tt-kicker">消息中心</view>
+          <view class="hero-title">消息与事务</view>
+          <view class="quick-actions">
+            <view class="quick-action" bindtap="openNotifications" aria-role="button" aria-label="打开通知中心，{{unreadNotificationCount}} 条未读" tabindex="0"><view class="quick-value">{{unreadNotificationCount}}</view><view class="quick-label">未读通知</view></view>
+            <view class="quick-action" bindtap="openSupport" aria-role="button" aria-label="打开案件中心，{{activeSupportCountUnknown ? '处理中数量暂时未知' : activeSupportCount + ' 个处理中案件'}}" tabindex="0"><view class="quick-value">{{activeSupportCountText}}</view><view class="quick-label">{{activeSupportCountUnknown ? '案件数未知' : '处理中案件'}}</view></view>
+            <view class="quick-action" bindtap="openOrders" aria-role="button" aria-label="打开订单履约状态" tabindex="0"><view class="quick-value">订单</view><view class="quick-label">履约状态</view></view>
+          </view>
+        </view>
+      </view>
+    </tt-card-stage>
   </view>
-  <view class="safety" bindtap="openSafety" aria-role="button" aria-label="打开沟通安全说明：平台内沟通、可举报、请勿交换私人联系方式" tabindex="0"><text>平台内沟通 · 可举报 · 请勿交换私人联系方式</text><text>›</text></view>
+  <view class="safety" bindtap="openSafety" aria-role="button" aria-label="打开沟通安全说明：平台内沟通、可举报、请勿交换私人联系方式" tabindex="0"><text>平台内沟通 · 可举报</text><text>›</text></view>
   <view wx:if="{{partialWarning}}" class="partial-warning">{{partialWarning}}</view>
   <view class="conversation-heading"><view class="section-title">最近会话</view><view class="muted">{{conversationTotal}} 个会话</view></view>
-  <tt-skeleton wx:if="{{loading}}" rows="3" />
-  <tt-state wx:elif="{{error}}" type="error" title="消息暂时无法加载" description="{{error}}" action-text="重新加载消息" bindaction="load" />
-  <tt-state wx:elif="{{!conversations.length}}" type="empty" title="还没有会话" description="支付订单后，安全的站内会话会出现在这里。" />
+  <tt-skeleton wx:if="{{loading}}" rows="3" motion-off="{{motionOff}}" />
+  <tt-state wx:elif="{{error}}" type="error" title="消息暂时无法加载" description="{{error}}" action-text="重新加载消息" motion-off="{{motionOff}}" bindaction="load" />
+  <tt-state wx:elif="{{!conversations.length}}" type="empty" title="暂无会话" description="" motion-off="{{motionOff}}" />
   <block wx:else>
-    <view class="card conversation" wx:for="{{conversations}}" wx:key="id" bindtap="openChat" data-id="{{item.id}}" aria-role="button" aria-label="打开与 {{item.name}} 的会话，{{item.unreadCount}} 条未读" tabindex="0">
-      <tt-avatar src="{{item.avatarUrl}}" fallback="{{item.participant.initials}}" alt="{{item.name}}的头像" size="md" online="{{item.participant.isOnline}}" />
+    <view class="card conversation conversation-card-{{index % 3}} {{index < 3 ? 'tt-enter-rise' : ''}} tt-stagger-{{index < 3 ? index + 1 : 0}}" wx:for="{{conversations}}" wx:key="id" bindtap="openChat" data-id="{{item.id}}" aria-role="button" aria-label="打开与 {{item.name}} 的会话，{{item.unreadCount}} 条未读" tabindex="0">
+      <tt-avatar class="conversation-avatar" src="{{item.avatarUrl}}" fallback="{{item.participant.initials}}" alt="{{item.name}}的头像" size="md" online="{{item.participant.isOnline}}" />
       <view class="conversation-copy"><view class="row">
         <view class="conversation-name"><text class="name">{{item.name}}</text><text wx:if="{{item.conversationBlockedByYou}}" class="conversation-blocked">已拉黑</text><text wx:elif="{{!item.messageInteractionAvailable && item.messageHistoryAvailable}}" class="conversation-unavailable">只读</text><text wx:elif="{{!item.messageInteractionAvailable}}" class="conversation-unavailable">无法收发</text><text wx:elif="{{item.messageNotificationsMuted}}" class="notification-muted">已静音</text></view>
         <text class="muted">{{item.updatedAtText}}</text>
@@ -30,9 +38,9 @@
     </view>
   </block>
   <view wx:if="{{!loading && !error && conversations.length}}" class="conversation-pagination">
-    <view class="muted">已显示 {{conversations.length}} / {{conversationTotal}} 个会话</view>
+    <view class="muted">{{conversations.length}} / {{conversationTotal}}</view>
     <view wx:if="{{loadMoreError}}" class="load-more-error">{{loadMoreError}}</view>
     <button wx:if="{{conversationPage < conversationTotalPages}}" class="retry-button" loading="{{loadingMore}}" disabled="{{loadingMore}}" bindtap="loadMoreConversations">{{loadMoreError ? '重试加载更多' : '加载更多会话'}}</button>
-    <view wx:else class="muted">已显示全部会话</view>
+    <view wx:else class="muted">已全部加载</view>
   </view>
 </view>

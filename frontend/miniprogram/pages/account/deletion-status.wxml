@@ -1,11 +1,12 @@
-<view class="page unavailable-page">
-  <view class="status-mark">!</view>
+<view class="page unavailable-page {{motionOff ? 'tt-motion-off' : ''}}">
+  <view class="status-eyebrow">隐私保护模式</view>
+  <view class="status-mark" aria-hidden="true">!</view>
   <view class="title">登录暂不可用</view>
   <view class="message">{{message}}</view>
 
   <view class="privacy-card">
-    <view class="privacy-title">隐私保护说明</view>
-    <view class="privacy-copy">为保护账号隐私，本页不会显示该标识关联的历史账号状态、处理日期或其他资料，也不会在后台继续请求需要登录的接口。</view>
+    <view class="privacy-title">不会显示该标识关联的历史账号状态、处理日期或其他资料</view>
+    <navigator class="privacy-copy" url="/pages/legal/index?type=privacy">查看隐私政策</navigator>
   </view>
 
   <button class="primary-button" open-type="contact">联系微信客服</button>

@@ -30,6 +30,7 @@ function tagOptions(selected: OrderExperienceFeedbackTag[]): FeedbackTagOption[]
 
 Page({
   data: {
+    motionOff: false,
     order: null as Order | null,
     existingReview: null as Review | null,
     feedbackState: "loading" as AftercareResourceState,

@@ -1,35 +1,46 @@
-.orders-page { padding-top: 36rpx; }
-.orders-heading { padding: 4rpx 4rpx 30rpx; }
-.orders-title { margin-top: 12rpx; color: var(--tt-text); font-size: 46rpx; font-weight: 700; letter-spacing: -1.2rpx; line-height: 1.16; }
-.orders-copy { margin-top: 12rpx; color: var(--tt-text-secondary); font-size: 24rpx; line-height: 1.58; }
+.orders-page { padding-top: 28rpx; padding-bottom: calc(56rpx + env(safe-area-inset-bottom)); }
+.orders-heading { position: relative; overflow: hidden; padding: 34rpx 32rpx 38rpx; border: 1rpx solid var(--tt-color-pastel-blue-stroke); border-radius: 30rpx; background: var(--tt-color-pastel-blue-bg); color: var(--tt-color-pastel-blue-fg); }
+.orders-heading::after { position: absolute; right: -44rpx; bottom: -58rpx; width: 180rpx; height: 116rpx; border: 1rpx solid var(--tt-color-pastel-blue-stroke); border-radius: 52% 48% 0 0; background: var(--tt-surface); content: ""; opacity: .42; transform: rotate(-9deg); }
+.orders-heading .tt-kicker { color: var(--tt-color-pastel-blue-fg); }
+.orders-title { margin-top: 18rpx; color: var(--tt-color-pastel-blue-fg); font-size: 46rpx; font-weight: 700; letter-spacing: -1.2rpx; line-height: 1.16; }
+.orders-copy { margin-top: 12rpx; color: var(--tt-color-pastel-blue-fg); font-size: 24rpx; line-height: 1.58; }
 .section-title { margin: 44rpx 4rpx 16rpx; font-size: 34rpx; }
 .order-view-tabs { display: flex; gap: 8rpx; margin-bottom: 18rpx; padding: 6rpx; border: 1rpx solid var(--tt-border); border-radius: 18rpx; background: var(--tt-surface-alt); }
 .order-view-tab { min-width: 0; min-height: 66rpx; flex: 1; padding: 10rpx; border: 0; border-radius: 13rpx; background: transparent; color: var(--tt-text-secondary); font-size: 24rpx; }
 .order-view-tab.is-active { background: var(--tt-surface); color: var(--tt-text); font-weight: 700; }
 .card { padding: 26rpx; border-radius: 24rpx; }
+.order-ticket { position: relative; isolation: isolate; margin-bottom: 32rpx; border-color: var(--tt-border-strong); background: var(--tt-surface); }
+.order-ticket::before,
+.order-ticket::after { position: absolute; top: 100%; right: 18rpx; left: 18rpx; z-index: 0; height: 10rpx; border: 1rpx solid var(--tt-border); border-top: 0; border-radius: 0 0 18rpx 18rpx; background: var(--tt-color-depth-neutral-near); content: ""; pointer-events: none; }
+.order-ticket::after { top: calc(100% + 10rpx); right: 34rpx; left: 34rpx; height: 7rpx; background: var(--tt-color-depth-neutral-far); opacity: .72; }
+.order-ticket-customer { border-top: 6rpx solid var(--tt-color-pastel-blue-stroke); }
+.order-ticket-companion { border-top: 6rpx solid var(--tt-color-pastel-lavender-stroke); }
+.authority-ticket { border-left: 6rpx solid var(--tt-color-pastel-butter-stroke); background: var(--tt-color-pastel-butter-bg); }
+.continuation-ticket { border-color: var(--tt-color-pastel-mint-stroke); background: var(--tt-color-pastel-mint-bg); }
 .row,.fulfillment-heading-row,.refund-heading-row,.experience-feedback-heading-row,.rebook-heading-row,.service-guidelines-heading-row,.timeline-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16rpx; }
 .name { color: var(--tt-text); font-size: 31rpx; font-weight: 700; line-height: 1.35; }
-.status { flex: none; padding: 6rpx 14rpx; border-radius: 999rpx; background: var(--tt-accent-soft); color: var(--tt-accent); font-size: 21rpx; font-weight: 700; }
+.status { flex: none; padding: 6rpx 14rpx; border: 1rpx solid var(--tt-color-status-unknown-stroke); border-radius: 999rpx; background: var(--tt-color-status-unknown-bg); color: var(--tt-color-status-unknown-fg); font-size: 21rpx; font-weight: 700; }
 .schedule { margin-top: 16rpx; color: var(--tt-text); font-size: 26rpx; font-weight: 600; }
 .status-explanation { margin-top: 12rpx; color: var(--tt-text-secondary); font-size: 23rpx; line-height: 1.55; }
 .order-summary-actions { display: flex; gap: 12rpx; margin-top: 20rpx; }
 .order-detail-entry,.order-expand { min-width: 0; min-height: 72rpx; flex: 1; padding: 12rpx 16rpx; font-size: 23rpx; }
 .order-detail-entry { border-color: var(--tt-accent); background: var(--tt-accent); color: var(--tt-on-accent); }
 .order-expand { border-color: var(--tt-border-strong); background: var(--tt-surface); color: var(--tt-text-secondary); }
-.order-expanded { margin-top: 22rpx; padding-top: 22rpx; border-top: 1rpx solid var(--tt-border); animation: reveal 220ms ease both; }
-@keyframes reveal { from { opacity: 0; transform: translateY(-8rpx); } }
+.order-expanded { margin-top: 22rpx; padding-top: 22rpx; border-top: 1rpx solid var(--tt-border); transform-origin: center top; }
 .resource-state,.notification-note,.filter-result-note { margin-bottom: 16rpx; padding: 20rpx; border-radius: 16rpx; background: var(--tt-surface-alt); color: var(--tt-text-secondary); font-size: 23rpx; line-height: 1.55; }
+.notification-note { border: 1rpx solid var(--tt-color-pastel-butter-stroke); background: var(--tt-color-pastel-butter-bg); color: var(--tt-color-pastel-butter-fg); }
 .resource-error,.pagination-error,.reschedule-response-error { background: var(--tt-danger-soft); color: var(--tt-danger); }
 .resource-empty { text-align: center; }
 .resource-retry { width: 100%; margin-top: 14rpx; }
 .plain { border-color: var(--tt-border-strong); background: var(--tt-surface); color: var(--tt-text-secondary); }
-.actions { display: flex; flex-wrap: wrap; gap: 12rpx; margin-top: 20rpx; }
+.actions { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 12rpx; margin-top: 20rpx; padding-top: 4rpx; background: var(--tt-surface); transform: none; }
 .action { min-width: 210rpx; flex: 1; }
 .fulfillment-panel,.refund-panel,.experience-feedback-panel,.experience-feedback-record,.rebook-panel,.service-guidelines-panel,.reschedule-panel,.reschedule-response,.reschedule-pending { margin-top: 18rpx; padding: 20rpx; border-radius: 18rpx; background: var(--tt-surface-alt); color: var(--tt-text); }
 .fulfillment-panel-ready,.fulfillment-panel-active { background: var(--tt-info-soft); }
 .fulfillment-panel-complete,.refund-panel-resolved { background: var(--tt-success-soft); }
 .fulfillment-panel-overdue,.refund-panel-attention { background: var(--tt-danger-soft); }
 .refund-panel-review,.reschedule-pending,.reschedule-response { background: var(--tt-warning-soft); }
+.refund-panel { position: relative; z-index: 1; border: 1rpx solid var(--tt-border); box-shadow: none; transform: none; }
 .fulfillment-kicker,.refund-kicker,.experience-feedback-kicker,.rebook-kicker,.service-guidelines-kicker { color: var(--tt-text-tertiary); font-size: 20rpx; font-weight: 700; letter-spacing: 1rpx; }
 .fulfillment-heading,.refund-heading,.rebook-heading,.reschedule-heading { color: var(--tt-text); font-size: 27rpx; font-weight: 700; }
 .fulfillment-detail,.refund-explanation,.experience-feedback-intro,.experience-feedback-record-copy,.rebook-copy,.service-guidelines-summary,.reschedule-state,.reschedule-response-note { margin-top: 10rpx; color: var(--tt-text-secondary); font-size: 23rpx; line-height: 1.58; }
@@ -51,7 +62,7 @@
 .experience-feedback-rating-label { margin-top: 4rpx; font-size: 18rpx; }
 .experience-feedback-note { width: 100%; min-height: 150rpx; margin-top: 14rpx; padding: 16rpx; }
 .experience-feedback-submit { width: 100%; margin-top: 14rpx; }
-.order-timeline { margin-top: 16rpx; }
+.order-timeline { margin-top: 16rpx; padding: 10rpx 16rpx 6rpx; border-left: 2rpx solid var(--tt-border-strong); border-radius: 0 16rpx 16rpx 0; background: var(--tt-surface-alt); transform-origin: top; }
 .timeline-event { display: flex; gap: 16rpx; padding: 12rpx 0; }
 .timeline-rail { width: 20rpx; flex: none; padding-top: 8rpx; }
 .timeline-dot { width: 14rpx; height: 14rpx; border-radius: 999rpx; background: var(--tt-text-tertiary); }
@@ -84,4 +95,18 @@
 .support-fact-action { width: 100%; margin-top: 12rpx; }
 .followup-section { margin-top: 40rpx; }
 .recommendation-card { margin-top: 14rpx; }
-@media (prefers-reduced-motion: reduce) { .order-expanded { animation: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .orders-heading,
+  .order-ticket,
+  .order-expanded,
+  .order-timeline { animation: none !important; transition: none !important; transform: none !important; }
+}
+
+.orders-page.tt-motion-off .orders-heading,
+.orders-page.tt-motion-off .order-ticket,
+.orders-page.tt-motion-off .order-expanded,
+.orders-page.tt-motion-off .order-timeline {
+  animation: none !important;
+  transition: none !important;
+  transform: none !important;
+}

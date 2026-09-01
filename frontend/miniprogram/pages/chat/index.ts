@@ -86,6 +86,7 @@ function imageMimeType(path: string): string {
 
 Page({
   data: {
+    motionOff: false,
     messages: [] as ChatMessage[],
     draft: "",
     loading: true,

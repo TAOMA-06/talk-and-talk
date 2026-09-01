@@ -1,7 +1,7 @@
 import { currentLegalConsent, ensurePrivacyAuthorization, openLegalDocument, recordLegalConsent } from "../../utils/privacy";
 
 Page({
-  data: { brandName: "Talk&Talk", agreed: false, adultConfirmed: false, submitting: false, detailsExpanded: false },
+  data: { motionOff: false, brandName: "Talk&Talk", agreed: false, adultConfirmed: false, submitting: false, detailsExpanded: false },
   onShow() {
     if (currentLegalConsent()) wx.switchTab({ url: "/pages/home/index" });
   },

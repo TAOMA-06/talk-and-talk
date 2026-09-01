@@ -2,7 +2,7 @@ import { api, ensureSession } from "../../utils/api";
 import { CatalogDisplay, withCatalogDisplays } from "../../utils/catalog";
 import { openCrisisResources, passCrisisGate } from "../../utils/crisis-gate";
 import { CrisisInterventionRiskCode, RecommendedCompanion } from "../../utils/models";
-import { companionAvatarUrl, HOME_HERO_ASSET } from "../../utils/design-assets";
+import { companionAvatarUrl } from "../../utils/design-assets";
 import {
   companionAvailabilityText,
   companionMetaText
@@ -14,22 +14,28 @@ type Scenario = {
   title: string;
   description: string;
   selected: boolean;
+  tone: "blue" | "apricot" | "mint" | "lavender" | "butter" | "rose";
+  tilt: "left" | "right" | "none";
+  label: string;
 };
 
 type HomeCompanion = CatalogDisplay<RecommendedCompanion> & {
   avatarUrl: string;
   availabilityText: string;
   metaText: string;
+  cardTone: "blue" | "apricot" | "mint" | "lavender" | "butter" | "rose";
 };
 
 const SCENARIOS: Array<Omit<Scenario, "selected">> = [
-  { id: "emotion", topicId: "t1", title: "想找人听我说", description: "情绪倾听" },
-  { id: "work", topicId: "t2", title: "工作压力很大", description: "职场减压" },
-  { id: "sleep", topicId: "t3", title: "睡前想有人陪", description: "睡前陪伴" },
-  { id: "study", topicId: "t4", title: "需要一起专注", description: "学习陪伴" },
-  { id: "exercise", topicId: "t5", title: "想获得一点鼓励", description: "运动鼓励" },
-  { id: "interest", topicId: "t6", title: "随便聊聊兴趣", description: "兴趣聊天" }
+  { id: "emotion", topicId: "t1", title: "想找人听我说", description: "情绪倾听", tone: "blue", tilt: "left", label: "01 · 倾听" },
+  { id: "work", topicId: "t2", title: "工作压力很大", description: "职场减压", tone: "apricot", tilt: "right", label: "02 · 减压" },
+  { id: "sleep", topicId: "t3", title: "睡前想有人陪", description: "睡前陪伴", tone: "lavender", tilt: "left", label: "03 · 夜晚" },
+  { id: "study", topicId: "t4", title: "需要一起专注", description: "学习陪伴", tone: "butter", tilt: "none", label: "04 · 专注" },
+  { id: "exercise", topicId: "t5", title: "想获得一点鼓励", description: "运动鼓励", tone: "mint", tilt: "right", label: "05 · 鼓励" },
+  { id: "interest", topicId: "t6", title: "随便聊聊兴趣", description: "兴趣聊天", tone: "rose", tilt: "left", label: "06 · 兴趣" }
 ];
+
+const RECOMMENDATION_TONES: HomeCompanion["cardTone"][] = ["rose", "mint", "blue", "lavender"];
 
 const RISK_PATTERNS: Array<{ riskCode: CrisisInterventionRiskCode; pattern: RegExp }> = [
   { riskCode: "selfHarmSignal", pattern: /自杀|轻生|不想活|结束生命|伤害自己|自残/ },
@@ -56,6 +62,8 @@ function inferredTopic(value: string): string {
 
 Page({
   data: {
+    motionOff: false,
+    heroPropsActive: false,
     brandName: "Talk&Talk",
     intentInput: "",
     scenarios: displayScenarios(""),
@@ -69,7 +77,17 @@ Page({
     recommendationsState: "loading" as "loading" | "available" | "empty" | "error",
     recommendationsError: "",
     recommendations: [] as HomeCompanion[],
-    homeHeroAsset: HOME_HERO_ASSET,
+  },
+  heroPropTimer: null as ReturnType<typeof setTimeout> | null,
+  onReady() {
+    this.heroPropTimer = setTimeout(() => {
+      this.heroPropTimer = null;
+      this.setData({ heroPropsActive: true });
+    }, 900);
+  },
+  onUnload() {
+    if (this.heroPropTimer) clearTimeout(this.heroPropTimer);
+    this.heroPropTimer = null;
   },
   onShow() { void this.load(); },
   async load() {
@@ -99,11 +117,12 @@ Page({
     this.setData({ recommendations: [], recommendationsState: "loading", recommendationsError: "" });
     try {
       const response = await api.recommendedCompanions({ placement: "discoverHome", pageSize: 4 });
-      const recommendations = withCatalogDisplays(response.items || []).map((item) => ({
+      const recommendations = withCatalogDisplays(response.items || []).map((item, index) => ({
         ...item,
         avatarUrl: companionAvatarUrl(item),
         availabilityText: companionAvailabilityText(item.availability),
-        metaText: companionMetaText(item.nextAvailableText, item)
+        metaText: companionMetaText(item.nextAvailableText, item),
+        cardTone: RECOMMENDATION_TONES[index % RECOMMENDATION_TONES.length]
       }));
       this.setData({
         recommendations,

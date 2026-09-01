@@ -5,6 +5,8 @@
 .skeleton-line-0 { width: 58%; }
 .skeleton-line-1 { width: 92%; }
 .skeleton-line-2 { width: 72%; }
-.shimmer { background: var(--tt-surface-alt); animation: pulse 1.4s ease-in-out infinite; }
+.shimmer { background: var(--tt-surface-alt); }
+.is-animated:not(.motion-off) .shimmer { animation: pulse var(--tt-motion-hero) var(--tt-ease-standard) 2; }
 @keyframes pulse { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .shimmer { animation: none; } }
+.motion-off .shimmer { animation: none; }
+@media (prefers-reduced-motion: reduce) { .shimmer { animation: none !important; transition: none; } }

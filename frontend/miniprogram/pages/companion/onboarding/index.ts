@@ -28,6 +28,7 @@ function errorMessage(error: unknown, fallback: string): string {
 
 Page({
   data: {
+    motionOff: false,
     brandName: "Talk&Talk",
     state: "loading" as ViewState,
     loading: true,

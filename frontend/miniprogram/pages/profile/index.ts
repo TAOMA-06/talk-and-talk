@@ -28,6 +28,7 @@ function displayTimeSlots(selectedTimeSlots: string[]): DisplayTimeSlot[] {
 
 Page({
   data: {
+    motionOff: false,
     brandName: "Talk&Talk", user: null as AuthUser | null, userInitials: "我", displayName: "", gender: "" as UserGender | "", genderLabel: "暂不透露",
     genderLabels: GENDER_OPTIONS.map((option) => option.label), genderIndex: 0, notifications: [] as Notification[],
     unreadNotificationCount: 0, notificationState: "loading" as ProfileResourceState, notificationError: "",
@@ -551,25 +552,10 @@ Page({
     wx.showToast({ title: "已退出登录", icon: "success" });
     void this.load();
   },
-  async requestDeletion() {
-    const confirmation = await new Promise<any>((resolve) => wx.showModal({
-      title: "申请注销账号",
-      content: "提交后平台将在 15 个工作日内处理；处理期间请勿重复提交。",
-      confirmText: "提交申请",
-      confirmColor: "#B94A68",
-      success: resolve
-    }));
-    if (!confirmation.confirm) return;
-    try {
-      const result = await api.requestDeletion();
-      wx.showToast({
-        title: result.message || "注销申请已提交；处理开始前可在“账户与隐私”取消",
-        icon: "none",
-        duration: 3000
-      });
-    } catch (error) {
-      wx.showToast({ title: (error as Error).message || "提交失败", icon: "none" });
-    }
+  requestDeletion() {
+    // The account center reads the current server policy and request state.
+    // Do not duplicate a processing SLA here: it can drift from the policy.
+    wx.navigateTo({ url: "/pages/account/index" });
   },
   async withdrawConsent() {
     const confirmation = await new Promise<any>((resolve) => wx.showModal({

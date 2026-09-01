@@ -1,11 +1,19 @@
-<view class="page notifications-page">
-  <view class="notification-hero">
-    <view>
-      <view class="tt-kicker">通知中心</view><view class="hero-title">事务与消息提醒</view>
-      <view class="hero-copy">订单、支付、客服、安全和聊天通知集中在这里；微信订阅授权不影响站内记录。</view>
-    </view>
-    <view wx:if="{{unreadState === 'error'}}" class="unread-count unread-count-unknown">未读数待核对</view>
-    <view wx:elif="{{unreadState === 'available' && unreadCount}}" class="unread-count">{{unreadCount}} 未读</view>
+<view class="page notifications-page {{motionOff ? 'tt-motion-off' : ''}}">
+  <view class="notification-post-stage tt-motion-m3">
+    <view class="notification-post-label"><text>通知</text><tt-cartoon-prop kind="envelope" tone="apricot" size="sm" motion="none" motion-off="{{motionOff}}" expressive risk="standard" /></view>
+    <tt-card-stage layout="deck" min-height="330" motion-level="{{loading || error ? 'm0' : 'm3'}}" entrance="deal" active="{{!loading && !error}}" motion-off="{{motionOff}}" risk="{{loading || error ? 'high' : 'standard'}}" aria-label="通知中心卡片舞台">
+      <view slot="back" class="notification-stage-layer"><view class="notification-back-card notification-back-order">订单</view></view>
+      <view slot="middle" class="notification-stage-layer"><view class="notification-back-card notification-back-support">案件</view></view>
+      <view slot="front" class="notification-stage-layer">
+        <view class="notification-hero">
+          <view>
+            <view class="tt-kicker">通知中心</view><view class="hero-title">事务提醒</view>
+          </view>
+          <view wx:if="{{unreadState === 'error'}}" class="unread-count unread-count-unknown">未读数待核对</view>
+          <view wx:elif="{{unreadState === 'available' && unreadCount}}" class="unread-count">{{unreadCount}} 未读</view>
+        </view>
+      </view>
+    </tt-card-stage>
   </view>
   <view class="toolbar">
     <button class="toolbar-button" loading="{{enabling}}" bindtap="enableImportantNotifications">开启关键微信提醒</button>
@@ -16,17 +24,17 @@
     <button class="unread-retry" bindtap="retryUnreadCount" aria-label="重新读取通知未读数量">重新读取未读数</button>
   </view>
 
-  <tt-skeleton wx:if="{{loading}}" rows="3" />
-  <tt-state wx:elif="{{error}}" type="error" title="通知暂时无法加载" description="{{error}}" action-text="重新加载通知" bindaction="load" />
-  <tt-state wx:elif="{{!notifications.length}}" type="empty" title="暂无通知" description="订单状态和客服进度仍可在对应页面主动查看。" />
+  <tt-skeleton wx:if="{{loading}}" rows="3" motion-off="{{motionOff}}" />
+  <tt-state wx:elif="{{error}}" type="error" title="通知暂时无法加载" description="{{error}}" action-text="重新加载通知" motion-off="{{motionOff}}" bindaction="load" />
+  <tt-state wx:elif="{{!notifications.length}}" type="empty" title="暂无通知" description="" motion-off="{{motionOff}}" />
   <block wx:else>
-    <view class="notification-card {{item.readAt ? '' : 'unread'}}" wx:for="{{notifications}}" wx:key="id" bindtap="openNotification" data-id="{{item.id}}" aria-role="button" aria-label="{{item.readAt ? '已读通知' : '未读通知'}}：{{item.title}}" tabindex="0">
+    <view class="notification-card notification-card-{{index % 3}} {{item.readAt ? '' : 'unread'}} {{index < 3 ? 'tt-enter-rise' : ''}} tt-stagger-{{index < 3 ? index + 1 : 0}}" wx:for="{{notifications}}" wx:key="id" bindtap="openNotification" data-id="{{item.id}}" aria-role="button" aria-label="{{item.readAt ? '已读通知' : '未读通知'}}：{{item.title}}" tabindex="0">
       <view class="notification-top"><text class="type">{{item.typeText}}</text><text class="time">{{item.timeText}}</text></view>
       <view class="notification-title">{{item.title}}</view>
       <view class="notification-body">{{item.body}}</view>
       <view class="notification-footer"><text wx:if="{{!item.readAt}}" class="unread-marker">未读</text><text class="open-hint">查看关联内容 ›</text></view>
     </view>
   </block>
-  <view wx:if="{{notifications.length}}" class="pagination-note">已加载 {{notifications.length}} / {{total}} 条 · 第 {{page}} / {{totalPages}} 页</view>
+  <view wx:if="{{notifications.length}}" class="pagination-note">{{notifications.length}} / {{total}}</view>
   <button wx:if="{{page < totalPages}}" class="retry-button" loading="{{loadingMore}}" disabled="{{loadingMore}}" bindtap="loadMore">加载更多通知</button>
 </view>

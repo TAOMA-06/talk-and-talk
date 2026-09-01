@@ -8,7 +8,6 @@ import {
 import {
   CompanionAvailabilityCandidate, Order, OrderExperienceFeedbackTag, OrderRescheduleRequest, OrderTimelineEvent, RecommendedCompanion, SupportTicket
 } from "../../utils/models";
-import { ensurePrivacyAuthorization } from "../../utils/privacy";
 import { flushRecommendationEvents, queueRecommendationEvent, trackRecommendationCardViews } from "../../utils/recommendations";
 import { requestTransactionalSubscriptions } from "../../utils/subscription";
 
@@ -1063,7 +1062,6 @@ function displayOrder(order: Order, viewerRole: OrderViewerRole): DisplayOrder {
   };
 }
 
-const PAYMENT_SYNC_RETRY_DELAYS_MS = [0, 400, 900];
 const CUSTOMER_ORDER_NOTIFICATION_KEYS = [
   "reservationExpired", "serviceStarted", "serviceCompleted", "supportUpdate",
   "rescheduleRequested", "rescheduleAccepted", "rescheduleRejected",
@@ -1089,28 +1087,9 @@ async function confirmOrderNotificationSetup(viewerRole: OrderViewerRole): Promi
   return Boolean(result?.confirm);
 }
 
-function delay(milliseconds: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds));
-}
-
-async function confirmPaymentWithBackend(orderId: string): Promise<boolean> {
-  for (const retryDelay of PAYMENT_SYNC_RETRY_DELAYS_MS) {
-    if (retryDelay > 0) await delay(retryDelay);
-    try {
-      const result = await api.syncPayment(orderId);
-      if (result.code === "SUCCESS" || ["paid", "inService", "completed", "refunded"].includes(result.data.orderStatus)) {
-        return true;
-      }
-    } catch {
-      // requestPayment success means WeChat accepted the payment. A transient
-      // backend query failure must not be presented to the user as payment loss.
-    }
-  }
-  return false;
-}
-
 Page({
   data: {
+    motionOff: false,
     orders: [] as DisplayOrder[], serviceOrders: [] as DisplayOrder[], supportTickets: [] as DisplaySupportTicket[], followupRecommendations: [] as DisplayRecommendation[],
     ordersState: "loading" as ResourceState,
     ordersError: "",
@@ -1138,7 +1117,7 @@ Page({
     recommendationsState: "loading" as ResourceState,
     recommendationsError: "",
     publicInteractionIdentityAvailable: clientPublicInteractionIdentityGrantsAvailable(),
-    loading: true, error: "", payingId: "", confirmingGuidelinesId: "", submittingSupportFactId: ""
+    loading: true, error: "", confirmingGuidelinesId: "", submittingSupportFactId: ""
   },
   stopRecommendationTracking: null as (() => void) | null,
   fulfillmentTimer: null as ReturnType<typeof setInterval> | null,
@@ -1773,8 +1752,8 @@ Page({
       this.patchOrder(id, { rescheduleResponseAction: "" });
     }
   },
-  async pay(event: any) {
-    const id = event.currentTarget.dataset.id;
+  pay(event: any) {
+    const id = String(event.currentTarget.dataset.id || "");
     const order = (this.data.orders as DisplayOrder[]).find((item) => item.id === id);
     if (!order) {
       wx.showToast({ title: "订单不存在，请刷新后重试", icon: "none" });
@@ -1784,48 +1763,13 @@ Page({
       wx.showToast({ title: "身份核验授权通道尚未开放，当前不能支付", icon: "none" });
       return;
     }
-    const confirmation = await new Promise<any>((resolve) => wx.showModal({
-      title: "确认订单并支付",
-      content: [
-        `服务对象：${order.displayName}`,
-        `预约时间：${order.scheduledAtText}`,
-        `服务时长：${order.durationMinutes} 分钟`,
-        `支付金额：${order.amountText}`,
-        `支付截止：${order.paymentDeadlineText}（确认保留或预约前 5 分钟截止，以更早者为准）`,
-        "未开始服务可申请全额原路退款；服务中或完成后申请将进入人工审核。"
-      ].join("\n"),
-      confirmText: "确认支付",
-      success: resolve
-    }));
-    if (!confirmation.confirm) return;
-    this.setData({ payingId: id });
-    try {
-      await ensurePrivacyAuthorization();
-      await requestTransactionalSubscriptions(["paymentSuccess", "serviceStarted", "serviceCompleted"]);
-      const prepay = await api.prepay(id);
-      if (prepay.payment.mock) {
-        await api.mockNotify(prepay.payment.outTradeNo);
-        wx.showToast({ title: "测试支付已完成", icon: "success" });
-      } else {
-        const params = prepay.payment.wechatMiniProgramParams;
-        if (!params) throw new Error("支付参数不完整");
-        await new Promise<void>((resolve, reject) => wx.requestPayment({
-          ...params,
-          success: () => resolve(),
-          fail: (reason: any) => reject(reason?.errMsg?.includes("cancel") ? new Error("已取消支付") : new Error("支付未完成"))
-        }));
-        const confirmed = await confirmPaymentWithBackend(id);
-        wx.showToast(confirmed
-          ? { title: "支付已确认", icon: "success" }
-          : { title: "支付结果确认中，请稍后刷新订单", icon: "none", duration: 3000 });
-      }
-      await this.load();
-    } catch (error) {
-      if (!await handleCustomerAdultEligibilityError(error)) {
-        wx.showToast({ title: (error as Error).message || "支付失败", icon: "none" });
-      }
+    if (!["pending", "paying"].includes(order.status) || !order.companionConfirmedAt) {
+      wx.showToast({ title: "订单状态已变化，请刷新后重试", icon: "none" });
+      return;
     }
-    finally { this.setData({ payingId: "" }); }
+    // Payment creation, WeChat invocation and authoritative result sync live on
+    // one dedicated page so list refreshes cannot accidentally repeat payment.
+    wx.navigateTo({ url: `/pages/order/payment?orderId=${encodeURIComponent(id)}` });
   },
   async cancel(event: any) {
     try { await api.cancelOrder(event.currentTarget.dataset.id); await this.load(); }
@@ -1871,7 +1815,7 @@ Page({
         : result.refund.status === "pendingReview"
           ? "售后申请已提交"
           : "退款申请已受理";
-      wx.showToast({ title, icon: "success" });
+      wx.showToast({ title, icon: result.refund.status === "success" ? "success" : "none" });
       await this.load();
     } catch (error) {
       const apiError = error as ApiError;

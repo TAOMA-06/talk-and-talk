@@ -1,0 +1,15 @@
+<view
+  class="card-shell tone-{{tone}} size-{{size}} tilt-{{tilt}} depth-{{depth}} motion-{{motionLevel}} entrance-{{entrance}} stagger-{{stagger}} risk-{{risk}} {{interactive ? 'interactive' : ''}} {{selected ? 'selected' : ''}} {{disabled ? 'disabled' : ''}} {{motionOff ? 'motion-off' : ''}}"
+  bindtap="onTap"
+  hover-class="{{interactive && !disabled && !motionOff ? 'card-shell-pressed' : 'none'}}"
+  hover-stay-time="80"
+  aria-role="{{interactive ? 'button' : 'group'}}"
+  aria-label="{{ariaLabel}}"
+  aria-disabled="{{disabled}}"
+  aria-pressed="{{interactive ? selected : false}}"
+  tabindex="{{interactive && !disabled ? 0 : -1}}"
+>
+  <view wx:if="{{depth !== 'flat'}}" class="card-depth-plane card-depth-far" aria-hidden="true"></view>
+  <view wx:if="{{depth !== 'flat'}}" class="card-depth-plane card-depth-near" aria-hidden="true"></view>
+  <view class="card-surface"><slot /></view>
+</view>

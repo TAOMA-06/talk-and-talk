@@ -6,9 +6,10 @@
     <meta name="robots" content="noindex, nofollow" />
     <title>审核部门 · Talk&Talk</title>
     <link rel="stylesheet" href="/review/assets/styles.css" />
+    <link rel="stylesheet" href="/ops-foundation.css" />
     <script src="/review/assets/app.js" defer></script>
   </head>
-  <body>
+  <body class="review-app">
     <main id="loginView" class="login-shell">
       <section class="login-intro" aria-labelledby="loginTitle">
         <a class="wordmark" href="/review/" aria-label="Talk and Talk 审核部门首页">
@@ -16,22 +17,29 @@
           <span>Talk&amp;Talk</span>
         </a>
         <div class="intro-copy">
-          <p class="eyebrow">REVIEW DEPARTMENT</p>
+          <p class="eyebrow">独立审核</p>
           <h1 id="loginTitle">把判断留在<br /><em>独立的地方。</em></h1>
-          <p>这是面向审核团队的受控工作台。它拥有独立账号、独立会话和专属审计轨迹，不属于用户应用。</p>
+          <p>独立账号、会话与审计轨迹；不属于用户应用。</p>
+        </div>
+        <div class="ops-login-theatre ops-review-theatre" aria-hidden="true">
+          <div class="ops-grid-paper"></div>
+          <div class="ops-paper ops-paper-back"><strong>只看判断所需</strong><span>最小证据</span></div>
+          <div class="ops-paper ops-paper-main"><strong>独立判断</strong><span>处置留痕</span></div>
+          <div class="ops-folder"><i></i><b></b><span>• •</span></div>
+          <div class="ops-theatre-stamp"><strong>审核部门身份域</strong></div>
         </div>
         <dl class="security-points">
-          <div><dt>01</dt><dd>独立身份<br />密码与动态口令</dd></div>
-          <div><dt>02</dt><dd>最小证据<br />仅展示判断所需信息</dd></div>
-          <div><dt>03</dt><dd>可追溯决策<br />每项处置均留档</dd></div>
+          <div><dt>01</dt><dd>独立身份<br />密码 + 动态口令</dd></div>
+          <div><dt>02</dt><dd>最小证据<br />仅看判断所需</dd></div>
+          <div><dt>03</dt><dd>审计留痕<br />每项处置留档</dd></div>
         </dl>
       </section>
 
       <section class="login-panel" aria-label="审核部门登录">
         <div class="login-card">
-          <p class="eyebrow">SECURE ACCESS</p>
+          <p class="eyebrow">审核登录</p>
           <h2>进入审核工作台</h2>
-          <p class="muted">仅限已获授权的审核员与审核负责人。</p>
+          <p class="muted">仅限授权审核员与负责人。</p>
           <form id="loginForm" class="credential-form" novalidate>
             <label>
               <span>审核员账号</span>
@@ -50,7 +58,7 @@
             </button>
             <p id="loginMessage" class="form-message" role="alert"></p>
           </form>
-          <p class="login-footer">遇到访问问题，请联系审核部门负责人；请勿使用用户账户尝试登录。</p>
+          <p class="login-footer">访问问题请联系审核负责人；不要使用用户账号。</p>
         </div>
       </section>
     </main>
@@ -98,10 +106,10 @@
 
         <section id="workbenchView" class="view-panel">
           <div class="metrics-grid" aria-label="审核概览">
-            <article class="metric-card accent"><span>待处理</span><strong id="metricPending">—</strong><small id="metricPriority">优先处理 critical / high</small></article>
-            <article class="metric-card"><span>人工复核</span><strong id="metricReview">—</strong><small>需要明确处置的案件</small></article>
-            <article class="metric-card"><span>已拦截</span><strong id="metricBlocked">—</strong><small>本队列历史判断</small></article>
-            <article class="metric-card"><span>已标注</span><strong id="metricLabels">—</strong><small>用于规则质量复盘</small></article>
+            <article class="metric-card accent"><span>待处理</span><strong id="metricPending">—</strong><small id="metricPriority">critical / high 优先</small></article>
+            <article class="metric-card"><span>人工复核</span><strong id="metricReview">—</strong><small>待明确处置</small></article>
+            <article class="metric-card"><span>已拦截</span><strong id="metricBlocked">—</strong><small>历史判断</small></article>
+            <article class="metric-card"><span>已标注</span><strong id="metricLabels">—</strong><small>质量复盘</small></article>
           </div>
 
           <section class="workbench" aria-label="审核案件">
@@ -132,7 +140,7 @@
               <div id="caseDetail" class="case-detail empty-state">
                 <div class="empty-mark" aria-hidden="true">◎</div>
                 <h2>选择一条工单</h2>
-                <p>左侧筛选并打开待审案件。证据、上下文和处置记录将在此处呈现。</p>
+                <p>证据、上下文与处置记录显示在这里。</p>
               </div>
             </div>
           </section>
@@ -143,23 +151,18 @@
             <article class="panel-surface label-intro">
               <p class="eyebrow">QUALITY LOOP</p>
               <h2>样本标注</h2>
-              <p>将模型判断与人工结论沉淀为可复盘样本。仅保存与审核目的相关的最小文本和说明。</p>
-              <dl>
-                <div><dt>期待判断</dt><dd>规则或模型原本应给出的结论</dd></div>
-                <div><dt>实际判断</dt><dd>审核员基于证据的最终结论</dd></div>
-                <div><dt>备注</dt><dd>记录边界、上下文或策略说明</dd></div>
-              </dl>
+              <p>仅保存复盘所需的最小文本。</p>
             </article>
             <form id="labelForm" class="panel-surface label-form" novalidate>
               <div class="panel-heading"><div><p class="eyebrow">NEW LABEL</p><h2>新建审核样本</h2></div></div>
-              <label><span>样本文本</span><textarea id="labelText" minlength="1" maxlength="2000" placeholder="粘贴或从当前案件带入需要复盘的文本" required></textarea></label>
+              <label><span>样本文本</span><textarea id="labelText" minlength="1" maxlength="2000" placeholder="输入复盘文本" required></textarea></label>
               <div class="two-up">
                 <label><span>期待判断</span><select id="expectedDecision"><option value="block">拦截 block</option><option value="warn">提醒 warn</option><option value="review">复核 review</option><option value="allow">放行 allow</option></select></label>
                 <label><span>实际判断</span><select id="actualDecision"><option value="allow">放行 allow</option><option value="review">复核 review</option><option value="warn">提醒 warn</option><option value="block">拦截 block</option></select></label>
               </div>
               <label><span>备注（可选）</span><input id="labelNote" maxlength="1000" placeholder="说明策略边界或上下文" /></label>
               <div class="form-actions"><button class="button primary" type="submit">保存样本</button><button id="exportLabelsButton" class="button quiet lead-only" type="button">开始分批导出 JSON（负责人）</button></div>
-              <p id="exportPolicyNote" class="policy-note">审核样本导出仅限审核负责人，导出动作会写入独立审计轨迹。</p>
+              <p id="exportPolicyNote" class="policy-note">仅负责人可导出；操作写入独立审计。</p>
               <p id="labelMessage" class="form-message" role="alert"></p>
             </form>
           </div>
@@ -171,7 +174,7 @@
               <div>
                 <p class="eyebrow">SECURE OFFBOARDING</p>
                 <h2>审核人员安全离职</h2>
-                <p>仅 active 审核负责人可执行。操作会停用独立审核身份、撤销全部审核会话，并将未结案件明确转派或交回未分配队列。</p>
+                <p>仅 active 负责人可执行；停用身份、撤销会话，并转派未结案件。</p>
               </div>
               <span class="policy-chip">历史审计与处置记录永久保留</span>
             </div>

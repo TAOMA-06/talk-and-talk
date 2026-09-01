@@ -1,4 +1,17 @@
-<view class="page">
+<view class="page community-page {{motionOff ? 'tt-motion-off' : ''}}">
+  <view class="community-postcard-stage tt-motion-m3">
+    <view class="community-stage-label"><text>广场</text><tt-cartoon-prop kind="bubble" tone="rose" size="sm" motion="none" motion-off="{{motionOff}}" expressive risk="standard" /></view>
+    <tt-card-stage layout="fan" min-height="330" motion-level="{{loading || error ? 'm0' : 'm3'}}" entrance="fan" active="{{!loading && !error}}" motion-off="{{motionOff}}" risk="{{loading || error ? 'high' : 'standard'}}" aria-label="陪伴广场边界卡片">
+      <view slot="back" class="community-stage-layer"><view class="community-side-card community-side-public">公开</view></view>
+      <view slot="middle" class="community-stage-layer"><view class="community-side-card community-side-receipt">回执</view></view>
+      <view slot="front" class="community-stage-layer">
+        <view class="community-hero">
+          <view class="tt-kicker">陪伴广场</view>
+          <view class="community-title">公开内容</view>
+        </view>
+      </view>
+    </tt-card-stage>
+  </view>
   <view wx:if="{{publicInteractionIdentityAvailable}}" class="card compose">
     <view class="title">说说你想聊的</view>
     <button class="kind" bindtap="switchKind">{{kind === 'femaleRequest' ? '女生需求' : '陪伴者自荐'}} · 切换</button>
@@ -8,16 +21,16 @@
   </view>
   <view wx:else class="card identity-unavailable">
     <view class="title">公开发布暂未开放</view>
-    <view class="muted">身份核验授权通道尚未开放，因此当前只能浏览、举报和查看自己的举报回执，不能发布新内容。</view>
+    <view class="muted">身份核验授权未开放；当前仅可浏览、举报和查看回执。</view>
   </view>
-  <view class="card report-receipts">
+  <view class="card report-receipts receipt-card">
     <view class="section-title">我的社区举报回执</view>
-    <view class="report-receipts-copy">这里只显示提交时间与收讫信息；不会显示帖子、作者、案件、审核结论或处理时限。记录按页读取，可继续加载历史回执。</view>
+    <view class="report-receipts-copy">收讫不代表已处理。</view>
     <view wx:if="{{reportReceiptsError}}" class="report-receipts-empty" aria-live="polite">
       <view>{{reportReceiptsError}}</view>
       <button class="state-retry" bindtap="retryReportReceipts" aria-label="重新读取社区举报回执">重新读取回执</button>
     </view>
-    <view wx:elif="{{!reportReceipts.length}}" class="report-receipts-empty">还没有社区举报回执。</view>
+    <view wx:elif="{{!reportReceipts.length}}" class="report-receipts-empty">暂无回执</view>
     <view wx:else class="report-receipt-list">
       <view wx:for="{{reportReceipts}}" wx:key="id" class="report-receipt-item">
         <text class="report-receipt-status">已收讫</text><text class="report-receipt-time">{{item.submittedAtText}}</text>
@@ -29,10 +42,10 @@
     <view>{{recommendationsError}}</view>
     <button class="state-retry" bindtap="retryRecommendations" aria-label="重新读取相关陪伴者">重新读取相关陪伴者</button>
   </view>
-  <view wx:elif="{{recommendationsState === 'empty'}}" class="empty related-section">当前没有可展示的相关陪伴者；这不会影响广场内容。</view>
+  <view wx:elif="{{recommendationsState === 'empty'}}" class="empty related-section">暂无相关陪伴者</view>
   <view wx:elif="{{recommendationsState === 'available'}}" class="related-section">
     <view class="section-title">相关陪伴者</view>
-    <view id="community-recommendation-{{item.impressionId}}" class="card recommendation-card" wx:for="{{recommendations}}" wx:key="impressionId" bindtap="openRecommendedCompanion" data-id="{{item.id}}" data-impression-id="{{item.impressionId}}" data-theme-id="{{item.topicIds[0]}}" aria-role="button" aria-label="查看推荐陪伴者：{{item.name}}" tabindex="0">
+    <view id="community-recommendation-{{item.impressionId}}" class="card recommendation-card recommendation-card-{{index % 3}} {{index < 3 ? 'tt-enter-rise' : ''}}" wx:for="{{recommendations}}" wx:key="impressionId" bindtap="openRecommendedCompanion" data-id="{{item.id}}" data-impression-id="{{item.impressionId}}" data-theme-id="{{item.topicIds[0]}}" aria-role="button" aria-label="查看推荐陪伴者：{{item.name}}" tabindex="0">
       <view class="recommendation-row"><view><view class="author">{{item.name}} · {{item.role}}</view><view class="muted">{{item.catalogPriceText}} · {{item.catalogDetailText}} · ★ {{item.rating}}</view><view class="muted">{{item.nextAvailableText}}</view></view><text class="go">查看</text></view>
       <view class="recommendation-reason">{{item.reasonText || '为你推荐'}}</view>
     </view>
@@ -43,7 +56,8 @@
     <button class="state-retry" bindtap="load" aria-label="重新加载广场">重新加载广场</button>
   </view>
   <view wx:elif="{{!posts.length}}" class="empty">{{publicInteractionIdentityAvailable ? '广场还很安静，发第一条内容吧。' : '当前没有可浏览的广场内容；公开发布尚未开放。'}}</view>
-  <view class="card" wx:for="{{posts}}" wx:key="id">
+  <view class="postcard-wrap postcard-wrap-{{index % 3}}" wx:for="{{posts}}" wx:key="id">
+  <view class="card post-card post-card-{{index % 3}}">
     <view class="row"><text class="author">{{item.authorName}}</text><text class="muted">{{item.kind === 'femaleRequest' ? '需求' : '自荐'}}</text></view>
     <view class="topic"># {{item.topic}}</view>
     <view class="content">{{item.content}}</view>
@@ -51,6 +65,7 @@
       <button class="like {{item.isLiked ? 'liked' : ''}}" bindtap="toggleLike" data-id="{{item.id}}">{{item.isLiked ? '已赞' : '点赞'}} {{item.likeCount}}</button>
       <button class="report" loading="{{reportingPostId === item.id}}" bindtap="reportPost" data-id="{{item.id}}">举报</button>
     </view>
+  </view>
   </view>
   <button wx:if="{{postPage < postTotalPages}}" class="state-retry" loading="{{loadingMorePosts}}" disabled="{{loadingMorePosts}}" bindtap="loadMorePosts">加载更多广场内容（已显示 {{posts.length}} / {{postTotal}}）</button>
 </view>

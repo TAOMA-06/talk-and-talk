@@ -9,7 +9,39 @@
   background: var(--tt-accent-soft);
   border: 1rpx solid var(--tt-accent-soft);
   border-left: 8rpx solid var(--tt-accent);
+  transition: opacity var(--tt-motion-press) var(--tt-ease-standard), transform var(--tt-motion-standard) var(--tt-ease-standard);
 }
+
+.authority-panel {
+  position: relative;
+  overflow: hidden;
+  border-color: var(--tt-border);
+  background: var(--tt-surface);
+  box-shadow: none;
+}
+
+.authority-label {
+  display: inline-flex;
+  min-height: 38rpx;
+  align-items: center;
+  margin: -4rpx 0 16rpx;
+  padding: 0 12rpx;
+  border: 1rpx solid var(--tt-border);
+  border-radius: 999rpx;
+  background: var(--tt-surface-alt);
+  color: var(--tt-text-tertiary);
+  font-size: 19rpx;
+  font-weight: 700;
+  letter-spacing: .5rpx;
+}
+
+.reservation-panel { border-top: 5rpx solid var(--tt-color-pastel-blue-stroke); }
+.refund-policy-card { border-top: 5rpx solid var(--tt-color-pastel-butter-stroke); }
+.refund-card { border-top: 5rpx solid var(--tt-color-status-warning-stroke); }
+.payment-dispute-card { border-top: 5rpx solid var(--tt-color-status-info-stroke); }
+.attendance-dispute-card { border-top: 5rpx solid var(--tt-color-pastel-lavender-stroke); }
+.action-card { border-top: 5rpx solid var(--tt-border-strong); }
+.timeline-card { border-top: 5rpx solid var(--tt-color-pastel-mint-stroke); }
 
 .status-paid, .status-inService, .status-completed {
   background: var(--tt-success-soft);
@@ -202,6 +234,12 @@
   font-size: 23rpx;
   line-height: 1.7;
   overflow-wrap: anywhere;
+}
+
+.payment-dispute-copy,
+.timeline-resource-state,
+.service-action-notice {
+  transition: opacity var(--tt-motion-press) var(--tt-ease-standard), transform var(--tt-motion-standard) var(--tt-ease-standard);
 }
 
 .payment-dispute-error {
@@ -464,4 +502,20 @@
 .payment-dispute-heading > view:first-child, .attendance-dispute-heading > view:first-child {
   min-width: 0;
   flex: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-hero,
+  .payment-dispute-copy,
+  .timeline-resource-state,
+  .service-action-notice { animation: none !important; transition: none !important; transform: none !important; }
+}
+
+.order-detail-page.tt-motion-off .status-hero,
+.order-detail-page.tt-motion-off .payment-dispute-copy,
+.order-detail-page.tt-motion-off .timeline-resource-state,
+.order-detail-page.tt-motion-off .service-action-notice {
+  animation: none !important;
+  transition: none !important;
+  transform: none !important;
 }

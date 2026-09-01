@@ -168,6 +168,8 @@ function formatRemaining(milliseconds: number): string {
 
 Page({
   data: {
+    motionOff: false,
+    voiceFeatureAvailable: clientRealtimeVoiceEnabled(),
     orderId: "",
     participantName: "对方",
     participantInitials: "TA",
@@ -203,6 +205,7 @@ Page({
   onLoad(options: Record<string, string | undefined>) {
     if (!clientRealtimeVoiceEnabled()) {
       this.setData({
+        voiceFeatureAvailable: false,
         roomState: "error",
         statusText: "首发仅开放文字陪伴；实时语音待平台配置完成后再开放。",
         canRetry: false,

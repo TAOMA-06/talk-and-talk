@@ -1,10 +1,10 @@
-<view class="page">
+<view class="page services-page {{motionOff ? 'tt-motion-off' : ''}}">
   <view wx:if="{{loading}}" class="empty">正在加载服务商品…</view>
 
   <view wx:elif="{{accessState === 'ineligible'}}" class="empty access-empty">
     <view class="access-title">暂不能管理服务商品</view>
     <view>{{loadError}}</view>
-    <view class="muted">为保护客户和陪伴者，服务商品只能由已完成身份与资料审核的陪伴者本人配置。</view>
+    <view class="muted">身份或资料审核未完成。</view>
     <button class="plain-button retry-button" bindtap="retry">重新检查</button>
   </view>
 
@@ -14,22 +14,38 @@
     <button class="primary-button retry-button" bindtap="retry">重新加载</button>
   </view>
 
-  <view wx:else>
-    <view class="intro-card">
-      <view class="title">服务商品</view>
-      <view class="muted">客户只会看到“已上架”的服务。暂停服务不会改写已创建订单的价格、时长或服务内容。</view>
-      <view class="workbench-actions">
-        <button class="primary-button create-button" disabled="{{offeringTotal >= 50}}" bindtap="openCreate">{{offeringTotal >= 50 ? '已达 50 项上限' : '新建服务'}}</button>
-        <button class="plain-button availability-button" bindtap="openAvailabilityWindows">查看可约时段</button>
-      </view>
+  <view wx:else class="services-ready">
+    <view class="service-studio tt-motion-m3">
+      <view class="service-sign"><text>服务商品</text><text class="service-count">{{offeringTotal}} / 50</text></view>
+      <tt-card-stage layout="deck" min-height="430" motion-level="m3" entrance="deal" active motion-off="{{motionOff}}" risk="standard" aria-label="服务草稿、可约时段与上架规则卡组">
+        <view slot="back" class="service-layer">
+          <view class="service-stage-card service-stage-draft"><view class="stage-index">02</view><view class="stage-title">草稿</view></view>
+        </view>
+        <view slot="middle" class="service-layer" bindtap="openAvailabilityWindows" aria-role="button" aria-label="查看可约时段" tabindex="0">
+          <view class="service-stage-card service-stage-calendar"><view class="stage-index">03</view><view class="stage-title">可约时段</view></view>
+        </view>
+        <view slot="front" class="service-layer">
+          <view class="intro-card">
+            <view class="tt-kicker">01</view>
+            <view class="title">服务管理</view>
+            <view class="muted">仅已上架服务对客户可见。</view>
+            <view class="workbench-actions">
+              <button class="primary-button create-button" disabled="{{offeringTotal >= 50}}" bindtap="openCreate">{{offeringTotal >= 50 ? '已达 50 项上限' : '新建服务'}}</button>
+              <button class="plain-button availability-button" bindtap="openAvailabilityWindows">查看可约时段</button>
+            </view>
+          </view>
+        </view>
+        <view slot="prop" class="service-props"><tt-cartoon-prop kind="folder" tone="apricot" size="lg" expressive motion-off="{{motionOff}}" risk="standard" /><tt-cartoon-prop kind="calendar" tone="butter" size="md" expressive motion-off="{{motionOff}}" risk="standard" /></view>
+      </tt-card-stage>
     </view>
 
     <view wx:if="{{!offerings.length}}" class="empty catalog-empty">
-      <view class="access-title">还没有服务商品</view>
-      <view>先建立一项服务草稿，确认内容、价格和时长后再上架给客户。</view>
+      <view class="access-title">暂无服务商品</view>
     </view>
 
-    <view wx:for="{{offerings}}" wx:key="id" class="card offering-card">
+    <view wx:for="{{offerings}}" wx:key="id" class="offering-item">
+      <tt-card-shell tone="{{index % 3 === 0 ? 'apricot' : index % 3 === 1 ? 'blue' : 'mint'}}" size="standard" depth="mid" motion-level="m1" entrance="none" motion-off="{{motionOff}}" risk="standard">
+      <view class="offering-card">
       <view class="offering-head">
         <view class="offering-main">
           <view class="offering-title">{{item.title}}</view>
@@ -46,8 +62,10 @@
         <button class="plain-button direction-button" disabled="{{!item.canMoveUp || reorderingId !== '' || offerings.length < offeringTotal}}" loading="{{reorderingId === item.id}}" bindtap="moveOffering" data-id="{{item.id}}" data-direction="-1">上移</button>
         <button class="plain-button direction-button" disabled="{{!item.canMoveDown || reorderingId !== '' || offerings.length < offeringTotal}}" loading="{{reorderingId === item.id}}" bindtap="moveOffering" data-id="{{item.id}}" data-direction="1">下移</button>
       </view>
+      </view>
+      </tt-card-shell>
     </view>
-    <view wx:if="{{offerings.length}}" class="catalog-pagination">已显示 {{offerings.length}} / {{offeringTotal}} 项</view>
+    <view wx:if="{{offerings.length}}" class="catalog-pagination">{{offerings.length}} / {{offeringTotal}}</view>
     <view wx:if="{{offeringsLoadMoreError}}" class="catalog-pagination-error" aria-live="polite">{{offeringsLoadMoreError}}</view>
     <button wx:if="{{offeringPage < offeringTotalPages}}" class="plain-button load-more-button" loading="{{offeringsLoadingMore}}" disabled="{{offeringsLoadingMore}}" bindtap="loadMoreOfferings">{{offeringsLoadMoreError ? '重试加载更多' : '加载更多服务商品'}}</button>
   </view>
@@ -58,7 +76,7 @@
         <view class="title small">{{editingId ? '编辑服务' : '新建服务'}}</view>
         <button class="close-button" disabled="{{saving}}" bindtap="closeEditor">关闭</button>
       </view>
-      <view class="editor-tip">服务文本会经过公开内容审核；请只描述平台内、可履约的服务内容。</view>
+      <view class="editor-tip">仅描述平台内可履约服务。</view>
 
       <view class="field-label">服务名称</view>
       <input value="{{formTitle}}" maxlength="80" placeholder="例如：30 分钟文字倾听" bindinput="setFormTitle" />
@@ -79,7 +97,7 @@
 
       <view class="field-label">价格（元）</view>
       <input value="{{formPriceYuan}}" type="digit" placeholder="例如 39 或 39.90" bindinput="setFormPrice" />
-      <view class="field-hint">最低 ¥1.00，最高 ¥20,000.00；平台会以分为单位准确保存。</view>
+      <view class="field-hint">¥1.00–¥20,000.00</view>
 
       <view class="field-label">关联主题（可选，最多 6 个）</view>
       <view wx:if="{{topicsState === 'loading'}}" class="field-hint" aria-live="polite">正在读取服务主题…</view>
@@ -90,11 +108,11 @@
       <view wx:elif="{{topicsState === 'available'}}" class="topic-choices">
         <view wx:for="{{topicChoices}}" wx:key="id" class="topic-choice {{item.selected ? 'selected' : ''}}" bindtap="toggleFormTopic" data-id="{{item.id}}" aria-role="checkbox" aria-checked="{{item.selected}}" aria-label="服务主题：{{item.name}}" tabindex="0">{{item.name}}</view>
       </view>
-      <view wx:else class="field-hint">平台当前没有可选择的服务主题；不影响保存服务。</view>
+      <view wx:else class="field-hint">暂无可选主题</view>
 
       <view class="publish-row">
         <view><view class="field-label compact-label">立即上架</view><view class="field-hint">关闭则保存为草稿，客户不可见。</view></view>
-        <switch checked="{{formActive}}" color="#C65345" bindchange="setFormActive" aria-label="{{formActive ? '停用' : '启用'}}当前服务商品" />
+        <switch checked="{{formActive}}" color="#292724" bindchange="setFormActive" aria-label="{{formActive ? '停用' : '启用'}}当前服务商品" />
       </view>
 
       <view wx:if="{{formError}}" class="form-error">{{formError}}</view>

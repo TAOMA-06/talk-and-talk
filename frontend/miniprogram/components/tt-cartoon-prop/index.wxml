@@ -1,0 +1,32 @@
+<view
+  class="cartoon-prop kind-{{kind}} tone-{{tone}} size-{{size}} motion-{{motion}} risk-{{risk}} {{active ? 'is-active' : ''}} {{motionOff ? 'motion-off' : ''}}"
+  aria-hidden="{{decorative}}"
+  aria-role="img"
+  aria-label="{{decorative ? '' : ariaLabel}}"
+>
+  <view wx:if="{{kind === 'bubble'}}" class="prop-shape bubble-shape">
+    <view class="bubble-tail"></view><view class="bubble-dot dot-one"></view><view class="bubble-dot dot-two"></view><view class="bubble-dot dot-three"></view>
+  </view>
+  <view wx:if="{{kind === 'lamp'}}" class="prop-shape lamp-shape">
+    <view class="prop-accent lamp-glow"></view><view class="lamp-shade"></view><view class="lamp-stem"></view><view class="lamp-base"></view>
+  </view>
+  <view wx:if="{{kind === 'cup'}}" class="prop-shape cup-shape">
+    <view class="prop-accent cup-steam steam-one"></view><view class="prop-accent cup-steam steam-two"></view><view class="cup-body"></view><view class="cup-handle"></view>
+  </view>
+  <view wx:if="{{kind === 'magnifier'}}" class="prop-shape magnifier-shape">
+    <view class="magnifier-glass"></view><view class="magnifier-handle"></view>
+  </view>
+  <view wx:if="{{kind === 'envelope'}}" class="prop-shape envelope-shape">
+    <view class="envelope-body"></view><view class="envelope-fold fold-left"></view><view class="envelope-fold fold-right"></view><view class="prop-accent envelope-flap"></view>
+  </view>
+  <view wx:if="{{kind === 'calendar'}}" class="prop-shape calendar-shape">
+    <view class="calendar-body"></view><view class="calendar-head"></view><view class="calendar-ring ring-left"></view><view class="calendar-ring ring-right"></view><view class="calendar-line line-one"></view><view class="calendar-line line-two"></view>
+  </view>
+  <view wx:if="{{kind === 'folder'}}" class="prop-shape folder-shape">
+    <view class="folder-back"></view><view class="folder-tab"></view><view class="prop-accent folder-front"></view>
+  </view>
+  <view wx:if="{{kind === 'sprout'}}" class="prop-shape sprout-shape">
+    <view class="sprout-stem"></view><view class="prop-accent sprout-leaf leaf-left"></view><view class="prop-accent sprout-leaf leaf-right"></view><view class="sprout-soil"></view>
+  </view>
+  <view wx:if="{{expressive && risk !== 'high'}}" class="prop-face" aria-hidden="true"><view class="face-eye eye-left"></view><view class="face-eye eye-right"></view><view class="face-mouth"></view></view>
+</view>

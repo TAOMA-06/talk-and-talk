@@ -30,6 +30,7 @@ function displayNotification(item: Notification): DisplayNotification {
 
 Page({
   data: {
+    motionOff: false,
     notifications: [] as DisplayNotification[],
     unreadCount: 0,
     unreadState: "loading" as "loading" | "available" | "error",

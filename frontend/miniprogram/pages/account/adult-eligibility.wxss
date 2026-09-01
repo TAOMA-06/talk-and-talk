@@ -1,13 +1,16 @@
 .adult-page {
+  padding-top: 24rpx;
   padding-bottom: 64rpx;
 }
 
 .hero {
   padding: 32rpx;
-  border-radius: 28rpx;
-  background: var(--tt-accent-soft);
-  border: 1rpx solid var(--tt-border);
+  border-radius: 24rpx;
+  background: var(--tt-surface);
+  border: 2rpx solid var(--tt-border-strong);
 }
+
+.hero-ledger { display: flex; align-items: center; justify-content: space-between; gap: 18rpx; margin-bottom: 24rpx; color: var(--tt-text-tertiary); font-size: 18rpx; font-weight: 800; letter-spacing: 1.6rpx; }
 
 .eyebrow {
   color: var(--tt-accent);
@@ -30,13 +33,17 @@
   line-height: 1.7;
 }
 
+.eligibility-rail { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8rpx; margin-top: 24rpx; }
+.eligibility-rail > view { display: flex; min-width: 0; flex-direction: column; gap: 5rpx; padding: 14rpx; border: 1rpx solid var(--tt-border); border-radius: 14rpx; background: var(--tt-surface-alt); color: var(--tt-text-secondary); font-size: 19rpx; line-height: 1.35; }
+.eligibility-rail text:first-child { color: var(--tt-text-tertiary); font-size: 17rpx; font-weight: 800; }
+
 .card {
   margin-top: 20rpx;
   padding: 28rpx;
   border-radius: 20rpx;
   background: var(--tt-surface);
   box-shadow: none;
-  border: 1rpx solid var(--tt-border);
+  border: 2rpx solid var(--tt-border);
 }
 
 .state-card {

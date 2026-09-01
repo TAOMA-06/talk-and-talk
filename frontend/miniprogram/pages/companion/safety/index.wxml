@@ -1,4 +1,4 @@
-<view class="page">
+<view class="page companion-safety-page {{motionOff ? 'tt-motion-off' : ''}}">
   <view wx:if="{{loading}}" class="empty">正在同步履约事件和客服工单…</view>
 
   <view wx:elif="{{error && !incidents.length && !tickets.length}}" class="empty">
@@ -9,22 +9,23 @@
 
   <block wx:else>
     <view class="hero">
-      <view class="eyebrow">履约与人身安全</view>
-      <view class="hero-title">先安全退出，再留下受控事实</view>
-      <view class="hero-copy">本页不是紧急救援。如果现实危险正在发生，请优先联系当地紧急服务和可信任的人，再向平台提交记录。</view>
-      <view wx:if="{{suspended}}" class="suspended">商业资格暂停不影响查看、提交安全事件或客服工单；平台不会因暂停状态关闭安全入口。</view>
+      <view class="safety-ledger"><text>安全事件</text><text>入口始终可用</text></view>
+      <view class="hero-title">先安全退出，再记录事实</view>
+      <view class="hero-copy">即时危险请先联系紧急服务或可信的人。</view>
+      <view class="decision-boundary"><view>不自动判责、退款或冻结</view></view>
+      <view wx:if="{{suspended}}" class="suspended">资格暂停不关闭安全与客服入口。</view>
     </view>
 
     <view wx:if="{{error}}" class="inline-error">{{error}}</view>
 
-    <view class="section-title">订单异常与证据记录</view>
+    <view class="section-title"><text class="section-index">01</text><text>订单异常与证据记录</text></view>
     <view class="card form-card">
       <picker mode="selector" range="{{incidentCategories}}" range-key="label" value="{{incidentCategoryIndex}}" bindchange="setIncidentCategory">
         <view class="field">事件类型：{{incidentCategories[incidentCategoryIndex].label}}</view>
       </picker>
       <input class="field" value="{{incidentOrderId}}" bindinput="setIncidentOrderId" placeholder="关联订单 UUID（可选）" />
       <textarea class="textarea" value="{{incidentSummary}}" bindinput="setIncidentSummary" maxlength="1000" placeholder="描述发生时间、事实和影响，不要写第三方证件、联系方式或健康隐私" />
-      <view wx:if="{{textOnly}}" class="hint">当前首发版本只接收文字事件说明；图片和音频证据暂未开放。</view>
+      <view wx:if="{{textOnly}}" class="hint">当前仅接收文字。</view>
       <block wx:if="{{!textOnly}}">
         <view class="evidence-toolbar">
           <button class="secondary-button" size="mini" disabled="{{incidentEvidenceUploading || incidentEvidenceDrafts.length >= 3}}" bindtap="addIncidentEvidenceImage">添加图片</button>
@@ -35,12 +36,12 @@
           <text>{{item.kind === 'image' ? '图片' : '音频'}} · {{item.statusText}}</text>
           <button size="mini" data-id="{{item.assetId}}" bindtap="removeIncidentEvidence">移除</button>
         </view>
-        <view class="hint">最多 3 个文件。文件直传受控存储并审核，事件只绑定审核通过的附件；创建事件不会自动判责、退款或冻结账号。</view>
+        <view class="hint">最多 3 个审核通过的附件</view>
       </block>
       <button class="primary-button" loading="{{saving}}" disabled="{{saving}}" bindtap="createIncident">创建待处理事件</button>
     </view>
 
-    <view wx:if="{{!incidents.length}}" class="card empty-card">当前没有履约事件记录。</view>
+    <view wx:if="{{!incidents.length}}" class="card empty-card">暂无事件记录</view>
     <view wx:for="{{incidents}}" wx:key="id" wx:for-item="incident" class="card incident-card status-{{incident.status}}">
       <view class="card-head"><view class="card-title">{{incident.categoryText}}</view><view class="status-chip">{{incident.statusText}}</view></view>
       <view class="card-meta">{{incident.createdText}}<text wx:if="{{incident.orderId}}"> · 订单 {{incident.orderId}}</text></view>
@@ -49,7 +50,7 @@
         <button wx:for="{{incident.evidenceAttachments}}" wx:for-item="attachment" wx:key="id" class="secondary-button" size="mini" data-id="{{attachment.id}}" bindtap="openBoundEvidence">{{attachment.kind === 'image' ? '查看图片证据' : '播放音频证据'}}</button>
       </view>
       <view wx:if="{{incident.resolution}}" class="resolution">处理结论：{{incident.resolution}}</view>
-      <view wx:elif="{{incident.status === 'open' || incident.status === 'inReview'}}" class="pending-note">尚无处理结论，请以此卡后续状态为准。</view>
+      <view wx:elif="{{incident.status === 'open' || incident.status === 'inReview'}}" class="pending-note">处理中，尚无结论</view>
     </view>
     <view wx:if="{{incidentTotalPages > 1}}" class="card">
       <button class="secondary-button" disabled="{{incidentPage <= 1}}" bindtap="previousIncidentPage">上一页</button>
@@ -57,7 +58,7 @@
       <button class="secondary-button" disabled="{{incidentPage >= incidentTotalPages}}" bindtap="nextIncidentPage">下一页</button>
     </view>
 
-    <view class="section-title">客服与安全工单</view>
+    <view class="section-title"><text class="section-index">02</text><text>客服与安全工单</text></view>
     <view class="card form-card">
       <picker mode="selector" range="{{supportCategories}}" range-key="label" value="{{supportCategoryIndex}}" bindchange="setSupportCategory">
         <view class="field">工单类型：{{supportCategories[supportCategoryIndex].label}}</view>
@@ -68,13 +69,13 @@
       <button class="primary-button" loading="{{saving}}" disabled="{{saving}}" bindtap="createSupportTicket">创建客服工单</button>
     </view>
 
-    <view wx:if="{{!tickets.length}}" class="card empty-card">当前没有客服工单。</view>
+    <view wx:if="{{!tickets.length}}" class="card empty-card">暂无客服工单</view>
     <view wx:for="{{tickets}}" wx:key="id" wx:for-item="ticket" class="card ticket-card">
       <view class="card-head"><view class="card-title">{{ticket.subject}}</view><view class="status-chip">{{ticket.statusText}}</view></view>
       <view class="card-meta">{{ticket.categoryText}} · {{ticket.createdText}} · 目标响应 {{ticket.dueText}}</view>
       <view class="card-body">{{ticket.body}}</view>
       <view wx:if="{{ticket.resolution}}" class="resolution">处理结论：{{ticket.resolution}}</view>
-      <view wx:elif="{{ticket.status === 'open' || ticket.status === 'inProgress'}}" class="pending-note">仍在处理中，创建工单不代表已解决。</view>
+      <view wx:elif="{{ticket.status === 'open' || ticket.status === 'inProgress'}}" class="pending-note">处理中，尚未解决</view>
       <view wx:if="{{ticket.orderFacts.length}}" class="facts">已提交 {{ticket.orderFacts.length}} 条订单事实</view>
       <button wx:if="{{ticket.orderId && (ticket.status === 'open' || ticket.status === 'inProgress') && (ticket.category === 'orderIssue' || ticket.category === 'refund')}}" class="secondary-button" data-id="{{ticket.id}}" bindtap="openFact">补充订单事实</button>
     </view>
@@ -88,9 +89,9 @@
   <view wx:if="{{factTicketId}}" class="modal-mask">
     <view class="modal">
       <view class="modal-title">补充订单事实</view>
-      <view class="modal-copy">只描述和该订单直接相关的事实；不要提交身份、联系方式、证件或健康资料。</view>
+      <view class="modal-copy">仅写订单事实；勿提交身份、联系方式、证件或健康资料。</view>
       <textarea class="textarea" value="{{factStatement}}" bindinput="setFactStatement" maxlength="1000" placeholder="至少5个字" />
-      <view wx:if="{{textOnly}}" class="hint">当前首发版本只接收文字订单事实；图片和音频证据暂未开放。</view>
+      <view wx:if="{{textOnly}}" class="hint">当前仅接收文字。</view>
       <block wx:if="{{!textOnly}}">
         <view class="evidence-toolbar">
           <button class="secondary-button" size="mini" disabled="{{factEvidenceUploading || factEvidenceDrafts.length >= 3}}" bindtap="addFactEvidenceImage">添加图片</button>

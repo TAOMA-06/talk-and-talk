@@ -67,6 +67,7 @@ function errorMessage(error: unknown, fallback: string): string {
 
 Page({
   data: {
+    motionOff: false,
     loading: true,
     accessState: "loading" as AccessState,
     loadError: "",

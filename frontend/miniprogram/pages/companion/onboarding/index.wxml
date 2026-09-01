@@ -1,4 +1,4 @@
-<view class="page">
+<view class="page onboarding-page {{motionOff ? 'tt-motion-off' : ''}}">
   <view wx:if="{{loading}}" class="empty">正在核对入驻状态…</view>
 
   <view wx:elif="{{state === 'error'}}" class="empty">
@@ -9,9 +9,9 @@
 
   <block wx:elif="{{state === 'application'}}">
     <view class="hero">
-      <view class="eyebrow">第一步 · 基础申请</view>
+      <view class="eyebrow">基础申请</view>
       <view class="hero-title">成为 {{brandName}} 陪伴者</view>
-      <view class="hero-copy">基础资料只会进入待审核状态，不会自动获得商用资格或公开展示。</view>
+      <view class="hero-copy">提交后进入审核，不自动获得接单资格。</view>
     </view>
     <view class="card form-card">
       <view class="field-label">公开身份/角色</view>
@@ -43,7 +43,7 @@
 
   <block wx:else>
     <view class="hero">
-      <view class="eyebrow">陪伴者生命周期</view>
+      <view class="eyebrow">陪伴者状态</view>
       <view class="hero-title">{{overview.companion.name}}</view>
       <view class="hero-copy">公开状态：{{overview.companion.isPublished ? '已发布' : '未发布'}} · {{statusText}}</view>
       <view wx:if="{{overview.commercialProfile.suspendedReason}}" class="warning">
@@ -54,9 +54,14 @@
         {{overview.commercialProfile.adultEligibility.verdict === 'adult' ? '已核验成年' : overview.commercialProfile.adultEligibility.verdict === 'ineligible' ? '不满足成年资格' : '待独立核验'}}
         <text wx:if="{{overview.commercialProfile.adultEligibility.validUntil}}"> · 有效至 {{overview.commercialProfile.adultEligibility.validUntil}}</text>
       </view>
+      <view class="status-facts">
+        <view class="status-fact"><text>资料公开</text><text>{{overview.companion.isPublished ? '已发布' : '未发布'}}</text></view>
+        <view class="status-fact"><text>商业资格</text><text>{{statusText}}</text></view>
+        <view class="status-fact"><text>成年结论</text><text>{{overview.commercialProfile.adultEligibility.verdict === 'adult' ? '已核验成年' : overview.commercialProfile.adultEligibility.verdict === 'ineligible' ? '不满足' : '待独立核验'}}</text></view>
+      </view>
     </view>
 
-    <view class="section-title">公开资料</view>
+    <view class="section-title"><text class="section-index">01</text><text>公开资料</text></view>
     <view class="card form-card">
       <view class="field-label">公开身份/角色</view>
       <input class="field" value="{{profile.role}}" data-field="role" bindinput="setProfileField" />
@@ -75,14 +80,14 @@
 
       <view wx:if="{{voiceIntroEnabled}}" class="subsection">语音介绍元数据</view>
       <view wx:if="{{voiceIntroEnabled}}" class="status-line">审核状态：{{overview.companion.voiceIntro.status}}</view>
-      <view wx:if="{{voiceIntroEnabled}}" class="hint">这里只接受受控媒体服务生成的外部引用；不会把本地路径或未审核音频当作已上线内容。</view>
+      <view wx:if="{{voiceIntroEnabled}}" class="hint">仅接受受控媒体引用。</view>
       <input wx:if="{{voiceIntroEnabled}}" class="field" value="{{profile.voiceIntroAssetRef}}" data-field="voiceIntroAssetRef" bindinput="setProfileField" placeholder="外部媒体引用，例如 media/audio/..." />
       <input wx:if="{{voiceIntroEnabled}}" class="field" type="number" value="{{profile.voiceIntroDurationSeconds}}" data-field="voiceIntroDurationSeconds" bindinput="setProfileField" placeholder="时长（秒，1–600）" />
-      <view wx:if="{{!voiceIntroEnabled}}" class="hint">首发文字陪伴不开放语音介绍；请完善文字资料后提交审核。</view>
+      <view wx:if="{{!voiceIntroEnabled}}" class="hint">语音介绍未开放。</view>
       <button class="primary-button submit" loading="{{saving}}" disabled="{{saving}}" bindtap="saveProfile">保存并提交资料审核</button>
     </view>
 
-    <view class="section-title">身份、协议与结算资料</view>
+    <view class="section-title"><text class="section-index">02</text><text>身份、协议与结算资料</text></view>
     <view class="card form-card">
       <view class="status-row">
         <view>

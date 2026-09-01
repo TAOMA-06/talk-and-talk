@@ -1,7 +1,9 @@
 Component({
   properties: {
     avatar: { type: Boolean, value: true },
-    rows: { type: Number, value: 3 }
+    rows: { type: Number, value: 3 },
+    animated: { type: Boolean, value: true },
+    motionOff: { type: Boolean, value: false }
   },
   data: { lineItems: [0, 1, 2] },
   observers: {

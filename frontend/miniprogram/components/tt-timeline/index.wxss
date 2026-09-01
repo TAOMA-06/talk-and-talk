@@ -1,0 +1,11 @@
+:host { display: block; }
+.timeline { display: flex; flex-direction: column; }
+.timeline-item { display: grid; grid-template-columns: 30rpx minmax(0, 1fr); gap: 16rpx; }
+.timeline-rail { position: relative; display: flex; justify-content: center; }
+.timeline-dot { position: relative; z-index: 1; width: 16rpx; height: 16rpx; margin-top: 30rpx; border: 4rpx solid var(--tt-color-bg-surface); border-radius: 999rpx; background: var(--tt-color-action-primary-bg); }
+.timeline-line { position: absolute; top: 42rpx; bottom: -24rpx; width: 2rpx; background: var(--tt-border); }
+.timeline-card { margin-bottom: 18rpx; padding: 24rpx; border: 1rpx solid var(--tt-border); border-radius: 20rpx; background: var(--tt-surface); }
+.timeline-top { display: flex; align-items: center; justify-content: space-between; gap: 12rpx; }
+.timeline-time { color: var(--tt-text-tertiary); font-size: 21rpx; font-variant-numeric: tabular-nums; }
+.timeline-title { margin-top: 12rpx; color: var(--tt-text); font-size: 27rpx; font-weight: 700; line-height: 1.4; }
+.timeline-description { margin-top: 8rpx; color: var(--tt-text-secondary); font-size: 23rpx; line-height: 1.55; }

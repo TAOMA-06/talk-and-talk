@@ -79,6 +79,7 @@ function validCategory(value: unknown): SupportTicketCategory {
 
 Page({
   data: {
+    motionOff: false,
     cases: [] as DisplayCase[],
     safetyCases: [] as DisplayCase[],
     communityReceipts: [] as CommunityReportReceipt[],

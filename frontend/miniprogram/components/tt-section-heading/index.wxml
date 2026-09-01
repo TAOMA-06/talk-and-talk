@@ -1,0 +1,8 @@
+<view class="section-heading motion-{{motionLevel}} risk-{{risk}} {{active ? 'is-active' : ''}} {{motionOff ? 'motion-off' : ''}}">
+  <view class="heading-copy">
+    <view wx:if="{{kicker}}" class="heading-kicker">{{kicker}}</view>
+    <view class="heading-title">{{title}}</view>
+    <view wx:if="{{description}}" class="heading-description">{{description}}</view>
+  </view>
+  <button wx:if="{{actionText}}" class="heading-action" bindtap="onAction">{{actionText}}</button>
+</view>

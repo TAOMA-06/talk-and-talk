@@ -5,12 +5,12 @@
 .support-hero {
   padding: 32rpx;
   border-radius: 28rpx;
-  background: var(--tt-accent-soft);
-  border: 1rpx solid var(--tt-border);
+  background: var(--tt-color-pastel-lavender-bg);
+  border: 1rpx solid var(--tt-color-pastel-lavender-stroke);
 }
 
 .hero-kicker {
-  color: var(--tt-accent);
+  color: var(--tt-color-pastel-lavender-fg);
   font-size: 22rpx;
   font-weight: 800;
   letter-spacing: 3rpx;
@@ -18,14 +18,14 @@
 
 .hero-title {
   margin-top: 10rpx;
-  color: var(--tt-accent);
+  color: var(--tt-color-pastel-lavender-fg);
   font-size: 40rpx;
   font-weight: 800;
 }
 
 .hero-copy {
   margin-top: 13rpx;
-  color: var(--tt-text);
+  color: var(--tt-color-pastel-lavender-fg);
   font-size: 24rpx;
   line-height: 1.65;
 }
@@ -58,7 +58,8 @@
 
 .public-support-card {
   margin-top: 22rpx;
-  border: 1rpx solid var(--tt-success-soft);
+  border: 1rpx solid var(--tt-color-pastel-mint-stroke);
+  background: var(--tt-color-pastel-mint-bg);
 }
 
 .public-support-heading {
@@ -137,8 +138,8 @@
 
 .wechat-complaint-card {
   margin-top: 22rpx;
-  border: 1rpx solid var(--tt-success-soft);
-  background: var(--tt-surface-alt);
+  border: 1rpx solid var(--tt-color-pastel-butter-stroke);
+  background: var(--tt-color-pastel-butter-bg);
 }
 
 .wechat-complaint-heading {
@@ -551,3 +552,24 @@
 .hero-button[disabled], .submit-button[disabled], .public-action[disabled] {
   opacity: 0.52;
 }
+
+.support-hero .hero-title,
+.support-hero .hero-copy { color: var(--tt-color-pastel-lavender-fg); }
+.public-support-card { border-color: var(--tt-color-pastel-mint-stroke); background: var(--tt-color-pastel-mint-bg); }
+.wechat-complaint-card { border-color: var(--tt-color-pastel-butter-stroke); background: var(--tt-color-pastel-butter-bg); }
+
+/* UI4 restrained case folders. Serious case/status cards remain flat and static. */
+.support-page { overflow-x: hidden; }
+.support-hero-stack { position: relative; margin-bottom: 30rpx; padding-bottom: 16rpx; }
+.support-stack-card { position: absolute; right: 18rpx; bottom: 0; left: 18rpx; min-height: 100%; padding: 18rpx 26rpx; border: 1rpx solid; border-radius: 28rpx; font-size: 19rpx; font-weight: 750; text-align: right; pointer-events: none; }
+.support-stack-safety { bottom: 0; border-color: var(--tt-color-pastel-rose-stroke); background: var(--tt-color-pastel-rose-bg); color: var(--tt-color-pastel-rose-fg); }
+.support-stack-service { right: 9rpx; bottom: 8rpx; left: 9rpx; border-color: var(--tt-color-pastel-blue-stroke); background: var(--tt-color-pastel-blue-bg); color: var(--tt-color-pastel-blue-fg); }
+.support-hero { position: relative; z-index: 2; }
+.public-support-card { border-radius: 24rpx; }
+.wechat-complaint-card,.form-card { border-radius: 24rpx; box-shadow: none; }
+.case-card { box-shadow: none; }
+.support-page.tt-motion-off .public-support-card,
+.support-page.tt-motion-off .hero-button,
+.support-page.tt-motion-off .hero-link,
+.support-page.tt-motion-off .public-action,
+.support-page.tt-motion-off .case-card { animation: none; transition: none; transform: none; }

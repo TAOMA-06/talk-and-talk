@@ -1,20 +1,28 @@
-<view class="page aftercare-page">
+<view class="page aftercare-page {{motionOff ? 'tt-motion-off' : ''}}">
   <view wx:if="{{loading}}" class="empty">正在读取服务后状态…</view>
   <view wx:elif="{{error}}" class="empty">
     <view>{{error}}</view>
     <button class="retry-button" bindtap="load">重新读取服务后状态</button>
   </view>
   <view wx:elif="{{order}}">
-    <view class="aftercare-hero">
-      <view class="hero-kicker">服务后的回声</view>
-      <view class="hero-title">{{companionName}} · {{serviceName}}</view>
-      <view wx:if="{{order.status === 'refunded'}}" class="hero-copy">订单已退款。历史反馈仍可查看，但不能再新建评价、私密体验反馈或确认完成；客服与安全入口继续保留。</view>
-      <view wx:else class="hero-copy">完成于 {{completedAtText}}。评价、私密体验反馈、售后和安全案件彼此独立。</view>
+    <view class="aftercare-story-stage tt-motion-{{order.status === 'refunded' ? 'm0' : 'm3'}}">
+      <view class="story-stage-label"><text>服务后</text><tt-cartoon-prop wx:if="{{order.status !== 'refunded'}}" kind="sprout" tone="mint" size="sm" motion="none" motion-off="{{motionOff}}" expressive risk="standard" /></view>
+      <tt-card-stage layout="stack" min-height="340" motion-level="{{order.status === 'refunded' ? 'm0' : 'm3'}}" entrance="rise" active motion-off="{{motionOff}}" risk="{{order.status === 'refunded' ? 'high' : 'standard'}}" aria-label="服务后反馈卡组">
+        <view slot="back" class="story-stage-layer"><view class="story-side-card story-private">私密</view></view>
+        <view slot="middle" class="story-stage-layer"><view class="story-side-card story-public">公开</view></view>
+        <view slot="front" class="story-stage-layer">
+          <view class="aftercare-hero">
+            <view class="hero-kicker">服务完成</view>
+            <view class="hero-title">{{companionName}} · {{serviceName}}</view>
+            <view wx:if="{{order.status === 'refunded'}}" class="hero-copy">已退款 · 不能新增反馈或确认完成</view>
+            <view wx:else class="hero-copy">{{completedAtText}}</view>
+          </view>
+        </view>
+      </tt-card-stage>
     </view>
 
-    <view class="card">
-      <view class="section-title">这次体验更接近哪一格？</view>
-      <view class="section-copy">同一评分可用于私密履约反馈和公开评价；你仍可以只提交其中一项。</view>
+    <view class="card rating-card">
+      <view class="section-title">体验评分</view>
       <view class="rating-row">
         <button wx:for="{{ratingOptions}}" wx:key="value" class="rating {{item.selected ? 'selected' : ''}}" data-value="{{item.value}}" disabled="{{order.status !== 'completed' || feedbackState === 'available'}}" bindtap="selectRating" aria-label="选择 {{item.value}} 分">{{item.value}}</button>
       </view>
@@ -22,13 +30,13 @@
 
     <view class="card private-card">
       <view class="heading-row"><view class="section-title">私密体验反馈</view><view class="private-badge">仅平台可见</view></view>
-      <view class="section-copy">用于核对履约质量，不会公开展示，也不会自动改变退款、结算或订单状态。</view>
-      <view wx:if="{{feedbackState === 'loading'}}" class="resource-state" aria-live="polite">正在核对是否已提交私密体验反馈…</view>
+      <view class="section-copy">仅平台可见，不改变订单或退款。</view>
+      <view wx:if="{{feedbackState === 'loading'}}" class="resource-state" aria-live="polite">正在核对…</view>
       <view wx:elif="{{feedbackState === 'error'}}" class="resource-state resource-error" aria-live="polite">
         <view>{{feedbackError}}</view>
         <button class="retry-button" bindtap="load" aria-label="重新读取订单与私密体验反馈状态">重新读取反馈状态</button>
       </view>
-      <view wx:elif="{{feedbackState === 'available' && order.experienceFeedback}}" class="submitted-note">已记录：{{order.experienceFeedback.rating}} 分。需要平台处理时，请另行提交客服案件。</view>
+      <view wx:elif="{{feedbackState === 'available' && order.experienceFeedback}}" class="submitted-note">已记录 {{order.experienceFeedback.rating}} 分</view>
       <view wx:elif="{{feedbackState === 'empty' && canSubmitExperience}}">
         <view class="tag-row">
           <button wx:for="{{feedbackTagOptions}}" wx:key="value" class="tag {{item.selected ? 'selected' : ''}}" data-value="{{item.value}}" bindtap="toggleFeedbackTag">{{item.label}}</button>
@@ -36,13 +44,13 @@
         <textarea class="feedback-input" value="{{feedbackNote}}" maxlength="200" placeholder="可选：补充不超过 200 字的履约感受" bindinput="setFeedbackNote"></textarea>
         <button class="primary-button full-button" loading="{{submittingFeedback}}" bindtap="submitPrivateFeedback">提交私密体验反馈</button>
       </view>
-      <view wx:else class="submitted-note">当前订单不再接受新的私密体验反馈；需要平台处理时请使用客服或安全入口。</view>
+      <view wx:else class="submitted-note">当前不可新增私密反馈</view>
     </view>
 
     <view class="card public-card">
       <view class="heading-row"><view class="section-title">公开评价</view><view class="public-badge">审核后展示</view></view>
-      <view class="section-copy">请避免公开个人隐私、联系方式、医疗信息或争议证据；需要平台处理请使用客服案件。</view>
-      <view wx:if="{{reviewState === 'loading'}}" class="resource-state" aria-live="polite">正在核对是否已提交公开评价…</view>
+      <view class="section-copy">勿写隐私、联系方式或争议证据。</view>
+      <view wx:if="{{reviewState === 'loading'}}" class="resource-state" aria-live="polite">正在核对…</view>
       <view wx:elif="{{reviewState === 'error'}}" class="resource-state resource-error" aria-live="polite">
         <view>{{reviewError}}</view>
         <button class="retry-button" bindtap="retryReview" aria-label="重新读取公开评价状态">重新读取评价状态</button>
@@ -52,18 +60,18 @@
         <textarea class="feedback-input" value="{{publicReviewContent}}" maxlength="1000" placeholder="写下真实、克制的服务体验" bindinput="setPublicReview"></textarea>
         <button class="primary-button full-button" loading="{{submittingReview}}" bindtap="submitPublicReview">提交公开评价</button>
       </view>
-      <view wx:else class="submitted-note">当前订单不再接受新的公开评价；已提交内容不会在这里伪造或补写。</view>
+      <view wx:else class="submitted-note">当前不可新增评价</view>
     </view>
 
     <view class="card action-card">
-      <view class="section-title">后续操作</view>
+      <view class="section-title">下一步</view>
       <button wx:if="{{canConfirmCompletion}}" class="secondary-button full-button" loading="{{confirmingCompletion}}" bindtap="confirmCompletion">确认服务完成</button>
-      <view wx:elif="{{order.customerConfirmedAt}}" class="submitted-note">你已确认服务完成；售后期限没有因此缩短。</view>
-      <view wx:else class="submitted-note">订单已退款，无需也不能再确认服务完成。</view>
-      <button class="secondary-button full-button" bindtap="rebook">重新核对商品和时段后再约</button>
-      <button wx:if="{{canRefund}}" class="secondary-button full-button" bindtap="requestRefund">提交售后退款申请</button>
-      <button class="secondary-button full-button" bindtap="openSupport">需要平台协助</button>
-      <button class="safety-button full-button" bindtap="openSafety">提交安全问题</button>
+      <view wx:elif="{{order.customerConfirmedAt}}" class="submitted-note">已确认完成 · 售后期限不变</view>
+      <view wx:else class="submitted-note">已退款 · 无需确认完成</view>
+      <button class="secondary-button full-button" bindtap="rebook">再次预约</button>
+      <button wx:if="{{canRefund}}" class="secondary-button full-button" bindtap="requestRefund">申请退款</button>
+      <button class="secondary-button full-button" bindtap="openSupport">平台协助</button>
+      <button class="safety-button full-button" bindtap="openSafety">安全问题</button>
     </view>
   </view>
 </view>

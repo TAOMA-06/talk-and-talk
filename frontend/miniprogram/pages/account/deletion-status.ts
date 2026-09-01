@@ -4,6 +4,7 @@ const DEFAULT_MESSAGE = "该登录标识暂不可使用，请联系客服";
 
 Page({
   data: {
+    motionOff: false,
     message: DEFAULT_MESSAGE
   },
   onShow() {

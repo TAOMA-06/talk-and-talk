@@ -1,0 +1,6 @@
+:host { display: block; min-width: 0; }
+.fact-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12rpx; }
+.fact-label { color: inherit; font-size: 21rpx; font-weight: 700; letter-spacing: .6rpx; line-height: 1.4; }
+.fact-value { margin-top: 18rpx; font-size: 32rpx; font-weight: 700; line-height: 1.25; font-variant-numeric: tabular-nums; }
+.fact-description { margin-top: 10rpx; font-size: 23rpx; line-height: 1.5; }
+.fact-meta { margin-top: 14rpx; color: inherit; font-size: 21rpx; line-height: 1.45; }

@@ -123,6 +123,7 @@ function present(dispute: AttendanceDispute | null) {
 
 Page({
   data: {
+    motionOff: false,
     orderId: "",
     dispute: null as AttendanceDispute | null,
     view: null as ReturnType<typeof present>,

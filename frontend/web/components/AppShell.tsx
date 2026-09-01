@@ -236,25 +236,18 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 <small>有边界的线上陪伴</small>
               </span>
             </div>
-            <p>
-              女性友好的线上陪伴平台。网页说明品牌、路径与边界；
-              服务开放状态请以微信小程序页面与正式公告为准；身份核验通道完成前不开放新预约、支付或聊天。
-            </p>
+            <p>女性友好的线上陪伴平台。当前状态以微信小程序为准。</p>
           </div>
           <div className="footer-nav-groups">
             <div>
               <strong>产品</strong>
               <Link href="/how-it-works">服务如何运作</Link>
               <Link href="/about">公开信息</Link>
-              <span>微信搜索 Talk&amp;Talk</span>
-              <span>官网不提供预约、支付或聊天</span>
             </div>
             <div>
               <strong>信任</strong>
               <Link href="/safety">安全与支持</Link>
-              <Link href="/how-it-works">服务边界与路径</Link>
-              <span>重要互动留在平台内</span>
-              <span>仅面向 18+ 用户</span>
+              <a href={TERMS_URL} target="_blank" rel="noreferrer">平台规则</a>
             </div>
             <div>
               <strong>公司</strong>
@@ -275,7 +268,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
           <p className="footer-bottom">
-            © 2026 Talk&amp;Talk · 官方网站 · 所有互动与交易均应在平台内完成
+            © 2026 Talk&amp;Talk · 官方网站
           </p>
         </footer>
 

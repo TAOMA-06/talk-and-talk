@@ -345,6 +345,7 @@ function bookingButtonText(
 
 Page({
   data: {
+    motionOff: false,
     companion: null as Companion | null, reviews: [] as Review[], loading: true, error: "", booking: false,
     reviewPage: 1,
     reviewTotal: 0,

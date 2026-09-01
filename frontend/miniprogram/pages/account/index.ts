@@ -256,6 +256,7 @@ function invoiceOrderOptions(orders: InvoiceCandidateOrder[]): InvoiceOrderOptio
 
 Page({
   data: {
+    motionOff: false,
     user: null as AuthUser | null,
     avatarText: "我",
     displayName: "微信用户",

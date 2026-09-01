@@ -8,6 +8,8 @@ import { Fraunces, Noto_Sans_SC } from "next/font/google";
 import AppShell from "../components/AppShell";
 import { publicDisclosure } from "../lib/public-disclosure";
 import "./globals.css";
+import "./styles/ui3-marketing.css";
+import "./styles/ui4-theatre.css";
 
 const displayFont = Fraunces({
   subsets: ["latin"],

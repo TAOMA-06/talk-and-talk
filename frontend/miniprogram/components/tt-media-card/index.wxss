@@ -1,11 +1,107 @@
-.media-card { display: flex; gap: 22rpx; padding: 24rpx 0; border-bottom: 1rpx solid var(--tt-border); }
+:host { display: block; min-width: 0; }
+.media-frame {
+  --media-fg: var(--tt-text);
+  --media-secondary: var(--tt-text-secondary);
+  --media-meta: var(--tt-text-tertiary);
+  --media-bg: var(--tt-surface);
+  --media-stroke: var(--tt-border);
+  --media-depth-near: var(--tt-color-depth-neutral-near);
+  --media-depth-far: var(--tt-color-depth-neutral-far);
+  --depth-x: 0rpx;
+  --depth-y: 0rpx;
+  --depth-near-x: 0rpx;
+  --depth-near-y: 0rpx;
+  --depth-far-x: 0rpx;
+  --depth-far-y: 0rpx;
+  position: relative;
+  min-width: 0;
+  padding-right: var(--depth-x);
+  padding-bottom: var(--depth-y);
+  isolation: isolate;
+}
+.media-depth {
+  position: absolute;
+  top: 0;
+  right: var(--depth-x);
+  bottom: var(--depth-y);
+  left: 0;
+  border: 1rpx solid var(--media-stroke);
+  border-radius: 22rpx;
+  pointer-events: none;
+}
+.media-depth-far { z-index: 1; background: var(--media-depth-far); transform: translate(var(--depth-far-x), var(--depth-far-y)); }
+.media-depth-near { z-index: 2; background: var(--media-depth-near); transform: translate(var(--depth-near-x), var(--depth-near-y)); }
+.media-card {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  gap: 22rpx;
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid var(--media-stroke);
+  background: var(--media-bg);
+}
+.variant-card,
+.variant-compact,
+.variant-horizontal { padding: 22rpx; border: 1rpx solid var(--media-stroke); border-radius: 22rpx; }
+.variant-compact { gap: 16rpx; padding: 18rpx; }
+.variant-horizontal { min-width: 540rpx; }
+
+.tone-neutral { --media-bg: var(--tt-surface-alt); --media-fg: var(--tt-text); --media-secondary: var(--tt-text-secondary); --media-meta: var(--tt-text-tertiary); }
+.tone-blue { --media-fg: var(--tt-color-pastel-blue-fg); --media-secondary: var(--tt-color-pastel-blue-fg); --media-meta: var(--tt-color-pastel-blue-fg); --media-bg: var(--tt-color-pastel-blue-bg); --media-stroke: var(--tt-color-pastel-blue-stroke); --media-depth-near: var(--tt-color-pastel-blue-bg); --media-depth-far: var(--tt-color-pastel-blue-stroke); }
+.tone-apricot { --media-fg: var(--tt-color-pastel-apricot-fg); --media-secondary: var(--tt-color-pastel-apricot-fg); --media-meta: var(--tt-color-pastel-apricot-fg); --media-bg: var(--tt-color-pastel-apricot-bg); --media-stroke: var(--tt-color-pastel-apricot-stroke); --media-depth-near: var(--tt-color-pastel-apricot-bg); --media-depth-far: var(--tt-color-pastel-apricot-stroke); }
+.tone-mint { --media-fg: var(--tt-color-pastel-mint-fg); --media-secondary: var(--tt-color-pastel-mint-fg); --media-meta: var(--tt-color-pastel-mint-fg); --media-bg: var(--tt-color-pastel-mint-bg); --media-stroke: var(--tt-color-pastel-mint-stroke); --media-depth-near: var(--tt-color-pastel-mint-bg); --media-depth-far: var(--tt-color-pastel-mint-stroke); }
+.tone-lavender { --media-fg: var(--tt-color-pastel-lavender-fg); --media-secondary: var(--tt-color-pastel-lavender-fg); --media-meta: var(--tt-color-pastel-lavender-fg); --media-bg: var(--tt-color-pastel-lavender-bg); --media-stroke: var(--tt-color-pastel-lavender-stroke); --media-depth-near: var(--tt-color-pastel-lavender-bg); --media-depth-far: var(--tt-color-pastel-lavender-stroke); }
+.tone-butter { --media-fg: var(--tt-color-pastel-butter-fg); --media-secondary: var(--tt-color-pastel-butter-fg); --media-meta: var(--tt-color-pastel-butter-fg); --media-bg: var(--tt-color-pastel-butter-bg); --media-stroke: var(--tt-color-pastel-butter-stroke); --media-depth-near: var(--tt-color-pastel-butter-bg); --media-depth-far: var(--tt-color-pastel-butter-stroke); }
+.tone-rose { --media-fg: var(--tt-color-pastel-rose-fg); --media-secondary: var(--tt-color-pastel-rose-fg); --media-meta: var(--tt-color-pastel-rose-fg); --media-bg: var(--tt-color-pastel-rose-bg); --media-stroke: var(--tt-color-pastel-rose-stroke); --media-depth-near: var(--tt-color-pastel-rose-bg); --media-depth-far: var(--tt-color-pastel-rose-stroke); }
+.depth-low { --depth-x: 6rpx; --depth-y: 8rpx; --depth-near-x: 3rpx; --depth-near-y: 4rpx; --depth-far-x: 6rpx; --depth-far-y: 8rpx; }
+.depth-mid { --depth-x: 12rpx; --depth-y: 16rpx; --depth-near-x: 6rpx; --depth-near-y: 8rpx; --depth-far-x: 12rpx; --depth-far-y: 16rpx; }
+.depth-high { --depth-x: 18rpx; --depth-y: 24rpx; --depth-near-x: 9rpx; --depth-near-y: 12rpx; --depth-far-x: 18rpx; --depth-far-y: 24rpx; }
+.depth-low .media-card { box-shadow: var(--tt-shadow-card-low); }
+.depth-mid .media-card { box-shadow: var(--tt-shadow-card-mid); }
+.depth-high .media-card { box-shadow: var(--tt-shadow-card-high); }
+.selected .media-card { border-width: 3rpx; border-color: var(--tt-color-action-primary-bg); }
+.media-frame:focus { outline: 3rpx solid var(--tt-color-focus-ring); outline-offset: 3rpx; }
+.media-frame:not(.motion-off) { transition: transform var(--tt-motion-press) var(--tt-ease-standard), opacity var(--tt-motion-press) var(--tt-ease-standard); }
+.media-frame.media-pressed:not(.motion-off) { opacity: .92; transform: scale(.985); }
+.motion-m2.entrance-rise.risk-standard:not(.motion-off) { animation: media-rise var(--tt-motion-standard) var(--tt-ease-emphasis) both; }
+.motion-m3.entrance-rise.risk-standard:not(.motion-off) { animation: media-rise var(--tt-motion-emphasis) var(--tt-ease-emphasis) both; }
+.motion-m3.entrance-deal-left.risk-standard:not(.motion-off),
+.motion-m4.entrance-deal-left.risk-standard:not(.motion-off) { animation: media-deal-left var(--tt-motion-hero) var(--tt-ease-playful) both; }
+.motion-m3.entrance-deal-right.risk-standard:not(.motion-off),
+.motion-m4.entrance-deal-right.risk-standard:not(.motion-off) { animation: media-deal-right var(--tt-motion-hero) var(--tt-ease-playful) both; }
+.stagger-1 { animation-delay: var(--tt-motion-delay-1) !important; }
+.stagger-2 { animation-delay: var(--tt-motion-delay-2) !important; }
+.stagger-3 { animation-delay: var(--tt-motion-delay-3) !important; }
+.stagger-4 { animation-delay: var(--tt-motion-delay-4) !important; }
+.stagger-5 { animation-delay: var(--tt-motion-delay-5) !important; }
+@keyframes media-rise {
+  from { opacity: 0; transform: translateY(22rpx) scale(.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes media-deal-left {
+  from { opacity: 0; transform: translateX(-92rpx) translateY(44rpx) rotate(-3deg) scale(.93); }
+  to { opacity: 1; transform: translateX(0) translateY(0) rotate(0) scale(1); }
+}
+@keyframes media-deal-right {
+  from { opacity: 0; transform: translateX(92rpx) translateY(44rpx) rotate(3deg) scale(.93); }
+  to { opacity: 1; transform: translateX(0) translateY(0) rotate(0) scale(1); }
+}
+
 .media-copy { min-width: 0; flex: 1; }
 .media-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 14rpx; }
-.media-title { color: var(--tt-text); font-size: 30rpx; font-weight: 700; line-height: 1.35; }
-.media-subtitle { margin-top: 5rpx; color: var(--tt-text-secondary); font-size: 23rpx; font-weight: 600; }
-.media-description { display: -webkit-box; margin-top: 12rpx; overflow: hidden; color: var(--tt-text-secondary); font-size: 24rpx; line-height: 1.5; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.media-title { color: var(--media-fg); font-size: 30rpx; font-weight: 700; line-height: 1.35; }
+.media-subtitle { margin-top: 5rpx; color: var(--media-secondary); font-size: 23rpx; font-weight: 600; }
+.media-description { display: -webkit-box; margin-top: 12rpx; overflow: hidden; color: var(--media-secondary); font-size: 24rpx; line-height: 1.5; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .media-bottom { margin-top: 14rpx; }
 .media-price-row { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; }
-.media-price { color: var(--tt-accent); font-size: 25rpx; font-weight: 700; white-space: nowrap; }
-.media-meta { display: block; margin-top: 7rpx; color: var(--tt-text-tertiary); font-size: 21rpx; line-height: 1.45; overflow-wrap: anywhere; }
-.media-arrow { color: var(--tt-text-tertiary); font-size: 34rpx; font-weight: 300; }
+.media-price { color: var(--media-fg); font-size: 25rpx; font-weight: 700; white-space: nowrap; }
+.media-meta { display: block; margin-top: 7rpx; color: var(--media-meta); font-size: 21rpx; line-height: 1.45; overflow-wrap: anywhere; }
+.media-arrow { color: var(--media-meta); font-size: 34rpx; font-weight: 300; }
+.motion-off,
+.motion-off.media-pressed { animation: none; transition: none; }
+.risk-high { animation: none; }
+.motion-off.media-pressed { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  .media-frame,
+  .media-frame.media-pressed { animation: none; transition: none; transform: none; }
+}

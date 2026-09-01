@@ -1,0 +1,17 @@
+<view
+  class="card-stage layout-{{layout}} motion-{{motionLevel}} entrance-{{entrance}} risk-{{risk}} {{active ? 'is-active' : ''}} {{motionOff ? 'motion-off' : ''}}"
+  style="min-height: {{minHeight}}rpx;"
+  aria-role="group"
+  aria-label="{{ariaLabel}}"
+>
+  <view class="stage-layer stage-back">
+    <view class="stage-motion"><view class="stage-hit"><slot name="back" /></view></view>
+  </view>
+  <view class="stage-layer stage-middle">
+    <view class="stage-motion"><view class="stage-hit"><slot name="middle" /></view></view>
+  </view>
+  <view class="stage-layer stage-front">
+    <view class="stage-motion"><view class="stage-hit"><slot name="front" /></view></view>
+  </view>
+  <view class="stage-prop"><slot name="prop" /></view>
+</view>

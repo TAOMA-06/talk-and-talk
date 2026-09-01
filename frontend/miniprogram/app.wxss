@@ -1,29 +1,97 @@
 page {
-  --tt-bg: #f7f5f2;
-  --tt-surface: #ffffff;
-  --tt-surface-alt: #f0eeeb;
-  --tt-surface-raised: #fffcf9;
-  --tt-text: #171717;
-  --tt-text-secondary: #64615d;
-  --tt-text-tertiary: #8a857f;
-  --tt-border: #e2dfda;
-  --tt-border-strong: #cbc6c0;
-  --tt-accent: #c65345;
-  --tt-accent-pressed: #a94439;
-  --tt-accent-soft: #f8e8e4;
-  --tt-on-accent: #ffffff;
-  --tt-success: #2f6b55;
-  --tt-success-soft: #eaf4ef;
-  --tt-warning: #8a6426;
-  --tt-warning-soft: #f8f0df;
-  --tt-danger: #a33d45;
-  --tt-danger-soft: #f8e8e9;
-  --tt-info: #466a7f;
-  --tt-info-soft: #e8f0f4;
+  --tt-color-bg-canvas: #f6f4f1;
+  --tt-color-bg-surface: #fffefc;
+  --tt-color-bg-surface-alt: #efeeea;
+  --tt-color-bg-surface-raised: #fffdf9;
+  --tt-color-fg-primary: #232220;
+  --tt-color-fg-secondary: #5c5954;
+  --tt-color-fg-tertiary: #706c66;
+  --tt-color-stroke-subtle: #dcd8d2;
+  --tt-color-stroke-control: #979189;
+  --tt-color-action-primary-bg: #292724;
+  --tt-color-action-primary-pressed: #171614;
+  --tt-color-action-primary-fg: #ffffff;
+  --tt-color-focus-ring: #315c73;
+  --tt-color-pastel-blue-bg: #dde8f2;
+  --tt-color-pastel-blue-fg: #314f67;
+  --tt-color-pastel-blue-stroke: #bdd0e0;
+  --tt-color-pastel-apricot-bg: #f1ded5;
+  --tt-color-pastel-apricot-fg: #6b4237;
+  --tt-color-pastel-apricot-stroke: #dfc0b2;
+  --tt-color-pastel-mint-bg: #ddece3;
+  --tt-color-pastel-mint-fg: #315447;
+  --tt-color-pastel-mint-stroke: #bed4c7;
+  --tt-color-pastel-lavender-bg: #e9e1f0;
+  --tt-color-pastel-lavender-fg: #574668;
+  --tt-color-pastel-lavender-stroke: #d3c4e0;
+  --tt-color-pastel-butter-bg: #f3eacd;
+  --tt-color-pastel-butter-fg: #67551f;
+  --tt-color-pastel-butter-stroke: #ded09f;
+  --tt-color-pastel-rose-bg: #f0dfe5;
+  --tt-color-pastel-rose-fg: #68424f;
+  --tt-color-pastel-rose-stroke: #ddbfca;
+  --tt-color-status-success-bg: #e2efe7;
+  --tt-color-status-success-fg: #2f5c44;
+  --tt-color-status-success-stroke: #bfd7c8;
+  --tt-color-status-info-bg: #e1ebf2;
+  --tt-color-status-info-fg: #31556b;
+  --tt-color-status-info-stroke: #c0d3df;
+  --tt-color-status-warning-bg: #f4ecd6;
+  --tt-color-status-warning-fg: #705821;
+  --tt-color-status-warning-stroke: #ddc98e;
+  --tt-color-status-danger-bg: #f3e2e2;
+  --tt-color-status-danger-fg: #7a393d;
+  --tt-color-status-danger-stroke: #dfbdbf;
+  --tt-color-status-unknown-bg: #ece9e4;
+  --tt-color-status-unknown-fg: #57524c;
+  --tt-color-status-unknown-stroke: #d3cec7;
+  --tt-color-depth-neutral-near: #e8e2dc;
+  --tt-color-depth-neutral-far: #d8d0c8;
+  --tt-shadow-card-low: 0 8rpx 20rpx rgba(68, 58, 50, .08), 0 2rpx 5rpx rgba(68, 58, 50, .05);
+  --tt-shadow-card-mid: 0 18rpx 38rpx rgba(68, 58, 50, .12), 0 6rpx 14rpx rgba(68, 58, 50, .07);
+  --tt-shadow-card-high: 0 28rpx 54rpx rgba(68, 58, 50, .16), 0 10rpx 24rpx rgba(68, 58, 50, .09);
+  --tt-overlay-scrim: rgba(14, 15, 16, .46);
+  --tt-overlay-scrim-strong: rgba(14, 15, 16, .58);
+  --tt-color-action-tint: rgba(49, 79, 103, .1);
+  --tt-motion-instant: 0ms;
+  --tt-motion-press: 140ms;
+  --tt-motion-standard: 260ms;
+  --tt-motion-emphasis: 420ms;
+  --tt-motion-hero: 620ms;
+  --tt-motion-stagger: 70ms;
+  --tt-motion-delay-1: 70ms;
+  --tt-motion-delay-2: 140ms;
+  --tt-motion-delay-3: 210ms;
+  --tt-motion-delay-4: 280ms;
+  --tt-motion-delay-5: 350ms;
+  --tt-ease-standard: cubic-bezier(.2, .72, .24, 1);
+  --tt-ease-emphasis: cubic-bezier(.16, 1, .3, 1);
+  --tt-ease-playful: cubic-bezier(.2, 1.12, .32, 1);
+  --tt-bg: var(--tt-color-bg-canvas);
+  --tt-surface: var(--tt-color-bg-surface);
+  --tt-surface-alt: var(--tt-color-bg-surface-alt);
+  --tt-surface-raised: var(--tt-color-bg-surface-raised);
+  --tt-text: var(--tt-color-fg-primary);
+  --tt-text-secondary: var(--tt-color-fg-secondary);
+  --tt-text-tertiary: var(--tt-color-fg-tertiary);
+  --tt-border: var(--tt-color-stroke-subtle);
+  --tt-border-strong: var(--tt-color-stroke-control);
+  --tt-accent: var(--tt-color-action-primary-bg);
+  --tt-accent-pressed: var(--tt-color-action-primary-pressed);
+  --tt-accent-soft: var(--tt-color-pastel-apricot-bg);
+  --tt-on-accent: var(--tt-color-action-primary-fg);
+  --tt-success: var(--tt-color-status-success-fg);
+  --tt-success-soft: var(--tt-color-status-success-bg);
+  --tt-warning: var(--tt-color-status-warning-fg);
+  --tt-warning-soft: var(--tt-color-status-warning-bg);
+  --tt-danger: var(--tt-color-status-danger-fg);
+  --tt-danger-soft: var(--tt-color-status-danger-bg);
+  --tt-info: var(--tt-color-status-info-fg);
+  --tt-info-soft: var(--tt-color-status-info-bg);
   min-height: 100%;
-  background: #f7f5f2;
+  background: #f6f4f1;
   background: var(--tt-bg);
-  color: #171717;
+  color: #232220;
   color: var(--tt-text);
   font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "PingFang SC", sans-serif;
   font-size: 28rpx;
@@ -33,29 +101,59 @@ page {
 
 @media (prefers-color-scheme: dark) {
   page {
-    --tt-bg: #0e0f10;
-    --tt-surface: #17191b;
-    --tt-surface-alt: #202326;
-    --tt-surface-raised: #1d2022;
-    --tt-text: #f5f3f0;
-    --tt-text-secondary: #a6a29d;
-    --tt-text-tertiary: #7d7f82;
-    --tt-border: #2b2e31;
-    --tt-border-strong: #3b3f43;
-    --tt-accent: #ff8a78;
-    --tt-accent-pressed: #ff9d8e;
-    --tt-accent-soft: #3a2421;
-    --tt-on-accent: #23100d;
-    --tt-success: #74b596;
-    --tt-success-soft: #1d3028;
-    --tt-warning: #d9b36c;
-    --tt-warning-soft: #342b1d;
-    --tt-danger: #ff858a;
-    --tt-danger-soft: #3a2225;
-    --tt-info: #83b0c8;
-    --tt-info-soft: #1f3038;
-    background: #0e0f10;
-    color: #f5f3f0;
+    --tt-color-bg-canvas: #121312;
+    --tt-color-bg-surface: #1b1c1a;
+    --tt-color-bg-surface-alt: #232521;
+    --tt-color-bg-surface-raised: #20221f;
+    --tt-color-fg-primary: #f3f1ed;
+    --tt-color-fg-secondary: #b9b4ac;
+    --tt-color-fg-tertiary: #9a958d;
+    --tt-color-stroke-subtle: #343630;
+    --tt-color-stroke-control: #6b6f67;
+    --tt-color-action-primary-bg: #f3f1ed;
+    --tt-color-action-primary-pressed: #ffffff;
+    --tt-color-action-primary-fg: #151618;
+    --tt-color-focus-ring: #9fc6dc;
+    --tt-color-pastel-blue-bg: #242f3a;
+    --tt-color-pastel-blue-fg: #cadcee;
+    --tt-color-pastel-blue-stroke: #405468;
+    --tt-color-pastel-apricot-bg: #372a26;
+    --tt-color-pastel-apricot-fg: #f0d1c5;
+    --tt-color-pastel-apricot-stroke: #64483f;
+    --tt-color-pastel-mint-bg: #24332b;
+    --tt-color-pastel-mint-fg: #c9e4d4;
+    --tt-color-pastel-mint-stroke: #405b4c;
+    --tt-color-pastel-lavender-bg: #302a38;
+    --tt-color-pastel-lavender-fg: #e2d3ee;
+    --tt-color-pastel-lavender-stroke: #554762;
+    --tt-color-pastel-butter-bg: #34301f;
+    --tt-color-pastel-butter-fg: #e9dcab;
+    --tt-color-pastel-butter-stroke: #5d5533;
+    --tt-color-pastel-rose-bg: #35292d;
+    --tt-color-pastel-rose-fg: #eccdd6;
+    --tt-color-pastel-rose-stroke: #5f4650;
+    --tt-color-status-success-bg: #1d3028;
+    --tt-color-status-success-fg: #9ed0b8;
+    --tt-color-status-success-stroke: #365845;
+    --tt-color-status-info-bg: #1f3038;
+    --tt-color-status-info-fg: #b4d2e1;
+    --tt-color-status-info-stroke: #3e6070;
+    --tt-color-status-warning-bg: #342b1d;
+    --tt-color-status-warning-fg: #e3c98f;
+    --tt-color-status-warning-stroke: #665531;
+    --tt-color-status-danger-bg: #3a2225;
+    --tt-color-status-danger-fg: #f3b6ba;
+    --tt-color-status-danger-stroke: #744149;
+    --tt-color-status-unknown-bg: #2a2927;
+    --tt-color-status-unknown-fg: #c8c3bc;
+    --tt-color-status-unknown-stroke: #4b4843;
+    --tt-color-depth-neutral-near: #343630;
+    --tt-color-depth-neutral-far: #292b27;
+    --tt-shadow-card-low: 0 8rpx 20rpx rgba(0, 0, 0, .18), 0 2rpx 5rpx rgba(0, 0, 0, .12);
+    --tt-shadow-card-mid: 0 18rpx 38rpx rgba(0, 0, 0, .26), 0 6rpx 14rpx rgba(0, 0, 0, .16);
+    --tt-shadow-card-high: 0 28rpx 54rpx rgba(0, 0, 0, .34), 0 10rpx 24rpx rgba(0, 0, 0, .2);
+    background: #121312;
+    color: #f3f1ed;
   }
 }
 
@@ -82,10 +180,17 @@ button {
   font-weight: 600;
   line-height: 1.35;
   overflow-wrap: anywhere;
-  transition: transform 160ms ease, opacity 160ms ease, background-color 160ms ease;
+  transition: transform var(--tt-motion-press) var(--tt-ease-standard), opacity var(--tt-motion-press) var(--tt-ease-standard);
 }
 
 button::after { border: 0; }
+button:focus,
+input:focus,
+textarea:focus,
+[tabindex="0"]:focus {
+  outline: 3rpx solid var(--tt-color-focus-ring);
+  outline-offset: 3rpx;
+}
 button.button-hover,
 button:active { opacity: .86; transform: scale(.985); }
 button[loading] { opacity: .68; }
@@ -165,6 +270,12 @@ textarea {
 }
 
 .tt-surface-alt { background: var(--tt-surface-alt); }
+.tt-tone-blue { border-color: var(--tt-color-pastel-blue-stroke); background: var(--tt-color-pastel-blue-bg); color: var(--tt-color-pastel-blue-fg); }
+.tt-tone-apricot { border-color: var(--tt-color-pastel-apricot-stroke); background: var(--tt-color-pastel-apricot-bg); color: var(--tt-color-pastel-apricot-fg); }
+.tt-tone-mint { border-color: var(--tt-color-pastel-mint-stroke); background: var(--tt-color-pastel-mint-bg); color: var(--tt-color-pastel-mint-fg); }
+.tt-tone-lavender { border-color: var(--tt-color-pastel-lavender-stroke); background: var(--tt-color-pastel-lavender-bg); color: var(--tt-color-pastel-lavender-fg); }
+.tt-tone-butter { border-color: var(--tt-color-pastel-butter-stroke); background: var(--tt-color-pastel-butter-bg); color: var(--tt-color-pastel-butter-fg); }
+.tt-tone-rose { border-color: var(--tt-color-pastel-rose-stroke); background: var(--tt-color-pastel-rose-bg); color: var(--tt-color-pastel-rose-fg); }
 .tt-divider { height: 1rpx; background: var(--tt-border); }
 .tt-row { display: flex; align-items: center; gap: 20rpx; }
 .tt-row-between { display: flex; align-items: center; justify-content: space-between; gap: 20rpx; }
@@ -225,6 +336,7 @@ textarea {
 .tt-status-warning { background: var(--tt-warning-soft); color: var(--tt-warning); }
 .tt-status-danger { background: var(--tt-danger-soft); color: var(--tt-danger); }
 .tt-status-info { background: var(--tt-info-soft); color: var(--tt-info); }
+.tt-status-unknown { background: var(--tt-color-status-unknown-bg); color: var(--tt-color-status-unknown-fg); }
 
 .empty,
 .tt-state {
@@ -237,12 +349,94 @@ textarea {
 }
 
 .tt-safe-bottom { padding-bottom: calc(24rpx + env(safe-area-inset-bottom)); }
-.tt-animate-in { animation: tt-fade-up 240ms ease both; }
-@keyframes tt-fade-up {
-  from { opacity: 0; transform: translateY(12rpx); }
-  to { opacity: 1; transform: translateY(0); }
+
+/* UI 4.0 motion primitives. Apply entrance classes only when content is ready. */
+.tt-motion-m0 { --tt-local-motion-duration: var(--tt-motion-instant); }
+.tt-motion-m1 { --tt-local-motion-duration: var(--tt-motion-press); }
+.tt-motion-m2 { --tt-local-motion-duration: var(--tt-motion-standard); }
+.tt-motion-m3 { --tt-local-motion-duration: var(--tt-motion-emphasis); }
+.tt-motion-m4 { --tt-local-motion-duration: var(--tt-motion-hero); }
+.tt-stagger-0 { animation-delay: var(--tt-motion-instant); }
+.tt-stagger-1 { animation-delay: var(--tt-motion-delay-1); }
+.tt-stagger-2 { animation-delay: var(--tt-motion-delay-2); }
+.tt-stagger-3 { animation-delay: var(--tt-motion-delay-3); }
+.tt-stagger-4 { animation-delay: var(--tt-motion-delay-4); }
+.tt-stagger-5 { animation-delay: var(--tt-motion-delay-5); }
+.tt-animate-in,
+.tt-enter-rise { animation: tt-enter-rise var(--tt-motion-standard) var(--tt-ease-emphasis) both; }
+.tt-enter-soft { animation: tt-enter-soft var(--tt-motion-standard) var(--tt-ease-standard) both; }
+.tt-enter-deal-left { animation: tt-enter-deal-left var(--tt-motion-emphasis) var(--tt-ease-playful) both; }
+.tt-enter-deal-center { animation: tt-enter-deal-center var(--tt-motion-emphasis) var(--tt-ease-playful) both; }
+.tt-enter-deal-right { animation: tt-enter-deal-right var(--tt-motion-emphasis) var(--tt-ease-playful) both; }
+.tt-enter-assemble { animation: tt-enter-assemble var(--tt-motion-hero) var(--tt-ease-emphasis) both; }
+.tt-state-transition { animation: tt-state-settle var(--tt-motion-standard) var(--tt-ease-emphasis) both; }
+.tt-pressable { transition: transform var(--tt-motion-press) var(--tt-ease-standard), opacity var(--tt-motion-press) var(--tt-ease-standard); }
+.tt-pressable:active { opacity: .88; transform: scale(.985); }
+
+@keyframes tt-enter-rise {
+  from { opacity: 0; transform: translateY(18rpx) scale(.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
+@keyframes tt-enter-soft {
+  from { opacity: 0; transform: scale(.975); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes tt-enter-deal-left {
+  from { opacity: 0; transform: translateX(-72rpx) translateY(34rpx) rotate(-3deg) scale(.94); }
+  to { opacity: 1; transform: translateX(0) translateY(0) rotate(0) scale(1); }
+}
+@keyframes tt-enter-deal-center {
+  from { opacity: 0; transform: translateY(76rpx) scale(.94); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes tt-enter-deal-right {
+  from { opacity: 0; transform: translateX(72rpx) translateY(38rpx) rotate(3deg) scale(.94); }
+  to { opacity: 1; transform: translateX(0) translateY(0) rotate(0) scale(1); }
+}
+@keyframes tt-enter-assemble {
+  from { opacity: 0; transform: translateY(52rpx) scale(.92); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes tt-state-settle {
+  from { opacity: 0; transform: translateY(8rpx) scale(.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.tt-motion-off .tt-animate-in,
+.tt-motion-off .tt-enter-rise,
+.tt-motion-off .tt-enter-soft,
+.tt-motion-off .tt-enter-deal-left,
+.tt-motion-off .tt-enter-deal-center,
+.tt-motion-off .tt-enter-deal-right,
+.tt-motion-off .tt-enter-assemble,
+.tt-motion-off .tt-state-transition,
+.tt-motion-off .tt-pressable,
+.tt-motion-off.tt-animate-in,
+.tt-motion-off.tt-enter-rise,
+.tt-motion-off.tt-enter-soft,
+.tt-motion-off.tt-enter-deal-left,
+.tt-motion-off.tt-enter-deal-center,
+.tt-motion-off.tt-enter-deal-right,
+.tt-motion-off.tt-enter-assemble,
+.tt-motion-off.tt-state-transition,
+.tt-motion-off.tt-pressable {
+  animation: none;
+  transition: none;
+}
+.tt-motion-off .tt-pressable:active,
+.tt-motion-off.tt-pressable:active { opacity: 1; transform: none; }
+
 @media (prefers-reduced-motion: reduce) {
   button,
-  .tt-animate-in { animation: none; transition: none; transform: none; }
+  .tt-animate-in,
+  .tt-enter-rise,
+  .tt-enter-soft,
+  .tt-enter-deal-left,
+  .tt-enter-deal-center,
+  .tt-enter-deal-right,
+  .tt-enter-assemble,
+  .tt-state-transition,
+  .tt-pressable { animation: none; transition: none; }
+  button:active,
+  .tt-pressable:active { opacity: 1; transform: none; }
 }

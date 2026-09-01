@@ -1,0 +1,18 @@
+:host { display: block; }
+.section-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 20rpx; }
+.heading-copy { min-width: 0; flex: 1; }
+.heading-kicker { margin-bottom: 8rpx; color: var(--tt-text-secondary); font-size: 21rpx; font-weight: 700; letter-spacing: 2rpx; }
+.heading-title { color: var(--tt-text); font-size: 34rpx; font-weight: 700; letter-spacing: -.4rpx; line-height: 1.3; }
+.heading-description { margin-top: 7rpx; color: var(--tt-text-secondary); font-size: 23rpx; line-height: 1.55; }
+.heading-action { min-height: 64rpx; padding: 10rpx 12rpx; border: 0; background: transparent; color: var(--tt-text); font-size: 23rpx; white-space: nowrap; }
+.heading-action:focus { outline: 3rpx solid var(--tt-color-focus-ring); outline-offset: 3rpx; }
+.is-active.motion-m2.risk-standard:not(.motion-off),
+.is-active.motion-m3.risk-standard:not(.motion-off),
+.is-active.motion-m4.risk-standard:not(.motion-off) { animation: heading-arrive var(--tt-motion-standard) var(--tt-ease-emphasis) both; }
+@keyframes heading-arrive {
+  from { opacity: 0; transform: translateY(12rpx); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.motion-off,
+.risk-high { animation: none; transition: none; }
+@media (prefers-reduced-motion: reduce) { .section-heading { animation: none; transition: none; } }

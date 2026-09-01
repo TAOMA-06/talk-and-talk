@@ -216,6 +216,7 @@ for (const voiceEvidenceConfig of [
 
 const staticAssets = [
   "config/transactional-template-manifest.js",
+  "public/ops-foundation.css",
   "public/admin/index.html",
   "public/admin/assets/app.js",
   "public/admin/assets/styles.css",

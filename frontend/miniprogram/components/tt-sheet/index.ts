@@ -5,7 +5,9 @@ Component({
     title: { type: String, value: "" },
     subtitle: { type: String, value: "" },
     closable: { type: Boolean, value: true },
-    maskClosable: { type: Boolean, value: true }
+    maskClosable: { type: Boolean, value: true },
+    motionLevel: { type: String, value: "m1" },
+    motionOff: { type: Boolean, value: false }
   },
   methods: {
     close() { if (this.data.closable) this.triggerEvent("close"); },

@@ -1,5 +1,7 @@
 # Talk&Talk Mini Program UI 2.0
 
+> Historical baseline retained for the accepted UI 2.0 evidence matrix. The active redesign system is [`UI3_DESIGN_SYSTEM.md`](./UI3_DESIGN_SYSTEM.md).
+
 ## Direction
 
 Apple-like hierarchy and restraint with native WeChat interaction behavior. Consumer surfaces lead with calm editorial content; companion tools use the same tokens with a denser operational layout.

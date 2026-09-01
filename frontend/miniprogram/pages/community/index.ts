@@ -54,6 +54,7 @@ function offerIdentityRecovery(error: unknown): void {
 
 Page({
   data: {
+    motionOff: false,
     publicInteractionIdentityAvailable: clientPublicInteractionIdentityGrantsAvailable(),
     posts: [] as CommunityPost[], recommendations: [] as DisplayRecommendation[], topic: "", content: "", kind: "femaleRequest",
     reportReceipts: [] as CommunityReportReceiptView[], reportReceiptsError: "",

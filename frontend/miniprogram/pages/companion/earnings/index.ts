@@ -73,6 +73,7 @@ function errorMessage(error: unknown, fallback: string): string {
 
 Page({
   data: {
+    motionOff: false,
     loading: true,
     error: "",
     commercialStatus: "",

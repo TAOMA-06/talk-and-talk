@@ -1,4 +1,4 @@
-<view class="cell {{disabled ? 'cell-disabled' : ''}}" aria-role="{{disabled ? '' : 'button'}}" tabindex="{{disabled ? -1 : 0}}" bindtap="onTap">
+<view class="cell {{disabled ? 'cell-disabled' : ''}}" aria-role="{{disabled ? '' : 'button'}}" aria-label="{{title}}，{{subtitle}}，{{meta}}" aria-disabled="{{disabled}}" tabindex="{{disabled ? -1 : 0}}" bindtap="onTap">
   <slot name="leading"></slot>
   <view class="cell-copy">
     <view class="cell-title">{{title}}</view>

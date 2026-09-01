@@ -1,0 +1,21 @@
+:host { display: block; min-width: 0; }
+.card-grid { min-width: 0; }
+.layout-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.layout-grid-three { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.layout-mosaic { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+.layout-stack { display: flex; flex-direction: column; }
+.layout-rail { display: flex; width: max-content; align-items: stretch; }
+.layout-theatre { display: grid; grid-template-columns: minmax(0, 1.18fr) minmax(0, .82fr); align-items: start; }
+.gap-tight { gap: 12rpx; }
+.gap-standard { gap: 18rpx; }
+.gap-roomy { gap: 24rpx; }
+.is-active.motion-m2.risk-standard:not(.motion-off),
+.is-active.motion-m3.risk-standard:not(.motion-off),
+.is-active.motion-m4.risk-standard:not(.motion-off) { animation: grid-settle var(--tt-motion-standard) var(--tt-ease-emphasis) both; }
+@keyframes grid-settle {
+  from { opacity: 0; transform: translateY(18rpx) scale(.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.motion-off,
+.risk-high { animation: none; transition: none; }
+@media (prefers-reduced-motion: reduce) { .card-grid { animation: none; transition: none; } }
