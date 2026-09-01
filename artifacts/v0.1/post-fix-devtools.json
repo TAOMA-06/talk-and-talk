@@ -1,0 +1,20 @@
+{
+  "passed": true,
+  "capturedAt": "2026-09-01T04:22:19.573Z",
+  "route": "pages/consent/index",
+  "actualPath": "pages/consent/index",
+  "screenshot": "artifacts/v0.1/devtools-post-fix-consent.png",
+  "screenshotSha256": "919ad3ebf0223ba5c8bc2c45ba2eba88fad131c85b2713dabe28c57cc4db6a19",
+  "screenshotDimensions": {
+    "width": 780,
+    "height": 1506
+  },
+  "sourceDigest": "aaf718cd943eb3bbedd433aa16495bd22665b2ceface2a9db88fe026906de638",
+  "localCopyDigest": "aaf718cd943eb3bbedd433aa16495bd22665b2ceface2a9db88fe026906de638",
+  "comparedFiles": 275,
+  "consoleEventCount": 5,
+  "sourceSelectorWarningCount": 0,
+  "sourceSelectorWarnings": [],
+  "selectorContract": ".motion-off targets .action-secondary and .action-primary classes; component tag, ID and attribute selectors are rejected by ui2-audit.mjs",
+  "boundary": "Official WeChat DevTools simulator and source-warning check; not Preview, Upload, real-device, FPS, API, identity, order or payment evidence."
+}

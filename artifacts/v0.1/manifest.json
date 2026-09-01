@@ -1,0 +1,584 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-01T06:55:55.921Z",
+  "capture": {
+    "tool": "WeChat DevTools App.captureScreenshot via miniprogram-automator",
+    "devtools": "Stable 2.01.2510290",
+    "simulator": {
+      "model": "iPhone 12/13 (Pro)",
+      "SDKVersion": "3.17.2",
+      "theme": "light",
+      "windowWidth": 390,
+      "windowHeight": 753,
+      "pixelRatio": 3
+    },
+    "fixture": "anonymous consent for route 01; legal-only fail-closed for routes 02-31",
+    "realIdentityToken": false,
+    "realRoleSession": false,
+    "realOrderOrPaymentData": false,
+    "localApiStarted": false,
+    "interpretation": "Real route rendering evidence, not business-flow success."
+  },
+  "routes": [
+    {
+      "index": 1,
+      "name": "01-consent",
+      "route": "/pages/consent/index",
+      "actualPath": "pages/consent/index",
+      "file": "artifacts/v0.1/screens/01-consent.png",
+      "source": "artifacts/ui4-visual-evidence/matrix/390/light/01-consent.png",
+      "sha256": "919ad3ebf0223ba5c8bc2c45ba2eba88fad131c85b2713dabe28c57cc4db6a19",
+      "bytes": 196412,
+      "dimensions": {
+        "width": 780,
+        "height": 1506
+      },
+      "captureState": "anonymous consent"
+    },
+    {
+      "index": 2,
+      "name": "02-home",
+      "route": "/pages/home/index",
+      "actualPath": "pages/home/index",
+      "file": "artifacts/v0.1/screens/02-home.png",
+      "source": "artifacts/ui4-visual-evidence/matrix/390/light/02-home.png",
+      "sha256": "f2489e5697f714d385d89af1a55019ab5c2de4d48353b76a113e5328c286aa16",
+      "bytes": 140482,
+      "dimensions": {
+        "width": 780,
+        "height": 1342
+      },
+      "captureState": "legal-only fail-closed"
+    },
+    {
+      "index": 3,
+      "name": "03-discover",
+      "route": "/pages/discover/index",
+      "actualPath": "pages/discover/index",
+      "file": "artifacts/v0.1/screens/03-discover.png",
+      "source": "artifacts/ui4-visual-evidence/matrix/390/light/03-discover.png",
+      "sha256": "d8179cd31582703f700000014ad9a1b33ae0fcf67b9ee839bde155019906f1bb",
+      "bytes": 126053,
+      "dimensions": {
+        "width": 780,
+        "height": 1342
+      },
+      "captureState": "legal-only fail-closed"
+    },
+    {
+      "index": 4,
+      "name": "04-community",
+      "route": "/pages/community/index",
+      "actualPath": "pages/community/index",
+      "file": "artifacts/v0.1/screens/04-community.png",
+      "source": "artifacts/ui4-visual-evidence/matrix/390/light/04-community.png",
+      "sha256": "b300504581641ccbeb0bd9eab5c1d66016c05afcd01bb8889e126a7ce13382b1",
+      "bytes": 120968,
+      "dimensions": {
+        "width": 780,
+        "height": 1506
+      },
+      "captureState": "legal-only fail-closed"
+    },
+    {
+      "index": 5,
+      "name": "05-orders",
+      "route": "/pages/orders/index",
+      "actualPath": "pages/orders/index",
+      "file": "artifacts/v0.1/screens/05-orders.png",
+      "source": "artifacts/ui4-visual-evidence/matrix/390/light/05-orders.png",
+      "sha256": "c14178f6342f45bebf5767665fdca724a396d3f351383f56e14741d1b1c159b9",
+      "bytes": 44364,
+      "dimensions": {
+        "width": 780,
+        "height": 1342
+      },
+      "captureState": "legal-only fail-closed"
+    },
+    {
+      "index": 6,
+      "name": "06-order-detail",
+      "route": "/pages/order/detail?id=demo-20260828-u1-order-paid",
+      "actualPath": "pages/order/detail",
+      "file": "artifacts/v0.1/screens/06-order-detail.png",
+      "source": "artifacts/ui4-visual-evidence/matrix/390/light/06-order-detail.png",
+      "sha256": "f444ded760b372ed56bb564407cd74a0f3322b0f7deafab09bb245b56684cbf1",
+      "bytes": 26616,
+      "dimensions": {
+        "width": 780,
+        "height": 1506
+      },
+      "captureState": "legal-only fail-closed"
+    },
+    {
+      "index": 7,
+      "name": "07-order-payment",
+      "route": "/pages/order/payment?orderId=demo-20260828-u1-order-pending",
+      "actualPath": "pages/order/payment",
+      "file": "artifacts/v0.1/screens/07-order-payment.png",
+      "source": "artifacts/ui4-visual-evidence/matrix/390/light/07-order-payment.png",
+      "sha256": "6b291fb81d34003ec67cb13bc910904752737db80eb0a53191373813255a8be4",
+      "bytes": 69690,
+      "dimensions": {
+        "width": 780,
+        "height": 1506
+      },
+      "captureState": "legal-only fail-closed"
+    },
+    {
+      "index": 8,
+      "name": "08-order-aftercare",
+      "route": "/pages/order/aftercare?orderId=demo-20260828-u1-order-refunded",
+      "actualPath": "pages/order/aftercare",
+      "file": "artifacts/v0.1/screens/08-order-aftercare.png",
+      "source": "artifacts/ui4-visual-evidence/matrix/390/light/08-order-aftercare.png",
+      "sha256": "658e1c861abe4319c3b21fa4ebed8327015171e32770a8d1e1a7d66febc667d6",
+      "bytes": 31443,
+      "dimensions": {
+        "width": 780,
+        "height": 1506
+      },
+      "captureState": "legal-only fail-closed"
+    },
+    {
+      "index": 9,
+      "name": "09-order-dispute",
+      "route": "/pages/order/dispute?orderId=demo-20260828-u1-order-refunded",
+      "actualPath": "pages/order/dispute",
+      "file": "artifacts/v0.1/screens/09-order-dispute.png",
+      "source": "artifacts/ui4-visual-evidence/matrix/390/light/09-order-dispute.png",
+      "sha256": "591f03f0dc90f4e4b8b50abb75607c5cc1683e6bf70f96c4d5892763081038b4",
+      "bytes": 26760,
+      "dimensions": {
+        "width": 780,
+        "height": 1506
+      },
+      "captureState": "legal-only fail-closed"
+    },
+    {
+      "index": 10,
+      "name": "10-messages",
+      "route": "/pages/messages/index",
+      "actualPath": "pages/messages/index",
+      "file": "artifacts/v0.1/screens/10-messages.png",
+      "source": "artifacts/ui4-visual-evidence/matrix/390/light/10-messages.png",
+      "sha256": "e76a35c4b2df73cae8350692ff7abe2c6c36c806c86077f2a2831bfe7ed895ad",
+      "bytes": 114790,
+      "dimensions": {
+        "width": 780,
+        "height": 1342
+      },
+      "captureState": "legal-only fail-closed"
+    },
+    {
+      "index": 11,
+      "name": "11-notifications",
+      "route": "/pages/notifications/index",
+      "actualPath": "pages/notifications/index",
+      "file": "artifacts/v0.1/screens/11-notifications.png",
+      "source": "artifacts/ui4-visual-evidence/matrix/390/light/11-notifications.png",
+      "sha256": "c205e5991a0d4bd4dfde1ef1a42ed17d76ce96d530c2a294f88891792b401f2c",
+      "bytes": 94910,
+      "dimensions": {
+        "width": 780,
+        "height": 1506
+      },
+      "captureState": "legal-only fail-closed"
+    },
+    {
+      "index": 12,
+      "name": "12-profile",
+      "route": "/pages/profile/index",
+      "actualPath": "pages/profile/index",
+      "file": "artifacts/v0.1/screens/12-profile.png",
+      "source": "artifacts/ui4-visual-evidence/matrix/390/light/12-profile.png",
+      "sha256": "362772e28e9fafadcd444758caecb0a26c7cf53650f627d7298a749b75565224",
+      "bytes": 37349,
+      "dimensions": {
+        "width": 780,
+        "height": 1342
+      },
+      "captureState": "legal-only fail-closed"
+    },
+    {
+      "index": 13,
+      "name": "13-account",
+      "route": "/pages/account/index",
+      "actualPath": "pages/account/index",
+      "file": "artifacts/v0.1/screens/13-account.png",
+      "source": "artifacts/ui4-visual-evidence/matrix/390/light/13-account.png",
+      "sha256": "af2c0416c0d7312a546ddc9acb8320d2b4bf31d223d31ba1b195b3a0f7474d6c",
+      "bytes": 45021,
+      "dimensions": {
+        "width": 780,
+        "height": 1506
+      },
+      "captureState": "legal-only fail-closed"
+    },
+    {
+      "index": 14,
+      "name": "14-adult-eligibility",
+      "route": "/pages/account/adult-eligibility",
+      "actualPath": "pages/account/adult-eligibility",
+      "file": "artifacts/v0.1/screens/14-adult-eligibility.png",
+      "source": "artifacts/ui4-visual-evidence/matrix/390/light/14-adult-eligibility.png",
+      "sha256": "7ea799d2a45b45f37cfe23a94e7e8c5cf1a8bee2b2ceba01468daed9f3128df4",
+      "bytes": 53987,
+      "dimensions": {
+        "width": 780,
+        "height": 1506
+      },
+      "captureState": "legal-only fail-closed"
+    },
+    {
+      "index": 15,
+      "name": "15-deletion-status",
+      "route": "/pages/account/deletion-status",
+      "actualPath": "pages/account/deletion-status",
+      "file": "artifacts/v0.1/screens/15-deletion-status.png",
+      "source": "artifacts/ui4-visual-evidence/matrix/390/light/15-deletion-status.png",
+      "sha256": "2381bcf795444fb7ae9b91356e7fcdb424667f3e5f6dd7e689b58e45dfeecbdc",
+      "bytes": 104847,
+      "dimensions": {
+        "width": 780,
+        "height": 1506
+      },
+      "captureState": "legal-only fail-closed"
+    },
+    {
+      "index": 16,
+      "name": "16-safety",
+      "route": "/pages/safety/index",
+      "actualPath": "pages/safety/index",
+      "file": "artifacts/v0.1/screens/16-safety.png",
+      "source": "artifacts/ui4-visual-evidence/matrix/390/light/16-safety.png",
+      "sha256": "a5866de0038d238c9a101af22ee9f59264749b043913217be1a77f4ec2d0b8dd",
+      "bytes": 202641,
+      "dimensions": {
+        "width": 780,
+        "height": 1506
+      },
+      "captureState": "legal-only fail-closed"
+    },
+    {
+      "index": 17,
+      "name": "17-crisis",
+      "route": "/pages/crisis/index",
+      "actualPath": "pages/crisis/index",
+      "file": "artifacts/v0.1/screens/17-crisis.png",
+      "source": "artifacts/ui4-visual-evidence/matrix/390/light/17-crisis.png",
+      "sha256": "d33ad9059d224e25cc6f63999c796a7c611a8ff44d2e65da0e2cce0d58ee4ecf",
+      "bytes": 287759,
+      "dimensions": {
+        "width": 780,
+        "height": 1506
+      },
+      "captureState": "legal-only fail-closed"
+    },
+    {
+      "index": 18,
+      "name": "18-support",
+      "route": "/pages/support/index",
+      "actualPath": "pages/support/index",
+      "file": "artifacts/v0.1/screens/18-support.png",
+      "source": "artifacts/ui4-visual-evidence/matrix/390/light/18-support.png",
+      "sha256": "3d0649b1ded4abd1d8d9b5c3909866698dc11a30ae3e7850e7b9a16cca5b6942",
+      "bytes": 128330,
+      "dimensions": {
+        "width": 780,
+        "height": 1506
+      },
+      "captureState": "legal-only fail-closed"
+    },
+    {
+      "index": 19,
+      "name": "19-support-detail",
+      "route": "/pages/support/detail?id=demo-20260828-u1-support-resolved",
+      "actualPath": "pages/support/detail",
+      "file": "artifacts/v0.1/screens/19-support-detail.png",
+      "source": "artifacts/ui4-visual-evidence/matrix/390/light/19-support-detail.png",
+      "sha256": "0ff31b572c819aa79bda814b9d8cf5ec206bdd81b345344256b5e3562ed37c9f",
+      "bytes": 32295,
+      "dimensions": {
+        "width": 780,
+        "height": 1506
+      },
+      "captureState": "legal-only fail-closed"
+    },
+    {
+      "index": 20,
+      "name": "20-companion-detail",
+      "route": "/pages/companion/detail?id=c1",
+      "actualPath": "pages/companion/detail",
+      "file": "artifacts/v0.1/screens/20-companion-detail.png",
+      "source": "artifacts/ui4-visual-evidence/matrix/390/light/20-companion-detail.png",
+      "sha256": "256b5b0c13b873b325fefd02d0e8b1029b3285fbd2b387261be92a5d9eaf6e7e",
+      "bytes": 80854,
+      "dimensions": {
+        "width": 780,
+        "height": 1506
+      },
+      "captureState": "legal-only fail-closed"
+    },
+    {
+      "index": 21,
+      "name": "21-companion-workbench",
+      "route": "/pages/companion/workbench/index",
+      "actualPath": "pages/companion/workbench/index",
+      "file": "artifacts/v0.1/screens/21-companion-workbench.png",
+      "source": "artifacts/ui4-visual-evidence/matrix/390/light/21-companion-workbench.png",
+      "sha256": "fd16975a98436565b885c6a5944ed93e9b4de7db5fcb173df4f00e7bea245bf4",
+      "bytes": 39614,
+      "dimensions": {
+        "width": 780,
+        "height": 1506
+      },
+      "captureState": "legal-only fail-closed"
+    },
+    {
+      "index": 22,
+      "name": "22-companion-onboarding",
+      "route": "/pages/companion/onboarding/index",
+      "actualPath": "pages/companion/onboarding/index",
+      "file": "artifacts/v0.1/screens/22-companion-onboarding.png",
+      "source": "artifacts/ui4-visual-evidence/matrix/390/light/22-companion-onboarding.png",
+      "sha256": "604e9786b3cd81e663b6ed710b7d18bace306aab572439aaf7c78df84a62ffdb",
+      "bytes": 39830,
+      "dimensions": {
+        "width": 780,
+        "height": 1506
+      },
+      "captureState": "legal-only fail-closed"
+    },
+    {
+      "index": 23,
+      "name": "23-companion-schedule",
+      "route": "/pages/companion/schedule/index",
+      "actualPath": "pages/companion/schedule/index",
+      "file": "artifacts/v0.1/screens/23-companion-schedule.png",
+      "source": "artifacts/ui4-visual-evidence/matrix/390/light/23-companion-schedule.png",
+      "sha256": "e6bf9be019a66f823d7258ba96e780b54f28611742e8fc2975ab1f03a167b2e2",
+      "bytes": 39807,
+      "dimensions": {
+        "width": 780,
+        "height": 1506
+      },
+      "captureState": "legal-only fail-closed"
+    },
+    {
+      "index": 24,
+      "name": "24-companion-development",
+      "route": "/pages/companion/development/index",
+      "actualPath": "pages/companion/development/index",
+      "file": "artifacts/v0.1/screens/24-companion-development.png",
+      "source": "artifacts/ui4-visual-evidence/matrix/390/light/24-companion-development.png",
+      "sha256": "5f385a661240a7c091ba805ce103f3375d2faf074fb7f87ccb2755ad4e564730",
+      "bytes": 36683,
+      "dimensions": {
+        "width": 780,
+        "height": 1506
+      },
+      "captureState": "legal-only fail-closed"
+    },
+    {
+      "index": 25,
+      "name": "25-companion-earnings",
+      "route": "/pages/companion/earnings/index",
+      "actualPath": "pages/companion/earnings/index",
+      "file": "artifacts/v0.1/screens/25-companion-earnings.png",
+      "source": "artifacts/ui4-visual-evidence/matrix/390/light/25-companion-earnings.png",
+      "sha256": "b791f49997d23c6f1804d002ecc23b4ad273711c51822b00decf9a724be02739",
+      "bytes": 43018,
+      "dimensions": {
+        "width": 780,
+        "height": 1506
+      },
+      "captureState": "legal-only fail-closed"
+    },
+    {
+      "index": 26,
+      "name": "26-companion-safety",
+      "route": "/pages/companion/safety/index",
+      "actualPath": "pages/companion/safety/index",
+      "file": "artifacts/v0.1/screens/26-companion-safety.png",
+      "source": "artifacts/ui4-visual-evidence/matrix/390/light/26-companion-safety.png",
+      "sha256": "1d91215163d34d1a8316c36cac36ab41effba601e576ef418f427dc1ad251b24",
+      "bytes": 41696,
+      "dimensions": {
+        "width": 780,
+        "height": 1506
+      },
+      "captureState": "legal-only fail-closed"
+    },
+    {
+      "index": 27,
+      "name": "27-companion-services",
+      "route": "/pages/companion/services/index",
+      "actualPath": "pages/companion/services/index",
+      "file": "artifacts/v0.1/screens/27-companion-services.png",
+      "source": "artifacts/ui4-visual-evidence/matrix/390/light/27-companion-services.png",
+      "sha256": "3b9db5c3bb5b68a215802e1f2e044bf0fd486a77f1677f2d1e26a237dadd0048",
+      "bytes": 35234,
+      "dimensions": {
+        "width": 780,
+        "height": 1506
+      },
+      "captureState": "legal-only fail-closed",
+      "visualStateGroup": "companion-ops-access-fail-closed",
+      "visualEquivalence": "Expected identical rendering under the legal-only fixture; routes remain distinct."
+    },
+    {
+      "index": 28,
+      "name": "28-companion-availability",
+      "route": "/pages/companion/availability/index",
+      "actualPath": "pages/companion/availability/index",
+      "file": "artifacts/v0.1/screens/28-companion-availability.png",
+      "source": "artifacts/ui4-visual-evidence/matrix/390/light/28-companion-availability.png",
+      "sha256": "3b9db5c3bb5b68a215802e1f2e044bf0fd486a77f1677f2d1e26a237dadd0048",
+      "bytes": 35234,
+      "dimensions": {
+        "width": 780,
+        "height": 1506
+      },
+      "captureState": "legal-only fail-closed",
+      "visualStateGroup": "companion-ops-access-fail-closed",
+      "visualEquivalence": "Expected identical rendering under the legal-only fixture; routes remain distinct."
+    },
+    {
+      "index": 29,
+      "name": "29-chat",
+      "route": "/pages/chat/index?id=c1",
+      "actualPath": "pages/chat/index",
+      "file": "artifacts/v0.1/screens/29-chat.png",
+      "source": "artifacts/ui4-visual-evidence/matrix/390/light/29-chat.png",
+      "sha256": "d64637ba027e82439b58c4f4abeed0a6fbc376d22ff9ffa5ea5c2ef161503c73",
+      "bytes": 102570,
+      "dimensions": {
+        "width": 780,
+        "height": 1506
+      },
+      "captureState": "legal-only fail-closed"
+    },
+    {
+      "index": 30,
+      "name": "30-voice",
+      "route": "/pages/voice/index?orderId=demo-20260828-u1-order-paid",
+      "actualPath": "pages/voice/index",
+      "file": "artifacts/v0.1/screens/30-voice.png",
+      "source": "artifacts/ui4-visual-evidence/matrix/390/light/30-voice.png",
+      "sha256": "c82beb46bae5a96dcc7c7a4eca5050c31a69a390d9f6cb83cfca685e5f8e20c2",
+      "bytes": 77263,
+      "dimensions": {
+        "width": 780,
+        "height": 1506
+      },
+      "captureState": "legal-only fail-closed"
+    },
+    {
+      "index": 31,
+      "name": "31-legal",
+      "route": "/pages/legal/index?type=privacy",
+      "actualPath": "pages/legal/index",
+      "file": "artifacts/v0.1/screens/31-legal.png",
+      "source": "artifacts/ui4-visual-evidence/matrix/390/light/31-legal.png",
+      "sha256": "5121a7b72cab3c5ea7de6f120f2138431f4c8d586b8a281526e217aecb6ca98d",
+      "bytes": 6802,
+      "dimensions": {
+        "width": 780,
+        "height": 1506
+      },
+      "captureState": "legal-only fail-closed"
+    }
+  ],
+  "integrity": {
+    "routeCount": 31,
+    "uniqueImageCount": 30,
+    "duplicateGroups": [
+      [
+        "27-companion-services",
+        "28-companion-availability"
+      ]
+    ]
+  },
+  "media": {
+    "overview": {
+      "file": "artifacts/v0.1/ui4-overview.png",
+      "sha256": "74ece971dc54809bcd757b77ccc80625522da292b3ba14a78f96c1e58cf65732",
+      "bytes": 217161,
+      "width": 1720,
+      "height": 960,
+      "frames": 1,
+      "loop": null,
+      "delayMs": null,
+      "role": "Public overview/contact sheet",
+      "sources": [
+        "screens/01-consent.png",
+        "screens/02-home.png",
+        "screens/16-safety.png"
+      ]
+    },
+    "gif": {
+      "file": "artifacts/v0.1/ui4-motion-demo.gif",
+      "sha256": "51649acc78b19804a915d76de0706ed5767937518b84603028910a3bc70a6489",
+      "bytes": 56340,
+      "width": 390,
+      "height": 671,
+      "frames": 6,
+      "loop": 0,
+      "delayMs": [
+        140,
+        140,
+        140,
+        140,
+        140,
+        1100
+      ],
+      "role": "Looping GitHub preview of a finite app entrance; not a continuous recording or FPS evidence.",
+      "sourceFrames": [
+        "artifacts/ui4-visual-evidence/dynamic/home-scene-deal/frame-01.png",
+        "artifacts/ui4-visual-evidence/dynamic/home-scene-deal/frame-02.png",
+        "artifacts/ui4-visual-evidence/dynamic/home-scene-deal/frame-03.png",
+        "artifacts/ui4-visual-evidence/dynamic/home-scene-deal/frame-04.png",
+        "artifacts/ui4-visual-evidence/dynamic/home-scene-deal/frame-05.png",
+        "artifacts/ui4-visual-evidence/dynamic/home-scene-deal/settled-a.png"
+      ],
+      "durationMs": 1800,
+      "repeats": "infinite GIF loop"
+    },
+    "video": {
+      "file": "artifacts/v0.1/talktalk-v0.1-motion-demo.mp4",
+      "sha256": "ced9997347e9fd03b3b1d045f03b92e4630ff187193d4ea6971f432a32e34b76",
+      "bytes": 63757,
+      "codec": "H.264",
+      "width": 540,
+      "height": 928,
+      "fps": 12,
+      "frames": 38,
+      "durationMs": 3166.6666666666665,
+      "hasAudio": false,
+      "role": "Finite editorial playback of deterministic UI4 entrance samples; not a continuous recording or FPS evidence.",
+      "sourceFrames": [
+        "artifacts/ui4-visual-evidence/dynamic/home-scene-deal/frame-01.png",
+        "artifacts/ui4-visual-evidence/dynamic/home-scene-deal/frame-02.png",
+        "artifacts/ui4-visual-evidence/dynamic/home-scene-deal/frame-03.png",
+        "artifacts/ui4-visual-evidence/dynamic/home-scene-deal/frame-04.png",
+        "artifacts/ui4-visual-evidence/dynamic/home-scene-deal/frame-05.png",
+        "artifacts/ui4-visual-evidence/dynamic/home-scene-deal/settled-a.png"
+      ]
+    },
+    "postFixDevTools": {
+      "file": "artifacts/v0.1/devtools-post-fix-consent.png",
+      "sha256": "919ad3ebf0223ba5c8bc2c45ba2eba88fad131c85b2713dabe28c57cc4db6a19",
+      "bytes": 196412,
+      "width": 780,
+      "height": 1506,
+      "frames": 1,
+      "loop": null,
+      "delayMs": null,
+      "usage": "Official post-fix DevTools simulator evidence; not a README hero.",
+      "verification": "artifacts/v0.1/post-fix-devtools.json",
+      "sourceDigest": "aaf718cd943eb3bbedd433aa16495bd22665b2ceface2a9db88fe026906de638",
+      "sourceSelectorWarningCount": 0
+    }
+  }
+}
