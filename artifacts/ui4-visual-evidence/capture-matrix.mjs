@@ -10,6 +10,7 @@ const waitMs = Math.max(400, Number(process.env.UI4_WAIT_MS || 900));
 const expectedTheme = process.env.UI4_THEME?.trim() || "light";
 const expectedWidth = Number(process.env.UI4_DEVICE_WIDTH || 390);
 const configuredOutputRoot = process.env.UI4_OUTPUT_ROOT?.trim();
+const skipScreenshot = /^(1|true|yes)$/i.test(process.env.UI4_SKIP_SCREENSHOT || "");
 const outputRoot = configuredOutputRoot
   ? resolve(configuredOutputRoot)
   : resolve(import.meta.dirname, "matrix", String(expectedWidth), expectedTheme);
@@ -106,14 +107,16 @@ try {
       await delay(waitMs);
       const current = await bounded(miniProgram.currentPage(), `${name}:current-page`);
       actualPath = page?.path || current?.path || "";
-      await bounded(miniProgram.pageScrollTo(0), `${name}:scroll-top`);
-      screenshotFile = `${name}.png`;
-      const screenshotPath = resolve(outputRoot, screenshotFile);
-      await unlink(screenshotPath).catch(() => undefined);
-      await bounded(miniProgram.screenshot({ path: screenshotPath }), `${name}:screenshot`, 25_000);
-      const buffer = await readFile(screenshotPath);
-      sha256 = createHash("sha256").update(buffer).digest("hex");
-      dimensions = pngDimensions(buffer);
+      if (!skipScreenshot) {
+        await bounded(miniProgram.pageScrollTo(0), `${name}:scroll-top`);
+        screenshotFile = `${name}.png`;
+        const screenshotPath = resolve(outputRoot, screenshotFile);
+        await unlink(screenshotPath).catch(() => undefined);
+        await bounded(miniProgram.screenshot({ path: screenshotPath }), `${name}:screenshot`, 25_000);
+        const buffer = await readFile(screenshotPath);
+        sha256 = createHash("sha256").update(buffer).digest("hex");
+        dimensions = pngDimensions(buffer);
+      }
       if (actualPath !== expectedPath) outcome = "redirected";
     } catch (captureError) {
       outcome = "failed";
@@ -141,7 +144,9 @@ try {
 
 const manifest = {
   generatedAt: new Date().toISOString(),
-  capture: "WeChat DevTools App.captureScreenshot via miniprogram-automator",
+  capture: skipScreenshot
+    ? "WeChat DevTools route/currentPage verification via miniprogram-automator"
+    : "WeChat DevTools App.captureScreenshot via miniprogram-automator",
   devtools: "Stable 2.01.2510290",
   simulator: {
     model: systemInfo?.model || null,
