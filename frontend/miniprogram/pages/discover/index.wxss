@@ -19,6 +19,14 @@
 .hero-copy { max-width: 540rpx; margin-top: 12rpx; color: var(--tt-color-pastel-lavender-fg); font-size: 24rpx; line-height: 1.56; }
 .garden-guide { display: flex; align-items: center; gap: 12rpx; margin-top: 20rpx; color: var(--tt-color-pastel-lavender-fg); font-size: 20rpx; font-weight: 650; }
 .garden-guide-line { width: 40rpx; height: 2rpx; background: currentColor; }
+.community-entry { display: flex; align-items: center; justify-content: space-between; gap: 20rpx; margin: 18rpx 0; padding: 24rpx 26rpx; border: 1rpx solid var(--tt-color-pastel-apricot-stroke); border-radius: 24rpx; background: var(--tt-color-pastel-apricot-bg); color: var(--tt-color-pastel-apricot-fg); transition: transform var(--tt-motion-press) var(--tt-ease-standard); }
+.community-entry:focus { outline: 4rpx solid var(--tt-focus); outline-offset: 4rpx; }
+.community-entry:active { transform: translateY(2rpx) scale(.992); }
+.community-entry-copy { min-width: 0; flex: 1; }
+.community-entry-kicker { font-size: 20rpx; font-weight: 800; letter-spacing: 1.6rpx; }
+.community-entry-title { margin-top: 8rpx; font-size: 30rpx; font-weight: 750; line-height: 1.35; }
+.community-entry-meta { margin-top: 6rpx; color: var(--tt-text-secondary); font-size: 21rpx; line-height: 1.5; }
+.community-entry-arrow { display: flex; width: 58rpx; height: 58rpx; flex: 0 0 58rpx; align-items: center; justify-content: center; border-radius: 999rpx; background: var(--tt-surface); color: var(--tt-color-pastel-apricot-fg); font-size: 40rpx; }
 .search-surface { position: relative; z-index: 4; padding: 20rpx; border: 1rpx solid var(--tt-border); border-radius: 24rpx; background: var(--tt-surface); }
 .search-row { display: flex; align-items: center; gap: 12rpx; }
 .search-input { min-width: 0; height: 84rpx; flex: 1; padding: 0 20rpx; border: 0; background: var(--tt-surface-alt); }
@@ -81,10 +89,12 @@
 .discover-root.tt-motion-off .result-deck-card,
 .discover-root.tt-motion-off .result-motion,
 .discover-root.tt-motion-off .active-filter,
+.discover-root.tt-motion-off .community-entry,
 .discover-root.tt-motion-off .filter-sheet,
 .discover-root.tt-motion-off .filter-mask { animation: none; transition: none; transform: none; }
 @media (prefers-reduced-motion: reduce) {
   .discovery-garden::before,.discovery-garden::after { display: none; }
+  .community-entry { transition: none; }
   .result-deck-card,.result-deck-0,.result-deck-1,.result-deck-2,.results-filtered .result-deck-card { transition: none; transform: none; }
   .filter-sheet,.filter-mask { animation: none; }
 }

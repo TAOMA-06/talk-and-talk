@@ -15,6 +15,7 @@ node_modules/
 backend/api/.env
 backend/api/.env.staging
 backend/api/.env.production
+backend/api/.env.cloudbase.*
 backend/api/dist/
 backend/api/coverage/
 backend/api/backups/
@@ -23,6 +24,9 @@ backend/api/backups/
 frontend/miniprogram/project.private.config.json
 frontend/miniprogram/miniprogram_npm/
 frontend/miniprogram-local/
+
+# Locally packaged handoff archives. The reproducible source project remains tracked.
+artifacts/delivery/*.zip
 
 # CloudBase CLI deployment manifests are environment-specific. Keep only the
 # reviewed, credential-free templates in version control.

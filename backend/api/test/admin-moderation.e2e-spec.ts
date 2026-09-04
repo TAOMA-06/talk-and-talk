@@ -945,8 +945,8 @@ describe("Admin Moderation (e2e)", () => {
 
     // This test exercises the review evidence boundary, not public message
     // admission. Seed the already-moderated records explicitly: production
-    // messaging must continue to fail closed until an approved, revocable
-    // identity authority exists.
+    // messaging admission is covered separately; seed the already-moderated
+    // record directly so this test stays focused on the review evidence boundary.
     const message = await prisma.message.create({
       data: {
         conversationId: conversation.id,

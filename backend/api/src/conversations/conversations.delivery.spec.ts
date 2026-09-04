@@ -1,4 +1,3 @@
-import * as publicInteractionIdentity from "../users/public-interaction-identity.gate";
 import { ConversationsService } from "./conversations.service";
 
 function moderationResult(decision: "allow" | "warn" | "review" | "block") {
@@ -15,21 +14,7 @@ function moderationResult(decision: "allow" | "warn" | "review" | "block") {
   } as any;
 }
 
-describe("ConversationsService moderation delivery state machine behind an approved identity adapter", () => {
-  let identityGateSpy: jest.SpyInstance;
-
-  beforeEach(() => {
-    // The first release deliberately rejects every legacy identity boolean. These
-    // tests isolate the downstream delivery state machine that remains ready for
-    // a future approved, independently bound identity adapter.
-    identityGateSpy = jest
-      .spyOn(publicInteractionIdentity, "assertPublicInteractionIdentity")
-      .mockImplementation(() => undefined);
-  });
-
-  afterEach(() => {
-    identityGateSpy.mockRestore();
-  });
+describe("ConversationsService moderation delivery state machine", () => {
 
   function setup(decision: "allow" | "warn" | "review" | "block") {
     const activeOrder = {
@@ -81,6 +66,9 @@ describe("ConversationsService moderation delivery state machine behind an appro
       ...data
     }));
     const db = {
+      user: {
+        findUnique: jest.fn().mockResolvedValue({ id: "user-1", accountStatus: "active" })
+      },
       conversationBlock: { findFirst: jest.fn().mockResolvedValue(null) },
       order: { findMany: jest.fn().mockResolvedValue([activeOrder]) },
       message: { create, update: jest.fn() },
@@ -191,6 +179,7 @@ describe("ConversationsService moderation delivery state machine behind an appro
     const { service, prisma, db } = setup("allow");
     prisma.$queryRaw.mockResolvedValueOnce([{ available: true }]);
     db.$queryRaw.mockReset()
+      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([{ available: false }]);
 

@@ -4,30 +4,24 @@ export type BackendConfig =
   | { transport: "https"; baseUrl: string }
   | { transport: "cloudRun"; envId: string; service: string; apiPrefix: string };
 
-/**
- * HTTPS remains the safe default and is also used by iOS and WeChat Pay callbacks.
- * `trial` intentionally targets staging so an experience build cannot mutate production.
- */
+/** HTTPS endpoints remain as an explicit fallback for non-CloudBase clients. */
 const HTTPS_BACKENDS: Record<MiniProgramEnvironment, string> = {
   develop: "https://api-staging.talkandtalk.app/api/v1",
   trial: "https://api-staging.talkandtalk.app/api/v1",
   release: "https://api.talkandtalk.app/api/v1"
 };
 
-/**
- * After creating the matching CloudBase environments, fill their IDs and switch the
- * corresponding flag to true. Release refuses an empty environment ID at runtime.
- */
+/** v1.0 uses the existing CloudBase environment for developer, trial and release builds. */
 const CLOUD_RUN_ENV_IDS: Record<MiniProgramEnvironment, string> = {
-  develop: "",
-  trial: "",
-  release: ""
+  develop: "talk-and-talk-staging-d6d04a14b8",
+  trial: "talk-and-talk-staging-d6d04a14b8",
+  release: "talk-and-talk-staging-d6d04a14b8"
 };
 
 const USE_CLOUD_RUN: Record<MiniProgramEnvironment, boolean> = {
-  develop: false,
-  trial: false,
-  release: false
+  develop: true,
+  trial: true,
+  release: true
 };
 
 const CLOUD_RUN_SERVICE = "talk-and-talk-api";
@@ -86,8 +80,8 @@ export function backendConfig(): BackendConfig {
 }
 
 export const LEGAL_URLS = {
-  privacy: "https://api.talkandtalk.app/legal/privacy.html",
-  terms: "https://api.talkandtalk.app/legal/terms.html"
+  privacy: "https://talk-and-talk-staging-d6d04a14b8-1428040864.tcloudbaseapp.com/legal/privacy.html",
+  terms: "https://talk-and-talk-staging-d6d04a14b8-1428040864.tcloudbaseapp.com/legal/terms.html"
 } as const;
 
 export const LEGAL_CONSENT_VERSION = "2.2-2026-08-01";
@@ -100,19 +94,6 @@ export const LEGAL_CONSENT_VERSION = "2.2-2026-08-01";
  * cannot reopen it in an experience build or a released Mini Program.
  */
 const COMMERCIAL_TEXT_ONLY_DEFAULT = true;
-
-/**
- * IDENTITY-R01/R02: no independently revocable identity authority is wired for
- * the first release. Keep every write UI that depends on public interaction
- * closed. A Developer Tools-only override exists solely so local smoke tests can
- * still exercise downstream flows; trial and release ignore it.
- */
-export function clientPublicInteractionIdentityGrantsAvailable(): boolean {
-  if (!isExplicitDevelopmentEnvironment()) return false;
-  return (globalThis as {
-    __TALK_AND_TALK_PUBLIC_INTERACTION_IDENTITY_AVAILABLE__?: boolean;
-  }).__TALK_AND_TALK_PUBLIC_INTERACTION_IDENTITY_AVAILABLE__ === true;
-}
 
 export function isCommercialTextOnly(): boolean {
   // `trial` is an externally consumable experience build and `release` is the

@@ -49,7 +49,7 @@ const required = [
   ["pages/order/detail", "查看履约争议详情"],
   ["pages/order/detail", "进入安全支付与结果页"],
   ["pages/orders/index", "保持原预约"],
-  ["pages/companion/detail", "新预约和支付暂不可用"],
+  ["pages/companion/detail", "仅创建待确认订单，不会扣款"],
   ["pages/crisis/index", "如果你或他人正处在危险中"],
   ["pages/account/adult-eligibility", "复核完成前，新的付费服务保持关闭"],
   ["pages/account/adult-eligibility", "提交成功不等于核验通过"],

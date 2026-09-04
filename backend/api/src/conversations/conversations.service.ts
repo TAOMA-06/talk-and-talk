@@ -12,7 +12,7 @@ import { MediaModerationWorker } from "../moderation/media/media-moderation.work
 import { ModerationCaseService } from "../moderation/moderation-case.service";
 import { ModerationService, ModerationResult } from "../moderation/moderation.service";
 import { NotificationsService } from "../notifications/notifications.service";
-import { assertPublicInteractionIdentity } from "../users/public-interaction-identity.gate";
+import { assertPublicInteractionAccountActive } from "../users/public-interaction-account.guard";
 import { ListConversationsDto } from "./dto/list-conversations.dto";
 import { ListMessagesQueryDto } from "./dto/list-messages.dto";
 import { ReserveMediaUploadDto } from "./dto/reserve-media-upload.dto";
@@ -491,9 +491,9 @@ export class ConversationsService {
     if (!user) {
       throw new AppException("UNAUTHORIZED", "User not found", HttpStatus.UNAUTHORIZED);
     }
-    // Real-time messaging requires the server identity signal before moderation,
-    // message rows, cases, or notifications are written.
-    assertPublicInteractionIdentity(user);
+    // Real-time messaging requires an active account before moderation, message
+    // rows, cases, or notifications are written.
+    assertPublicInteractionAccountActive(user);
     const isCompanion = conversation.companion.ownerUserId === userId;
 
     const [recentMessages, recentHighRiskBlocks] = await Promise.all([
@@ -532,6 +532,7 @@ export class ConversationsService {
 
     const result = await this.prisma.$transaction(async (tx) => {
       const db = tx as Db;
+      await this.lockAndAssertPublicInteractionSender(db, userId);
       await this.lockConversationBoundary(db, conversation.id);
       await this.assertConversationInteractionAvailable(conversation.id, db);
       const now = Date.now();
@@ -721,6 +722,22 @@ export class ConversationsService {
     if (typeof db.$queryRaw === "function") {
       await db.$queryRaw`SELECT "id" FROM "Conversation" WHERE "id" = ${conversationId} FOR UPDATE`;
     }
+  }
+
+  private async lockAndAssertPublicInteractionSender(db: Db, userId: string) {
+    if (typeof db.$queryRaw === "function") {
+      await db.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${userId} FOR UPDATE`;
+    }
+    const lockedUser = await db.user.findUnique({
+      where: { id: userId },
+      select: { accountStatus: true }
+    });
+    if (!lockedUser) {
+      throw new AppException("UNAUTHORIZED", "User not found", HttpStatus.UNAUTHORIZED);
+    }
+    // Re-read after taking the account row lock. Otherwise an account action
+    // that commits during moderation could still allow one final message write.
+    assertPublicInteractionAccountActive(lockedUser);
   }
 
   private async findAnyConversationBlock(conversationId: string, db: Db = this.prisma as any) {

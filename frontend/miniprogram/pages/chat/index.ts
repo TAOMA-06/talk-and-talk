@@ -1,17 +1,11 @@
 import { api, ApiError, currentUser, ensureSession, readLocalFile, uploadAuthorizedMedia } from "../../utils/api";
 import {
   clientChatMediaEnabled,
-  clientPublicInteractionIdentityGrantsAvailable,
   isCommercialTextOnly
 } from "../../utils/config";
 import { openCrisisResources } from "../../utils/crisis-gate";
 import { ChatMessage } from "../../utils/models";
 import { ensurePrivacyAuthorization } from "../../utils/privacy";
-import {
-  isPublicInteractionIdentityError,
-  publicInteractionErrorUserMessage,
-  publicInteractionRecoveryPath
-} from "../../utils/public-interaction-errors";
 import { sha256Hex } from "../../utils/sha256";
 import { requestTransactionalSubscriptions } from "../../utils/subscription";
 
@@ -97,7 +91,6 @@ Page({
     mediaUploading: false,
     mediaEnabled: false,
     textOnly: isCommercialTextOnly(),
-    publicInteractionIdentityAvailable: clientPublicInteractionIdentityGrantsAvailable(),
     messageNotificationsMuted: false,
     messageNotificationUpdating: false,
     conversationBlockedByYou: false,
@@ -394,28 +387,9 @@ Page({
       wx.showToast({ title: "当前会话无法继续收发消息", icon: "none" });
       return;
     }
-    if (isPublicInteractionIdentityError(error as ApiError)) {
-      const recoveryPath = publicInteractionRecoveryPath(error as ApiError);
-      wx.showModal({
-        title: "身份核验通道尚未开放",
-        content: publicInteractionErrorUserMessage(error as ApiError),
-        confirmText: "查看说明",
-        cancelText: "稍后",
-        success: (result) => {
-          if (result.confirm && recoveryPath?.startsWith("/pages/")) {
-            wx.navigateTo({ url: recoveryPath, fail: () => wx.switchTab({ url: recoveryPath }) });
-          }
-        }
-      });
-      return;
-    }
     wx.showToast({ title: (error as Error).message || fallback, icon: "none" });
   },
   async send() {
-    if (!this.data.publicInteractionIdentityAvailable) {
-      wx.showToast({ title: "身份核验通道尚未开放，当前不能发送消息", icon: "none" });
-      return;
-    }
     const content = this.data.draft.trim();
     if (!content || this.data.sending || this.data.mediaUploading || this.data.restrictionEndsAt || !this.data.messageInteractionAvailable) return;
     this.setData({ sending: true });

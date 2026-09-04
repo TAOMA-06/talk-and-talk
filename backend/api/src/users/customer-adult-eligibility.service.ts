@@ -40,6 +40,15 @@ type EligibilityDatabase = {
   customerAdultEligibility: {
     findFirst(input: Record<string, unknown>): Promise<EligibilityRecord | null>;
   };
+  legalConsentReceipt?: {
+    findFirst(input: Record<string, unknown>): Promise<{
+      id: string;
+      adultConfirmed: boolean;
+      acceptedAt: Date;
+      consentedAt: Date;
+      withdrawnAt: Date | null;
+    } | null>;
+  };
 };
 
 export type CurrentCustomerAdultEligibility = {
@@ -64,6 +73,27 @@ export async function assertCurrentCustomerAdultEligibility(
     orderBy: [{ submittedAt: "desc" }, { id: "desc" }]
   });
   if (!record) {
+    // Every ordinary API caller has already passed JwtAuthGuard's current legal
+    // receipt check. Re-read that same server record inside the order/payment
+    // transaction so a new v1.0 customer can use the explicit 18+ declaration
+    // made on the first screen without obtaining an unrelated opaque token.
+    const consent = typeof db.legalConsentReceipt?.findFirst === "function"
+      ? await db.legalConsentReceipt.findFirst({
+          where: { userId, adultConfirmed: true, withdrawnAt: null },
+          orderBy: [{ consentedAt: "desc" }, { id: "desc" }]
+        })
+      : null;
+    if (consent?.adultConfirmed === true && consent.withdrawnAt === null) {
+      return {
+        recordId: consent.id,
+        verifiedAt: consent.acceptedAt ?? consent.consentedAt,
+        // The surrounding auth guard owns current-version validity. This value
+        // only satisfies internal call sites whose legacy return type includes
+        // a date; it is not persisted or exposed as an external verification.
+        validUntil: new Date("9999-12-31T23:59:59.000Z"),
+        verificationMethod: "legalConsentAttestation"
+      };
+    }
     throw adultEligibilityException(
       "CUSTOMER_ADULT_ELIGIBILITY_REQUIRED",
       "A current adult-eligibility verification is required",

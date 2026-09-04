@@ -1,15 +1,23 @@
 import { ConfigService } from "@nestjs/config";
 
+import type { SecurityCounterService } from "../common/security-counter/security-counter.service";
 import { HealthService } from "./health.service";
 
+jest.mock("../common/security-counter/security-counter.service", () => ({
+  SecurityCounterService: class SecurityCounterService {}
+}));
 jest.mock("pg", () => ({
   Pool: jest.fn()
 }));
 
-jest.mock("ioredis", () => jest.fn());
-
 const { Pool } = jest.requireMock("pg") as { Pool: jest.Mock };
-const Redis = jest.requireMock("ioredis") as jest.Mock;
+
+function counters(backend: "redis" | "postgres" = "redis") {
+  return {
+    backend,
+    ping: jest.fn().mockResolvedValue(undefined)
+  } as unknown as SecurityCounterService;
+}
 
 function config(appEnv = "staging"): ConfigService {
   return {
@@ -31,7 +39,8 @@ describe("HealthService", () => {
   });
 
   it("reports slim liveness without probing dependencies", async () => {
-    const service = new HealthService(config());
+    const securityCounters = counters();
+    const service = new HealthService(config(), securityCounters);
     const liveness = await service.check();
 
     expect(liveness).toEqual({
@@ -40,7 +49,7 @@ describe("HealthService", () => {
       version: "9.9.9"
     });
     expect(Pool).not.toHaveBeenCalled();
-    expect(Redis).not.toHaveBeenCalled();
+    expect(securityCounters.ping).not.toHaveBeenCalled();
   });
 
   it("keeps liveness ok when a dependency fails and only readiness degrades", async () => {
@@ -48,14 +57,7 @@ describe("HealthService", () => {
       query: jest.fn().mockRejectedValue(new Error("db offline secret-host")),
       end: jest.fn().mockResolvedValue(undefined)
     }));
-    Redis.mockImplementation(() => ({
-      on: jest.fn(),
-      connect: jest.fn().mockResolvedValue(undefined),
-      ping: jest.fn().mockResolvedValue("PONG"),
-      disconnect: jest.fn()
-    }));
-
-    const service = new HealthService(config());
+    const service = new HealthService(config(), counters());
     const liveness = await service.check();
     const ready = await service.ready();
 
@@ -64,6 +66,11 @@ describe("HealthService", () => {
     expect(ready.status).toBe("degraded");
     expect(ready.dependencies.database.status).toBe("error");
     expect(ready.dependencies.database.message).toBe("Dependency check failed");
+    expect(ready.dependencies.securityCounters).toEqual(expect.objectContaining({
+      backend: "redis",
+      status: "ok"
+    }));
+    expect(ready.dependencies.redis?.status).toBe("ok");
     expect(JSON.stringify(ready)).not.toContain("secret-host");
   });
 
@@ -72,16 +79,27 @@ describe("HealthService", () => {
       query: jest.fn().mockRejectedValue(new Error("password authentication failed for user secret-admin")),
       end: jest.fn().mockResolvedValue(undefined)
     }));
-    Redis.mockImplementation(() => ({
-      on: jest.fn(),
-      connect: jest.fn().mockResolvedValue(undefined),
-      ping: jest.fn().mockResolvedValue("PONG"),
-      disconnect: jest.fn()
-    }));
-
-    const result = await new HealthService(config("production")).ready();
+    const result = await new HealthService(config("production"), counters()).ready();
 
     expect(result.dependencies.database.message).toBe("Dependency check failed");
     expect(JSON.stringify(result)).not.toContain("secret-admin");
+  });
+
+  it("requires the PostgreSQL security-counter table but does not report Redis as a dependency", async () => {
+    Pool.mockImplementation(() => ({
+      query: jest.fn().mockResolvedValue({ rows: [{ one: 1 }] }),
+      end: jest.fn().mockResolvedValue(undefined)
+    }));
+    const securityCounters = counters("postgres");
+
+    const result = await new HealthService(config(), securityCounters).ready();
+
+    expect(securityCounters.ping).toHaveBeenCalledTimes(1);
+    expect(result.status).toBe("ok");
+    expect(result.dependencies.securityCounters).toEqual(expect.objectContaining({
+      backend: "postgres",
+      status: "ok"
+    }));
+    expect(result.dependencies).not.toHaveProperty("redis");
   });
 });

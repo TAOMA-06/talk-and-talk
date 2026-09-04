@@ -19,6 +19,7 @@ const healthyReady: HealthReadyResponse = {
   uptimeSeconds: 10,
   dependencies: {
     database: { status: "ok", latencyMs: 1 },
+    securityCounters: { status: "ok", latencyMs: 2, backend: "redis" },
     redis: { status: "ok", latencyMs: 2 }
   }
 };

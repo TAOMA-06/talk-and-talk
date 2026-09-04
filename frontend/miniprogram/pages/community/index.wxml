@@ -12,16 +12,12 @@
       </view>
     </tt-card-stage>
   </view>
-  <view wx:if="{{publicInteractionIdentityAvailable}}" class="card compose">
+  <view class="card compose">
     <view class="title">说说你想聊的</view>
     <button class="kind" bindtap="switchKind">{{kind === 'femaleRequest' ? '女生需求' : '陪伴者自荐'}} · 切换</button>
     <input placeholder="话题，例如：今晚想找人聊聊" value="{{topic}}" bindinput="setTopic" maxlength="80" />
     <textarea placeholder="请勿留下联系方式、引导私联或线下见面" value="{{content}}" bindinput="setContent" maxlength="2000" auto-height="true" />
     <button class="primary-button" loading="{{submitting}}" bindtap="submit">发布到广场</button>
-  </view>
-  <view wx:else class="card identity-unavailable">
-    <view class="title">公开发布暂未开放</view>
-    <view class="muted">身份核验授权未开放；当前仅可浏览、举报和查看回执。</view>
   </view>
   <view class="card report-receipts receipt-card">
     <view class="section-title">我的社区举报回执</view>
@@ -55,7 +51,7 @@
     <view>{{error}}</view>
     <button class="state-retry" bindtap="load" aria-label="重新加载广场">重新加载广场</button>
   </view>
-  <view wx:elif="{{!posts.length}}" class="empty">{{publicInteractionIdentityAvailable ? '广场还很安静，发第一条内容吧。' : '当前没有可浏览的广场内容；公开发布尚未开放。'}}</view>
+  <view wx:elif="{{!posts.length}}" class="empty">广场还很安静，发第一条内容吧。</view>
   <view class="postcard-wrap postcard-wrap-{{index % 3}}" wx:for="{{posts}}" wx:key="id">
   <view class="card post-card post-card-{{index % 3}}">
     <view class="row"><text class="author">{{item.authorName}}</text><text class="muted">{{item.kind === 'femaleRequest' ? '需求' : '自荐'}}</text></view>

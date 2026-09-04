@@ -57,6 +57,38 @@ describe("AuthController WeChat Mini Program boundary", () => {
     });
   });
 
+  it("passes the complete CloudBase-injected Mini Program identity as one bounded context", async () => {
+    loginWithWechatMiniProgram.mockResolvedValue({
+      accessToken: "access-token",
+      refreshToken: "refresh-token",
+      expiresIn: 900,
+      user: { id: "wechat-user", role: "user", profile: null }
+    });
+
+    await controller.wechatMiniProgramLogin(
+      { code: "wx-login-code" },
+      {
+        headers: {
+          "x-wx-openid": "openid-from-cloudbase",
+          "x-wx-appid": "wx118721bab077fbbb",
+          "x-wx-env": "talk-and-talk-staging-d6d04a14b8",
+          "x-wx-source": "wx_devtools"
+        }
+      } as any
+    );
+
+    expect(loginWithWechatMiniProgram).toHaveBeenCalledWith(
+      "wx-login-code",
+      undefined,
+      {
+        openId: "openid-from-cloudbase",
+        appId: "wx118721bab077fbbb",
+        envId: "talk-and-talk-staging-d6d04a14b8",
+        source: "wx_devtools"
+      }
+    );
+  });
+
   it("marks an empty wx.login code invalid before it reaches the controller", async () => {
     const dto = new WechatMiniProgramLoginDto();
     dto.code = "";

@@ -2,7 +2,6 @@ import { api, ApiError, ensureSession } from "../../utils/api";
 import { handleCustomerAdultEligibilityError } from "../../utils/adult-eligibility-recovery";
 import { CatalogDisplay, withCatalogDisplays } from "../../utils/catalog";
 import {
-  clientPublicInteractionIdentityGrantsAvailable,
   clientRealtimeVoiceEnabled
 } from "../../utils/config";
 import {
@@ -1116,7 +1115,6 @@ Page({
     supportTicketsLoadMoreError: "",
     recommendationsState: "loading" as ResourceState,
     recommendationsError: "",
-    publicInteractionIdentityAvailable: clientPublicInteractionIdentityGrantsAvailable(),
     loading: true, error: "", confirmingGuidelinesId: "", submittingSupportFactId: ""
   },
   stopRecommendationTracking: null as (() => void) | null,
@@ -1137,7 +1135,6 @@ Page({
   async load(stopRefresh = false) {
     this.stopTracking();
     this.setData({
-      publicInteractionIdentityAvailable: clientPublicInteractionIdentityGrantsAvailable(),
       loading: true,
       error: "",
       ordersState: "loading",
@@ -1757,10 +1754,6 @@ Page({
     const order = (this.data.orders as DisplayOrder[]).find((item) => item.id === id);
     if (!order) {
       wx.showToast({ title: "订单不存在，请刷新后重试", icon: "none" });
-      return;
-    }
-    if (!clientPublicInteractionIdentityGrantsAvailable()) {
-      wx.showToast({ title: "身份核验授权通道尚未开放，当前不能支付", icon: "none" });
       return;
     }
     if (!["pending", "paying"].includes(order.status) || !order.companionConfirmedAt) {

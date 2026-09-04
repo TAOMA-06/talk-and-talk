@@ -25,7 +25,7 @@ describe("AppController (e2e)", () => {
         check: jest.fn().mockResolvedValue({
           status: "ok",
           service: "talk-and-talk-api",
-          version: "0.1.0",
+          version: "1.0.0",
           uptimeSeconds: 1,
           dependencies: {
             database: { status: "ok", latencyMs: 1 },
@@ -57,7 +57,7 @@ describe("AppController (e2e)", () => {
       data: {
         status: "ok",
         service: "talk-and-talk-api",
-        version: "0.1.0",
+        version: "1.0.0",
         uptimeSeconds: 1,
         dependencies: {
           database: { status: "ok", latencyMs: 1 },

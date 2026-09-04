@@ -14,6 +14,15 @@
     </tt-card-stage>
   </view>
 
+  <view class="community-entry tt-enter-rise tt-stagger-3" bindtap="openCommunity" aria-role="button" aria-label="进入陪伴广场，查看和发布话题" tabindex="0">
+    <view class="community-entry-copy">
+      <view class="community-entry-kicker">陪伴广场</view>
+      <view class="community-entry-title">看看大家正在聊什么</view>
+      <view class="community-entry-meta">浏览公开话题，也可以发布你的陪伴需求</view>
+    </view>
+    <view class="community-entry-arrow">›</view>
+  </view>
+
   <view class="search-surface tt-enter-rise tt-stagger-3">
     <view class="search-row">
       <input class="search-input" value="{{searchInput}}" maxlength="40" confirm-type="search" placeholder="搜索名称、角色、服务或标签" bindinput="setSearchInput" bindconfirm="submitSearch" />

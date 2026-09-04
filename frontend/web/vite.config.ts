@@ -11,45 +11,48 @@ const { d1, r2 } = hostingConfig;
 // macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
 
-const localBindingConfig = {
-  main: "./worker/index.ts",
-  compatibility_flags: ["nodejs_compat"],
-  // vinext's custom Worker image route reads original local assets through
-  // this binding. The Cloudflare Vite plugin rewrites the directory for the
-  // emitted server config, so this source path is only a build-time marker.
-  assets: {
-    directory: "./dist/client",
-    binding: "ASSETS",
-    not_found_handling: "none" as const,
-    // Security headers are attached in worker/index.ts. Cloudflare otherwise
-    // serves matching Next/Vinext image assets before the Worker and bypasses
-    // that response boundary.
-    run_worker_first: true,
-  },
-  // Cloudflare provides this binding in deployed Workers. Local Miniflare
-  // installations may omit its transformer implementation; the Worker then
-  // serves the validated original asset rather than failing the public page.
-  images: { binding: "IMAGES" },
-  d1_databases: d1
-    ? [
-        {
-          binding: d1,
-          database_name: "talk-and-talk-d1",
-          database_id: SITE_CREATOR_PLACEHOLDER_DATABASE_ID,
-        },
-      ]
-    : [],
-  r2_buckets: r2
-    ? [
-        {
-          binding: r2,
-          bucket_name: "talk-and-talk-r2",
-        },
-      ]
-    : [],
-};
+function localBindingConfig(command: "build" | "serve") {
+  return {
+    main: "./worker/index.ts",
+    compatibility_flags: ["nodejs_compat"],
+    // vinext's custom Worker image route reads original local assets through
+    // this binding. The Cloudflare Vite plugin rewrites the directory for the
+    // emitted server config, so this source path is only a build-time marker.
+    assets: {
+      directory: "./dist/client",
+      binding: "ASSETS",
+      not_found_handling: "none" as const,
+      // Worker-first is a deployment requirement so static image responses get
+      // the same security headers as HTML. In Vite dev it would intercept the
+      // source CSS/module URLs before Vite can serve them, leaving every route
+      // as unstyled SSR HTML.
+      ...(command === "build" ? { run_worker_first: true as const } : {}),
+    },
+    // Cloudflare provides this binding in deployed Workers. Local Miniflare
+    // installations may omit its transformer implementation; the Worker then
+    // serves the validated original asset rather than failing the public page.
+    images: { binding: "IMAGES" },
+    d1_databases: d1
+      ? [
+          {
+            binding: d1,
+            database_name: "talk-and-talk-d1",
+            database_id: SITE_CREATOR_PLACEHOLDER_DATABASE_ID,
+          },
+        ]
+      : [],
+    r2_buckets: r2
+      ? [
+          {
+            binding: r2,
+            bucket_name: "talk-and-talk-r2",
+          },
+        ]
+      : [],
+  };
+}
 
-export default defineConfig(async () => {
+export default defineConfig(async ({ command }) => {
   // Keep Wrangler and Miniflare state project-local. These are non-secret tool
   // settings; application environment belongs in ignored `.env*` files.
   process.env.WRANGLER_WRITE_LOGS ??= "false";
@@ -68,7 +71,7 @@ export default defineConfig(async () => {
       sites(),
       cloudflare({
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
-        config: localBindingConfig,
+        config: localBindingConfig(command),
       }),
     ],
   };

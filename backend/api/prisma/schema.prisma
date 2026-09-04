@@ -3406,6 +3406,19 @@ model VerificationCode {
   @@index([expiresAt, id], map: "VerificationCode_retention_due")
 }
 
+// Short-lived rate-limit and replay-protection state for deployments that do
+// not provide Redis. keyHash is a one-way digest; raw phone/IP/login keys are
+// never persisted in PostgreSQL.
+model SecurityCounter {
+  keyHash   String   @id @db.Char(64)
+  value     Int      @default(1)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([expiresAt, keyHash], map: "SecurityCounter_expiry")
+}
+
 model RefreshToken {
   id             String    @id @default(uuid())
   userId         String

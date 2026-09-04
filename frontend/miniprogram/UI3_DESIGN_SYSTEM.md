@@ -68,7 +68,7 @@ Domain-specific order, payment, dispute, safety and earnings templates stay doma
 
 - Trial/release remain text-only until real capability gates open.
 - Voice, image, live-call, voice-intro, profile-media and voice-SKU cards do not render while disabled.
-- Public-interaction identity gates continue to block community posts, new bookings, payment and new messages in UI handlers and on the server.
+- Active accounts can reach community posts, new bookings, payment and order messages without a profile identity grant; account restrictions and all domain-specific safety gates remain enforced by the server.
 - `unknown`, load failure and unavailable states never collapse to zero or success.
 
 ## Verification

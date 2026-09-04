@@ -14,6 +14,7 @@ import { CrisisInterventionModule } from "./crisis-intervention/crisis-intervent
 import { AuditModule } from "./common/audit/audit.module";
 import { RequestIdMiddleware } from "./common/middleware/request-id.middleware";
 import { IpRateLimitMiddleware } from "./common/rate-limit/ip-rate-limit.middleware";
+import { SecurityCounterModule } from "./common/security-counter/security-counter.module";
 import { DatabaseModule } from "./database/database.module";
 import { FavoritesModule } from "./favorites/favorites.module";
 import { HealthModule } from "./health/health.module";
@@ -42,6 +43,7 @@ import { UsersModule } from "./users/users.module";
       validate: validateEnvironment
     }),
     DatabaseModule,
+    SecurityCounterModule,
     AuditModule,
     AuthModule,
     AccountGovernanceModule,

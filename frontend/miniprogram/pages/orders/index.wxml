@@ -31,10 +31,9 @@
         <view class="reschedule-response-actions"><button wx:if="{{item.canAcceptReschedule}}" class="primary-button reschedule-response-button" disabled="{{item.rescheduleResponseAction !== ''}}" loading="{{item.rescheduleResponseAction === 'accept'}}" bindtap="respondReschedule" data-id="{{item.id}}" data-action="accept">接受改期</button><button class="plain reschedule-response-button" disabled="{{item.rescheduleResponseAction !== ''}}" loading="{{item.rescheduleResponseAction === 'reject'}}" bindtap="respondReschedule" data-id="{{item.id}}" data-action="reject">保持原预约</button></view>
         <view wx:if="{{item.rescheduleResponseError}}" class="reschedule-response-error">{{item.rescheduleResponseError}}</view>
       </view>
-      <view wx:if="{{(item.status === 'pending' || item.status === 'paying') && item.companionConfirmedAt && !publicInteractionIdentityAvailable}}" class="muted">身份核验授权未开放，暂不能支付。</view>
       <view wx:if="{{item.status === 'completed' && item.refundRequestDeadlineAt}}" class="muted">自助售后截止：{{item.refundDeadlineText}}</view>
       <view class="actions">
-        <button wx:if="{{publicInteractionIdentityAvailable && (item.status === 'pending' || item.status === 'paying') && item.companionConfirmedAt}}" class="primary-button action" bindtap="pay" data-id="{{item.id}}" aria-label="进入安全支付与结果页">去支付</button>
+        <button wx:if="{{(item.status === 'pending' || item.status === 'paying') && item.companionConfirmedAt}}" class="primary-button action" bindtap="pay" data-id="{{item.id}}" aria-label="进入安全支付与结果页">去支付</button>
         <button wx:if="{{item.status === 'pending' || item.status === 'paying'}}" class="plain action" bindtap="cancel" data-id="{{item.id}}">取消订单</button>
         <button wx:if="{{item.canInitiateReschedule && !item.pendingReschedule && !item.isTextOnlyHistoricalVoiceOrder}}" class="plain action" bindtap="openOrderDetail" data-id="{{item.id}}">改期</button>
         <button wx:if="{{item.canRequestRefund}}" class="plain action" bindtap="refund" data-id="{{item.id}}">{{item.refundActionText}}</button>

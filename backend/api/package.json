@@ -1,6 +1,6 @@
 {
   "name": "talk-and-talk-api",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "Talk&Talk production API",
   "scripts": {
@@ -35,7 +35,8 @@
     "review:totp-secret": "node scripts/generate-totp-secret.mjs",
     "preflight:deployment": "node scripts/deployment-preflight.mjs",
     "verify:voice-release-artifacts": "node scripts/voice-release-artifacts.mjs",
-    "verify:cloudbase-template": "node scripts/validate-cloudbase-template.mjs"
+    "verify:cloudbase-template": "node scripts/validate-cloudbase-template.mjs",
+    "build:cloudbase-migrations": "node ../../scripts/build-cloudbase-pg-migrations.mjs"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.28",

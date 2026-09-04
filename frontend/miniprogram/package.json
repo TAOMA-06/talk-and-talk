@@ -1,8 +1,13 @@
 {
   "name": "talk-and-talk-miniprogram",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "Talk&Talk 微信小程序客户端依赖",
+  "scripts": {
+    "build:release": "node ../../scripts/build-miniprogram-v1-release.mjs",
+    "build:ui-review": "node ../../artifacts/v0.1/build-direct-open-review.mjs",
+    "test:ui-review": "node ../../artifacts/v0.1/verify-direct-open-review.mjs"
+  },
   "dependencies": {
     "trtc-wx-sdk": "1.1.15"
   }

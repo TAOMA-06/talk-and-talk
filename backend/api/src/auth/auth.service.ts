@@ -1,16 +1,16 @@
 import { createHash, randomInt, randomUUID } from "node:crypto";
 
-import { HttpStatus, Inject, Injectable, OnModuleDestroy } from "@nestjs/common";
+import { HttpStatus, Inject, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import * as bcrypt from "bcrypt";
-import Redis from "ioredis";
 import { parsePhoneNumberFromString } from "libphonenumber-js";
 import * as jose from "jose";
 import { Prisma } from "../../generated/prisma/client";
 
 import { AuditService } from "../common/audit/audit.service";
 import { AppException } from "../common/errors/app.exception";
+import { SecurityCounterService } from "../common/security-counter/security-counter.service";
 import { maskPhone as maskPhoneUtil } from "../common/logging/redact";
 import { validateConsumerJwtTtls } from "../config/configuration";
 import { PrismaService } from "../database/prisma.service";
@@ -41,6 +41,13 @@ export interface SessionMetadata {
   clientPlatform?: string | null;
 }
 
+export interface CloudBaseMiniProgramIdentity {
+  openId: string;
+  appId: string;
+  envId: string;
+  source: "wx_devtools" | "wx_client";
+}
+
 type AuthenticationKind = "consumer" | "staff";
 
 export interface UserWithProfile {
@@ -63,38 +70,29 @@ function maskPhone(phone: string): string {
 class ConsumerIdentityResolutionChangedError extends Error {}
 
 @Injectable()
-export class AuthService implements OnModuleDestroy {
-  private redis: Redis | null = null;
-
+export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
     @Inject(SMS_PROVIDER) private readonly sms: SmsProvider,
     private readonly audit: AuditService,
-    private readonly tombstones: AuthIdentityTombstoneService
+    private readonly tombstones: AuthIdentityTombstoneService,
+    private readonly counters: SecurityCounterService
   ) {}
-
-  private getRedis(): Redis {
-    if (!this.redis) {
-      this.redis = new Redis(this.config.getOrThrow<string>("REDIS_URL"), {
-        maxRetriesPerRequest: 3,
-        lazyConnect: true
-      });
-      this.redis.on("error", () => undefined);
-    }
-    return this.redis;
-  }
-
-  onModuleDestroy(): void {
-    this.redis?.disconnect();
-    this.redis = null;
-  }
 
   wechatMiniProgramStatus() {
     const appId = this.config.get<string>("WECHAT_MINIPROGRAM_APP_ID", "").trim();
     const appSecret = this.config.get<string>("WECHAT_MINIPROGRAM_APP_SECRET", "").trim();
-    const configured = Boolean(appId && appSecret);
+    const cloudBaseHeaderAuth = this.config.get<boolean>(
+      "WECHAT_CLOUDBASE_HEADER_AUTH_ENABLED",
+      false
+    ) === true;
+    const cloudBaseEnvId = this.config.get<string>("CLOUDBASE_ENV_ID", "").trim();
+    const cloudBaseMiniAppOnly = this.config.get<boolean>("CLOUDBASE_MINIAPP_ONLY", false) === true;
+    const configured = Boolean(
+      appId && (appSecret || (cloudBaseHeaderAuth && cloudBaseMiniAppOnly && cloudBaseEnvId))
+    );
     return {
       module: "wechatMiniProgram",
       status: configured ? "configured" : "unconfigured",
@@ -118,17 +116,15 @@ export class AuthService implements OnModuleDestroy {
     }
     const e164 = parsed.format("E.164");
 
-    const redis = this.getRedis();
     const phoneKey = `sms:phone:${e164}`;
-    const phoneRateLimitClaim = await redis.set(phoneKey, "1", "EX", 60, "NX");
-    if (phoneRateLimitClaim !== "OK") {
+    const phoneRateLimitClaim = await this.counters.claim(phoneKey, 60);
+    if (!phoneRateLimitClaim) {
       throw new AppException("RATE_LIMITED", "Verification code sent too frequently, please try later", HttpStatus.TOO_MANY_REQUESTS);
     }
 
     if (ip) {
       const ipKey = `sms:ip:${ip}`;
-      const ipCount = await redis.incr(ipKey);
-      if (ipCount === 1) await redis.expire(ipKey, 3600);
+      const ipCount = await this.counters.increment(ipKey, 3600);
       if (ipCount > 5) {
         throw new AppException("RATE_LIMITED", "Too many requests from this IP", HttpStatus.TOO_MANY_REQUESTS);
       }
@@ -155,7 +151,7 @@ export class AuthService implements OnModuleDestroy {
       }
     });
 
-    await redis.del(`sms:verify:${e164}`);
+    await this.counters.delete(`sms:verify:${e164}`);
     await this.sms.sendCode(e164, code);
 
     const appEnv = this.config.get<string>("APP_ENV", "development");
@@ -206,7 +202,7 @@ export class AuthService implements OnModuleDestroy {
     if (consumed.count !== 1) {
       throw new AppException("INVALID_VERIFICATION_CODE", "Verification code is invalid or expired", HttpStatus.UNAUTHORIZED);
     }
-    await this.getRedis().del(`sms:verify:${e164}`);
+    await this.counters.delete(`sms:verify:${e164}`);
 
     const result = await this.resolveConsumerIdentityAndIssueSession(
       "phone",
@@ -227,13 +223,11 @@ export class AuthService implements OnModuleDestroy {
   ): Promise<AuthTokens & { user: UserWithProfile }> {
     const normalizedUsername = username.trim().toLowerCase();
     const usernameKey = createHash("sha256").update(normalizedUsername).digest("hex");
-    const redis = this.getRedis();
     const rateKeys = [`staff-login:user:${usernameKey}`];
     if (ip) rateKeys.push(`staff-login:ip:${createHash("sha256").update(ip).digest("hex")}`);
 
     for (const key of rateKeys) {
-      const count = await redis.incr(key);
-      if (count === 1) await redis.expire(key, 900);
+      const count = await this.counters.increment(key, 900);
       if (count > 10) {
         throw new AppException("STAFF_LOGIN_RATE_LIMITED", "Too many login attempts", HttpStatus.TOO_MANY_REQUESTS);
       }
@@ -257,8 +251,7 @@ export class AuthService implements OnModuleDestroy {
         );
         const counter = matchTotpCounter(secret, totpCode);
         if (counter !== null) {
-          const replayClaim = await redis.set(`staff-totp:${credential.id}:${counter}`, "1", "EX", 90, "NX");
-          totpMatches = replayClaim === "OK";
+          totpMatches = await this.counters.claim(`staff-totp:${credential.id}:${counter}`, 90);
         }
       } catch {
         totpMatches = false;
@@ -340,13 +333,15 @@ export class AuthService implements OnModuleDestroy {
    */
   async loginWithWechatMiniProgram(
     code: string,
-    sessionMetadata?: SessionMetadata
+    sessionMetadata?: SessionMetadata,
+    cloudBaseIdentity?: CloudBaseMiniProgramIdentity
   ): Promise<AuthTokens & { user: UserWithProfile }> {
     const appId = this.config.get<string>("WECHAT_MINIPROGRAM_APP_ID", "").trim();
     const appSecret = this.config.get<string>("WECHAT_MINIPROGRAM_APP_SECRET", "").trim();
     const trimmedCode = code.trim();
+    const trustedCloudBaseOpenId = this.trustedCloudBaseOpenId(cloudBaseIdentity, appId);
 
-    if (!appId || !appSecret) {
+    if (!appId || (!trustedCloudBaseOpenId && !appSecret)) {
       throw new AppException(
         "WECHAT_MINIPROGRAM_LOGIN_UNAVAILABLE",
         "WeChat Mini Program login is not configured",
@@ -355,6 +350,17 @@ export class AuthService implements OnModuleDestroy {
     }
     if (!trimmedCode) {
       throw new AppException("INVALID_WECHAT_CODE", "WeChat login code is required", HttpStatus.BAD_REQUEST);
+    }
+
+    if (trustedCloudBaseOpenId) {
+      const result = await this.resolveConsumerIdentityAndIssueSession(
+        "wechatMiniProgram",
+        trustedCloudBaseOpenId,
+        {},
+        sessionMetadata
+      );
+      await this.recordLoginAudit(result.user.id, result.user.role, "wechatCloudBase");
+      return result;
     }
 
     const query = new URLSearchParams({
@@ -402,6 +408,33 @@ export class AuthService implements OnModuleDestroy {
     );
     await this.recordLoginAudit(result.user.id, result.user.role, "wechatMiniProgram");
     return result;
+  }
+
+  private trustedCloudBaseOpenId(
+    identity: CloudBaseMiniProgramIdentity | undefined,
+    configuredAppId: string
+  ): string | null {
+    if (!identity) return null;
+    const enabled = this.config.get<boolean>("WECHAT_CLOUDBASE_HEADER_AUTH_ENABLED", false) === true;
+    const configuredEnvId = this.config.get<string>("CLOUDBASE_ENV_ID", "").trim();
+    const miniAppOnly = this.config.get<boolean>("CLOUDBASE_MINIAPP_ONLY", false) === true;
+    if (
+      !enabled
+      || !miniAppOnly
+      || !configuredAppId
+      || !configuredEnvId
+      || identity.appId !== configuredAppId
+      || identity.envId !== configuredEnvId
+      || !["wx_devtools", "wx_client"].includes(identity.source)
+      || !/^[A-Za-z0-9_-]{6,128}$/.test(identity.openId)
+    ) {
+      throw new AppException(
+        "INVALID_WECHAT_CLOUDBASE_CONTEXT",
+        "WeChat CloudBase identity context is invalid",
+        HttpStatus.UNAUTHORIZED
+      );
+    }
+    return identity.openId;
   }
 
   async refresh(refreshToken: string, sessionMetadata?: SessionMetadata): Promise<AuthTokens> {
@@ -890,12 +923,8 @@ export class AuthService implements OnModuleDestroy {
   }
 
   private async rejectPhoneVerificationAttempt(e164: string): Promise<never> {
-    const redis = this.getRedis();
     const key = `sms:verify:${e164}`;
-    const attemptCount = await redis.incr(key);
-    if (attemptCount === 1) {
-      await redis.expire(key, 600);
-    }
+    const attemptCount = await this.counters.increment(key, 600);
     if (attemptCount >= 5) {
       const now = new Date();
       await this.prisma.verificationCode.updateMany({

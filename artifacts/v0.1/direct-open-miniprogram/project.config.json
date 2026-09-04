@@ -1,0 +1,15 @@
+{
+  "appid": "touristappid",
+  "compileType": "miniprogram",
+  "libVersion": "3.8.5",
+  "projectname": "talk-and-talk-ui-review-do-not-upload",
+  "description": "Talk&Talk 本地 UI 评审版：演示截图，不联网，不可上传",
+  "setting": {
+    "es6": true,
+    "enhance": true,
+    "postcss": true,
+    "minified": false,
+    "urlCheck": false,
+    "minifyWXML": true
+  }
+}

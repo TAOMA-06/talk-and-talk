@@ -15,7 +15,6 @@ import {
   WeChatPayProvider
 } from "../src/payments/wechat/wechat-pay.provider";
 import { PaymentsService } from "../src/payments/payments.service";
-import * as publicInteractionIdentity from "../src/users/public-interaction-identity.gate";
 import {
   grantCurrentCustomerAdultEligibility,
   grantCurrentLegalConsent
@@ -28,15 +27,9 @@ describe("Orders and payments (e2e)", () => {
   let jwt: JwtService;
   let wechat: WeChatPayProvider;
   let paymentsService: PaymentsService;
-  let identityGateSpy: jest.SpyInstance;
   let ownerSequence = 0;
 
   beforeAll(async () => {
-    // This suite exercises downstream transaction state behind a hypothetical
-    // approved identity adapter. A dedicated test below restores the real
-    // first-release gate and proves that order/prepay writes fail closed.
-    identityGateSpy = jest.spyOn(publicInteractionIdentity, "assertPublicInteractionIdentity")
-      .mockImplementation(() => undefined);
     process.env.NODE_ENV = "test";
     process.env.API_PREFIX = "api/v1";
     process.env.CORS_ORIGINS = "http://localhost:3000";
@@ -72,7 +65,6 @@ describe("Orders and payments (e2e)", () => {
   afterAll(async () => {
     await cleanup();
     await app.close();
-    identityGateSpy.mockRestore();
   });
 
   async function cleanup() {
@@ -113,7 +105,8 @@ describe("Orders and payments (e2e)", () => {
 
   async function createUser(
     phone = "+8613800138000",
-    role: "user" | "companion" | "moderator" | "support" | "finance" | "admin" = "user"
+    role: "user" | "companion" | "moderator" | "support" | "finance" | "admin" = "user",
+    isVerified = true
   ) {
     const user = await prisma.user.create({
       data: {
@@ -124,7 +117,7 @@ describe("Orders and payments (e2e)", () => {
             phone,
             age: 22,
             gender: "female",
-            isVerified: true
+            isVerified
           }
         }
       }
@@ -190,30 +183,8 @@ describe("Orders and payments (e2e)", () => {
       .expect(201);
   }
 
-  it("keeps new order and prepay writes closed without an approved identity authority", async () => {
-    const { token } = await createUser();
-    const orderCountBefore = await prisma.order.count();
-
-    identityGateSpy.mockRestore();
-    try {
-      await request(app.getHttpServer())
-        .post("/api/v1/orders")
-        .set("Authorization", `Bearer ${token}`)
-        .send({ companionId: "c1", themeId: "t1", durationMinutes: 30, scheduledAt: futureScheduledAt() })
-        .expect(403)
-        .expect(({ body }) => {
-          expect(body.error.code).toBe("PUBLIC_INTERACTION_IDENTITY_REQUIRED");
-          expect(body.error.details).toEqual(expect.objectContaining({
-            verificationStatus: "notVerified",
-            publicInteractionBlocked: true
-          }));
-        });
-      expect(await prisma.order.count()).toBe(orderCountBefore);
-    } finally {
-      identityGateSpy = jest.spyOn(publicInteractionIdentity, "assertPublicInteractionIdentity")
-        .mockImplementation(() => undefined);
-    }
-
+  it("allows active customers to create and prepay without a profile identity grant", async () => {
+    const { token } = await createUser("+8613800138000", "user", false);
     const created = await request(app.getHttpServer())
       .post("/api/v1/orders")
       .set("Authorization", `Bearer ${token}`)
@@ -222,22 +193,13 @@ describe("Orders and payments (e2e)", () => {
     await confirmOrderForPayment(created.body.data.id);
     const paymentCountBefore = await prisma.paymentTransaction.count();
 
-    identityGateSpy.mockRestore();
-    try {
-      await request(app.getHttpServer())
-        .post(`/api/v1/orders/${created.body.data.id}/prepay`)
-        .set("Authorization", `Bearer ${token}`)
-        .expect(403)
-        .expect(({ body }) => {
-          expect(body.error.code).toBe("PUBLIC_INTERACTION_IDENTITY_REQUIRED");
-        });
-      expect(await prisma.paymentTransaction.count()).toBe(paymentCountBefore);
-      expect((await prisma.order.findUniqueOrThrow({ where: { id: created.body.data.id } })).status)
-        .toBe("pending");
-    } finally {
-      identityGateSpy = jest.spyOn(publicInteractionIdentity, "assertPublicInteractionIdentity")
-        .mockImplementation(() => undefined);
-    }
+    await request(app.getHttpServer())
+      .post(`/api/v1/orders/${created.body.data.id}/prepay`)
+      .set("Authorization", `Bearer ${token}`)
+      .expect(201);
+    expect(await prisma.paymentTransaction.count()).toBe(paymentCountBefore + 1);
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: created.body.data.id } })).status)
+      .toBe("paying");
   });
 
   it("creates order, mock pays, and activates conversation once", async () => {

@@ -1,12 +1,12 @@
 import { createHash, randomUUID } from "node:crypto";
 
-import { HttpStatus, Injectable, OnModuleDestroy } from "@nestjs/common";
+import { HttpStatus, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import * as bcrypt from "bcrypt";
-import Redis from "ioredis";
 
 import { AppException } from "../common/errors/app.exception";
+import { SecurityCounterService } from "../common/security-counter/security-counter.service";
 import { PrismaService } from "../database/prisma.service";
 import { decryptTotpSecret, matchTotpCounter } from "../auth/staff-auth.crypto";
 import {
@@ -20,30 +20,13 @@ import {
 const DUMMY_REVIEW_PASSWORD_HASH = bcrypt.hashSync("invalid-review-credential-padding", 12);
 
 @Injectable()
-export class ReviewAuthService implements OnModuleDestroy {
-  private redis: Redis | null = null;
-
+export class ReviewAuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
-    private readonly config: ConfigService
+    private readonly config: ConfigService,
+    private readonly counters: SecurityCounterService
   ) {}
-
-  private getRedis(): Redis {
-    if (!this.redis) {
-      this.redis = new Redis(this.config.getOrThrow<string>("REDIS_URL"), {
-        maxRetriesPerRequest: 3,
-        lazyConnect: true
-      });
-      this.redis.on("error", () => undefined);
-    }
-    return this.redis;
-  }
-
-  onModuleDestroy(): void {
-    this.redis?.disconnect();
-    this.redis = null;
-  }
 
   async login(
     username: string,
@@ -53,13 +36,11 @@ export class ReviewAuthService implements OnModuleDestroy {
   ): Promise<ReviewAuthTokens & { reviewer: AuthenticatedReviewer }> {
     const normalizedUsername = username.trim().toLowerCase();
     const usernameKey = createHash("sha256").update(normalizedUsername).digest("hex");
-    const redis = this.getRedis();
     const rateKeys = [`review-login:user:${usernameKey}`];
     if (ip) rateKeys.push(`review-login:ip:${createHash("sha256").update(ip).digest("hex")}`);
 
     for (const key of rateKeys) {
-      const count = await redis.incr(key);
-      if (count === 1) await redis.expire(key, 900);
+      const count = await this.counters.increment(key, 900);
       if (count > 10) {
         throw new AppException("REVIEW_LOGIN_RATE_LIMITED", "Too many review login attempts", HttpStatus.TOO_MANY_REQUESTS);
       }
@@ -79,8 +60,7 @@ export class ReviewAuthService implements OnModuleDestroy {
         );
         const counter = matchTotpCounter(secret, totpCode);
         if (counter !== null) {
-          const replayClaim = await redis.set(`review-totp:${reviewer.id}:${counter}`, "1", "EX", 90, "NX");
-          totpMatches = replayClaim === "OK";
+          totpMatches = await this.counters.claim(`review-totp:${reviewer.id}:${counter}`, 90);
         }
       } catch {
         totpMatches = false;

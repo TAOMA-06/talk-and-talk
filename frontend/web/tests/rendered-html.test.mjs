@@ -173,6 +173,17 @@ test("candidate check explicitly invokes both locked-worker runtime suites", asy
   assert.match(packageJson.scripts["test:production-surface"], /NODE_ENV=production/);
 });
 
+test("keeps Worker-first asset routing out of the Vite development server", async () => {
+  const viteConfig = await readFile(new URL("../vite.config.ts", import.meta.url), "utf8");
+  assert.match(viteConfig, /defineConfig\(async \(\{ command \}\)/);
+  assert.match(viteConfig, /command === "build" \? \{ run_worker_first: true as const \} : \{\}/);
+  assert.doesNotMatch(
+    viteConfig,
+    /assets:\s*\{[^}]*run_worker_first:\s*true[^}]*\}\s*,/s,
+    "run_worker_first must not be unconditional because it intercepts Vite source CSS/module requests",
+  );
+});
+
 // The local-open render suite intentionally exercises development HTML. Register
 // this assertion only in the dedicated locked-runtime suites instead of emitting
 // a skip that could be confused with candidate evidence.

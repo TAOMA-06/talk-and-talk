@@ -1,13 +1,7 @@
 import { ConfigService } from "@nestjs/config";
 
+import { SecurityCounterService } from "../security-counter/security-counter.service";
 import { IpRateLimitMiddleware, clientIp, isWeChatPaymentCallback, shouldFailClosed } from "./ip-rate-limit.middleware";
-
-const disconnect = jest.fn();
-
-jest.mock("ioredis", () => jest.fn().mockImplementation(() => ({
-  on: jest.fn(),
-  disconnect
-})));
 
 describe("clientIp", () => {
   it("uses Express req.ip instead of trusting a client supplied forwarding header", () => {
@@ -51,11 +45,11 @@ describe("shouldFailClosed", () => {
     expect(shouldFailClosed({ method: "POST", originalUrl } as any, "staging")).toBe(true);
   });
 
-  it("keeps health checks available when Redis is unavailable", () => {
+  it("keeps health checks available when the counter backend is unavailable", () => {
     expect(shouldFailClosed({ method: "GET", originalUrl: "/api/v1/health" } as any, "production")).toBe(false);
   });
 
-  it("keeps development usable without Redis", () => {
+  it("keeps development usable without the counter backend", () => {
     expect(shouldFailClosed({ method: "POST", originalUrl: "/api/v1/auth/refresh" } as any, "development")).toBe(false);
   });
 });
@@ -77,15 +71,60 @@ describe("isWeChatPaymentCallback", () => {
   });
 });
 
-describe("IpRateLimitMiddleware lifecycle", () => {
-  it("disconnects the Redis client during application shutdown", () => {
-    const middleware = new IpRateLimitMiddleware({
-      getOrThrow: jest.fn().mockReturnValue("redis://localhost:6379")
-    } as unknown as ConfigService);
+describe("IpRateLimitMiddleware counters", () => {
+  it.each([
+    ["redis", /^rl:ip:203\.0\.113\.8:\d+$/],
+    ["postgres", "rl:ip:203.0.113.8"]
+  ] as const)("uses the %s counter key strategy", async (backend, expectedKey) => {
+    const increment = jest.fn().mockResolvedValue(1);
+    const middleware = new IpRateLimitMiddleware(
+      {
+        get: jest.fn((key: string) => key === "RATE_LIMIT_PER_MINUTE" ? 120 : "development")
+      } as unknown as ConfigService,
+      { backend, increment } as unknown as SecurityCounterService
+    );
+    const next = jest.fn();
+    const response = { setHeader: jest.fn() };
 
-    (middleware as any).getRedis();
-    middleware.onModuleDestroy();
+    await middleware.use({
+      method: "GET",
+      originalUrl: "/api/v1/companions",
+      ip: "203.0.113.8",
+      socket: {}
+    } as any, response as any, next);
 
-    expect(disconnect).toHaveBeenCalledTimes(1);
+    expect(increment).toHaveBeenCalledWith(
+      typeof expectedKey === "string" ? expectedKey : expect.stringMatching(expectedKey),
+      60
+    );
+    expect(next).toHaveBeenCalledWith();
+    expect(response.setHeader).toHaveBeenCalledWith("X-RateLimit-Remaining", "119");
+  });
+
+  it("fails closed on sensitive production writes when the selected backend is unavailable", async () => {
+    const middleware = new IpRateLimitMiddleware(
+      {
+        get: jest.fn((key: string, fallback?: unknown) =>
+          key === "APP_ENV" ? "production" : fallback
+        )
+      } as unknown as ConfigService,
+      {
+        backend: "postgres",
+        increment: jest.fn().mockRejectedValue(new Error("database details must stay private"))
+      } as unknown as SecurityCounterService
+    );
+    const next = jest.fn();
+
+    await middleware.use({
+      method: "POST",
+      originalUrl: "/api/v1/auth/phone/login",
+      ip: "203.0.113.8",
+      socket: {}
+    } as any, { setHeader: jest.fn() } as any, next);
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({
+      code: "RATE_LIMIT_UNAVAILABLE",
+      status: 503
+    }));
   });
 });

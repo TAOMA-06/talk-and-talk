@@ -22,7 +22,7 @@
 
   <view class="consent-surface">
     <checkbox-group bindchange="setAgreement"><label class="agreement"><checkbox value="accepted" checked="{{agreed}}" color="#292724" />我已阅读并同意《用户协议》和《隐私政策》</label></checkbox-group>
-    <checkbox-group bindchange="setAdultConfirmation"><label class="agreement"><checkbox value="adult" checked="{{adultConfirmed}}" color="#292724" />我确认本人已年满 18 周岁</label></checkbox-group>
+    <checkbox-group bindchange="setAdultConfirmation"><label class="agreement"><checkbox value="adult" checked="{{adultConfirmed}}" color="#292724" />我确认本人已年满 18 周岁，并以此作为使用付费服务的年龄声明</label></checkbox-group>
     <button class="primary-button accept" loading="{{submitting}}" disabled="{{!agreed || !adultConfirmed || submitting}}" bindtap="accept">同意并进入</button>
   </view>
   <view class="rights-recovery">

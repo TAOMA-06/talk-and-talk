@@ -6,6 +6,7 @@ import { JwtService } from "@nestjs/jwt";
 import { Prisma } from "../../generated/prisma/client";
 
 import { AuditService } from "../common/audit/audit.service";
+import { SecurityCounterService } from "../common/security-counter/security-counter.service";
 import { PrismaService } from "../database/prisma.service";
 import { AuthIdentityTombstoneService } from "./auth-identity-tombstone.service";
 import { AuthService } from "./auth.service";
@@ -24,13 +25,12 @@ const mockPrisma: any = {
   $transaction: jest.fn(async (callback: (tx: any) => Promise<unknown>) => callback(mockPrisma))
 };
 
-const mockRedis = {
-  get: jest.fn(),
-  set: jest.fn(),
-  incr: jest.fn(),
-  expire: jest.fn(),
-  del: jest.fn(),
-  disconnect: jest.fn()
+const mockCounters = {
+  claim: jest.fn(),
+  increment: jest.fn(),
+  delete: jest.fn(),
+  ping: jest.fn(),
+  backend: "redis"
 };
 
 const mockTombstones = {
@@ -39,13 +39,6 @@ const mockTombstones = {
   throwAuthState: jest.fn((state: unknown) => { throw state; })
 };
 
-jest.mock("ioredis", () => {
-  return jest.fn().mockImplementation(() => ({
-    ...mockRedis,
-    on: jest.fn()
-  }));
-});
-
 describe("AuthService", () => {
   let service: AuthService;
   let smsProvider: MockSmsProvider;
@@ -53,9 +46,9 @@ describe("AuthService", () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    mockRedis.get.mockResolvedValue(null);
-    mockRedis.incr.mockResolvedValue(1);
-    mockRedis.set.mockResolvedValue("OK");
+    mockCounters.increment.mockResolvedValue(1);
+    mockCounters.claim.mockResolvedValue(true);
+    mockCounters.delete.mockResolvedValue(undefined);
     mockPrisma.verificationCode.updateMany.mockResolvedValue({ count: 1 });
     mockPrisma.$queryRaw.mockResolvedValue([{ id: "user-1" }]);
     mockTombstones.findBlockingStateTx.mockResolvedValue(null);
@@ -81,6 +74,9 @@ describe("AuthService", () => {
                 SMS_CODE_TTL_SECONDS: 300,
                 WECHAT_MINIPROGRAM_APP_ID: "wx-mini-app",
                 WECHAT_MINIPROGRAM_APP_SECRET: "mini-secret",
+                WECHAT_CLOUDBASE_HEADER_AUTH_ENABLED: true,
+                CLOUDBASE_ENV_ID: "talk-and-talk-staging-d6d04a14b8",
+                CLOUDBASE_MINIAPP_ONLY: true,
                 JWT_ACCESS_TTL: "15m",
                 JWT_REFRESH_TTL: "30d"
               };
@@ -102,6 +98,7 @@ describe("AuthService", () => {
         { provide: SMS_PROVIDER, useClass: MockSmsProvider },
         { provide: AuditService, useValue: { record: jest.fn().mockResolvedValue({}) } }
         ,{ provide: AuthIdentityTombstoneService, useValue: mockTombstones }
+        ,{ provide: SecurityCounterService, useValue: mockCounters }
       ]
     }).compile();
 
@@ -128,13 +125,7 @@ describe("AuthService", () => {
       const result = await service.sendCode("13800138000");
 
       expect(result.expiresInSeconds).toBe(300);
-      expect(mockRedis.set).toHaveBeenCalledWith(
-        "sms:phone:+8613800138000",
-        "1",
-        "EX",
-        60,
-        "NX"
-      );
+      expect(mockCounters.claim).toHaveBeenCalledWith("sms:phone:+8613800138000", 60);
       expect(mockPrisma.verificationCode.updateMany).toHaveBeenCalledWith({
         where: {
           phone: "+8613800138000",
@@ -144,7 +135,7 @@ describe("AuthService", () => {
         data: { consumedAt: expect.any(Date) }
       });
       expect(mockPrisma.verificationCode.create).toHaveBeenCalled();
-      expect(mockRedis.del).toHaveBeenCalledWith("sms:verify:+8613800138000");
+      expect(mockCounters.delete).toHaveBeenCalledWith("sms:verify:+8613800138000");
       const lastCode = smsProvider.getLastCode();
       expect(lastCode?.phone).toBe("+8613800138000");
       expect(lastCode?.code).toMatch(/^\d{6}$/);
@@ -172,7 +163,7 @@ describe("AuthService", () => {
     });
 
     it("should reject rate-limited phone", async () => {
-      mockRedis.set.mockResolvedValue(null);
+      mockCounters.claim.mockResolvedValue(false);
 
       await expect(service.sendCode("13800138000")).rejects.toThrow("too frequently");
       expect(mockPrisma.verificationCode.create).not.toHaveBeenCalled();
@@ -181,15 +172,6 @@ describe("AuthService", () => {
     it("should reject invalid phone", async () => {
       await expect(service.sendCode("123")).rejects.toThrow("Invalid phone");
     });
-  });
-
-  it("disconnects the Redis client during application shutdown", async () => {
-    mockPrisma.verificationCode.create.mockResolvedValue({ id: "vc-1" });
-    await service.sendCode("13800138000");
-
-    service.onModuleDestroy();
-
-    expect(mockRedis.disconnect).toHaveBeenCalledTimes(1);
   });
 
   it("fails closed instead of issuing a session when a JWT TTL bypasses startup validation", async () => {
@@ -257,7 +239,7 @@ describe("AuthService", () => {
         },
         data: { consumedAt: expect.any(Date) }
       });
-      expect(mockRedis.del).toHaveBeenCalledWith("sms:verify:+8613800138000");
+      expect(mockCounters.delete).toHaveBeenCalledWith("sms:verify:+8613800138000");
     });
 
     it("should reject invalid code", async () => {
@@ -265,8 +247,7 @@ describe("AuthService", () => {
 
       await expect(service.loginWithPhone("13800138000", "000000"))
         .rejects.toThrow("invalid or expired");
-      expect(mockRedis.incr).toHaveBeenCalledWith("sms:verify:+8613800138000");
-      expect(mockRedis.expire).toHaveBeenCalledWith("sms:verify:+8613800138000", 600);
+      expect(mockCounters.increment).toHaveBeenCalledWith("sms:verify:+8613800138000", 600);
     });
 
     it("invalidates the active code after five failed verification attempts", async () => {
@@ -278,7 +259,7 @@ describe("AuthService", () => {
         expiresAt: new Date(Date.now() + 60_000),
         consumedAt: null
       });
-      mockRedis.incr.mockResolvedValue(5);
+      mockCounters.increment.mockResolvedValue(5);
 
       await expect(service.loginWithPhone("13800138000", "000000"))
         .rejects.toMatchObject({ code: "INVALID_VERIFICATION_CODE" });
@@ -527,6 +508,52 @@ describe("AuthService", () => {
   });
 
   describe("loginWithWechatMiniProgram", () => {
+    it("uses the trusted CloudBase Mini Program identity without exposing or requiring an AppSecret exchange", async () => {
+      const fetchMock = jest.fn();
+      global.fetch = fetchMock as unknown as typeof fetch;
+      mockPrisma.authIdentity.findUnique.mockResolvedValue(null);
+      mockPrisma.user.create.mockResolvedValue({ id: "wechat-cloud-user", role: "user" });
+      mockPrisma.refreshToken.create.mockResolvedValue({});
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: "wechat-cloud-user",
+        role: "user",
+        profile: { displayName: null, phone: null, gender: null, isVerified: false, safetyScore: 80 }
+      });
+
+      const result = await service.loginWithWechatMiniProgram(
+        "mini-code",
+        { clientPlatform: "wechat" },
+        {
+          openId: "openid-from-cloudbase",
+          appId: "wx-mini-app",
+          envId: "talk-and-talk-staging-d6d04a14b8",
+          source: "wx_client"
+        }
+      );
+
+      expect(result.user.id).toBe("wechat-cloud-user");
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(mockPrisma.user.create).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({
+          identities: { create: { provider: "wechatMiniProgram", providerId: "openid-from-cloudbase" } }
+        })
+      }));
+    });
+
+    it("rejects a mismatched CloudBase environment before identity persistence", async () => {
+      await expect(service.loginWithWechatMiniProgram(
+        "mini-code",
+        undefined,
+        {
+          openId: "openid-from-cloudbase",
+          appId: "wx-mini-app",
+          envId: "different-environment",
+          source: "wx_client"
+        }
+      )).rejects.toMatchObject({ code: "INVALID_WECHAT_CLOUDBASE_CONTEXT", status: 401 });
+      expect(mockPrisma.user.create).not.toHaveBeenCalled();
+    });
+
     it("exchanges a code, creates an identity, and returns the normal session", async () => {
       const fetchMock = jest.fn().mockResolvedValue({
         ok: true,
@@ -627,6 +654,7 @@ describe("AuthService", () => {
           { provide: SMS_PROVIDER, useValue: new MockSmsProvider() },
           { provide: AuditService, useValue: { record: jest.fn().mockResolvedValue({}) } }
           ,{ provide: AuthIdentityTombstoneService, useValue: mockTombstones }
+          ,{ provide: SecurityCounterService, useValue: mockCounters }
         ]
       }).compile();
 

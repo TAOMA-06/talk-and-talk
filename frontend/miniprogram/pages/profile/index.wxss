@@ -91,10 +91,6 @@ textarea { min-height: 160rpx; }
 .account-actions { display: flex; flex-direction: column; gap: 6rpx; margin-top: 18rpx; padding-top: 18rpx; border-top: 1rpx solid var(--tt-border); }
 .danger { color: var(--tt-danger); }
 .profile-hub { border-color: var(--tt-color-pastel-lavender-stroke); background: var(--tt-color-pastel-lavender-bg); }
-.public-identity-card { border-color: var(--tt-color-status-warning-stroke); background: var(--tt-color-status-warning-bg); color: var(--tt-color-status-warning-fg); }
-.public-identity-card .title,
-.public-identity-card .muted { color: currentColor; }
-.public-identity-card .muted { color: var(--tt-color-status-warning-fg); }
 .favorites-card { border-color: var(--tt-color-pastel-rose-stroke); background: var(--tt-color-pastel-rose-bg); }
 .recent-views-card { border-color: var(--tt-color-pastel-blue-stroke); background: var(--tt-color-pastel-blue-bg); }
 .safety-entry { border-color: var(--tt-color-pastel-butter-stroke); background: var(--tt-color-pastel-butter-bg); }

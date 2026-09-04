@@ -2,6 +2,7 @@ import { Global, Module } from "@nestjs/common";
 import { JwtModule } from "@nestjs/jwt";
 import { PassportModule } from "@nestjs/passport";
 
+import { SecurityCounterModule } from "../common/security-counter/security-counter.module";
 import { AuthController } from "./auth.controller";
 import { AuthIdentityTombstoneService } from "./auth-identity-tombstone.service";
 import { AuthService } from "./auth.service";
@@ -17,7 +18,7 @@ import { SmsModule } from "./sms/sms.module";
  */
 @Global()
 @Module({
-  imports: [PassportModule, JwtModule.register({}), SmsModule],
+  imports: [PassportModule, JwtModule.register({}), SmsModule, SecurityCounterModule],
   controllers: [AuthController],
   providers: [AuthIdentityTombstoneService, AuthService, JwtStrategy, JwtAuthGuard],
   exports: [AuthIdentityTombstoneService, AuthService, JwtAuthGuard]

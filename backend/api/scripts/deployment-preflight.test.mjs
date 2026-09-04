@@ -35,6 +35,7 @@ function validProduction() {
     API_PREFIX: "api/v1",
     DATABASE_URL: "postgresql://talk:strong-password@10.0.0.10:5432/talk_and_talk",
     REDIS_URL: "rediss://:strong-password@10.0.0.11:6379",
+    SECURITY_COUNTER_BACKEND: "redis",
     CORS_ORIGINS: "https://api.talkandtalk.app",
     JWT_ACCESS_SECRET: "access-secret-that-is-longer-than-32-characters",
     JWT_REFRESH_SECRET: "refresh-secret-that-is-longer-than-32-characters",
@@ -131,6 +132,103 @@ test("parses quoted env values without exposing comments", () => {
 
 test("accepts a complete production Mini Program deployment", () => {
   assert.deepEqual(validateDeploymentConfig(validProduction()), []);
+});
+
+test("accepts CloudBase PG variables with PostgreSQL security counters and no Redis", () => {
+  const env = validProduction();
+  env.DATABASE_URL = "";
+  env.REDIS_URL = "";
+  env.SECURITY_COUNTER_BACKEND = "postgres";
+  env.PGHOST = "cloudbase-postgres.internal";
+  env.PGPORT = "5432";
+  env.PGDATABASE = "talk_and_talk";
+  env.PGUSER = "talk-runtime";
+  env.PGPASSWORD = "cloudbase-runtime-password";
+
+  assert.deepEqual(validateDeploymentConfig(env), []);
+});
+
+test("accepts declared CloudBase runtime PG injection without storing connection credentials locally", () => {
+  const env = validProduction();
+  env.APP_ENV = "staging";
+  env.DATABASE_URL = "";
+  env.REDIS_URL = "";
+  env.SECURITY_COUNTER_BACKEND = "postgres";
+  env.CLOUDBASE_MANAGED_MIGRATIONS = "true";
+  env.CLOUDBASE_RUNTIME_PG_INJECTION = "true";
+  env.CLOUDBASE_ENV_ID = "talk-and-talk-staging-d6d04a14b8";
+
+  assert.deepEqual(validateDeploymentConfig(env), []);
+  env.CLOUDBASE_MANAGED_MIGRATIONS = "false";
+  assert.match(
+    validateDeploymentConfig(env).join("\n"),
+    /runtime PG injection requires managed migrations/
+  );
+});
+
+test("accepts AppSecret-less CloudBase identity only for a Mini Program-only staging service", () => {
+  const env = validProduction();
+  env.APP_ENV = "staging";
+  env.WECHAT_MINIPROGRAM_APP_SECRET = "";
+  env.WECHAT_CLOUDBASE_HEADER_AUTH_ENABLED = "true";
+  env.CLOUDBASE_ENV_ID = "talk-and-talk-staging-d6d04a14b8";
+  env.CLOUDBASE_MINIAPP_ONLY = "true";
+  env.WECHAT_SUBSCRIBE_MESSAGES_ENABLED = "false";
+
+  assert.deepEqual(validateDeploymentConfig(env), []);
+  env.CLOUDBASE_MINIAPP_ONLY = "false";
+  assert.match(
+    validateDeploymentConfig(env).join("\n"),
+    /CLOUDBASE_MINIAPP_ONLY=true/
+  );
+});
+
+test("rejects incomplete CloudBase PG variables without exposing their secret", () => {
+  const env = validProduction();
+  const secret = "must-never-appear-in-preflight-errors";
+  env.DATABASE_URL = "";
+  env.SECURITY_COUNTER_BACKEND = "postgres";
+  env.REDIS_URL = "";
+  env.PGHOST = "cloudbase-postgres.internal";
+  env.PGPORT = "5432";
+  env.PGUSER = "talk-runtime";
+  env.PGPASSWORD = secret;
+
+  const errors = validateDeploymentConfig(env).join("\n");
+  assert.match(errors, /PGDATABASE/);
+  assert.doesNotMatch(errors, new RegExp(secret));
+});
+
+test("keeps Redis required by default and rejects unknown counter backends", () => {
+  assert.match(
+    validateDeploymentConfig({ ...validProduction(), REDIS_URL: "" }).join("\n"),
+    /REDIS_URL is required when SECURITY_COUNTER_BACKEND=redis/
+  );
+  assert.match(
+    validateDeploymentConfig({ ...validProduction(), SECURITY_COUNTER_BACKEND: "memory" }).join("\n"),
+    /SECURITY_COUNTER_BACKEND must be redis or postgres/
+  );
+  assert.match(
+    validateDeploymentConfig({ ...validProduction(), CLOUDBASE_MANAGED_MIGRATIONS: "yes" }).join("\n"),
+    /CLOUDBASE_MANAGED_MIGRATIONS must be true or false/
+  );
+});
+
+test("keeps the Docker migration default and supports the CloudBase managed-DDL boundary", () => {
+  const entrypoint = readFileSync(resolve(scriptDirectory, "../docker-entrypoint.sh"), "utf8");
+  const dockerfile = readFileSync(resolve(scriptDirectory, "../Dockerfile"), "utf8");
+
+  assert.match(entrypoint, /resolveDatabaseUrl\(process\.env\)/);
+  assert.match(entrypoint, /CLOUDBASE_MANAGED_MIGRATIONS:-false/);
+  assert.match(entrypoint, /skipping Prisma migrate\/status/);
+  assert.match(entrypoint, /tcb db pg migration or ExecutePGSql/);
+  assert.match(entrypoint, /prisma migrate deploy/);
+  assert.match(entrypoint, /prisma migrate status/);
+  assert.ok(
+    entrypoint.indexOf("resolveDatabaseUrl(process.env)")
+      < entrypoint.indexOf("CLOUDBASE_MANAGED_MIGRATIONS:-false")
+  );
+  assert.match(dockerfile, /COPY --from=build \/app\/config \.\/config/);
 });
 
 test("fails closed when commercial refund policy approval or bounds are invalid", () => {

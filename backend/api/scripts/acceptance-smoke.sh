@@ -13,8 +13,9 @@
 # The Mini Program payment channel requires a real, server-verified WeChat
 # openid.  This script therefore exercises the same server-side order/payment
 # lifecycle through the mock App channel, without fabricating WeChat identity.
-# While IDENTITY-R01/R02 freezes every grant, the script proves the exact 403
-# and stops before any order/payment write instead of bypassing the product gate.
+# Public interaction no longer depends on a profile identity grant. The script
+# exercises the active-account order, confirmation and mock-payment lifecycle;
+# adult eligibility and companion commercial checks remain authoritative.
 
 set -euo pipefail
 umask 077
@@ -505,12 +506,7 @@ OWNER_ID="$AUTH_USER_ID"
 record_legal_consent owner "$OWNER_TOKEN" "$OWNER_ID"
 
 say 'Customer creates a future service order'
-ORDER_JSON="$(api_request order-create POST '/orders' "$CUSTOMER_TOKEN" "$(make_order_body "$(near_future_schedule)")" 'PUBLIC_INTERACTION_IDENTITY_REQUIRED')"
-if [[ "$(<"$TMP_DIR/order-create.status")" == "403" ]]; then
-  say 'PASS: approved identity authority is absent; order and payment writes failed closed before creation'
-  say 'Downstream mock transaction coverage remains in isolated tests behind an explicitly labelled test adapter; this run is not commercial acceptance'
-  exit 0
-fi
+ORDER_JSON="$(api_request order-create POST '/orders' "$CUSTOMER_TOKEN" "$(make_order_body "$(near_future_schedule)")")"
 ORDER_ID="$(json_data "$ORDER_JSON" 'id')"
 
 say 'Companion owner confirms the service order'

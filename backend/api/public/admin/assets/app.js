@@ -119,7 +119,7 @@
     orderIntakeDisabled: "订单入口已关闭",
     payoutClaimsDisabled: "结算认领已关闭",
     paymentDisputeIntakeDisabled: "微信支付投诉接入已关闭",
-    publicInteractionIdentityAuthorityUnavailable: "可撤销的真实身份授权体系尚未接入，新预约与支付保持关闭",
+    publicInteractionIdentityAuthorityUnavailable: "兼容状态异常：公开互动身份硬门已解除，服务端不应再报告此阻断",
     wechatDailyBillReconciliationDisabled: "微信日账单对账未完成配置",
     wechatDailyBillReconciliationIncomplete: "微信日账单覆盖不完整",
     wechatDailyBillOpenIssues: "微信日账单差异未结",

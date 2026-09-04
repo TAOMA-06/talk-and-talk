@@ -1,0 +1,596 @@
+{
+  "schemaVersion": 1,
+  "kind": "talk-and-talk-direct-open-ui-review",
+  "sourceManifest": "SOURCE-CAPTURE-MANIFEST.json",
+  "sourceManifestSha256": "420e0e46e1adad8367240f3187af241fd876b0117068da078ad8c765010f5e6d",
+  "sourceGeneratedAt": "2026-09-04T10:34:05.640Z",
+  "sourceCapture": {
+    "tool": "WeChat DevTools App.captureScreenshot via miniprogram-automator",
+    "devtools": "Stable 2.01.2510290",
+    "simulator": {
+      "model": "iPhone 12/13 (Pro)",
+      "SDKVersion": "3.17.2",
+      "theme": "light",
+      "windowWidth": 390,
+      "windowHeight": 753,
+      "pixelRatio": 3
+    },
+    "stateBoundary": {
+      "fixtures": {
+        "consent": "fixture-empty-storage.json",
+        "allOtherRoutes": "fixture-legal-only.json"
+      },
+      "resetBeforeEveryRoute": true,
+      "realIdentityToken": false,
+      "realRoleSession": false,
+      "realOrderOrPaymentData": false,
+      "localApiStarted": false,
+      "interpretation": "actual local route and fail-closed rendering evidence; not real business-flow success"
+    }
+  },
+  "screenCount": 31,
+  "assetBytes": 371272,
+  "networkRequests": 0,
+  "businessRuntime": false,
+  "uploadAllowed": false,
+  "screens": [
+    {
+      "index": 1,
+      "number": "01",
+      "name": "01-consent",
+      "title": "首次同意",
+      "group": "core",
+      "tone": "blue",
+      "route": "/pages/consent/index",
+      "shortRoute": "consent/index",
+      "image": "/assets/screens/01-consent.jpg",
+      "sourceSha256": "919ad3ebf0223ba5c8bc2c45ba2eba88fad131c85b2713dabe28c57cc4db6a19",
+      "reviewSha256": "f222e30f460be74b592335e43cbb22b9b0aa040c097617efa0c3b4a05047d991",
+      "bytes": 31815,
+      "dimensions": {
+        "width": 390,
+        "height": 753
+      }
+    },
+    {
+      "index": 2,
+      "number": "02",
+      "name": "02-home",
+      "title": "首页",
+      "group": "core",
+      "tone": "apricot",
+      "route": "/pages/home/index",
+      "shortRoute": "home/index",
+      "image": "/assets/screens/02-home.jpg",
+      "sourceSha256": "f2489e5697f714d385d89af1a55019ab5c2de4d48353b76a113e5328c286aa16",
+      "reviewSha256": "e146c8108824771e2397e2a044896eef325745e57ef14cba720026cdfbc5a385",
+      "bytes": 19055,
+      "dimensions": {
+        "width": 390,
+        "height": 671
+      }
+    },
+    {
+      "index": 3,
+      "number": "03",
+      "name": "03-discover",
+      "title": "发现",
+      "group": "core",
+      "tone": "mint",
+      "route": "/pages/discover/index",
+      "shortRoute": "discover/index",
+      "image": "/assets/screens/03-discover.jpg",
+      "sourceSha256": "d8179cd31582703f700000014ad9a1b33ae0fcf67b9ee839bde155019906f1bb",
+      "reviewSha256": "293a71192388c7e93648446f7de97768e192acda9797b5c58a1b6dfe8c223d5d",
+      "bytes": 18472,
+      "dimensions": {
+        "width": 390,
+        "height": 671
+      }
+    },
+    {
+      "index": 4,
+      "number": "04",
+      "name": "04-community",
+      "title": "广场",
+      "group": "core",
+      "tone": "lavender",
+      "route": "/pages/community/index",
+      "shortRoute": "community/index",
+      "image": "/assets/screens/04-community.jpg",
+      "sourceSha256": "a4e4912d6bbc56046c42b9d6c9a257840b419f701fe04f08c540cfcfc28e127c",
+      "reviewSha256": "7644c8be0e13ee9483eab164fb36eec474e228480cc19e02fee0737d444a3789",
+      "bytes": 22408,
+      "dimensions": {
+        "width": 390,
+        "height": 753
+      }
+    },
+    {
+      "index": 5,
+      "number": "05",
+      "name": "05-orders",
+      "title": "订单中心",
+      "group": "orders",
+      "tone": "butter",
+      "route": "/pages/orders/index",
+      "shortRoute": "orders/index",
+      "image": "/assets/screens/05-orders.jpg",
+      "sourceSha256": "c14178f6342f45bebf5767665fdca724a396d3f351383f56e14741d1b1c159b9",
+      "reviewSha256": "4c1fddeb5813272b8b5c4349a76771ea450080275426cb6451a5da20e126316f",
+      "bytes": 7932,
+      "dimensions": {
+        "width": 390,
+        "height": 671
+      }
+    },
+    {
+      "index": 6,
+      "number": "06",
+      "name": "06-order-detail",
+      "title": "订单详情",
+      "group": "orders",
+      "tone": "rose",
+      "route": "/pages/order/detail?id=demo-20260828-u1-order-paid",
+      "shortRoute": "order/detail",
+      "image": "/assets/screens/06-order-detail.jpg",
+      "sourceSha256": "f444ded760b372ed56bb564407cd74a0f3322b0f7deafab09bb245b56684cbf1",
+      "reviewSha256": "00b98f1cd470edefbfd865276087d258ab42a8548c98de77afcc74fe55df1665",
+      "bytes": 4451,
+      "dimensions": {
+        "width": 390,
+        "height": 753
+      }
+    },
+    {
+      "index": 7,
+      "number": "07",
+      "name": "07-order-payment",
+      "title": "支付确认",
+      "group": "orders",
+      "tone": "blue",
+      "route": "/pages/order/payment?orderId=demo-20260828-u1-order-pending",
+      "shortRoute": "order/payment",
+      "image": "/assets/screens/07-order-payment.jpg",
+      "sourceSha256": "6b291fb81d34003ec67cb13bc910904752737db80eb0a53191373813255a8be4",
+      "reviewSha256": "3ebe88ae641355a939b4d67514f2b1c5e22d684f9ef35da79213d65ce4a68255",
+      "bytes": 11631,
+      "dimensions": {
+        "width": 390,
+        "height": 753
+      }
+    },
+    {
+      "index": 8,
+      "number": "08",
+      "name": "08-order-aftercare",
+      "title": "评价与售后",
+      "group": "orders",
+      "tone": "apricot",
+      "route": "/pages/order/aftercare?orderId=demo-20260828-u1-order-refunded",
+      "shortRoute": "order/aftercare",
+      "image": "/assets/screens/08-order-aftercare.jpg",
+      "sourceSha256": "658e1c861abe4319c3b21fa4ebed8327015171e32770a8d1e1a7d66febc667d6",
+      "reviewSha256": "6c2fdf66922f9b38c417c53290b60dcbe048daedbce6f1fabc1fc62095956fef",
+      "bytes": 4704,
+      "dimensions": {
+        "width": 390,
+        "height": 753
+      }
+    },
+    {
+      "index": 9,
+      "number": "09",
+      "name": "09-order-dispute",
+      "title": "订单争议",
+      "group": "orders",
+      "tone": "mint",
+      "route": "/pages/order/dispute?orderId=demo-20260828-u1-order-refunded",
+      "shortRoute": "order/dispute",
+      "image": "/assets/screens/09-order-dispute.jpg",
+      "sourceSha256": "591f03f0dc90f4e4b8b50abb75607c5cc1683e6bf70f96c4d5892763081038b4",
+      "reviewSha256": "e7c50e5502741b03be861f9a2ab4bec72ebda78c6c9e438f5b39c56b9daac98e",
+      "bytes": 4500,
+      "dimensions": {
+        "width": 390,
+        "height": 753
+      }
+    },
+    {
+      "index": 10,
+      "number": "10",
+      "name": "10-messages",
+      "title": "消息",
+      "group": "core",
+      "tone": "lavender",
+      "route": "/pages/messages/index",
+      "shortRoute": "messages/index",
+      "image": "/assets/screens/10-messages.jpg",
+      "sourceSha256": "e76a35c4b2df73cae8350692ff7abe2c6c36c806c86077f2a2831bfe7ed895ad",
+      "reviewSha256": "0ba6ff6002447d57676218be7b71cff722dd3972328305b1cfb974ba601a9110",
+      "bytes": 16857,
+      "dimensions": {
+        "width": 390,
+        "height": 671
+      }
+    },
+    {
+      "index": 11,
+      "number": "11",
+      "name": "11-notifications",
+      "title": "通知",
+      "group": "account",
+      "tone": "butter",
+      "route": "/pages/notifications/index",
+      "shortRoute": "notifications/index",
+      "image": "/assets/screens/11-notifications.jpg",
+      "sourceSha256": "c205e5991a0d4bd4dfde1ef1a42ed17d76ce96d530c2a294f88891792b401f2c",
+      "reviewSha256": "d18db50bd2533a97d7f226f7564f26d1e55697088e8f6a5afd858c3a0a707958",
+      "bytes": 13638,
+      "dimensions": {
+        "width": 390,
+        "height": 753
+      }
+    },
+    {
+      "index": 12,
+      "number": "12",
+      "name": "12-profile",
+      "title": "我的",
+      "group": "core",
+      "tone": "rose",
+      "route": "/pages/profile/index",
+      "shortRoute": "profile/index",
+      "image": "/assets/screens/12-profile.jpg",
+      "sourceSha256": "362772e28e9fafadcd444758caecb0a26c7cf53650f627d7298a749b75565224",
+      "reviewSha256": "30562a63112513b06dbfcdd4f87551e8c1ba5df043780361ee5319829ee19c56",
+      "bytes": 5309,
+      "dimensions": {
+        "width": 390,
+        "height": 671
+      }
+    },
+    {
+      "index": 13,
+      "number": "13",
+      "name": "13-account",
+      "title": "账户与隐私",
+      "group": "account",
+      "tone": "blue",
+      "route": "/pages/account/index",
+      "shortRoute": "account/index",
+      "image": "/assets/screens/13-account.jpg",
+      "sourceSha256": "af2c0416c0d7312a546ddc9acb8320d2b4bf31d223d31ba1b195b3a0f7474d6c",
+      "reviewSha256": "7d16595190976a591f45986bdb12a7114bdff8c726c06be87096c30ac87a2ddb",
+      "bytes": 6566,
+      "dimensions": {
+        "width": 390,
+        "height": 753
+      }
+    },
+    {
+      "index": 14,
+      "number": "14",
+      "name": "14-adult-eligibility",
+      "title": "成年资格",
+      "group": "account",
+      "tone": "apricot",
+      "route": "/pages/account/adult-eligibility",
+      "shortRoute": "account/adult-eligibility",
+      "image": "/assets/screens/14-adult-eligibility.jpg",
+      "sourceSha256": "7ea799d2a45b45f37cfe23a94e7e8c5cf1a8bee2b2ceba01468daed9f3128df4",
+      "reviewSha256": "dc9cd28a956bdcf95a5b41c86f991bf63f50bbe8b9dffce2c1a8a872c38dcf83",
+      "bytes": 9054,
+      "dimensions": {
+        "width": 390,
+        "height": 753
+      }
+    },
+    {
+      "index": 15,
+      "number": "15",
+      "name": "15-deletion-status",
+      "title": "注销状态",
+      "group": "account",
+      "tone": "mint",
+      "route": "/pages/account/deletion-status",
+      "shortRoute": "account/deletion-status",
+      "image": "/assets/screens/15-deletion-status.jpg",
+      "sourceSha256": "2381bcf795444fb7ae9b91356e7fcdb424667f3e5f6dd7e689b58e45dfeecbdc",
+      "reviewSha256": "cb515014bb13c540938aad928ccc6aa803b2131b4c59869d662b89fea5d48198",
+      "bytes": 13886,
+      "dimensions": {
+        "width": 390,
+        "height": 753
+      }
+    },
+    {
+      "index": 16,
+      "number": "16",
+      "name": "20-companion-detail",
+      "title": "安全中心",
+      "group": "safety",
+      "tone": "lavender",
+      "route": "/pages/companion/detail?id=c1",
+      "shortRoute": "companion/detail",
+      "image": "/assets/screens/20-companion-detail.jpg",
+      "sourceSha256": "256b5b0c13b873b325fefd02d0e8b1029b3285fbd2b387261be92a5d9eaf6e7e",
+      "reviewSha256": "22541c1603fdf6f67a6d65fcadc6685b5f6c063b68227158cb04f210ffffcbe0",
+      "bytes": 13205,
+      "dimensions": {
+        "width": 390,
+        "height": 753
+      }
+    },
+    {
+      "index": 17,
+      "number": "17",
+      "name": "16-safety",
+      "title": "紧急帮助",
+      "group": "safety",
+      "tone": "butter",
+      "route": "/pages/safety/index",
+      "shortRoute": "safety/index",
+      "image": "/assets/screens/16-safety.jpg",
+      "sourceSha256": "a5866de0038d238c9a101af22ee9f59264749b043913217be1a77f4ec2d0b8dd",
+      "reviewSha256": "86478f3dc43f0e6c9b675330e2b1f5681f53f0eba3d6e46072e58363dc26bedc",
+      "bytes": 28551,
+      "dimensions": {
+        "width": 390,
+        "height": 753
+      }
+    },
+    {
+      "index": 18,
+      "number": "18",
+      "name": "17-crisis",
+      "title": "客服中心",
+      "group": "safety",
+      "tone": "rose",
+      "route": "/pages/crisis/index",
+      "shortRoute": "crisis/index",
+      "image": "/assets/screens/17-crisis.jpg",
+      "sourceSha256": "d33ad9059d224e25cc6f63999c796a7c611a8ff44d2e65da0e2cce0d58ee4ecf",
+      "reviewSha256": "9b3162cea6a1255638ef7ca6291fda172dcd7ab97009e6ebe3514121f6ff02e8",
+      "bytes": 41344,
+      "dimensions": {
+        "width": 390,
+        "height": 753
+      }
+    },
+    {
+      "index": 19,
+      "number": "19",
+      "name": "18-support",
+      "title": "客服详情",
+      "group": "safety",
+      "tone": "blue",
+      "route": "/pages/support/index",
+      "shortRoute": "support/index",
+      "image": "/assets/screens/18-support.jpg",
+      "sourceSha256": "3d0649b1ded4abd1d8d9b5c3909866698dc11a30ae3e7850e7b9a16cca5b6942",
+      "reviewSha256": "3119b48c8dc8294e9827930b5168b572660dd8d1eb4ae3f840328cd58026bf04",
+      "bytes": 22012,
+      "dimensions": {
+        "width": 390,
+        "height": 753
+      }
+    },
+    {
+      "index": 20,
+      "number": "20",
+      "name": "19-support-detail",
+      "title": "陪伴者详情",
+      "group": "core",
+      "tone": "apricot",
+      "route": "/pages/support/detail?id=demo-20260828-u1-support-resolved",
+      "shortRoute": "support/detail",
+      "image": "/assets/screens/19-support-detail.jpg",
+      "sourceSha256": "0ff31b572c819aa79bda814b9d8cf5ec206bdd81b345344256b5e3562ed37c9f",
+      "reviewSha256": "4b4001aa4d04613b4d38c43f845f11ed9263d5119f652acffcca0121ea5e6449",
+      "bytes": 5523,
+      "dimensions": {
+        "width": 390,
+        "height": 753
+      }
+    },
+    {
+      "index": 21,
+      "number": "21",
+      "name": "21-companion-workbench",
+      "title": "陪伴者工作台",
+      "group": "companion",
+      "tone": "mint",
+      "route": "/pages/companion/workbench/index",
+      "shortRoute": "companion/workbench/index",
+      "image": "/assets/screens/21-companion-workbench.jpg",
+      "sourceSha256": "fd16975a98436565b885c6a5944ed93e9b4de7db5fcb173df4f00e7bea245bf4",
+      "reviewSha256": "ffcc93ff8c7dfca9d7c7d8ea2bc92fc3aa2cc73d3fd59bb2752be684cff31de8",
+      "bytes": 5624,
+      "dimensions": {
+        "width": 390,
+        "height": 753
+      }
+    },
+    {
+      "index": 22,
+      "number": "22",
+      "name": "22-companion-onboarding",
+      "title": "陪伴者入驻",
+      "group": "companion",
+      "tone": "lavender",
+      "route": "/pages/companion/onboarding/index",
+      "shortRoute": "companion/onboarding/index",
+      "image": "/assets/screens/22-companion-onboarding.jpg",
+      "sourceSha256": "604e9786b3cd81e663b6ed710b7d18bace306aab572439aaf7c78df84a62ffdb",
+      "reviewSha256": "e8eba9b9e185b2800315647bccd1286e2eb371d21f500db3fd35f70a86c63200",
+      "bytes": 5389,
+      "dimensions": {
+        "width": 390,
+        "height": 753
+      }
+    },
+    {
+      "index": 23,
+      "number": "23",
+      "name": "23-companion-schedule",
+      "title": "排班管理",
+      "group": "companion",
+      "tone": "butter",
+      "route": "/pages/companion/schedule/index",
+      "shortRoute": "companion/schedule/index",
+      "image": "/assets/screens/23-companion-schedule.jpg",
+      "sourceSha256": "e6bf9be019a66f823d7258ba96e780b54f28611742e8fc2975ab1f03a167b2e2",
+      "reviewSha256": "a5ed3b95ee21b6b3eb3a68983da04312606d016c8d253daf01ebde41ebf5ed6b",
+      "bytes": 5634,
+      "dimensions": {
+        "width": 390,
+        "height": 753
+      }
+    },
+    {
+      "index": 24,
+      "number": "24",
+      "name": "24-companion-development",
+      "title": "成长与训练",
+      "group": "companion",
+      "tone": "rose",
+      "route": "/pages/companion/development/index",
+      "shortRoute": "companion/development/index",
+      "image": "/assets/screens/24-companion-development.jpg",
+      "sourceSha256": "5f385a661240a7c091ba805ce103f3375d2faf074fb7f87ccb2755ad4e564730",
+      "reviewSha256": "0e0336c4f9bf071051290908c6e6da4c7e8f56d92bc6e7f92faec44c01546004",
+      "bytes": 5102,
+      "dimensions": {
+        "width": 390,
+        "height": 753
+      }
+    },
+    {
+      "index": 25,
+      "number": "25",
+      "name": "25-companion-earnings",
+      "title": "收益",
+      "group": "companion",
+      "tone": "blue",
+      "route": "/pages/companion/earnings/index",
+      "shortRoute": "companion/earnings/index",
+      "image": "/assets/screens/25-companion-earnings.jpg",
+      "sourceSha256": "b791f49997d23c6f1804d002ecc23b4ad273711c51822b00decf9a724be02739",
+      "reviewSha256": "8679584ebca7b91de072de8d7c89ca673fea21efb7eddceb159e2f4abc1f11a7",
+      "bytes": 5719,
+      "dimensions": {
+        "width": 390,
+        "height": 753
+      }
+    },
+    {
+      "index": 26,
+      "number": "26",
+      "name": "26-companion-safety",
+      "title": "陪伴者安全",
+      "group": "companion",
+      "tone": "apricot",
+      "route": "/pages/companion/safety/index",
+      "shortRoute": "companion/safety/index",
+      "image": "/assets/screens/26-companion-safety.jpg",
+      "sourceSha256": "1d91215163d34d1a8316c36cac36ab41effba601e576ef418f427dc1ad251b24",
+      "reviewSha256": "0c6c93aa53d8f9e6c9518492d8f32694f9b4c4d9e5984deacea4ebdf972db47d",
+      "bytes": 5692,
+      "dimensions": {
+        "width": 390,
+        "height": 753
+      }
+    },
+    {
+      "index": 27,
+      "number": "27",
+      "name": "27-companion-services",
+      "title": "服务管理",
+      "group": "companion",
+      "tone": "mint",
+      "route": "/pages/companion/services/index",
+      "shortRoute": "companion/services/index",
+      "image": "/assets/screens/27-companion-services.jpg",
+      "sourceSha256": "3b9db5c3bb5b68a215802e1f2e044bf0fd486a77f1677f2d1e26a237dadd0048",
+      "reviewSha256": "ed751310b75da92f93d6fcdecf36c5f9a2a8e7debb1ffda6a23759f525a3048e",
+      "bytes": 5025,
+      "dimensions": {
+        "width": 390,
+        "height": 753
+      }
+    },
+    {
+      "index": 28,
+      "number": "28",
+      "name": "28-companion-availability",
+      "title": "可约时间",
+      "group": "companion",
+      "tone": "lavender",
+      "route": "/pages/companion/availability/index",
+      "shortRoute": "companion/availability/index",
+      "image": "/assets/screens/28-companion-availability.jpg",
+      "sourceSha256": "3b9db5c3bb5b68a215802e1f2e044bf0fd486a77f1677f2d1e26a237dadd0048",
+      "reviewSha256": "ed751310b75da92f93d6fcdecf36c5f9a2a8e7debb1ffda6a23759f525a3048e",
+      "bytes": 5025,
+      "dimensions": {
+        "width": 390,
+        "height": 753
+      }
+    },
+    {
+      "index": 29,
+      "number": "29",
+      "name": "29-chat",
+      "title": "聊天",
+      "group": "core",
+      "tone": "butter",
+      "route": "/pages/chat/index?id=c1",
+      "shortRoute": "chat/index",
+      "image": "/assets/screens/29-chat.jpg",
+      "sourceSha256": "6633c8e8ca14c4fa1777c12972117f933bc4c8d2c686e5c951cb148706aac08b",
+      "reviewSha256": "c0fe30291e16454053586de6b38b3b20b2dbbb45cf432e8dc3e63b1f410b2c33",
+      "bytes": 12556,
+      "dimensions": {
+        "width": 390,
+        "height": 753
+      }
+    },
+    {
+      "index": 30,
+      "number": "30",
+      "name": "30-voice",
+      "title": "语音状态",
+      "group": "core",
+      "tone": "rose",
+      "route": "/pages/voice/index?orderId=demo-20260828-u1-order-paid",
+      "shortRoute": "voice/index",
+      "image": "/assets/screens/30-voice.jpg",
+      "sourceSha256": "c82beb46bae5a96dcc7c7a4eca5050c31a69a390d9f6cb83cfca685e5f8e20c2",
+      "reviewSha256": "b611c70d44bb339058761973f0259bec898cc36257effe463d1691fbffeeb869",
+      "bytes": 12522,
+      "dimensions": {
+        "width": 390,
+        "height": 753
+      }
+    },
+    {
+      "index": 31,
+      "number": "31",
+      "name": "31-legal",
+      "title": "法律文档",
+      "group": "account",
+      "tone": "blue",
+      "route": "/pages/legal/index?type=privacy",
+      "shortRoute": "legal/index",
+      "image": "/assets/screens/31-legal.jpg",
+      "sourceSha256": "5121a7b72cab3c5ea7de6f120f2138431f4c8d586b8a281526e217aecb6ca98d",
+      "reviewSha256": "9f777659191dba9650f00d468f3d3a668ff6a24b9dafc1b5b325c7e9b59379a2",
+      "bytes": 2071,
+      "dimensions": {
+        "width": 390,
+        "height": 753
+      }
+    }
+  ]
+}

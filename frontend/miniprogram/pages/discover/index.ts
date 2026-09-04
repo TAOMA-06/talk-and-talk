@@ -488,6 +488,9 @@ Page({
   openEmergencyHelp() {
     openCrisisResources({ source: "directEmergencyHelp", riskCode: "userRequested" });
   },
+  openCommunity() {
+    wx.navigateTo({ url: "/pages/community/index" });
+  },
   async openCompanion(event: any) {
     if (!await passCrisisGate("discover")) return;
     const { id, impressionId, themeId } = event.currentTarget.dataset;

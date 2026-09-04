@@ -40,7 +40,7 @@
 
 - [ ] `COMMERCIAL_RELEASE_MODE=commercial`；`REFUND_POLICY_VERSION`、`REFUND_REQUEST_WINDOW_HOURS` 与已批准规则一致，取得非秘密 `REFUND_POLICY_APPROVAL_REFERENCE` 后才设置 `REFUND_POLICY_APPROVED=true`；`COMPANION_SETTLEMENT_HOLD_HOURS` 至少晚于退款窗口 24 小时。生产示例默认未批准并保持 No-Go
 - [ ] **首发产品范围（text-only）**：`MEDIA_PROVIDER=disabled`、`MEDIA_FEATURE_ENABLED=false`、`TRTC_ENABLED=false`；小程序客户端隐藏聊天附件与实时语音入口。MEDIA/TRTC 能力保留在仓库内，但未取得生产运行证据前不得对用户开放
-- [ ] 已接入真实、可追溯且可撤销的身份 authority，普通用户与陪伴者均有当前授权、独立复核、撤销/到期和重新核验记录；在此之前正式版必须隐藏新预约/支付/发布/聊天写入，`POST /orders` 与 prepay 返回 `PUBLIC_INTERACTION_IDENTITY_REQUIRED` 且订单、支付、通知、审计业务写均为 0
+- [ ] 已验证活跃普通用户无需 `profile.isVerified` 即可创建预约、进入支付、社区发布和订单内消息；restricted/banned 账号仍在写入前拒绝。客户当前法律同意与成年资格、陪伴者商业资格、内容审核、时段容量、幂等和支付风控必须继续分别通过
 - [ ] 账号注销后的分类保留期限已经外部法律/合规批准；仅在取得可追溯、非秘密的批准引用后，将 `ACCOUNT_DELETION_RETENTION_POLICY_APPROVED=true` 并填写 `ACCOUNT_DELETION_RETENTION_POLICY_APPROVAL_REFERENCE`，否则保持 No-Go
 - [ ] `COMPANION_VOICE_EVIDENCE_VIEWER_URL` 指向无凭据、无 query/fragment 的外部 HTTPS 受控查看器；签名密钥为独立 32+ 位随机值，TTL 在 60–900 秒。管理员实测短期地址过期、换人或换版本后不可复用；查看器缺失时语音批准返回 503 且后台明确 No-Go
 - [ ] 用正式小程序重放一次创建订单：缺少 `clientRequestId`、`serviceOfferingId` 或 `availabilityWindowId` 均返回 422；相同幂等键和相同业务输入只返回原订单及原退款规则版本/小时快照，即使当前配置已经换版也不产生第二笔订单或支付意图

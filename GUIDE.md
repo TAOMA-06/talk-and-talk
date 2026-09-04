@@ -314,7 +314,7 @@ XcodeGen 工程。`project.yml` 生成 `TalkAndTalk.xcodeproj`。Debug 默认可
 | `health/` | `/health` 存活、`/health/ready` 依赖就绪 |
 | `metrics/` | 鉴权后的 Prometheus 指标 |
 | `auth/` | 微信小程序登录、短信（生产 `none`）、JWT、staff 登录、身份墓碑防重绑 |
-| `users/` | 当前用户、资料、法律同意、成年资格、注销执行 worker、公开互动身份门禁 |
+| `users/` | 当前用户、资料、法律同意、成年资格、注销执行 worker、公开互动账号状态门 |
 | `account-governance/` | 数据导出、发票、账号申诉、治理工单（用户侧 + admin） |
 | `companions/` | 陪伴者资料、商品 SKU、排班规则、可约窗口、周期草稿物化 |
 | `recommendations/` | 可解释推荐与运营位（admin 控制器在同模块） |

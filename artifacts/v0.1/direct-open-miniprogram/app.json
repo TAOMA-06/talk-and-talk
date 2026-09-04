@@ -1,0 +1,15 @@
+{
+  "pages": [
+    "pages/gallery/index",
+    "pages/screen/index"
+  ],
+  "window": {
+    "navigationBarBackgroundColor": "#f8f6f1",
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "Talk&Talk · UI 评审版",
+    "backgroundColor": "#f8f6f1",
+    "backgroundTextStyle": "light"
+  },
+  "sitemapLocation": "sitemap.json",
+  "style": "v2"
+}

@@ -1,0 +1,9 @@
+{
+  "desc": "Talk&Talk 本地 UI 评审版，不参与索引或发布",
+  "rules": [
+    {
+      "action": "disallow",
+      "page": "*"
+    }
+  ]
+}

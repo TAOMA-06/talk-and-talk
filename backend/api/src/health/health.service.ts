@@ -2,8 +2,10 @@ import { performance } from "node:perf_hooks";
 
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import Redis from "ioredis";
 import { Pool } from "pg";
+
+import { SecurityCounterService } from "../common/security-counter/security-counter.service";
+import type { SecurityCounterBackend } from "../config/configuration";
 
 export type DependencyStatus = {
   status: "ok" | "error";
@@ -22,7 +24,8 @@ export type HealthReadyResponse = HealthLivenessResponse & {
   uptimeSeconds: number;
   dependencies: {
     database: DependencyStatus;
-    redis: DependencyStatus;
+    securityCounters: DependencyStatus & { backend: SecurityCounterBackend };
+    redis?: DependencyStatus;
   };
 };
 
@@ -32,11 +35,12 @@ export type HealthResponse = HealthReadyResponse;
 @Injectable()
 export class HealthService {
   constructor(
-    private readonly config: ConfigService
+    private readonly config: ConfigService,
+    private readonly counters: SecurityCounterService
   ) {}
 
   /**
-   * Public liveness: process is up. Never probe DB/Redis here — dependency
+   * Public liveness: process is up. Never probe DB/counters here — dependency
    * failures belong on authenticated `/health/ready` so orchestrators do not
    * restart healthy processes during brief dependency blips.
    */
@@ -50,11 +54,15 @@ export class HealthService {
 
   /** Internal readiness with dependency detail. Callers must gate exposure. */
   async ready(): Promise<HealthReadyResponse> {
-    const [database, redis] = await Promise.all([
+    const [database, securityCounterStatus] = await Promise.all([
       this.checkDatabase(),
-      this.checkRedis()
+      this.checkSecurityCounters()
     ]);
-    const healthy = database.status === "ok" && redis.status === "ok";
+    const healthy = database.status === "ok" && securityCounterStatus.status === "ok";
+    const securityCounters = {
+      ...securityCounterStatus,
+      backend: this.counters.backend
+    };
 
     return {
       status: healthy ? "ok" : "degraded",
@@ -64,7 +72,8 @@ export class HealthService {
       uptimeSeconds: Math.round(process.uptime()),
       dependencies: {
         database,
-        redis
+        securityCounters,
+        ...(this.counters.backend === "redis" ? { redis: securityCounterStatus } : {})
       }
     };
   }
@@ -88,24 +97,13 @@ export class HealthService {
     }
   }
 
-  private async checkRedis(): Promise<DependencyStatus> {
+  private async checkSecurityCounters(): Promise<DependencyStatus> {
     const start = performance.now();
-    const redis = new Redis(this.config.getOrThrow<string>("REDIS_URL"), {
-      connectTimeout: 1200,
-      lazyConnect: true,
-      maxRetriesPerRequest: 0,
-      retryStrategy: null
-    });
-    redis.on("error", () => undefined);
-
     try {
-      await redis.connect();
-      await redis.ping();
+      await this.counters.ping();
       return this.ok(start);
     } catch (error) {
       return this.error(start, error);
-    } finally {
-      redis.disconnect();
     }
   }
 

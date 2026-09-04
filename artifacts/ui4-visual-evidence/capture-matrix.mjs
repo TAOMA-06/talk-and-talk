@@ -9,10 +9,18 @@ const port = Number(process.env.MINIPROGRAM_AUTOMATION_PORT || 9428);
 const waitMs = Math.max(400, Number(process.env.UI4_WAIT_MS || 900));
 const expectedTheme = process.env.UI4_THEME?.trim() || "light";
 const expectedWidth = Number(process.env.UI4_DEVICE_WIDTH || 390);
-const outputRoot = resolve(import.meta.dirname, "matrix", String(expectedWidth), expectedTheme);
+const configuredOutputRoot = process.env.UI4_OUTPUT_ROOT?.trim();
+const outputRoot = configuredOutputRoot
+  ? resolve(configuredOutputRoot)
+  : resolve(import.meta.dirname, "matrix", String(expectedWidth), expectedTheme);
 const legalFixture = JSON.parse(await readFile(resolve(import.meta.dirname, "fixture-legal-only.json"), "utf8"));
 const emptyFixture = JSON.parse(await readFile(resolve(import.meta.dirname, "fixture-empty-storage.json"), "utf8"));
-const routes = JSON.parse(await readFile(resolve(import.meta.dirname, "../ui2-visual-evidence/routes.ui2.json"), "utf8"));
+const configuredRoutes = JSON.parse(await readFile(resolve(import.meta.dirname, "../ui2-visual-evidence/routes.ui2.json"), "utf8"));
+const routeFilter = process.env.UI4_ROUTE_FILTER?.trim();
+const routes = routeFilter
+  ? configuredRoutes.filter(([name]) => name === routeFilter)
+  : configuredRoutes;
+if (routeFilter && routes.length !== 1) throw new Error(`Unknown UI4_ROUTE_FILTER: ${routeFilter}`);
 if (!automatorBase) throw new Error("MINIPROGRAM_AUTOMATOR_ROOT is required");
 
 const automatorRoot = `${automatorBase}/node_modules/miniprogram-automator`;
@@ -83,7 +91,18 @@ try {
     let dimensions = null;
     try {
       await resetToFixture(miniProgram, name === "01-consent" ? emptyFixture : legalFixture);
-      const page = await bounded(miniProgram.reLaunch(route), `${name}:reLaunch`, 22_000);
+      let page;
+      try {
+        page = await bounded(miniProgram.reLaunch(route), `${name}:reLaunch`, 22_000);
+      } catch (routeError) {
+        // Some tourist-AppID DevTools builds complete the route but omit the
+        // automation callback. Accept only an independently observed exact
+        // current path; otherwise preserve the original failure.
+        await delay(650);
+        const observed = await bounded(miniProgram.currentPage(), `${name}:reLaunch-current-page`);
+        if (observed?.path !== expectedPath) throw routeError;
+        page = observed;
+      }
       await delay(waitMs);
       const current = await bounded(miniProgram.currentPage(), `${name}:current-page`);
       actualPath = page?.path || current?.path || "";
@@ -114,7 +133,7 @@ try {
       durationMs: Date.now() - startedAt
     };
     results.push(result);
-    process.stdout.write(`${JSON.stringify({ name, outcome, actualPath, durationMs: result.durationMs })}\n`);
+    process.stdout.write(`${JSON.stringify({ name, outcome, actualPath, error, durationMs: result.durationMs })}\n`);
   }
 } finally {
   miniProgram.disconnect();

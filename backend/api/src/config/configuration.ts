@@ -1,9 +1,11 @@
 import transactionalTemplateManifest = require("../../config/transactional-template-manifest.js");
+import { resolveDatabaseUrl } from "../../config/database-url.js";
 
 type NodeEnv = "development" | "test" | "production";
 type AppEnv = "development" | "staging" | "production";
 type CommercialReleaseMode = "internal" | "paidPilot" | "commercial";
 type CommercialSurface = "text_only" | "full";
+export type SecurityCounterBackend = "redis" | "postgres";
 
 export type WeChatSubscribeTemplate = {
   key: string;
@@ -21,6 +23,7 @@ interface Environment {
   APP_VERSION: string;
   DATABASE_URL: string;
   REDIS_URL: string;
+  SECURITY_COUNTER_BACKEND: SecurityCounterBackend;
   CORS_ORIGINS: string[];
   JWT_ACCESS_SECRET: string;
   JWT_REFRESH_SECRET: string;
@@ -66,6 +69,9 @@ interface Environment {
   WECHAT_PAY_COMPLAINT_BATCH_SIZE: number;
   WECHAT_MINIPROGRAM_APP_ID: string;
   WECHAT_MINIPROGRAM_APP_SECRET: string;
+  WECHAT_CLOUDBASE_HEADER_AUTH_ENABLED: boolean;
+  CLOUDBASE_ENV_ID: string;
+  CLOUDBASE_MINIAPP_ONLY: boolean;
   APPLE_SIGN_IN_BUNDLE_ID: string;
   SMS_PROVIDER: string;
   STAFF_TOTP_ENCRYPTION_KEY: string;
@@ -359,6 +365,12 @@ function parseCommercialSurface(value: string | undefined): CommercialSurface {
   throw new Error("COMMERCIAL_SURFACE must be text_only or full");
 }
 
+function parseSecurityCounterBackend(value: string | undefined): SecurityCounterBackend {
+  const backend = value?.trim().toLowerCase() || "redis";
+  if (backend === "redis" || backend === "postgres") return backend;
+  throw new Error("SECURITY_COUNTER_BACKEND must be redis or postgres");
+}
+
 function parseWeChatSubscribeTemplates(value: string | undefined, enabled: boolean): WeChatSubscribeTemplate[] {
   const source = optionalString(value);
   if (!source) {
@@ -469,6 +481,13 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
   }
   const apiPrefix = env.API_PREFIX?.trim() || "api/v1";
   const corsOrigins = parseCorsOrigins(env.CORS_ORIGINS, nodeEnv, appEnv);
+  const securityCounterBackend = parseSecurityCounterBackend(env.SECURITY_COUNTER_BACKEND);
+  const databaseUrl = resolveDatabaseUrl(
+    env,
+    appEnv === "production" ? "" : DEFAULT_DATABASE_URL
+  );
+  const redisUrl = optionalString(env.REDIS_URL)
+    || (appEnv === "production" ? "" : DEFAULT_REDIS_URL);
 
   const jwtAccessSecret = env.JWT_ACCESS_SECRET?.trim() || (nodeEnv === "production" ? "" : "dev-access-secret");
   const jwtRefreshSecret = env.JWT_REFRESH_SECRET?.trim() || (nodeEnv === "production" ? "" : "dev-refresh-secret");
@@ -557,8 +576,13 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
   const mockWechatNotifySecret =
     optionalString(env.MOCK_WECHAT_NOTIFY_SECRET) ||
     (nodeEnv === "test" ? "test-only-mock-wechat-notify-secret-32b" : "");
-  if (appEnv === "production" && (!env.DATABASE_URL?.trim() || !env.REDIS_URL?.trim())) {
-    throw new Error("DATABASE_URL and REDIS_URL must be explicitly configured in production");
+  if (appEnv === "production" && !databaseUrl) {
+    throw new Error(
+      "DATABASE_URL or PGHOST/PGPORT/PGDATABASE/PGUSER/PGPASSWORD must be explicitly configured in production"
+    );
+  }
+  if (appEnv === "production" && securityCounterBackend === "redis" && !redisUrl) {
+    throw new Error("REDIS_URL must be explicitly configured when SECURITY_COUNTER_BACKEND=redis");
   }
   if (appEnv === "production") {
     assertProductionValue("JWT_ACCESS_SECRET", jwtAccessSecret);
@@ -566,8 +590,10 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     assertProductionValue("REVIEW_JWT_ACCESS_SECRET", reviewJwtAccessSecret);
     assertProductionValue("REVIEW_JWT_REFRESH_SECRET", reviewJwtRefreshSecret);
     assertProductionValue("METRICS_TOKEN", metricsToken);
-    assertProductionValue("DATABASE_URL", env.DATABASE_URL!.trim());
-    assertProductionValue("REDIS_URL", env.REDIS_URL!.trim());
+    assertProductionValue("DATABASE_URL", databaseUrl);
+    if (securityCounterBackend === "redis") {
+      assertProductionValue("REDIS_URL", redisUrl);
+    }
   }
 
   const externalAiUserContentEnabled = parseBoolean(env.EXTERNAL_AI_USER_CONTENT_ENABLED, false);
@@ -1087,16 +1113,40 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
 
   const miniProgramAppId = optionalString(env.WECHAT_MINIPROGRAM_APP_ID);
   const miniProgramAppSecret = optionalString(env.WECHAT_MINIPROGRAM_APP_SECRET);
-  if (Boolean(miniProgramAppId) !== Boolean(miniProgramAppSecret)) {
-    throw new Error("WECHAT_MINIPROGRAM_APP_ID and WECHAT_MINIPROGRAM_APP_SECRET must be configured together");
+  const wechatCloudBaseHeaderAuthEnabled = parseBoolean(
+    env.WECHAT_CLOUDBASE_HEADER_AUTH_ENABLED,
+    false
+  );
+  const cloudBaseEnvId = optionalString(env.CLOUDBASE_ENV_ID);
+  const cloudBaseMiniAppOnly = parseBoolean(env.CLOUDBASE_MINIAPP_ONLY, false);
+  if (miniProgramAppSecret && !miniProgramAppId) {
+    throw new Error("WECHAT_MINIPROGRAM_APP_SECRET requires WECHAT_MINIPROGRAM_APP_ID");
+  }
+  if (wechatCloudBaseHeaderAuthEnabled) {
+    if (!/^[A-Za-z][A-Za-z0-9-]{5,63}$/.test(cloudBaseEnvId)) {
+      throw new Error("CLOUDBASE_ENV_ID must be configured for CloudBase Mini Program identity");
+    }
+    if (!cloudBaseMiniAppOnly) {
+      throw new Error("CloudBase header identity requires CLOUDBASE_MINIAPP_ONLY=true");
+    }
+  }
+  if (miniProgramAppId && !miniProgramAppSecret && !wechatCloudBaseHeaderAuthEnabled) {
+    throw new Error("WECHAT_MINIPROGRAM_APP_ID requires AppSecret or CloudBase header identity");
   }
   if (appEnv === "production") {
     if (!/^wx[0-9A-Za-z]{10,}$/.test(miniProgramAppId)) {
       throw new Error("WECHAT_MINIPROGRAM_APP_ID must look like a real WeChat AppID in production");
     }
-    if (miniProgramAppSecret.length < 16) {
+    if (!wechatCloudBaseHeaderAuthEnabled && miniProgramAppSecret.length < 16) {
       throw new Error("WECHAT_MINIPROGRAM_APP_SECRET is unexpectedly short for production");
     }
+  }
+  if (
+    wechatSubscribeMessagesEnabled
+    && (appEnv === "staging" || appEnv === "production")
+    && miniProgramAppSecret.length < 16
+  ) {
+    throw new Error("WECHAT_SUBSCRIBE_MESSAGES_ENABLED requires WECHAT_MINIPROGRAM_APP_SECRET");
   }
 
   const wechatPayMchId = optionalString(env.WECHAT_PAY_MCH_ID);
@@ -1110,7 +1160,6 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     const requiredMiniProgramPaymentConfig = {
       WECHAT_PAY_APP_ID: optionalString(env.WECHAT_PAY_APP_ID),
       WECHAT_MINIPROGRAM_APP_ID: miniProgramAppId,
-      WECHAT_MINIPROGRAM_APP_SECRET: miniProgramAppSecret,
       WECHAT_PAY_MCH_ID: wechatPayMchId,
       WECHAT_PAY_API_V3_KEY: wechatPayApiV3Key,
       WECHAT_PAY_CERT_SERIAL_NO: wechatPayCertSerialNo,
@@ -1137,7 +1186,9 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     if (new URL(wechatPayNotifyBaseUrl).protocol !== "https:") {
       throw new Error("WECHAT_PAY_NOTIFY_BASE_URL must be an absolute HTTPS URL in production");
     }
-    assertProductionValue("WECHAT_MINIPROGRAM_APP_SECRET", miniProgramAppSecret);
+    if (miniProgramAppSecret) {
+      assertProductionValue("WECHAT_MINIPROGRAM_APP_SECRET", miniProgramAppSecret);
+    }
     assertProductionValue("WECHAT_PAY_API_V3_KEY", wechatPayApiV3Key);
   }
 
@@ -1525,14 +1576,17 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     HOST: parseHost(env.HOST, appEnv),
     PORT: parsePort(env.PORT),
     API_PREFIX: apiPrefix.replace(/^\/+|\/+$/g, ""),
-    APP_VERSION: env.APP_VERSION?.trim() || "0.1.0",
+    APP_VERSION: env.APP_VERSION?.trim() || "1.0.0",
     DATABASE_URL: requiredProtocolUrl(
       "DATABASE_URL",
-      env.DATABASE_URL,
-      DEFAULT_DATABASE_URL,
+      databaseUrl,
+      appEnv === "production" ? "" : DEFAULT_DATABASE_URL,
       ["postgres:", "postgresql:"]
     ),
-    REDIS_URL: requiredProtocolUrl("REDIS_URL", env.REDIS_URL, DEFAULT_REDIS_URL, ["redis:", "rediss:"]),
+    REDIS_URL: redisUrl
+      ? requiredProtocolUrl("REDIS_URL", redisUrl, DEFAULT_REDIS_URL, ["redis:", "rediss:"])
+      : "",
+    SECURITY_COUNTER_BACKEND: securityCounterBackend,
     CORS_ORIGINS: corsOrigins,
     JWT_ACCESS_SECRET: jwtAccessSecret,
     JWT_REFRESH_SECRET: jwtRefreshSecret,
@@ -1578,6 +1632,9 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     WECHAT_PAY_COMPLAINT_BATCH_SIZE: wechatPayComplaintBatchSize,
     WECHAT_MINIPROGRAM_APP_ID: miniProgramAppId,
     WECHAT_MINIPROGRAM_APP_SECRET: miniProgramAppSecret,
+    WECHAT_CLOUDBASE_HEADER_AUTH_ENABLED: wechatCloudBaseHeaderAuthEnabled,
+    CLOUDBASE_ENV_ID: cloudBaseEnvId,
+    CLOUDBASE_MINIAPP_ONLY: cloudBaseMiniAppOnly,
     APPLE_SIGN_IN_BUNDLE_ID: optionalString(env.APPLE_SIGN_IN_BUNDLE_ID),
     SMS_PROVIDER: smsProvider,
     STAFF_TOTP_ENCRYPTION_KEY: staffTotpEncryptionKey,

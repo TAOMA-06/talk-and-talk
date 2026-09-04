@@ -76,6 +76,9 @@ const ordersSource = readFileSync(join(root, "pages/orders/index.ts"), "utf8");
 const paymentSource = readFileSync(join(root, "pages/order/payment.ts"), "utf8");
 const chatTemplate = readFileSync(join(root, "pages/chat/index.wxml"), "utf8");
 const communityTemplate = readFileSync(join(root, "pages/community/index.wxml"), "utf8");
+const discoverTemplate = readFileSync(join(root, "pages/discover/index.wxml"), "utf8");
+const discoverSource = readFileSync(join(root, "pages/discover/index.ts"), "utf8");
+const profileTemplate = readFileSync(join(root, "pages/profile/index.wxml"), "utf8");
 const companionDetailTemplate = readFileSync(join(root, "pages/companion/detail.wxml"), "utf8");
 const publicInteractionConfigSource = readFileSync(join(root, "utils/config.ts"), "utf8");
 const modelsSource = readFileSync(join(root, "utils/models.ts"), "utf8");
@@ -98,40 +101,55 @@ assert.match(
 );
 assert.match(
   chatTemplate,
-  /messageInteractionAvailable && publicInteractionIdentityAvailable[\s\S]*class="composer"/,
-  "the chat composer must stay hidden while the first-release identity authority is frozen"
+  /hasLoadedInitial && messageInteractionAvailable[\s\S]*class="composer"/,
+  "the chat composer must be available whenever the conversation is interactive"
 );
 assert.match(
   communityTemplate,
-  /wx:if="\{\{publicInteractionIdentityAvailable\}\}" class="[^"]*\bcompose\b[^"]*"/,
-  "the community composer must stay hidden while the first-release identity authority is frozen"
+  /<view class="card compose">/,
+  "the community composer must be available without an identity-authority client gate"
 );
 assert.match(
   communityTemplate,
-  /publicInteractionIdentityAvailable \? '广场还很安静，发第一条内容吧。' : '当前没有可浏览的广场内容；公开发布尚未开放。'/,
-  "an empty frozen community must not invite an impossible first post"
+  /广场还很安静，发第一条内容吧。/,
+  "an empty community must invite the active user to publish"
 );
 assert.match(
+  discoverTemplate,
+  /class="community-entry[^\"]*"[^>]*bindtap="openCommunity"/,
+  "the discover tab must expose a user-clickable community entry"
+);
+assert.match(
+  discoverSource,
+  /openCommunity\(\)\s*\{\s*wx\.navigateTo\(\{ url: "\/pages\/community\/index" \}\);\s*\}/,
+  "the community entry must navigate to the registered community page"
+);
+assert.doesNotMatch(
+  profileTemplate,
+  /个性化推荐[\s\S]{0,80}当前未开放|aria-label="个性化推荐未开放"/,
+  "the formal profile must not expose an unfinished personalization switch"
+);
+assert.doesNotMatch(
   companionDetailTemplate,
-  /!publicInteractionIdentityAvailable[\s\S]*新预约和支付暂不可用/,
-  "booking detail must explain the closed identity gate before payment"
+  /publicInteractionIdentityAvailable|身份核验授权未开放/,
+  "booking detail must not retain the removed identity-authority client gate"
 );
-assert.match(
+assert.doesNotMatch(
   publicInteractionConfigSource,
-  /clientPublicInteractionIdentityGrantsAvailable[\s\S]*!isExplicitDevelopmentEnvironment\(\)[\s\S]*return false/,
-  "trial, release and unknown builds must ignore any Developer Tools identity override"
+  /clientPublicInteractionIdentityGrantsAvailable|PUBLIC_INTERACTION_IDENTITY_AVAILABLE/,
+  "client configuration must not carry the removed identity-authority switch"
 );
 assert.match(
   ordersTemplate,
-  /publicInteractionIdentityAvailable && \(item\.status === 'pending' \|\| item\.status === 'paying'\) && item\.companionConfirmedAt[\s\S]*?进入安全支付与结果页[\s\S]*?去支付/,
-  "the order list must hide payment while the identity authority is frozen"
+  /\(item\.status === 'pending' \|\| item\.status === 'paying'\) && item\.companionConfirmedAt[\s\S]*?进入安全支付与结果页[\s\S]*?去支付/,
+  "the order list must expose payment for a confirmed payable order"
 );
 const ordersPayHandler = /\n  pay\(event: any\) \{([\s\S]*?)\n  \},\n  async cancel/.exec(ordersSource)?.[1] || "";
 assert.ok(ordersPayHandler, "the order list must keep a dedicated payment navigation handler");
 assert.match(
   ordersPayHandler,
-  /!clientPublicInteractionIdentityGrantsAvailable\(\)[\s\S]*?return;[\s\S]*?!\["pending", "paying"\]\.includes\(order\.status\) \|\| !order\.companionConfirmedAt[\s\S]*?return;[\s\S]*?wx\.navigateTo\(\{ url: `\/pages\/order\/payment\?orderId=\$\{encodeURIComponent\(id\)\}` \}\)/,
-  "the order list must preserve identity and payable-state gates before navigating to the dedicated payment page"
+  /!\["pending", "paying"\]\.includes\(order\.status\) \|\| !order\.companionConfirmedAt[\s\S]*?return;[\s\S]*?wx\.navigateTo\(\{ url: `\/pages\/order\/payment\?orderId=\$\{encodeURIComponent\(id\)\}` \}\)/,
+  "the order list must preserve payable-state checks before navigating to the dedicated payment page"
 );
 assert.equal(
   [...ordersPayHandler.matchAll(/wx\.navigateTo/g)].length,
@@ -144,19 +162,14 @@ assert.doesNotMatch(
   "the order list must not confirm, subscribe, prepay, invoke WeChat Pay, notify, or sync payment"
 );
 assert.match(
-  orderDetailTemplate,
-  /view\.paymentUnavailableNotice[\s\S]*?view\.canPay[\s\S]*?进入安全支付与结果页/,
-  "order detail must replace the impossible payment control with an honest notice"
-);
-assert.match(
   orderDetailSource,
-  /canPay: otherwisePayable && identityAvailable[\s\S]*?openPayment\(\)[\s\S]*?!clientPublicInteractionIdentityGrantsAvailable\(\)[\s\S]*?return;[\s\S]*?wx\.navigateTo/,
-  "order detail must hide and handler-block payment navigation"
+  /canPay: otherwisePayable[\s\S]*?openPayment\(\)[\s\S]*?wx\.navigateTo/,
+  "order detail must expose payment navigation when the order is otherwise payable"
 );
-assert.match(
+assert.doesNotMatch(
   paymentSource,
-  /!clientPublicInteractionIdentityGrantsAvailable\(\)[\s\S]*?paymentState: "unavailable"[\s\S]*?不会请求订阅授权、创建预支付或调用微信支付/,
-  "a direct payment-page entry must render unavailable before any payment side effect"
+  /clientPublicInteractionIdentityGrantsAvailable|身份核验通道尚未开放/,
+  "the payment page must not retain the removed identity-authority client gate"
 );
 assert.match(
   orderDetailTemplate,
@@ -278,7 +291,6 @@ let updatedProfilePayload = null;
 let currentProfileGender = "female";
 let paymentIsMock = true;
 let failNextOrderCreate = false;
-let publicInteractionOrderBlocked = false;
 let failServiceOfferingsLoad = false;
 let returnMalformedServiceOffering = false;
 let failAvailabilityLoad = false;
@@ -1480,20 +1492,6 @@ function responseFor(path, method, data, query = new URLSearchParams()) {
     createdOrderPayload = data;
     assert.ok(Date.parse(data.scheduledAt) > Date.now(), "created order must include a future scheduledAt");
     assert.match(data.clientRequestId, /^[A-Za-z0-9_-]{16,64}$/, "created order must carry a stable idempotency key");
-    if (publicInteractionOrderBlocked) {
-      return {
-        __smokeError: {
-          statusCode: 403,
-          code: "PUBLIC_INTERACTION_IDENTITY_REQUIRED",
-          message: "identity authority unavailable",
-          details: {
-            verificationStatus: "notVerified",
-            recoveryPath: "/pages/profile/index",
-            publicInteractionBlocked: true
-          }
-        }
-      };
-    }
     if (nextOrderApiErrorCode) {
       const code = nextOrderApiErrorCode;
       nextOrderApiErrorCode = "";
@@ -1937,20 +1935,6 @@ function responseFor(path, method, data, query = new URLSearchParams()) {
     };
   }
   if (path === `/orders/${order.id}/prepay`) {
-    if (publicInteractionOrderBlocked) {
-      return {
-        __smokeError: {
-          statusCode: 403,
-          code: "PUBLIC_INTERACTION_IDENTITY_REQUIRED",
-          message: "identity authority unavailable",
-          details: {
-            verificationStatus: "notVerified",
-            recoveryPath: "/pages/profile/index",
-            publicInteractionBlocked: true
-          }
-        }
-      };
-    }
     return {
     order: { ...order, status: "paying" },
     payment: {
@@ -2622,7 +2606,6 @@ globalThis.getApp = () => smokeApp;
 // Capability-path coverage for dormant MEDIA/TRTC code. Shipping UX stays
 // text-only via utils/config.ts unless this override is set.
 globalThis.__TALK_AND_TALK_COMMERCIAL_TEXT_ONLY__ = false;
-globalThis.__TALK_AND_TALK_PUBLIC_INTERACTION_IDENTITY_AVAILABLE__ = true;
 globalThis.__TALK_AND_TALK_TRTC_SDK__ = class SmokeTrtc {
   constructor(page) {
     this.page = page;
@@ -2844,13 +2827,15 @@ assert.equal(smokeApp.globalData.discoveryIntent, null);
 
 const legal = await loadPage("legal/index");
 legal.onLoad({ type: "terms" });
-assert.equal(legal.data.src, "https://api.talkandtalk.app/legal/terms.html");
+assert.equal(legal.data.src, "https://talk-and-talk-staging-d6d04a14b8-1428040864.tcloudbaseapp.com/legal/terms.html");
 legal.onLoad({ type: "privacy" });
-assert.equal(legal.data.src, "https://api.talkandtalk.app/legal/privacy.html");
+assert.equal(legal.data.src, "https://talk-and-talk-staging-d6d04a14b8-1428040864.tcloudbaseapp.com/legal/privacy.html");
 
 const discover = blockedDiscover;
 await discover.load();
 await new Promise((resolve) => setTimeout(resolve, 10));
+discover.openCommunity();
+assert.equal(navigations.at(-1), "/pages/community/index", "the discover tab must make the community reachable");
 assert.equal(discover.data.companions.length, 1);
 assert.equal(discover.data.companions[0].impressionId, recommendedCompanion.impressionId);
 assert.equal(discover.data.companions[0].catalogPriceText, "¥39 起", "discovery must display the current sellable catalog price");
@@ -3264,17 +3249,6 @@ detail.selectAvailabilityCandidate({ currentTarget: { dataset: { id: voiceSlot.i
 assert.equal(detail.data.selectedAvailabilityCandidateId, voiceSlot.id);
   assert.equal(detail.data.canBook, true);
   assert.match(detail.data.bookingButtonText, /¥69/);
-  publicInteractionOrderBlocked = true;
-  await detail.book();
-  detail.toggleBookingBoundary();
-  detail.toggleBookingAccuracy();
-  await detail.confirmBooking();
-  assert.equal(detail.data.bookingConfirmationVisible, false, "an identity refusal must close the booking review without creating an order");
-  assert.equal(detail.data.orderClientRequestId, "", "an explicit pre-write identity refusal may forget its pending idempotency key");
-  assert.match(modalInvocations.at(-1).title, /身份核验通道尚未开放/);
-  assert.match(modalInvocations.at(-1).content, /新预约、支付、公开发帖和即时消息暂不可用/);
-  assert.equal(navigations.at(-1) === "/pages/profile/index", false, "cancelling the explanation modal must not force navigation");
-  publicInteractionOrderBlocked = false;
   attemptedOrderRequestIds.length = 0;
   failNextOrderCreate = true;
 await detail.book();
@@ -4694,68 +4668,28 @@ const previousCompanionConfirmation = order.companionConfirmedAt;
 const previousOrderStatus = order.status;
 order.status = "pending";
 order.companionConfirmedAt = new Date().toISOString();
-const paymentEnvironmentBeforeFrozenCheck = environmentVersion;
+const paymentEnvironmentBeforeAccessCheck = environmentVersion;
 environmentVersion = "release";
 await orders.load();
-assert.equal(orders.data.publicInteractionIdentityAvailable, false,
-  "a release order list must project the frozen identity authority into its template state");
-const frozenListPrepayCalls = calls.filter((call) =>
-  call.path === `/orders/${order.id}/prepay` && call.method === "POST"
-).length;
-const frozenListSubscriptionRequests = subscriptionRequests.length;
-const frozenListModals = modalInvocations.length;
-const frozenListNavigations = navigations.length;
-const frozenListPaymentInvocations = paymentInvocations.length;
-const frozenListPaymentSyncCalls = calls.filter((call) =>
-  call.path === `/orders/${order.id}/payment/sync` && call.method === "POST"
-).length;
+const payableListNavigations = navigations.length;
 await orders.pay({ currentTarget: { dataset: { id: order.id } } });
-assert.equal(calls.filter((call) =>
-  call.path === `/orders/${order.id}/prepay` && call.method === "POST"
-).length, frozenListPrepayCalls, "a frozen order list must not call prepay");
-assert.equal(subscriptionRequests.length, frozenListSubscriptionRequests,
-  "a frozen order list must not request subscription authorization before refusing payment");
-assert.equal(modalInvocations.length, frozenListModals,
-  "a frozen order list must refuse before opening payment confirmation");
-assert.equal(navigations.length, frozenListNavigations,
-  "a frozen order list must refuse before navigating to the payment page");
-assert.equal(paymentInvocations.length, frozenListPaymentInvocations,
-  "a frozen order list must not invoke wx.requestPayment");
-assert.equal(calls.filter((call) =>
-  call.path === `/orders/${order.id}/payment/sync` && call.method === "POST"
-).length, frozenListPaymentSyncCalls, "a frozen order list must not sync payment");
+assert.equal(navigations.length, payableListNavigations + 1,
+  "a release order list must open payment for a confirmed payable order");
+assert.equal(navigations.at(-1), `/pages/order/payment?orderId=${order.id}`);
 
 await orderDetail.load();
-assert.equal(orderDetail.data.view.canPay, false, "release order detail must hide payment");
-assert.match(orderDetail.data.view.paymentUnavailableNotice, /当前不能支付/);
-const frozenDetailNavigations = navigations.length;
+assert.equal(orderDetail.data.view.canPay, true, "release order detail must expose an otherwise payable order");
+const payableDetailNavigations = navigations.length;
 orderDetail.openPayment();
-assert.equal(navigations.length, frozenDetailNavigations,
-  "a frozen order detail must block direct payment navigation");
+assert.equal(navigations.length, payableDetailNavigations + 1,
+  "release order detail must open the dedicated payment page");
 
 const payment = await loadPage("order/payment");
 payment.onLoad({ orderId: order.id });
 await payment.load();
-assert.equal(payment.data.paymentState, "unavailable",
-  "a direct release payment-page entry must be unavailable before payment side effects");
-assert.match(payment.data.stateMessage, /不会请求订阅授权、创建预支付或调用微信支付/);
-const frozenPagePrepayCalls = calls.filter((call) =>
-  call.path === `/orders/${order.id}/prepay` && call.method === "POST"
-).length;
-const frozenPageSubscriptionRequests = subscriptionRequests.length;
-const frozenPagePaymentInvocations = paymentInvocations.length;
-payment.setData({ paymentState: "ready", termsConfirmed: true });
-await payment.pay();
-assert.equal(payment.data.paymentState, "unavailable");
-assert.equal(calls.filter((call) =>
-  call.path === `/orders/${order.id}/prepay` && call.method === "POST"
-).length, frozenPagePrepayCalls, "the frozen payment handler must not call prepay");
-assert.equal(subscriptionRequests.length, frozenPageSubscriptionRequests,
-  "the frozen payment handler must not request subscription authorization");
-assert.equal(paymentInvocations.length, frozenPagePaymentInvocations,
-  "the frozen payment handler must not invoke wx.requestPayment");
-
-environmentVersion = paymentEnvironmentBeforeFrozenCheck;
+assert.equal(payment.data.paymentState, "ready",
+  "a direct release payment-page entry must allow an otherwise payable order");
+environmentVersion = paymentEnvironmentBeforeAccessCheck;
 payment.setData({ termsConfirmed: false });
 await payment.load();
 assert.equal(payment.data.paymentState, "ready", "a confirmed pending order must expose an independent payment state");
@@ -4771,16 +4705,6 @@ assert.match(payment.data.stateMessage, /请勿支付并联系平台客服/);
   assert.equal(payment.data.paymentState, "ready", "payment may recover only after the authoritative order returns a valid snapshot");
   payment.toggleTerms();
   modalConfirm = true;
-  publicInteractionOrderBlocked = true;
-  const paymentCallsBeforeIdentityRefusal = paymentInvocations.length;
-  await payment.pay();
-  assert.equal(payment.data.paymentState, "unavailable", "payment must fail closed when text delivery identity is unavailable");
-  assert.match(payment.data.stateTitle, /身份核验通道尚未开放/);
-  assert.match(payment.data.stateMessage, /新预约、支付、公开发帖和即时消息暂不可用/);
-  assert.equal(paymentInvocations.length, paymentCallsBeforeIdentityRefusal, "an identity refusal must happen before wx.requestPayment");
-  publicInteractionOrderBlocked = false;
-  await payment.load();
-  assert.equal(payment.data.paymentState, "ready");
   await payment.pay();
 assert.equal(payment.data.paymentState, "success", "payment success must be based on backend synchronization");
 assert.ok(calls.some((call) => call.path === `/orders/${order.id}/payment/sync` && call.method === "POST"));
@@ -5503,31 +5427,34 @@ const apiModule = await import(`${pathToFileURL(join(output, "utils/api.js")).hr
 const configModule = await import(`${pathToFileURL(join(output, "utils/config.js")).href}`);
 const controlledEvidenceModule = await import(`${pathToFileURL(join(output, "utils/controlled-evidence.js")).href}`);
 assert.equal(configModule.isCommercialTextOnly(), false, "smoke enables the dormant voice/media capability path");
-assert.equal(configModule.clientPublicInteractionIdentityGrantsAvailable(), true, "smoke explicitly enables downstream interaction UX only in Developer Tools");
-delete globalThis.__TALK_AND_TALK_PUBLIC_INTERACTION_IDENTITY_AVAILABLE__;
-assert.equal(configModule.clientPublicInteractionIdentityGrantsAvailable(), false, "develop must default to the frozen identity-authority UI");
-globalThis.__TALK_AND_TALK_PUBLIC_INTERACTION_IDENTITY_AVAILABLE__ = true;
 delete globalThis.__TALK_AND_TALK_COMMERCIAL_TEXT_ONLY__;
 assert.equal(configModule.isCommercialTextOnly(), true, "develop must still default to text-only without an explicit test override");
 globalThis.__TALK_AND_TALK_COMMERCIAL_TEXT_ONLY__ = false;
 environmentVersion = "trial";
 assert.equal(configModule.isCommercialTextOnly(), true, "trial must fail closed even when a global override requests media");
-assert.equal(configModule.clientPublicInteractionIdentityGrantsAvailable(), false, "trial must ignore the Developer Tools identity override");
-assert.equal(configModule.backendConfig().baseUrl, "https://api-staging.talkandtalk.app/api/v1");
+assert.deepEqual(configModule.backendConfig(), {
+  transport: "cloudRun",
+  envId: "talk-and-talk-staging-d6d04a14b8",
+  service: "talk-and-talk-api",
+  apiPrefix: "/api/v1"
+});
 environmentVersion = "unknown";
 assert.equal(configModule.isCommercialTextOnly(), true, "an unrecognized Mini Program environment must fail closed even when an override requests media");
-assert.equal(configModule.clientPublicInteractionIdentityGrantsAvailable(), false, "an unknown environment must keep public-interaction writes hidden");
 accountInfoThrows = true;
 assert.equal(configModule.isCommercialTextOnly(), true, "missing Mini Program environment information must fail closed even when an override requests media");
 accountInfoThrows = false;
 environmentVersion = "release";
 assert.equal(configModule.isCommercialTextOnly(), true, "release must fail closed even when a global override requests media");
-assert.equal(configModule.clientPublicInteractionIdentityGrantsAvailable(), false, "release must keep impossible order, community and chat writes hidden");
 assert.equal(configModule.clientChatMediaEnabled(true), false, "text-only scope must hide chat attachments even if the server flag is true");
 assert.equal(configModule.clientRealtimeVoiceEnabled(), false, "text-only scope must hide realtime voice entry points");
 assert.equal(configModule.clientVoiceIntroEnabled(), false, "text-only scope must hide voice intro entry points");
 assert.equal(configModule.clientVoiceSkuEnabled(), false, "text-only scope must hide voice SKU activation");
-assert.equal(configModule.backendConfig().baseUrl, "https://api.talkandtalk.app/api/v1");
+assert.deepEqual(configModule.backendConfig(), {
+  transport: "cloudRun",
+  envId: "talk-and-talk-staging-d6d04a14b8",
+  service: "talk-and-talk-api",
+  apiPrefix: "/api/v1"
+});
 const releaseServiceManager = {
   ...serviceManager,
   data: structuredClone(serviceManager.data),

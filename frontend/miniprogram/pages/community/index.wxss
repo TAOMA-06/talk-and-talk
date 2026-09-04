@@ -40,19 +40,6 @@
   margin-top: 20rpx;
 }
 
-.identity-unavailable {
-  border-color: var(--tt-border) !important;
-  border-left: 6rpx solid var(--tt-warning) !important;
-  background: var(--tt-warning-soft) !important;
-}
-
-.identity-unavailable .muted {
-  margin-top: 12rpx;
-  color: var(--tt-warning);
-  font-size: 25rpx;
-  line-height: 1.65;
-}
-
 .kind {
   display: inline-flex;
   min-height: 64rpx;

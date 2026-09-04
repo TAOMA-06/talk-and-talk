@@ -3,7 +3,10 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import databaseUrlConfig from "../config/database-url.js";
 import transactionalTemplateManifest from "../config/transactional-template-manifest.js";
+
+const { POSTGRES_FALLBACK_KEYS, resolveDatabaseUrl } = databaseUrlConfig;
 
 const PLACEHOLDER = /change[_-]?me|replace[_-]?me|example|your[_-]/i;
 const PAY_REQUIRED_FIELDS = [
@@ -86,17 +89,24 @@ function parseJwtTtlMs(value) {
 export function validateDeploymentConfig(env) {
   const errors = [];
   const production = env.APP_ENV === "production";
+  const securityCounterBackend = (env.SECURITY_COUNTER_BACKEND || "redis").trim().toLowerCase();
+  const cloudBaseRuntimePgInjection = env.CLOUDBASE_RUNTIME_PG_INJECTION === "true";
+  let databaseUrl = "";
+  try {
+    databaseUrl = resolveDatabaseUrl(env);
+  } catch (error) {
+    errors.push(error instanceof Error ? error.message : "Unable to resolve DATABASE_URL");
+  }
   const availabilityReminderDeliveryEnabled = env.AVAILABILITY_REMINDER_DELIVERY_ENABLED === "true";
   const trtcEnabled = env.TRTC_ENABLED === "true";
   const trtcRoomControlEnabled = env.TRTC_ROOM_CONTROL_ENABLED === "true";
   const trtcEmergencyStopEnabled = env.TRTC_EMERGENCY_STOP_ENABLED === "true";
   const required = [
-    "NODE_ENV", "APP_ENV", "API_PREFIX", "DATABASE_URL", "REDIS_URL", "CORS_ORIGINS",
+    "NODE_ENV", "APP_ENV", "API_PREFIX", "CORS_ORIGINS",
     "JWT_ACCESS_SECRET", "JWT_REFRESH_SECRET", "JWT_ACCESS_TTL", "JWT_REFRESH_TTL",
     "AUTH_IDENTITY_TOMBSTONE_HMAC_KEYS", "AUTH_IDENTITY_TOMBSTONE_ACTIVE_KEY_ID",
     "AUTH_IDENTITY_REREGISTRATION_POLICY",
-    "REVIEW_JWT_ACCESS_SECRET", "REVIEW_JWT_REFRESH_SECRET", "WECHAT_MINIPROGRAM_APP_ID",
-    "WECHAT_MINIPROGRAM_APP_SECRET"
+    "REVIEW_JWT_ACCESS_SECRET", "REVIEW_JWT_REFRESH_SECRET", "WECHAT_MINIPROGRAM_APP_ID"
   ];
   if (production) {
     required.push(
@@ -149,17 +159,58 @@ export function validateDeploymentConfig(env) {
     else if (PLACEHOLDER.test(value)) errors.push(`${key} still contains a placeholder`);
   }
 
+  if (!databaseUrl) {
+    if (!cloudBaseRuntimePgInjection) {
+      errors.push("DATABASE_URL or PGHOST/PGPORT/PGDATABASE/PGUSER/PGPASSWORD is required");
+    }
+  } else if (!validUrl(databaseUrl, ["postgres:", "postgresql:"])) {
+    errors.push("DATABASE_URL must be a PostgreSQL URL");
+  }
+  if (env.DATABASE_URL?.trim() && PLACEHOLDER.test(env.DATABASE_URL)) {
+    errors.push("DATABASE_URL still contains a placeholder");
+  }
+  if (!env.DATABASE_URL?.trim()) {
+    for (const key of POSTGRES_FALLBACK_KEYS) {
+      if (env[key]?.trim() && PLACEHOLDER.test(env[key])) {
+        errors.push(`${key} still contains a placeholder`);
+      }
+    }
+  }
+
+  if (!["redis", "postgres"].includes(securityCounterBackend)) {
+    errors.push("SECURITY_COUNTER_BACKEND must be redis or postgres");
+  }
+  if (
+    env.CLOUDBASE_MANAGED_MIGRATIONS
+    && !["true", "false"].includes(env.CLOUDBASE_MANAGED_MIGRATIONS)
+  ) {
+    errors.push("CLOUDBASE_MANAGED_MIGRATIONS must be true or false when configured");
+  }
+  if (env.CLOUDBASE_RUNTIME_PG_INJECTION && !["true", "false"].includes(env.CLOUDBASE_RUNTIME_PG_INJECTION)) {
+    errors.push("CLOUDBASE_RUNTIME_PG_INJECTION must be true or false when configured");
+  }
+  if (cloudBaseRuntimePgInjection && (
+    env.CLOUDBASE_MANAGED_MIGRATIONS !== "true"
+    || securityCounterBackend !== "postgres"
+    || !/^[A-Za-z][A-Za-z0-9-]{5,63}$/.test(env.CLOUDBASE_ENV_ID || "")
+  )) {
+    errors.push("CloudBase runtime PG injection requires managed migrations, PostgreSQL counters, and CLOUDBASE_ENV_ID");
+  }
+  const redisRequired = securityCounterBackend === "redis";
+  if (redisRequired && !env.REDIS_URL?.trim()) {
+    errors.push("REDIS_URL is required when SECURITY_COUNTER_BACKEND=redis");
+  } else if (redisRequired && PLACEHOLDER.test(env.REDIS_URL)) {
+    errors.push("REDIS_URL still contains a placeholder");
+  }
+
   if (env.NODE_ENV !== "production") errors.push("NODE_ENV must be production for a deployed container");
   if (!['staging', 'production'].includes(env.APP_ENV)) errors.push("APP_ENV must be staging or production");
   if (env.API_PREFIX !== "api/v1") errors.push("API_PREFIX must remain api/v1");
 
-  if (env.DATABASE_URL && !validUrl(env.DATABASE_URL, ["postgres:", "postgresql:"])) {
-    errors.push("DATABASE_URL must be a PostgreSQL URL");
-  }
   if (env.REDIS_URL && !validUrl(env.REDIS_URL, ["redis:", "rediss:"])) {
     errors.push("REDIS_URL must be a Redis URL");
   }
-  if (production && env.REDIS_URL) {
+  if (production && redisRequired && env.REDIS_URL) {
     try {
       if (!new URL(env.REDIS_URL).password) errors.push("production REDIS_URL must include a password");
     } catch {
@@ -260,6 +311,21 @@ export function validateDeploymentConfig(env) {
   }
   if (env.WECHAT_MINIPROGRAM_APP_SECRET && env.WECHAT_MINIPROGRAM_APP_SECRET.length < 16) {
     errors.push("WECHAT_MINIPROGRAM_APP_SECRET is unexpectedly short");
+  }
+  const cloudBaseHeaderAuth = env.WECHAT_CLOUDBASE_HEADER_AUTH_ENABLED === "true";
+  if (!env.WECHAT_MINIPROGRAM_APP_SECRET?.trim() && !cloudBaseHeaderAuth) {
+    errors.push("WECHAT_MINIPROGRAM_APP_SECRET or CloudBase header identity is required");
+  }
+  if (cloudBaseHeaderAuth) {
+    if (!/^[A-Za-z][A-Za-z0-9-]{5,63}$/.test(env.CLOUDBASE_ENV_ID || "")) {
+      errors.push("CLOUDBASE_ENV_ID is required for CloudBase header identity");
+    }
+    if (env.CLOUDBASE_MINIAPP_ONLY !== "true") {
+      errors.push("CloudBase header identity requires CLOUDBASE_MINIAPP_ONLY=true");
+    }
+  }
+  if (env.WECHAT_SUBSCRIBE_MESSAGES_ENABLED === "true" && (env.WECHAT_MINIPROGRAM_APP_SECRET || "").length < 16) {
+    errors.push("WECHAT_SUBSCRIBE_MESSAGES_ENABLED requires WECHAT_MINIPROGRAM_APP_SECRET");
   }
   if (production && env.WECHAT_PAY_MCH_ID && !/^\d{6,32}$/.test(env.WECHAT_PAY_MCH_ID)) {
     errors.push("WECHAT_PAY_MCH_ID must contain 6-32 digits");

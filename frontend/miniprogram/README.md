@@ -2,6 +2,25 @@
 
 原生 TypeScript 小程序，复用 `backend/api` 的 `/api/v1` 契约；不包含管理后台。核心能力包括微信登录、发现与可解释推荐、订单和 JSAPI 支付、站内聊天/举报、评价、通知与数据权利。陪伴者角色还提供自助入驻/补件、训练与复审、商品、排班、今日任务、收益和限制申诉工作台；资料只有在真实 KYC/成年/合同/税务/收款证据经运营双人复核后才可发布，界面存在不等于外部核验已经通过。
 
+普通用户公开互动不要求 `profile.isVerified` 或独立身份 authority；active 账号可进入预约、支付、社区发布和订单消息。首屏强制确认本人已满 18 周岁，当前服务端协议收据直接作为客户侧年龄声明，不再要求普通用户填写外部核验引用。陪伴者商业资格、内容审核、会话边界、时段容量、订单幂等和支付处理仍保持各自的服务端约束。
+
+## 先选择正确的打开方式
+
+| 目的 | 导入目录 | 是否需要后端 | 能证明什么 |
+| --- | --- | --- | --- |
+| 正式联调、Preview 与 Upload | `frontend/miniprogram` | 需要已部署的真实后端 | v1.0 业务运行与微信发布 |
+| 本机真实联调 | `frontend/miniprogram-local` | 需要本机 API、PostgreSQL、Redis | 当前机器上的接口与页面行为 |
+| 历史界面评审 | `artifacts/v0.1/direct-open-miniprogram` | 不需要 | 只展示截图，不属于正式发布 |
+
+如需复查历史截图评审工程：
+
+```bash
+npm --prefix frontend/miniprogram run build:ui-review
+npm --prefix frontend/miniprogram run test:ui-review
+```
+
+该工程显著标记为“演示截图 / 不可上传”，不会进入 v1.0 正式交付包。
+
 ## 本机后端联调（微信开发者工具）
 
 **不要编辑** [`utils/config.ts`](./utils/config.ts) 或 [`project.config.json`](./project.config.json)。这两个受发行门禁保护，必须始终使用 production HTTPS 地址和 `urlCheck: true`。
@@ -13,7 +32,7 @@ node frontend/miniprogram/scripts/create-local-copy.mjs \
   --api-base-url http://127.0.0.1:3000/api/v1
 ```
 
-随后在微信开发者工具中**导入 `frontend/miniprogram-local`，而不是原始的 `frontend/miniprogram`**。生成副本会：
+随后在微信开发者工具中**导入 `frontend/miniprogram-local`，而不是原始的 `frontend/miniprogram`**。仅仅导入正式源不会自动提供 staging 后端，也不是本地演示流程。生成副本会：
 
 - 将 API 与协议页切换到本机后端；
 - 仅在 HTTP 本机/私网地址时设置 `urlCheck: false`；
@@ -32,7 +51,7 @@ HTTPS staging 副本会保留 `urlCheck: true`。脚本拒绝把公共 HTTP 地�
 
 仓库不保存 AppID；CI 只使用 `WECHAT_MINIPROGRAM_APP_ID` 做发行结构门禁，不生成签名包或自动上传。开发者工具内的本机请求不替代真实微信登录、真实支付回调、体验版上传或真机验收。
 
-正式联调与发行时，在微信开发者工具导入原始目录并选择实际小程序 AppID。[`utils/config.ts`](./utils/config.ts) 让开发版/体验版使用 staging、正式版使用 production；如已创建微信云托管环境，可填入环境 ID 并启用 `callContainer`。使用 HTTPS 时，须在小程序后台配置 request/upload/download 合法域名并填写隐私保护指引；生产域名为 `https://api.talkandtalk.app`。
+正式联调与发行时，在微信开发者工具导入原始目录并选择实际小程序 AppID。[`utils/config.ts`](./utils/config.ts) 已将开发版、体验版和正式版统一接入 `talk-and-talk-staging-d6d04a14b8` 的 `talk-and-talk-api` 云托管服务，通过 `wx.cloud.callContainer` 调用，不再依赖尚未配置的 `api.talkandtalk.app` 域名。
 
 提交前可在仓库根目录运行：
 
@@ -60,7 +79,7 @@ node frontend/miniprogram/scripts/test-local-build.mjs
 - 在 GitHub Actions 仓库变量中填写公开标识 `WECHAT_MINIPROGRAM_APP_ID`。项目文件保持空 AppID，禁止提交真实 AppID 或任何 AppSecret。
 - 推荐把现有 Docker 后端部署到微信云托管容器，PostgreSQL/Redis 放在同一 VPC；完整选型与验收见 [`docs/wechat-backend-selection.md`](../../docs/wechat-backend-selection.md)。
 - 将小程序 AppID 绑定到微信支付商户号，并完成 JSAPI 支付权限开通；后端复用既有商户证书和回调地址。
-- 在小程序后台配置隐私政策，隐私链接使用 `https://api.talkandtalk.app/legal/privacy.html`；将 `https://api.talkandtalk.app` 同时配置为业务域名，确保小程序内的用户协议和隐私政策 `web-view` 可打开。首次同意前不会登录或请求 API，聊天和支付还会调用平台隐私授权接口。
+- 在小程序后台配置隐私政策，隐私链接使用 `https://talk-and-talk-staging-d6d04a14b8-1428040864.tcloudbaseapp.com/legal/privacy.html`；将该 CloudBase 静态托管域名配置为业务域名，确保小程序内的用户协议和隐私政策 `web-view` 可打开。首次同意前不会登录或请求 API，聊天和支付还会调用平台隐私授权接口。
 - 上传前只允许导入原始 `frontend/miniprogram`，并在真机验证微信登录、真实小额支付、退款、订单会话与审核提示；禁止上传 `frontend/miniprogram-local`。
 - 当前发行步骤是：官方微信开发者工具导入目录 → 选择真实 AppID → 关闭“不校验合法域名” → 编译/预览 → 上传体验版 → 真机验收 → 提交审核。未配置 `miniprogram-ci` 私钥前，GitHub Actions 的绿灯不能替代这条签名上传链路。
 

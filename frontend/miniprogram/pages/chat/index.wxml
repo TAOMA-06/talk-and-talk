@@ -2,7 +2,6 @@
   <view class="chat-boundary-stack" aria-label="文字会话与平台边界">
   <view class="chat-room-label"><text>文字会话</text></view>
   <view class="notice boundary-notice">平台内沟通 · 勿私联或私下转账</view>
-  <view wx:if="{{!publicInteractionIdentityAvailable}}" class="identity-unavailable-notice">身份核验授权未开放；消息可查看，暂不能发送。</view>
   <view wx:if="{{textOnly}}" class="notice text-only-notice">当前仅支持文字消息。</view>
   </view>
   <view class="conversation-tools-trigger" bindtap="toggleConversationControls" aria-role="button" aria-label="{{conversationControlsOpen ? '收起' : '展开'}}会话设置与安全" aria-expanded="{{conversationControlsOpen}}" tabindex="0"><view class="conversation-tools-title">设置与安全</view><text>{{conversationControlsOpen ? '收起' : '查看'}}</text></view>
@@ -75,7 +74,7 @@
     </view>
     <view wx:if="{{syncing}}" class="sync-status">正在同步新消息…</view>
   </view>
-  <view wx:if="{{hasLoadedInitial && messageInteractionAvailable && publicInteractionIdentityAvailable}}" class="composer">
+  <view wx:if="{{hasLoadedInitial && messageInteractionAvailable}}" class="composer">
     <input value="{{draft}}" bindinput="setDraft" maxlength="2000" placeholder="输入消息…" confirm-type="send" bindconfirm="send" disabled="{{restrictionEndsAt !== ''}}" />
     <button wx:if="{{mediaEnabled && !textOnly}}" class="media" disabled="{{sending || mediaUploading || restrictionEndsAt}}" bindtap="chooseImage">图片</button>
     <button wx:if="{{mediaEnabled && !textOnly}}" class="media {{recording ? 'recording' : ''}}" disabled="{{sending || mediaUploading || restrictionEndsAt}}" bindtap="toggleRecord">{{recording ? '结束' : '语音'}}</button>

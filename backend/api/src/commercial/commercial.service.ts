@@ -14,7 +14,6 @@ import {
 import { WECHAT_PREPAY_TTL_MS } from "../payments/wechat/wechat-pay.provider";
 import { evaluateWeChatReconciliationGate } from "../payments/wechat-reconciliation-gate";
 import { PaymentDisputesService } from "../payments/payment-disputes.service";
-import { PUBLIC_INTERACTION_IDENTITY_AUTHORITY_AVAILABLE } from "../users/public-interaction-identity.gate";
 
 type ListEarningsQuery = { page?: number; pageSize?: number; status?: string };
 type CommercialProfileInput = {
@@ -841,8 +840,9 @@ export class CommercialService {
       orderIntakeDisabled: this.config.get<boolean>("ORDER_INTAKE_ENABLED", true) ? 0 : 1,
       payoutClaimsDisabled: this.config.get<boolean>("PAYOUT_CLAIMS_ENABLED", true) ? 0 : 1,
       paymentDisputeIntakeDisabled: this.config.get<boolean>("WECHAT_PAY_COMPLAINTS_ENABLED", false) ? 0 : 1,
-      publicInteractionIdentityAuthorityUnavailable:
-        commercialMode && !PUBLIC_INTERACTION_IDENTITY_AUTHORITY_AVAILABLE ? 1 : 0,
+      // Compatibility field retained for older admin clients. The former
+      // identity-authority hard gate has been removed by product decision.
+      publicInteractionIdentityAuthorityUnavailable: 0,
       refundPolicyUnapproved: refundPolicyConfigurationApproved ? 0 : 1,
       refundPolicySnapshotGaps,
       wechatDailyBillReconciliationDisabled: dailyBillConfigured ? 0 : 1,

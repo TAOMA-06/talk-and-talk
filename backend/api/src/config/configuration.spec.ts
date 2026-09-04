@@ -121,7 +121,8 @@ describe("validateEnvironment", () => {
     expect(env.PORT).toBe(3000);
     expect(env.HOST).toBe("127.0.0.1");
     expect(env.API_PREFIX).toBe("api/v1");
-    expect(env.APP_VERSION).toBe("0.1.0");
+    expect(env.APP_VERSION).toBe("1.0.0");
+    expect(env.SECURITY_COUNTER_BACKEND).toBe("redis");
     expect(env.CORS_ORIGINS).toContain("http://localhost:3000");
     expect(env.EXTERNAL_AI_USER_CONTENT_ENABLED).toBe(false);
     expect(env.TRTC_ENABLED).toBe(false);
@@ -880,11 +881,66 @@ describe("validateEnvironment", () => {
     })).toThrow("templateId is invalid");
   });
 
-  it("requires explicit database and Redis URLs in production", () => {
+  it("requires an explicit database connection in production", () => {
     expect(() => validateEnvironment({
       ...productionEnv,
       DATABASE_URL: ""
-    })).toThrow("DATABASE_URL and REDIS_URL");
+    })).toThrow("DATABASE_URL or PGHOST");
+  });
+
+  it("constructs DATABASE_URL from complete CloudBase PostgreSQL variables with escaped credentials", () => {
+    const env = validateEnvironment({
+      ...productionEnv,
+      DATABASE_URL: "",
+      REDIS_URL: "",
+      SECURITY_COUNTER_BACKEND: "postgres",
+      PGHOST: "2001:db8::10",
+      PGPORT: "5432",
+      PGDATABASE: "talk/cloudbase",
+      PGUSER: "talk+runtime",
+      PGPASSWORD: " secret:@/ value "
+    });
+
+    expect(env.DATABASE_URL).toBe(
+      "postgresql://talk%2Bruntime:%20secret%3A%40%2F%20value%20@[2001:db8::10]:5432/talk%2Fcloudbase"
+    );
+    expect(env.REDIS_URL).toBe("");
+    expect(env.SECURITY_COUNTER_BACKEND).toBe("postgres");
+  });
+
+  it("fails incomplete CloudBase PostgreSQL fallback without exposing secret values", () => {
+    const secret = "never-print-this-database-password";
+    let message = "";
+    try {
+      validateEnvironment({
+        ...productionEnv,
+        DATABASE_URL: "",
+        PGHOST: "cloudbase-postgres.internal",
+        PGPORT: "5432",
+        PGUSER: "talk",
+        PGPASSWORD: secret
+      });
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+    expect(message).toContain("PGDATABASE");
+    expect(message).not.toContain(secret);
+  });
+
+  it("requires Redis only for the default Redis security-counter backend", () => {
+    expect(() => validateEnvironment({
+      ...productionEnv,
+      REDIS_URL: ""
+    })).toThrow("SECURITY_COUNTER_BACKEND=redis");
+
+    expect(validateEnvironment({
+      ...productionEnv,
+      SECURITY_COUNTER_BACKEND: "postgres",
+      REDIS_URL: ""
+    }).REDIS_URL).toBe("");
+    expect(() => validateEnvironment({
+      SECURITY_COUNTER_BACKEND: "memory"
+    })).toThrow("SECURITY_COUNTER_BACKEND");
   });
 
   it("requires explicit bounded order intake and payout controls in production", () => {
@@ -914,6 +970,32 @@ describe("validateEnvironment", () => {
   it("requires WeChat Mini Program credentials to be configured together", () => {
     expect(() => validateEnvironment({ WECHAT_MINIPROGRAM_APP_ID: "wx123" }))
       .toThrow("WECHAT_MINIPROGRAM_APP_ID");
+  });
+
+  it("allows AppSecret-less CloudBase identity only for a declared Mini Program-only service", () => {
+    const environment = validateEnvironment({
+      ...productionEnv,
+      APP_ENV: "staging",
+      WECHAT_MINIPROGRAM_APP_SECRET: "",
+      WECHAT_CLOUDBASE_HEADER_AUTH_ENABLED: "true",
+      CLOUDBASE_ENV_ID: "talk-and-talk-staging-d6d04a14b8",
+      CLOUDBASE_MINIAPP_ONLY: "true",
+      NOTIFICATION_DELIVERY_ENABLED: "false",
+      WECHAT_SUBSCRIBE_MESSAGES_ENABLED: "false",
+      WECHAT_SUBSCRIBE_TEMPLATES_JSON: ""
+    });
+
+    expect(environment.WECHAT_CLOUDBASE_HEADER_AUTH_ENABLED).toBe(true);
+    expect(environment.CLOUDBASE_MINIAPP_ONLY).toBe(true);
+    expect(environment.WECHAT_MINIPROGRAM_APP_SECRET).toBe("");
+    expect(() => validateEnvironment({
+      ...productionEnv,
+      APP_ENV: "staging",
+      WECHAT_MINIPROGRAM_APP_SECRET: "",
+      WECHAT_CLOUDBASE_HEADER_AUTH_ENABLED: "true",
+      CLOUDBASE_ENV_ID: "talk-and-talk-staging-d6d04a14b8",
+      CLOUDBASE_MINIAPP_ONLY: "false"
+    })).toThrow("CLOUDBASE_MINIAPP_ONLY=true");
   });
 
   it("fails fast when production Mini Program payment configuration is incomplete", () => {

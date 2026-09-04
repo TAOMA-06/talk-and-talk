@@ -15,7 +15,6 @@
     <view class="quick-grid tt-card account-index-card">
       <tt-list-cell title="通知" bindtap="openNotificationCenter" />
       <tt-list-cell title="案件" bindtap="openSupportCenter" />
-      <tt-list-cell title="成年资格" meta="查看" bindtap="openAdultEligibility" />
     </view>
     <view wx:if="{{partialWarning}}" class="partial-warning">{{partialWarning}}</view>
     </block>

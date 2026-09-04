@@ -2,7 +2,11 @@ import { Body, Controller, Get, Post, Req, UseGuards } from "@nestjs/common";
 import { Request } from "express";
 
 import { clientIp } from "../common/rate-limit/ip-rate-limit.middleware";
-import { AuthenticatedUser, AuthService } from "./auth.service";
+import {
+  AuthenticatedUser,
+  AuthService,
+  CloudBaseMiniProgramIdentity
+} from "./auth.service";
 import { SendCodeDto } from "./dto/send-code.dto";
 import { PhoneLoginDto } from "./dto/phone-login.dto";
 import { AppleLoginDto } from "./dto/apple-login.dto";
@@ -32,6 +36,17 @@ function sessionMetadata(req?: Request) {
     ?? safeHeader(req, "user-agent", 80);
   const clientPlatform = safeHeader(req, "x-client-platform", 32);
   return sessionLabel || clientPlatform ? { sessionLabel, clientPlatform } : undefined;
+}
+
+function cloudBaseMiniProgramIdentity(req?: Request): CloudBaseMiniProgramIdentity | undefined {
+  const openId = safeHeader(req, "x-wx-openid", 128);
+  const appId = safeHeader(req, "x-wx-appid", 32);
+  const envId = safeHeader(req, "x-wx-env", 64);
+  const source = safeHeader(req, "x-wx-source", 24);
+  if (!openId || !appId || !envId || (source !== "wx_devtools" && source !== "wx_client")) {
+    return undefined;
+  }
+  return { openId, appId, envId, source };
 }
 
 @Controller("auth")
@@ -73,6 +88,10 @@ export class AuthController {
   @Post("wechat/mini-program")
   async wechatMiniProgramLogin(@Body() dto: WechatMiniProgramLoginDto, @Req() req?: Request) {
     const metadata = sessionMetadata(req);
+    const cloudBaseIdentity = cloudBaseMiniProgramIdentity(req);
+    if (cloudBaseIdentity) {
+      return this.authService.loginWithWechatMiniProgram(dto.code, metadata, cloudBaseIdentity);
+    }
     return metadata
       ? this.authService.loginWithWechatMiniProgram(dto.code, metadata)
       : this.authService.loginWithWechatMiniProgram(dto.code);

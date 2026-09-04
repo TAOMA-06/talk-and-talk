@@ -11,7 +11,7 @@ import { NotificationsService } from "../notifications/notifications.service";
 import { OrdersService } from "../orders/orders.service";
 import { VoiceRoomControlService } from "../voice/voice-room-control.service";
 import { assertCurrentCustomerAdultEligibility } from "../users/customer-adult-eligibility.service";
-import { assertPublicInteractionIdentity } from "../users/public-interaction-identity.gate";
+import { assertPublicInteractionAccountActive } from "../users/public-interaction-account.guard";
 import {
   WECHAT_PAY_PROVIDER,
   WeChatNotifyPayload,
@@ -1686,10 +1686,10 @@ export class PaymentsService implements OnModuleInit {
         HttpStatus.CONFLICT
       );
     }
-    // A text-only order must never accept money when neither participant can
-    // use the only in-scope delivery channel. This uses the same authority gate
-    // as message sending; current first-release grants are deliberately frozen.
-    assertPublicInteractionIdentity(order.user ?? { accountStatus: "unavailable" });
+    // Payment remains limited to active participants. Identity-authority grants
+    // are no longer required; adult and companion commercial eligibility stay
+    // enforced by their dedicated checks.
+    assertPublicInteractionAccountActive(order.user ?? { accountStatus: "unavailable" });
     if (!(order.scheduledAt instanceof Date) ||
         order.scheduledAt.getTime() <= Date.now() + MIN_PREPAY_LEAD_MS +
           MIN_PREPAY_USABLE_WINDOW_MS + PREPAY_ISSUANCE_ALLOWANCE_MS) {
@@ -1707,7 +1707,7 @@ export class PaymentsService implements OnModuleInit {
         HttpStatus.CONFLICT
       );
     }
-    assertPublicInteractionIdentity(owner);
+    assertPublicInteractionAccountActive(owner);
     if (!(order.companionConfirmedAt instanceof Date)) {
       throw new AppException(
         "ORDER_NOT_CONFIRMED",

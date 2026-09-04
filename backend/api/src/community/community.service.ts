@@ -4,7 +4,7 @@ import { AppException } from "../common/errors/app.exception";
 import { PrismaService } from "../database/prisma.service";
 import { ModerationCaseService } from "../moderation/moderation-case.service";
 import { ModerationService } from "../moderation/moderation.service";
-import { assertPublicInteractionIdentity } from "../users/public-interaction-identity.gate";
+import { assertPublicInteractionAccountActive } from "../users/public-interaction-account.guard";
 import { CreateCommunityPostDto, CreateCommunityPostReportDto, ListCommunityItemsDto } from "./dto/community.dto";
 
 const REPORT_REASON_SENSITIVE_VALUE = /(?:1[3-9]\d{9}|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}|\d{17}[\dX])/i;
@@ -83,9 +83,9 @@ export class CommunityService {
       include: { profile: true, companionProfile: { include: { commercialProfile: true } } }
     } as any);
     if (!user) throw new AppException("UNAUTHORIZED", "User not found", HttpStatus.UNAUTHORIZED);
-    // Public community posts require the server identity signal before any
-    // moderation side-effect or post write. Adult eligibility remains separate.
-    assertPublicInteractionIdentity(user);
+    // Public community posts require an active account before any moderation
+    // side-effect or post write. Adult eligibility remains separate.
+    assertPublicInteractionAccountActive(user);
     if (
       dto.kind === "malePromotion" &&
       (user.accountStatus !== "active" ||
@@ -108,6 +108,17 @@ export class CommunityService {
     const item = await this.prisma.$transaction(async (tx) => {
       const db = tx as any;
       await this.lockCommunityWriter(db, userId);
+      const lockedUser = await db.user.findUnique({
+        where: { id: userId },
+        select: { accountStatus: true }
+      });
+      if (!lockedUser) {
+        throw new AppException("UNAUTHORIZED", "User not found", HttpStatus.UNAUTHORIZED);
+      }
+      // The pre-moderation read keeps an already-restricted account from doing
+      // work. This locked re-read closes the race where an account restriction
+      // commits while moderation is running but before the post is inserted.
+      assertPublicInteractionAccountActive(lockedUser);
       await this.assertCommunityWriteAllowed(db, userId, "post");
       const created = await db.communityPost.create({
         data: {

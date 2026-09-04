@@ -75,6 +75,38 @@ describe("CustomerAdultEligibilityService", () => {
     }));
   });
 
+  it("accepts the current server-side 18+ consent receipt when no separate review record exists", async () => {
+    const acceptedAt = new Date("2026-08-01T00:00:00.000Z");
+    const db = {
+      customerAdultEligibility: { findFirst: jest.fn().mockResolvedValue(null) },
+      legalConsentReceipt: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: "consent-1",
+          adultConfirmed: true,
+          acceptedAt,
+          consentedAt: acceptedAt,
+          withdrawnAt: null
+        })
+      }
+    } as any;
+
+    await expect(assertCurrentCustomerAdultEligibility(
+      db,
+      "customer-1",
+      now,
+      new Date("2026-09-01T00:00:00.000Z")
+    )).resolves.toEqual({
+      recordId: "consent-1",
+      verifiedAt: acceptedAt,
+      validUntil: new Date("9999-12-31T23:59:59.000Z"),
+      verificationMethod: "legalConsentAttestation"
+    });
+    expect(db.legalConsentReceipt.findFirst).toHaveBeenCalledWith({
+      where: { userId: "customer-1", adultConfirmed: true, withdrawnAt: null },
+      orderBy: [{ consentedAt: "desc" }, { id: "desc" }]
+    });
+  });
+
   it("creates only a pending self-submission with an opaque evidence reference", async () => {
     tx.customerAdultEligibility.create.mockResolvedValue(baseRecord());
 

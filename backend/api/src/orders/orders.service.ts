@@ -25,7 +25,7 @@ import { NotificationsService } from "../notifications/notifications.service";
 import { RecommendationsService } from "../recommendations/recommendations.service";
 import { VoiceRoomControlService } from "../voice/voice-room-control.service";
 import { assertCurrentCustomerAdultEligibility } from "../users/customer-adult-eligibility.service";
-import { assertPublicInteractionIdentity } from "../users/public-interaction-identity.gate";
+import { assertPublicInteractionAccountActive } from "../users/public-interaction-account.guard";
 import {
   WECHAT_PAY_PROVIDER,
   WECHAT_PREPAY_TTL_MS,
@@ -278,12 +278,9 @@ export class OrdersService {
       await db.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${userId} FOR UPDATE`;
       const customer = await db.user.findUnique({
         where: { id: userId },
-        select: {
-          accountStatus: true,
-          profile: { select: { isVerified: true } }
-        }
+        select: { accountStatus: true }
       });
-      assertPublicInteractionIdentity(customer ?? { accountStatus: "unavailable" });
+      assertPublicInteractionAccountActive(customer ?? { accountStatus: "unavailable" });
       const futureBoundary = await db.companionCustomerFutureBoundary.findUnique({
         where: {
           companionId_customerUserId: {
@@ -352,7 +349,6 @@ export class OrdersService {
           HttpStatus.CONFLICT
         );
       }
-      assertPublicInteractionIdentity(companion.owner ?? { accountStatus: "unavailable" });
       await assertCurrentCompanionCommercialEligibility(
         db,
         companion.id,

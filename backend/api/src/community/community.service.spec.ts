@@ -1,4 +1,3 @@
-import * as publicInteractionIdentity from "../users/public-interaction-identity.gate";
 import { CommunityService } from "./community.service";
 
 describe("CommunityService", () => {
@@ -18,17 +17,6 @@ describe("CommunityService", () => {
     appendCommunityReportToCase: jest.fn().mockResolvedValue(undefined)
   } as any;
   const service = new CommunityService(prisma, moderation, moderationCases);
-
-  async function withApprovedIdentityAdapter<T>(run: () => Promise<T>): Promise<T> {
-    const identityGateSpy = jest
-      .spyOn(publicInteractionIdentity, "assertPublicInteractionIdentity")
-      .mockImplementation(() => undefined);
-    try {
-      return await run();
-    } finally {
-      identityGateSpy.mockRestore();
-    }
-  }
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -107,24 +95,20 @@ describe("CommunityService", () => {
       }
     });
 
-    await withApprovedIdentityAdapter(async () => {
-      await expect(service.create("companion-user", {
-        kind: "malePromotion",
-        topic: "情绪倾听",
-        content: "今晚可预约"
-      })).rejects.toMatchObject({ code: "COMPANION_PROFILE_REQUIRED" });
-    });
+    await expect(service.create("companion-user", {
+      kind: "malePromotion",
+      topic: "情绪倾听",
+      content: "今晚可预约"
+    })).rejects.toMatchObject({ code: "COMPANION_PROFILE_REQUIRED" });
     expect(moderation.moderateAsync).not.toHaveBeenCalled();
     expect(prisma.communityPost.create).not.toHaveBeenCalled();
   });
 
-  it.each([false, true])(
-    "rejects a legacy identity boolean (%s) before moderation or any write",
-    async (legacyIsVerified) => {
+  it("rejects a restricted account before moderation or any write", async () => {
     prisma.user.findUnique.mockResolvedValue({
       id: "user-1",
-      accountStatus: "active",
-      profile: { displayName: "小安", isVerified: legacyIsVerified },
+      accountStatus: "restricted",
+      profile: { displayName: "小安", isVerified: false },
       companionProfile: null
     });
 
@@ -133,21 +117,20 @@ describe("CommunityService", () => {
       topic: "聊天",
       content: "今晚想找人聊聊"
     })).rejects.toMatchObject({
-      code: "PUBLIC_INTERACTION_IDENTITY_REQUIRED",
+      code: "ACCOUNT_RESTRICTED",
       status: 403
     });
     expect(moderation.moderateAsync).not.toHaveBeenCalled();
     expect(prisma.$transaction).not.toHaveBeenCalled();
     expect(prisma.communityPost.create).not.toHaveBeenCalled();
     expect(moderationCases.createFromResult).not.toHaveBeenCalled();
-    }
-  );
+  });
 
   it("persists allowed posts after moderation", async () => {
     prisma.user.findUnique.mockResolvedValue({
       id: "user-1",
       accountStatus: "active",
-      profile: { displayName: "小安", isVerified: true },
+      profile: { displayName: "小安", isVerified: false },
       companionProfile: null
     });
     moderation.moderateAsync.mockResolvedValue({ decision: "allow" });
@@ -157,14 +140,39 @@ describe("CommunityService", () => {
       author: { profile: { displayName: "小安" }, companionProfile: null }, likes: []
     });
 
-    const result = await withApprovedIdentityAdapter(() => service.create(
+    const result = await service.create(
       "user-1",
       { kind: "femaleRequest", topic: "聊天", content: "今晚想找人聊聊" }
-    ));
+    );
 
     expect(moderation.moderateAsync).toHaveBeenCalledWith("聊天 今晚想找人聊聊", "community");
     expect(result.moderationStatus).toBe("approved");
     expect(moderationCases.createFromResult).not.toHaveBeenCalled();
+  });
+
+  it("rechecks the active account under the transaction lock before inserting a post", async () => {
+    prisma.user.findUnique
+      .mockResolvedValueOnce({
+        id: "user-1",
+        accountStatus: "active",
+        profile: { displayName: "小安", isVerified: false },
+        companionProfile: null
+      })
+      .mockResolvedValueOnce({ id: "user-1", accountStatus: "restricted" });
+    moderation.moderateAsync.mockResolvedValue({ decision: "allow" });
+
+    await expect(service.create("user-1", {
+      kind: "femaleRequest",
+      topic: "聊天",
+      content: "今晚想找人聊聊"
+    })).rejects.toMatchObject({ code: "ACCOUNT_RESTRICTED", status: 403 });
+
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(prisma.user.findUnique).toHaveBeenLastCalledWith({
+      where: { id: "user-1" },
+      select: { accountStatus: true }
+    });
+    expect(prisma.communityPost.create).not.toHaveBeenCalled();
   });
 
   it("throttles a new community post under the caller lock without changing account or content state", async () => {
@@ -177,13 +185,11 @@ describe("CommunityService", () => {
     moderation.moderateAsync.mockResolvedValue({ decision: "allow" });
     prisma.communityPost.count.mockResolvedValue(3);
 
-    await withApprovedIdentityAdapter(async () => {
-      await expect(service.create("user-1", {
-        kind: "femaleRequest",
-        topic: "聊天",
-        content: "想找人聊聊"
-      })).rejects.toMatchObject({ code: "COMMUNITY_WRITE_RATE_LIMITED", status: 429 });
-    });
+    await expect(service.create("user-1", {
+      kind: "femaleRequest",
+      topic: "聊天",
+      content: "想找人聊聊"
+    })).rejects.toMatchObject({ code: "COMMUNITY_WRITE_RATE_LIMITED", status: 429 });
 
     expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
     expect(prisma.communityPost.count).toHaveBeenCalledWith({
@@ -228,10 +234,10 @@ describe("CommunityService", () => {
       author: { profile: { displayName: "小安" }, companionProfile: null }, likes: []
     });
 
-    const result = await withApprovedIdentityAdapter(() => service.create(
+    const result = await service.create(
       "user-1",
       { kind: "femaleRequest", topic: "兼职", content: "请私聊我" }
-    ));
+    );
 
     expect(result.moderationStatus).toBe("pending");
     expect(moderationCases.createFromResult).toHaveBeenCalledWith(expect.objectContaining({

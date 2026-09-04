@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Talk&Talk API
-  version: 0.1.0
+  version: 1.0.0
   description: |
     Frozen public contract for `/api/v1`.
     All JSON responses use a uniform envelope (see components.schemas.SuccessEnvelope / ErrorEnvelope).
@@ -382,7 +382,8 @@ paths:
   /auth/wechat/mini-program:
     post:
       tags: [auth]
-      summary: Sign in with WeChat Mini Program code
+      summary: Sign in from the WeChat Mini Program
+      description: Uses CloudBase-injected x-wx identity headers when the service is configured for Mini Program-only CloudBase access; otherwise exchanges the short-lived wx.login code with WeChat on the server.
       operationId: wechatMiniProgramLogin
       security: []
       requestBody:
@@ -417,7 +418,7 @@ paths:
   /auth/wechat/mini-program/status:
     get:
       tags: [auth]
-      summary: Check whether server-side Mini Program credentials are configured
+      summary: Check whether CloudBase identity or server-side Mini Program credentials are configured
       operationId: wechatMiniProgramStatus
       security: []
       responses:
@@ -2733,10 +2734,10 @@ paths:
                         $ref: "#/components/schemas/OrderDto"
         "403":
           description: >-
-            The shared public-interaction identity authority gate is closed
-            (`PUBLIC_INTERACTION_IDENTITY_REQUIRED`). Because text messaging is
-            the only first-release delivery channel, no order, timeline event,
-            notification, recommendation attribution, or payment intent is created.
+            The authenticated customer account is not active (`ACCOUNT_RESTRICTED`).
+            No order, timeline event, notification, recommendation attribution,
+            or payment intent is created. Profile identity verification is not
+            required for an active customer.
           content:
             application/json:
               schema:
@@ -3202,9 +3203,9 @@ paths:
                 $ref: "#/components/schemas/SuccessEnvelope"
         "403":
           description: >-
-            The customer cannot use the only first-release delivery channel
-            because the shared identity authority gate is closed. No provider
-            prepay call, payment row, or order-state mutation occurs.
+            The customer account is not active (`ACCOUNT_RESTRICTED`). No provider
+            prepay call, payment row, or order-state mutation occurs. Profile
+            identity verification is not required for an active customer.
           content:
             application/json:
               schema:
@@ -3273,9 +3274,8 @@ paths:
                 $ref: "#/components/schemas/SuccessEnvelope"
         "403":
           description: >
-            Public interaction identity hard gate rejected the caller
-            (`PUBLIC_INTERACTION_IDENTITY_REQUIRED`). details include
-            verificationStatus, recoveryPath, and publicInteractionBlocked.
+            The caller account is not active (`ACCOUNT_RESTRICTED`). details include
+            accountStatus, recoveryPath, and publicInteractionBlocked.
             No post, moderation case, notification, or audit write occurs.
           content:
             application/json:
@@ -4092,10 +4092,9 @@ paths:
                 $ref: "#/components/schemas/SuccessEnvelope"
         "403":
           description: >
-            Public interaction identity hard gate or conversation interaction
-            boundary rejected the caller. Identity rejects use
-            `PUBLIC_INTERACTION_IDENTITY_REQUIRED` with recoveryPath and do not
-            write messages, moderation cases, notifications, or order changes.
+            Account state or the conversation interaction boundary rejected the
+            caller. Account rejects use `ACCOUNT_RESTRICTED`; no message,
+            moderation case, notification, or order change is written.
           content:
             application/json:
               schema:
@@ -10307,7 +10306,8 @@ components:
           type: integer
           minimum: 0
           maximum: 1
-          description: One in commercial mode until a current, revocable authority-backed identity grant model exists. While one, new orders and prepay fail before writes; legacy profile booleans cannot clear it.
+          deprecated: true
+          description: Compatibility field retained for older admin clients. It is always zero because public interaction no longer requires an identity-authority grant; active-account, legal-consent, adult-eligibility, companion-commercial and payment controls remain separate.
         refundPolicyUnapproved: { type: integer, minimum: 0, maximum: 1, description: One when commercial mode lacks an approved controlled refund-policy version and non-secret approval reference. }
         refundPolicySnapshotGaps: { type: integer, minimum: 0, description: Orders with a missing, out-of-range, or completion-deadline-inconsistent immutable refund-policy snapshot. Any value above zero blocks commercial readiness. }
         wechatDailyBillReconciliationDisabled: { type: integer, minimum: 0, maximum: 1 }

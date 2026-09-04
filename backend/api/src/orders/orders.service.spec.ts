@@ -1,7 +1,6 @@
 import { HttpStatus } from "@nestjs/common";
 
 import { AppException } from "../common/errors/app.exception";
-import * as publicInteractionIdentity from "../users/public-interaction-identity.gate";
 import { OrdersService } from "./orders.service";
 
 describe("OrdersService", () => {
@@ -66,8 +65,6 @@ describe("OrdersService", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.spyOn(publicInteractionIdentity, "assertPublicInteractionIdentity")
-      .mockImplementation(() => undefined);
     prisma.order.findUnique.mockReset().mockResolvedValue({
       userId: "u1",
       companion: { ownerUserId: "u-companion" }
@@ -200,20 +197,11 @@ describe("OrdersService", () => {
     }));
   });
 
-  it("refuses a new text-only order before writes when the shared identity authority gate is closed", async () => {
-    jest.spyOn(publicInteractionIdentity, "assertPublicInteractionIdentity")
-      .mockImplementationOnce(() => {
-        throw new AppException(
-          "PUBLIC_INTERACTION_IDENTITY_REQUIRED",
-          "identity authority unavailable",
-          HttpStatus.FORBIDDEN,
-          {
-            verificationStatus: "notVerified",
-            recoveryPath: "/pages/profile/index",
-            publicInteractionBlocked: true
-          }
-        );
-      });
+  it("refuses a new order before writes when the customer account is not active", async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      accountStatus: "restricted",
+      profile: { isVerified: false }
+    });
 
     await expect(service.create("u1", {
       companionId: "c1",
@@ -222,16 +210,13 @@ describe("OrdersService", () => {
       serviceIntent: "listen",
       scheduledAt: new Date(Date.now() + 3_600_000).toISOString()
     })).rejects.toMatchObject({
-      code: "PUBLIC_INTERACTION_IDENTITY_REQUIRED",
+      code: "ACCOUNT_RESTRICTED",
       status: HttpStatus.FORBIDDEN
     });
 
     expect(prisma.user.findUnique).toHaveBeenCalledWith({
       where: { id: "u1" },
-      select: {
-        accountStatus: true,
-        profile: { select: { isVerified: true } }
-      }
+      select: { accountStatus: true }
     });
     expect(prisma.order.create).not.toHaveBeenCalled();
     expect(prisma.orderTimelineEvent.create).not.toHaveBeenCalled();

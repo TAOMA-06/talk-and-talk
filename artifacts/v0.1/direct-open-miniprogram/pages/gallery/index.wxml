@@ -1,0 +1,50 @@
+<view class="review-page">
+  <view class="hero">
+    <view class="hero-orbit orbit-one"></view>
+    <view class="hero-orbit orbit-two"></view>
+    <view class="review-badge">本地 UI 评审版 · 不可上传</view>
+    <view class="hero-title">31 个页面，<text>直接查看。</text></view>
+    <view class="hero-copy">无需后端、账号或合法域名。点击卡片查看真实微信开发者工具画面。</view>
+    <view class="hero-facts">
+      <view><text>{{screenCount}}</text><label>页面</label></view>
+      <view><text>390</text><label>视口</label></view>
+      <view><text>0</text><label>网络请求</label></view>
+    </view>
+  </view>
+
+  <view class="truth-note">
+    <view class="truth-dot"></view>
+    <view><text>演示截图，不是业务成功态</text><label>用于快速确认 UI 覆盖；真实登录、订单、支付和消息仍需后端联调。</label></view>
+  </view>
+
+  <scroll-view class="group-strip" scroll-x enhanced show-scrollbar="{{false}}">
+    <view class="group-row">
+      <button wx:for="{{groups}}" wx:key="key" class="group-chip {{activeGroup === item.key ? 'is-active' : ''}}" data-group="{{item.key}}" aria-pressed="{{activeGroup === item.key}}" bindtap="chooseGroup">{{item.label}}</button>
+    </view>
+  </scroll-view>
+
+  <view class="section-heading">
+    <view><text>页面画廊</text><label>{{visibleScreens.length}} 个画面</label></view>
+    <view class="section-mark">UI4</view>
+  </view>
+
+  <view class="screen-grid">
+    <navigator wx:for="{{visibleScreens}}" wx:key="name" class="screen-card tone-{{item.tone}}" url="/pages/screen/index?index={{item.index}}" aria-label="查看第{{item.number}}页：{{item.title}}" hover-class="screen-card-pressed">
+      <view class="thumb-shell">
+        <image class="screen-thumb" src="{{item.image}}" mode="aspectFill" lazy-load="{{true}}" aria-label="{{item.title}}页面缩略图" />
+        <view class="screen-number">{{item.number}}</view>
+      </view>
+      <view class="screen-copy">
+        <view class="screen-label">{{item.title}}</view>
+        <view class="screen-route">{{item.shortRoute}}</view>
+      </view>
+      <view class="screen-open">查看 →</view>
+    </navigator>
+  </view>
+
+  <view class="review-footer">
+    <view>Talk&amp;Talk · Pastel Card Theatre</view>
+    <text>真实画面 · 明确边界 · 本地评审</text>
+  </view>
+  <view class="safe-bottom"></view>
+</view>

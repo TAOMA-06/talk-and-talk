@@ -1,7 +1,6 @@
 import { HttpStatus } from "@nestjs/common";
 
 import { AppException } from "../common/errors/app.exception";
-import * as publicInteractionIdentity from "../users/public-interaction-identity.gate";
 import { MockWeChatPayProvider, TEST_MOCK_WECHAT_NOTIFY_SECRET } from "./wechat/mock-wechat-pay.provider";
 import { PaymentsService } from "./payments.service";
 
@@ -137,8 +136,6 @@ describe("PaymentsService", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.spyOn(publicInteractionIdentity, "assertPublicInteractionIdentity")
-      .mockImplementation(() => undefined);
     prisma.order.findUnique.mockResolvedValue(baseOrder);
     prisma.paymentTransaction.findUnique.mockResolvedValue({ orderId: "o1" });
     prisma.paymentTransaction.updateMany.mockResolvedValue({ count: 1 });
@@ -173,24 +170,15 @@ describe("PaymentsService", () => {
     });
   });
 
-  it("refuses prepay before any payment write when the text-delivery identity gate is closed", async () => {
+  it("refuses prepay before any payment write when the customer account is not active", async () => {
     const providerPrepay = jest.spyOn(wechat, "createMiniProgramPrepay");
-    jest.spyOn(publicInteractionIdentity, "assertPublicInteractionIdentity")
-      .mockImplementationOnce(() => {
-        throw new AppException(
-          "PUBLIC_INTERACTION_IDENTITY_REQUIRED",
-          "identity authority unavailable",
-          HttpStatus.FORBIDDEN,
-          {
-            verificationStatus: "notVerified",
-            recoveryPath: "/pages/profile/index",
-            publicInteractionBlocked: true
-          }
-        );
-      });
+    const restrictedOrder = {
+      ...baseOrder,
+      user: { ...baseOrder.user, accountStatus: "restricted", profile: { isVerified: false } }
+    };
     const db = {
       $queryRaw: jest.fn(),
-      order: { findUnique: jest.fn().mockResolvedValue(baseOrder) },
+      order: { findUnique: jest.fn().mockResolvedValue(restrictedOrder) },
       paymentTransaction: {
         findFirst: jest.fn(),
         create: jest.fn(),
@@ -201,7 +189,7 @@ describe("PaymentsService", () => {
 
     await expect(service.prepay("u1", "o1", "miniProgram"))
       .rejects.toMatchObject({
-        code: "PUBLIC_INTERACTION_IDENTITY_REQUIRED",
+        code: "ACCOUNT_RESTRICTED",
         status: HttpStatus.FORBIDDEN
       });
 

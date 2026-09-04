@@ -1,0 +1,25 @@
+<view class="screen-page">
+  <view class="screen-header tone-{{screen.tone}}">
+    <view class="screen-header-top"><text>{{screen.number}} / {{total}}</text><label>UI 评审版 · 演示截图</label></view>
+    <view class="screen-title">{{screen.title}}</view>
+    <view class="screen-route">{{screen.route}}</view>
+  </view>
+
+  <button class="image-shell" bindtap="openLarge" hover-class="image-shell-pressed" aria-label="全屏查看{{screen.title}}画面">
+    <image class="full-screen-image" src="{{screen.image}}" mode="widthFix" />
+    <view class="zoom-hint">点击全屏查看</view>
+  </button>
+
+  <view class="boundary-note">
+    <view class="boundary-title">这是什么</view>
+    <view>真实微信开发者工具截图，用于确认页面覆盖和视觉方向。</view>
+    <view class="boundary-sub">不联网，不代表登录、订单、支付或消息已经在此评审工程中运行。</view>
+  </view>
+
+  <view class="screen-actions">
+    <button class="secondary" disabled="{{!hasPrevious}}" bindtap="previous">← 上一页</button>
+    <button class="primary" bindtap="backToGallery">返回总览</button>
+    <button class="secondary" disabled="{{!hasNext}}" bindtap="next">下一页 →</button>
+  </view>
+  <view class="safe-bottom"></view>
+</view>

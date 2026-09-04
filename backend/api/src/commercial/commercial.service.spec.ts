@@ -953,9 +953,10 @@ describe("CommercialService", () => {
       if (key === "REFUND_POLICY_APPROVAL_REFERENCE") return "legal:refund-policy-2026-08";
       return internalConfig(key, fallback);
     });
-    const identityAuthorityOnly = await readinessService.operationalReadiness();
-    expect(Object.entries(identityAuthorityOnly.blockers).filter(([, count]) => count > 0))
-      .toEqual([["publicInteractionIdentityAuthorityUnavailable", 1]]);
+    const identityAuthorityRemoved = await readinessService.operationalReadiness();
+    expect(identityAuthorityRemoved.blockers.publicInteractionIdentityAuthorityUnavailable).toBe(0);
+    expect(Object.entries(identityAuthorityRemoved.blockers).filter(([, count]) => count > 0))
+      .toEqual([]);
     config.get.mockImplementation(internalConfig);
 
     readinessPrisma.$queryRaw.mockImplementation(async (parts: TemplateStringsArray) => {

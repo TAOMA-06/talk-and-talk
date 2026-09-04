@@ -543,7 +543,7 @@ describe("ConversationsService.ensureConversation", () => {
   });
 });
 
-describe("ConversationsService.send identity hard gate", () => {
+describe("ConversationsService.send account access", () => {
   const prisma = {
     conversation: {
       findFirst: jest.fn(),
@@ -606,15 +606,15 @@ describe("ConversationsService.send identity hard gate", () => {
     );
   });
 
-  it("rejects an unverified sender before moderation, message, case, or notification writes", async () => {
+  it("rejects a restricted sender before moderation, message, case, or notification writes", async () => {
     prisma.user.findUnique.mockResolvedValue({
       id: "u1",
-      accountStatus: "active",
+      accountStatus: "restricted",
       profile: { displayName: "小安", isVerified: false, safetyScore: 80 }
     });
 
     await expect(service.send("u1", "c1", { content: "你好" })).rejects.toMatchObject({
-      code: "PUBLIC_INTERACTION_IDENTITY_REQUIRED",
+      code: "ACCOUNT_RESTRICTED",
       status: 403
     });
 
@@ -627,7 +627,7 @@ describe("ConversationsService.send identity hard gate", () => {
     expect(crisisIntervention.recordCriticalChatSignal).not.toHaveBeenCalled();
   });
 
-  it("rejects attachment input before any chat, identity, moderation, or message work on text-only", async () => {
+  it("rejects attachment input before any chat, account, moderation, or message work on text-only", async () => {
     mediaAssets.assertChatMediaUploadEnabled.mockImplementation(() => {
       throw Object.assign(new Error("media disabled"), { code: "MEDIA_FEATURE_DISABLED", status: 503 });
     });
@@ -647,11 +647,11 @@ describe("ConversationsService.send identity hard gate", () => {
     expect(notifications.createConversationMessageReceivedIfUnmuted).not.toHaveBeenCalled();
   });
 
-  it("rejects a legacy verified sender before moderation because the boolean has no authority binding", async () => {
+  it("allows an active sender without requiring the legacy verification boolean", async () => {
     prisma.user.findUnique.mockResolvedValue({
       id: "u1",
       accountStatus: "active",
-      profile: { displayName: "小安", isVerified: true, safetyScore: 80 }
+      profile: { displayName: "小安", isVerified: false, safetyScore: 80 }
     });
     moderation.moderateAsync.mockResolvedValue({
       decision: "allow",
@@ -682,17 +682,47 @@ describe("ConversationsService.send identity hard gate", () => {
     prisma.conversation.update.mockResolvedValue(conversation);
     mediaAssets.attachmentsForMessage.mockResolvedValue([]);
 
-    await expect(service.send("u1", "c1", { content: "你好" })).rejects.toMatchObject({
-      code: "PUBLIC_INTERACTION_IDENTITY_REQUIRED",
-      status: 403,
-      details: expect.objectContaining({
-        verificationStatus: "notVerified",
-        publicInteractionBlocked: true
+    await expect(service.send("u1", "c1", { content: "你好" })).resolves.toEqual(
+      expect.objectContaining({
+        message: expect.objectContaining({ id: "m1", content: "你好" }),
+        moderation: expect.objectContaining({ deliveryStatus: "published" })
       })
+    );
+
+    expect(moderation.moderateAsync).toHaveBeenCalled();
+    expect(prisma.$transaction).toHaveBeenCalled();
+    expect(prisma.message.create).toHaveBeenCalled();
+  });
+
+  it("rechecks the active sender under the transaction lock before writing a message", async () => {
+    prisma.user.findUnique
+      .mockResolvedValueOnce({
+        id: "u1",
+        accountStatus: "active",
+        profile: { displayName: "小安", isVerified: false, safetyScore: 80 }
+      })
+      .mockResolvedValueOnce({ id: "u1", accountStatus: "restricted" });
+    moderation.moderateAsync.mockResolvedValue({
+      decision: "allow",
+      riskLevel: "low",
+      priority: "normal",
+      score: 0.01,
+      reasons: [],
+      matchedRules: [],
+      categories: ["normal"],
+      policyVersion: "chat-v2",
+      usedAI: false
     });
 
-    expect(moderation.moderateAsync).not.toHaveBeenCalled();
-    expect(prisma.$transaction).not.toHaveBeenCalled();
+    await expect(service.send("u1", "c1", { content: "你好" })).rejects.toMatchObject({
+      code: "ACCOUNT_RESTRICTED",
+      status: 403
+    });
+
+    expect(prisma.user.findUnique).toHaveBeenLastCalledWith({
+      where: { id: "u1" },
+      select: { accountStatus: true }
+    });
     expect(prisma.message.create).not.toHaveBeenCalled();
     expect(notifications.createConversationMessageReceivedIfUnmuted).not.toHaveBeenCalled();
   });

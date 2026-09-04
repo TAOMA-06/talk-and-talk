@@ -1075,14 +1075,14 @@ test("first-release authority decisions remain fail-closed in the public contrac
 
   const orderCreate = document.paths["/orders"].post;
   const prepay = document.paths["/orders/{id}/prepay"].post;
-  assert.match(orderCreate.responses["403"].description, /only first-release delivery channel/);
-  assert.match(orderCreate.responses["403"].description, /no order/);
+  assert.match(orderCreate.responses["403"].description, /ACCOUNT_RESTRICTED/);
+  assert.match(orderCreate.responses["403"].description, /No order/);
   assert.match(prepay.responses["403"].description, /No provider prepay call/);
   const readinessBlockers = document.components.schemas.CommercialReadinessBlockers;
   assert.ok(readinessBlockers.required.includes("publicInteractionIdentityAuthorityUnavailable"));
   assert.match(
     readinessBlockers.properties.publicInteractionIdentityAuthorityUnavailable.description,
-    /new orders and prepay fail before writes/
+    /always zero/
   );
 });
 

@@ -81,10 +81,10 @@ AppID、微信凭据引用及真实支付商户绑定均不得写入 Git 或由�
 | 2 | 发现、详情、广场、评价 | 读取 NestJS 正式 API 数据；只展示实名、商业档案已复核且已上架的陪伴者 |
 | 3 | 创建订单 → 陪伴者确认 → `channel=miniProgram` prepay | 未确认时禁止支付；staging mock 返回 `wechatMiniProgramParams`；真实环境能调起 `wx.requestPayment` |
 | 4 | 取消 / 成功支付 | 取消不标记 paid；成功后以微信回调刷新订单和会话 |
-| 5 | 聊天和举报 | 当前 identity authority 未接入时，聊天输入隐藏且 API 精确 403、举报仍可用；取得真实授权证据后才验收 normal/warn/review/block 提示 |
+| 5 | 聊天和举报 | active 账号在有效订单会话窗口内可发送文字；restricted/banned、会话关闭、限言或拉黑仍失败关闭；验收 normal/warn/review/block 提示和举报回执 |
 | 6 | 陪伴者订单 | paid → inService → completed 状态流转正确；完成订单可评价 |
 | 7 | 隐私保护指引 | 首次涉及聊天、支付或发帖时，平台要求时可正常授权；隐私链接可打开 |
-| 8 | 订单聊天权益 | authority 未接入时新订单/预支付在写前失败；已有订单历史、举报、售后和客服可用。取得真实授权后，`paid` / `inService` 的窗口可发普通消息，完成订单仅可查看历史 |
+| 8 | 订单聊天权益 | active 客户完成当前协议与 18+ 明确确认后可创建订单，并在陪伴者确认后进入预支付；`paid` / `inService` 的窗口可发普通文字消息，完成订单仅可查看历史；陪伴者商业资格和会话边界仍独立校验 |
 
 ## 历史 iOS 回归（不属于当前商用放行范围）
 

@@ -1,6 +1,7 @@
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 
+import { SecurityCounterService } from "../common/security-counter/security-counter.service";
 import { PrismaService } from "../database/prisma.service";
 import { ReviewAuthService } from "./review-auth.service";
 import { REVIEW_TOKEN_KIND } from "./review-auth.types";
@@ -38,11 +39,36 @@ describe("ReviewAuthService", () => {
       return values[key];
     })
   };
+  const counters = {
+    increment: jest.fn().mockResolvedValue(1),
+    claim: jest.fn().mockResolvedValue(true)
+  };
   let service: ReviewAuthService;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new ReviewAuthService(prisma as unknown as PrismaService, jwt as unknown as JwtService, config as unknown as ConfigService);
+    counters.increment.mockResolvedValue(1);
+    counters.claim.mockResolvedValue(true);
+    service = new ReviewAuthService(
+      prisma as unknown as PrismaService,
+      jwt as unknown as JwtService,
+      config as unknown as ConfigService,
+      counters as unknown as SecurityCounterService
+    );
+  });
+
+  it("applies the shared security counter before looking up review credentials", async () => {
+    counters.increment.mockResolvedValue(11);
+
+    await expect(service.login("reviewer.liu", "password", "000000", "203.0.113.9"))
+      .rejects.toMatchObject({ code: "REVIEW_LOGIN_RATE_LIMITED" });
+
+    expect(counters.increment).toHaveBeenCalledTimes(1);
+    expect(counters.increment).toHaveBeenCalledWith(
+      expect.stringMatching(/^review-login:user:[a-f0-9]{64}$/),
+      900
+    );
+    expect(prisma.reviewStaff.findUnique).not.toHaveBeenCalled();
   });
 
   it("refreshes only an independent review session, never a User refresh token", async () => {

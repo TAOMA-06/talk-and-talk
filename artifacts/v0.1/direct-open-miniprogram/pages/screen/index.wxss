@@ -1,0 +1,24 @@
+.screen-page { padding: 24rpx 24rpx 0; }
+.screen-header { padding: 28rpx 30rpx 30rpx; border: 2rpx solid rgba(41, 39, 36, .12); border-radius: 34rpx; box-shadow: 0 12rpx 28rpx rgba(60, 54, 48, .08); }
+.tone-blue { background: #dfeaf3; }
+.tone-apricot { background: #f1e2d5; }
+.tone-mint { background: #dfece5; }
+.tone-lavender { background: #e8e1ee; }
+.tone-butter { background: #f2ead1; }
+.tone-rose { background: #f1e0e3; }
+.screen-header-top { display: flex; align-items: center; justify-content: space-between; color: #665f58; font-size: 21rpx; font-weight: 650; }
+.screen-header-top text { padding: 8rpx 12rpx; border-radius: 12rpx; background: rgba(255, 255, 255, .55); color: #2f3431; }
+.screen-title { margin-top: 22rpx; font-size: 46rpx; font-weight: 780; letter-spacing: -1rpx; }
+.screen-route { overflow: hidden; margin-top: 12rpx; color: #6f6962; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 21rpx; text-overflow: ellipsis; white-space: nowrap; }
+.image-shell { position: relative; overflow: hidden; width: 100%; margin-top: 20rpx; padding: 12rpx; border: 2rpx solid #ded8cf; border-radius: 34rpx; background: #fff; box-shadow: 0 16rpx 36rpx rgba(54, 48, 42, .1); transition: transform 120ms ease; }
+.image-shell-pressed { transform: scale(.99); }
+.full-screen-image { display: block; width: 100%; border-radius: 24rpx; background: #f7f4ee; }
+.zoom-hint { position: absolute; right: 28rpx; bottom: 28rpx; padding: 12rpx 18rpx; border-radius: 999rpx; background: rgba(31, 44, 38, .9); color: #fff; font-size: 20rpx; font-weight: 700; }
+.boundary-note { display: flex; flex-direction: column; gap: 8rpx; margin-top: 20rpx; padding: 26rpx; border-radius: 28rpx; background: #eee9e1; color: #57524c; font-size: 23rpx; line-height: 1.55; }
+.boundary-title { color: #292724; font-size: 27rpx; font-weight: 740; }
+.boundary-sub { color: #7a746d; }
+.screen-actions { display: flex; gap: 12rpx; margin-top: 20rpx; }
+.screen-actions button { display: flex; align-items: center; justify-content: center; height: 82rpx; border-radius: 24rpx; font-size: 22rpx; font-weight: 720; }
+.screen-actions .secondary { flex: 1; border: 2rpx solid #d7d1c9; background: #fff; }
+.screen-actions .primary { flex: 1.1; background: #293a32; color: #fff; }
+.screen-actions button[disabled] { opacity: .35; }

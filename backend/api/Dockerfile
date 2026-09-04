@@ -41,6 +41,7 @@ COPY --from=build /app/dist ./dist
 COPY --from=build /app/public ./dist/public
 COPY --from=build /app/generated ./generated
 COPY --from=build /app/prisma ./prisma
+COPY --from=build /app/config ./config
 COPY --from=build /app/prisma.config.ts ./prisma.config.ts
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh \

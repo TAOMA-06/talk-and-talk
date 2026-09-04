@@ -26,17 +26,11 @@
       <tt-list-cell title="案件" bindtap="openSupportCenter" />
     </view>
 
-    <view class="card public-identity-card" aria-live="polite">
-      <view class="title small">公开互动暂不可用</view>
-      <view class="muted">身份核验授权未开放；新预约、支付、发帖和即时消息保持关闭。</view>
-      <button class="resource-retry" bindtap="openSupportCenter">查看支持</button>
-    </view>
-
     <view class="card resource-error-card" wx:if="{{recommendationSettingsState === 'error'}}" aria-live="polite">
       <view class="title small">推荐设置无法读取</view><view class="muted">{{recommendationSettingsError}}</view><button class="resource-retry" bindtap="load">重试</button>
     </view>
-    <view class="card" wx:elif="{{recommendationSettingsState === 'available' && recommendationPreferences}}">
-      <view class="recommendation-header"><view><view class="title small">个性化推荐</view><view class="muted">当前未开放</view></view><switch checked="{{false}}" disabled color="#292724" aria-label="个性化推荐未开放" /></view>
+    <view class="card" wx:elif="{{recommendationSettingsState === 'available' && recommendationPreferences && recommendationPreferences.behavioralTags.length}}">
+      <view class="recommendation-header"><view><view class="title small">推荐记录管理</view><view class="muted">可删除用于推荐的历史标签</view></view></view>
       <view wx:if="{{recommendationPreferences.behavioralTags.length}}" class="behavior-tags"><view class="recommendation-label">历史标签</view><view class="choices"><view wx:for="{{recommendationPreferences.behavioralTags}}" wx:key="id" class="behavior-tag" bindtap="deleteRecommendationTag" data-id="{{item.id}}" aria-role="button" aria-label="删除行为标签：{{item.name}}" tabindex="0">{{item.name}} ×</view></view></view>
     </view>
 

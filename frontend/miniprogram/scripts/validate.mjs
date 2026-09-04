@@ -264,6 +264,12 @@ function recordString(source, recordName, key) {
   return body?.match(new RegExp(`${key}\\s*:\\s*[\"']([^\"']+)[\"']`))?.[1] || null;
 }
 
+function recordBoolean(source, recordName, key) {
+  const body = source.match(new RegExp(`const\\s+${recordName}\\b[^=]*=\\s*\\{([\\s\\S]*?)\\n\\}(?:\\s+as\\s+const)?;`))?.[1];
+  const value = body?.match(new RegExp(`${key}\\s*:\\s*(true|false)`))?.[1];
+  return value === "true";
+}
+
 function isNonPublicOrLiteralHost(hostname) {
   const host = hostname.replace(/^\[|\]$/g, "").toLowerCase();
   return host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || isIP(host) !== 0;
@@ -306,6 +312,14 @@ const stagingApiBaseUrl = publicHttpsUrl(
   "/api/v1",
   "HTTPS_BACKENDS.trial"
 );
+const releaseCloudRunEnabled = recordBoolean(apiConfig, "USE_CLOUD_RUN", "release");
+for (const environment of ["develop", "trial", "release"]) {
+  if (!recordBoolean(apiConfig, "USE_CLOUD_RUN", environment)) continue;
+  const envId = recordString(apiConfig, "CLOUD_RUN_ENV_IDS", environment);
+  if (!envId || !/^[a-z][a-z0-9-]{5,63}$/i.test(envId)) {
+    errors.push(`CLOUD_RUN_ENV_IDS.${environment} must be configured when USE_CLOUD_RUN.${environment}=true`);
+  }
+}
 if (releaseApiBaseUrl && stagingApiBaseUrl && releaseApiBaseUrl.origin === stagingApiBaseUrl.origin) {
   errors.push("HTTPS_BACKENDS.trial and HTTPS_BACKENDS.release must use separate origins");
 }
@@ -316,7 +330,7 @@ for (const [document, publicFile] of [["privacy", "privacy.html"], ["terms", "te
     `/legal/${publicFile}`,
     `LEGAL_URLS.${document}`
   );
-  if (releaseApiBaseUrl && legalUrl && releaseApiBaseUrl.origin !== legalUrl.origin) {
+  if (!releaseCloudRunEnabled && releaseApiBaseUrl && legalUrl && releaseApiBaseUrl.origin !== legalUrl.origin) {
     errors.push(`LEGAL_URLS.${document} must use the same public origin as HTTPS_BACKENDS.release`);
   }
   if (!existsSync(join(repo, "backend/api/public/legal", publicFile))) {

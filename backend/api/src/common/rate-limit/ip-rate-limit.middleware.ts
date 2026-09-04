@@ -1,36 +1,20 @@
-import { HttpStatus, Injectable, NestMiddleware, OnModuleDestroy } from "@nestjs/common";
+import { HttpStatus, Injectable, NestMiddleware } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { NextFunction, Request, Response } from "express";
-import Redis from "ioredis";
 
 import { AppException } from "../errors/app.exception";
+import { SecurityCounterService } from "../security-counter/security-counter.service";
 /**
- * Simple IP rate limit using Redis. External environments fail closed on sensitive
- * write routes when Redis is unavailable; ordinary routes and health checks remain
- * available for diagnosis.
+ * Shared IP rate limit. External environments fail closed on sensitive write
+ * routes when the selected counter backend is unavailable; ordinary routes and
+ * health checks remain available for diagnosis.
  */
 @Injectable()
-export class IpRateLimitMiddleware implements NestMiddleware, OnModuleDestroy {
-  private redis: Redis | null = null;
-
-  constructor(private readonly config: ConfigService) {}
-
-  private getRedis(): Redis {
-    if (!this.redis) {
-      this.redis = new Redis(this.config.getOrThrow<string>("REDIS_URL"), {
-        maxRetriesPerRequest: 1,
-        lazyConnect: true,
-        enableOfflineQueue: false
-      });
-      this.redis.on("error", () => undefined);
-    }
-    return this.redis;
-  }
-
-  onModuleDestroy(): void {
-    this.redis?.disconnect();
-    this.redis = null;
-  }
+export class IpRateLimitMiddleware implements NestMiddleware {
+  constructor(
+    private readonly config: ConfigService,
+    private readonly counters: SecurityCounterService
+  ) {}
 
   async use(req: Request, res: Response, next: NextFunction) {
     // WeChat payment callbacks share egress IPs and may burst retries. Do not
@@ -42,22 +26,15 @@ export class IpRateLimitMiddleware implements NestMiddleware, OnModuleDestroy {
     const limit = this.config.get<number>("RATE_LIMIT_PER_MINUTE") ?? 120;
     const windowSeconds = 60;
     const ip = clientIp(req);
-    const key = `rl:ip:${ip}:${Math.floor(Date.now() / (windowSeconds * 1000))}`;
+    // Keep the exact aligned Redis buckets for existing deployments. The
+    // PostgreSQL implementation owns expiry, so a stable key avoids creating
+    // a new durable row for every IP and minute.
+    const key = this.counters.backend === "redis"
+      ? `rl:ip:${ip}:${Math.floor(Date.now() / (windowSeconds * 1000))}`
+      : `rl:ip:${ip}`;
 
     try {
-      const redis = this.getRedis();
-      if (redis.status !== "ready") {
-        try {
-          await redis.connect();
-        } catch {
-          this.handleRedisUnavailable(req, next);
-          return;
-        }
-      }
-      const count = await redis.incr(key);
-      if (count === 1) {
-        await redis.expire(key, windowSeconds);
-      }
+      const count = await this.counters.increment(key, windowSeconds);
       res.setHeader("X-RateLimit-Limit", String(limit));
       res.setHeader("X-RateLimit-Remaining", String(Math.max(0, limit - count)));
       if (count > limit) {
@@ -71,13 +48,13 @@ export class IpRateLimitMiddleware implements NestMiddleware, OnModuleDestroy {
         return;
       }
     } catch {
-      this.handleRedisUnavailable(req, next);
+      this.handleCounterUnavailable(req, next);
       return;
     }
     next();
   }
 
-  private handleRedisUnavailable(req: Request, next: NextFunction): void {
+  private handleCounterUnavailable(req: Request, next: NextFunction): void {
     const appEnv = this.config.get<string>("APP_ENV", "development");
     if (shouldFailClosed(req, appEnv)) {
       next(

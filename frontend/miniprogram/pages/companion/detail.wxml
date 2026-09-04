@@ -222,7 +222,6 @@
       <view wx:else class="availability-state availability-unavailable">{{availabilityMessage}}</view>
     </view>
     <view wx:if="{{selectedAvailabilityCandidate}}" class="booking-summary booking-slot-summary">已选时段：{{selectedAvailabilityCandidate.dateLabel}} {{selectedAvailabilityCandidate.timeLabel}}–{{selectedAvailabilityCandidate.endTimeLabel}}（北京时间）</view>
-    <view wx:if="{{!publicInteractionIdentityAvailable}}" class="availability-state availability-unavailable">身份核验授权未开放，新预约和支付暂不可用。</view>
     <tt-action-bar primary-text="{{bookingButtonText}}" disabled="{{!canBook || booking}}" loading="{{booking}}" motion-off="{{motionOff}}" bindprimary="book" />
   </view>
   <view class="reviews-heading"><tt-section-heading title="评价" motion-off="{{motionOff}}" /></view>
