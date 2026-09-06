@@ -1,3 +1,5 @@
+import { partnerRuntime } from "./partner-preview";
+
 const DEFAULT_API_BASE_URL = "https://api.talkandtalk.app/api/v1";
 
 export const ACCESS_COOKIE = "tt_access";
@@ -49,6 +51,9 @@ export async function backendRequest(
         accept: "application/json",
         ...(init.body ? { "content-type": "application/json" } : {}),
         ...Object.fromEntries(new Headers(init.headers).entries()),
+        ...(partnerRuntime().WEB_GATEWAY_SECRET
+          ? { "x-talktalk-web-gateway": partnerRuntime().WEB_GATEWAY_SECRET! }
+          : {}),
       },
     });
   } finally {

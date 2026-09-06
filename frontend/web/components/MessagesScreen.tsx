@@ -10,7 +10,7 @@ import {
   ShieldCheck,
   Volume2,
 } from "lucide-react";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { requestApi } from "../lib/api-client";
 import { dateTime, pickList, readableError, relativeTime } from "../lib/format";
@@ -29,6 +29,7 @@ export default function MessagesScreen() {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const lastWriteAt = useRef(0);
 
   const selected = useMemo(
     () => conversations.find((item) => item.id === selectedId) || null,
@@ -62,24 +63,32 @@ export default function MessagesScreen() {
       return;
     }
     let active = true;
-    const timer = window.setTimeout(() => {
-      setMessagesLoading(true);
+    let inFlight = false;
+    const pull = (initial = false) => {
+      if (inFlight || (!initial && document.visibilityState === "hidden")) return;
+      inFlight = true;
+      const startedAt = Date.now();
+      if (initial) setMessagesLoading(true);
       void requestApi<{ messages: ChatMessage[] }>(
         `/conversations/${encodeURIComponent(selectedId)}/messages?limit=50`,
       )
         .then((result) => {
-          if (active) setMessages(pickList<ChatMessage>(result, ["messages", "items"]));
+          if (active && lastWriteAt.current <= startedAt) setMessages(pickList<ChatMessage>(result, ["messages", "items"]));
         })
         .catch((reason) => {
           if (active) setError(readableError(reason));
         })
         .finally(() => {
+          inFlight = false;
           if (active) setMessagesLoading(false);
         });
-    }, 0);
+    };
+    const timer = window.setTimeout(() => pull(true), 0);
+    const poll = window.setInterval(() => pull(), 3000);
     return () => {
       active = false;
       window.clearTimeout(timer);
+      window.clearInterval(poll);
     };
   }, [selectedId, user]);
 
@@ -97,6 +106,7 @@ export default function MessagesScreen() {
         method: "POST",
         data: { content: draft.trim() },
       });
+      lastWriteAt.current = Date.now();
       setDraft("");
       setMessages((items) => [
         ...items,

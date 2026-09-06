@@ -1,6 +1,23 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+test("partner web access opens only with the explicit staging target and gateway credential", () => {
+  const preview = {
+    NODE_ENV: "production",
+    WEB_PARTNER_PREVIEW: "true",
+    WEB_GATEWAY_SECRET: "x".repeat(48),
+    TALKTALK_API_BASE_URL: "https://talk-and-talk-web-api-308403-7-1428040864.sh.run.tcloudbase.com/api/v1",
+  };
+  for (const path of ["/discover", "/login", "/orders", "/messages", "/workbench", "/api/session", "/api/backend/orders"]) {
+    assert.equal(dispositionForPath(path, preview), "allow", path);
+  }
+  assert.equal(dispositionForPath("/business", preview), "notFound");
+  for (const override of [{ WEB_GATEWAY_SECRET: "" }, { WEB_PARTNER_PREVIEW: "false" }, { TALKTALK_API_BASE_URL: "https://api.talkandtalk.app/api/v1" }]) {
+    assert.equal(dispositionForPath("/orders", { ...preview, ...override }), "notFound");
+    assert.equal(dispositionForPath("/api/session", { ...preview, ...override }), "routeNotAllowed");
+  }
+});
+
 import {
   classifyWebSurface,
   dispositionForPath,

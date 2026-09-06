@@ -17,6 +17,9 @@ export type WeChatSubscribeTemplate = {
 interface Environment {
   NODE_ENV: NodeEnv;
   APP_ENV: AppEnv;
+  WEB_GATEWAY_SECRET: string;
+  PARTNER_ACCESS_CODE_SHA256: string;
+  PARTNER_ACCESS_EXPIRES_AT: string;
   HOST: string;
   PORT: number;
   API_PREFIX: string;
@@ -1570,9 +1573,22 @@ export function validateEnvironment(raw: Record<string, unknown>): Environment {
     );
   }
 
+  const webGatewaySecret = env.WEB_GATEWAY_SECRET?.trim() || "";
+  const partnerAccessHash = env.PARTNER_ACCESS_CODE_SHA256?.trim() || "";
+  const partnerAccessExpiresAt = env.PARTNER_ACCESS_EXPIRES_AT?.trim() || "";
+  if (webGatewaySecret && (webGatewaySecret.length < 32 || wechatCloudBaseHeaderAuthEnabled)) {
+    throw new Error("WEB_GATEWAY_SECRET requires at least 32 characters and disabled WeChat header authentication");
+  }
+  if (partnerAccessHash && (appEnv !== "staging" || !webGatewaySecret
+    || !/^[a-f0-9]{64}$/.test(partnerAccessHash) || !Number.isFinite(Date.parse(partnerAccessExpiresAt)))) {
+    throw new Error("Partner access requires staging, a protected web gateway, a SHA-256 code hash, and an expiry date");
+  }
   return {
     NODE_ENV: nodeEnv,
     APP_ENV: appEnv,
+    WEB_GATEWAY_SECRET: webGatewaySecret,
+    PARTNER_ACCESS_CODE_SHA256: partnerAccessHash,
+    PARTNER_ACCESS_EXPIRES_AT: partnerAccessExpiresAt,
     HOST: parseHost(env.HOST, appEnv),
     PORT: parsePort(env.PORT),
     API_PREFIX: apiPrefix.replace(/^\/+|\/+$/g, ""),

@@ -9,10 +9,13 @@ const output = resolve(repo, "backend/api/.env.cloudbase.staging");
 const envId = "talk-and-talk-staging-d6d04a14b8";
 const appId = "wx118721bab077fbbb";
 const staticOrigin = "https://talk-and-talk-staging-d6d04a14b8-1428040864.tcloudbaseapp.com";
+const rotate = process.argv.includes("--rotate");
 
 try {
   await access(output, constants.F_OK);
-  throw new Error(`${output} already exists; preserve deployed secrets instead of rotating them`);
+  if (!rotate) {
+    throw new Error(`${output} already exists; pass --rotate only after an intentional credential rotation`);
+  }
 } catch (error) {
   if ((error).code !== "ENOENT") throw error;
 }
@@ -26,6 +29,11 @@ const values = {
   PORT: "3000",
   API_PREFIX: "api/v1",
   APP_VERSION: "1.0.0",
+  PGHOST: "172.17.0.6",
+  PGPORT: "5432",
+  PGDATABASE: "postgres",
+  PGUSER: "talk_api",
+  PGPASSWORD: secret(),
   SECURITY_COUNTER_BACKEND: "postgres",
   CLOUDBASE_MANAGED_MIGRATIONS: "true",
   CLOUDBASE_RUNTIME_PG_INJECTION: "true",
@@ -91,7 +99,7 @@ const values = {
   AVAILABILITY_REMINDER_PREPARATION_ENABLED: "false",
   AVAILABILITY_REMINDER_DELIVERY_ENABLED: "false",
   COMPANION_ACTION_EXPIRY_ENABLED: "true",
-  SEED_ON_STARTUP: "true"
+  SEED_ON_STARTUP: "false"
 };
 
 const lines = [
@@ -101,4 +109,9 @@ const lines = [
 ];
 await writeFile(output, lines.join("\n"), { mode: 0o600 });
 await chmod(output, 0o600);
-process.stdout.write(`${JSON.stringify({ output, keys: Object.keys(values).length, mode: "0600" })}\n`);
+process.stdout.write(`${JSON.stringify({
+  output,
+  keys: Object.keys(values).length,
+  mode: "0600",
+  rotated: rotate
+})}\n`);

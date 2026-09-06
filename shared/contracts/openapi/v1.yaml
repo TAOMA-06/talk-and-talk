@@ -312,6 +312,52 @@ paths:
                             type: integer
         "429":
           $ref: "#/components/responses/Error"
+  /auth/partner/login:
+    post:
+      tags: [auth]
+      summary: Sign in to the invitation-only partner web test
+      description: Available only on the protected staging web backend while its invitation is active. Uses fixed non-staff test personas and normal revocable consumer sessions. Never enabled in production.
+      operationId: partnerPreviewLogin
+      security: []
+      parameters:
+        - in: header
+          name: x-talktalk-web-gateway
+          required: true
+          schema: { type: string, minLength: 32 }
+          description: Server-to-server credential; never sent to browser code.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [accessCode, persona]
+              properties:
+                accessCode: { type: string, minLength: 24, maxLength: 128, writeOnly: true }
+                persona: { type: string, enum: [customer-a, customer-b, companion] }
+      responses:
+        "201":
+          description: Token pair and fixed test persona
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/AuthSession"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "503":
+          $ref: "#/components/responses/Error"
   /auth/phone/login:
     post:
       tags: [auth]

@@ -1,6 +1,7 @@
 import { HttpStatus, Injectable, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { randomUUID } from "node:crypto";
+import { PARTNER_CHAT_IDS, isPartnerChat, partnerPreviewActive } from "../auth/partner-preview-access";
 
 import { AppException } from "../common/errors/app.exception";
 import { AuditService } from "../common/audit/audit.service";
@@ -109,7 +110,7 @@ export class ConversationsService {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 20;
     const where: any = {
-        orders: { some: { status: { in: [...CHAT_ENABLED_ORDER_STATUSES] } } },
+        ...this.activatedConversationFilter(),
         OR: [{ userId }, { companion: { ownerUserId: userId } }],
         ...(query.blockedByYou === true
           ? { blocks: { some: { blockedByUserId: userId } } }
@@ -685,7 +686,7 @@ export class ConversationsService {
   private async ensureConversation(userId: string, externalId: string) {
     const existing = await this.prisma.conversation.findFirst({
       where: {
-        orders: { some: { status: { in: [...CHAT_ENABLED_ORDER_STATUSES] } } },
+        ...this.activatedConversationFilter(),
         OR: [
           { userId, externalId },
           { id: externalId, companion: { ownerUserId: userId } }
@@ -776,6 +777,10 @@ export class ConversationsService {
   }
 
   private async hasCurrentMessageInteractionWindow(conversationId: string, db: Db = this.prisma as any) {
+    if (partnerPreviewActive(this.config) && PARTNER_CHAT_IDS.includes(conversationId)) {
+      const conversation = await db.conversation.findUnique({ where: { id: conversationId } });
+      if (conversation && isPartnerChat(this.config, conversation)) return true;
+    }
     const now = new Date();
     const preServiceWindowMinutes = this.orderChatPreServiceWindowMinutes();
     const postServiceWindowMinutes = this.orderChatPostServiceWindowMinutes();
@@ -805,6 +810,18 @@ export class ConversationsService {
       "ORDER_CHAT_PRE_SERVICE_WINDOW_MINUTES",
       DEFAULT_ORDER_CHAT_PRE_SERVICE_WINDOW_MINUTES
     ) ?? DEFAULT_ORDER_CHAT_PRE_SERVICE_WINDOW_MINUTES;
+  }
+
+  private activatedConversationFilter() {
+    const paid = { orders: { some: { status: { in: [...CHAT_ENABLED_ORDER_STATUSES] } } } };
+    if (!partnerPreviewActive(this.config)) return paid;
+    return { AND: [{ OR: [paid, {
+      companionId: "c1",
+      OR: [
+        { id: PARTNER_CHAT_IDS[0], userId: "partner-customer-a" },
+        { id: PARTNER_CHAT_IDS[1], userId: "partner-customer-b" }
+      ]
+    }] }] };
   }
 
   private orderChatPostServiceWindowMinutes(): number {

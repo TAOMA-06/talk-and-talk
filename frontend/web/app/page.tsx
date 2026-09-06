@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 
 import MarketingHomeScreen from "../components/MarketingHomeScreen";
+import { redirect } from "next/navigation";
+import { isPartnerPreviewEnabled } from "../lib/partner-preview";
 
 export const metadata: Metadata = {
   // Absolute title: root layout uses `template: "%s｜Talk&Talk"` for child routes.
@@ -21,5 +23,6 @@ export const metadata: Metadata = {
 };
 
 export default function Home() {
+  if (isPartnerPreviewEnabled()) redirect("/mini/index.html");
   return <MarketingHomeScreen />;
 }

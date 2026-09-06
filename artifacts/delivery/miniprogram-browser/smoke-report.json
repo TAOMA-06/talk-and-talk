@@ -1,0 +1,65 @@
+{
+  "assertions": [
+    {
+      "name": "native-consent-page-rendered",
+      "outcome": "pass"
+    },
+    {
+      "name": "native-consent-events-and-navigation",
+      "outcome": "pass"
+    },
+    {
+      "name": "real-cookie-session-login",
+      "outcome": "pass"
+    },
+    {
+      "name": "native-textarea-data-binding",
+      "outcome": "pass"
+    },
+    {
+      "name": "native-tab-发现",
+      "outcome": "pass"
+    },
+    {
+      "name": "live-companion-directory-loaded",
+      "outcome": "pass"
+    },
+    {
+      "name": "native-companion-detail-opened",
+      "outcome": "pass"
+    },
+    {
+      "name": "native-tab-订单",
+      "outcome": "pass"
+    },
+    {
+      "name": "native-tab-消息",
+      "outcome": "pass"
+    },
+    {
+      "name": "native-chat-message-persisted",
+      "outcome": "pass"
+    },
+    {
+      "name": "native-input-cleared-after-send",
+      "outcome": "pass"
+    },
+    {
+      "name": "native-tab-我的",
+      "outcome": "pass"
+    },
+    {
+      "name": "tab-page-state-preserved",
+      "outcome": "pass"
+    },
+    {
+      "name": "desktop-retains-portrait-mini-program",
+      "outcome": "pass"
+    },
+    {
+      "name": "no-browser-runtime-errors",
+      "outcome": "pass"
+    }
+  ],
+  "errors": []
+}

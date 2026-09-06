@@ -1,0 +1,22 @@
+{
+  "name": "talk-and-talk-miniprogram-browser",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "glass-easel": "1.1.0",
+    "glass-easel-miniprogram-adapter": "1.1.0"
+  },
+  "devDependencies": {
+    "css-loader": "^7.1.2",
+    "glass-easel-miniprogram-webpack-plugin": "1.1.0",
+    "less": "^4.2.2",
+    "less-loader": "^12.3.0",
+    "mini-css-extract-plugin": "^2.9.2",
+    "typescript": "5.9.3",
+    "webpack": "^5.101.3"
+  }
+}

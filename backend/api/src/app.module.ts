@@ -13,6 +13,7 @@ import { ConversationsModule } from "./conversations/conversations.module";
 import { CrisisInterventionModule } from "./crisis-intervention/crisis-intervention.module";
 import { AuditModule } from "./common/audit/audit.module";
 import { RequestIdMiddleware } from "./common/middleware/request-id.middleware";
+import { WebGatewayMiddleware } from "./common/middleware/web-gateway.middleware";
 import { IpRateLimitMiddleware } from "./common/rate-limit/ip-rate-limit.middleware";
 import { SecurityCounterModule } from "./common/security-counter/security-counter.module";
 import { DatabaseModule } from "./database/database.module";
@@ -68,12 +69,12 @@ import { UsersModule } from "./users/users.module";
     HealthModule,
     LegalModule
   ],
-  providers: [IpRateLimitMiddleware]
+  providers: [IpRateLimitMiddleware, WebGatewayMiddleware]
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer
-      .apply(RequestIdMiddleware, RequestMetricsMiddleware, IpRateLimitMiddleware)
+      .apply(WebGatewayMiddleware, RequestIdMiddleware, RequestMetricsMiddleware, IpRateLimitMiddleware)
       .forRoutes("{*path}");
   }
 }

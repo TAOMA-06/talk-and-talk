@@ -1,0 +1,117 @@
+{
+  "generatedAt": "2026-09-05T03:45:01.955Z",
+  "origin": "http://localhost:3025",
+  "backend": "https://talk-and-talk-web-api-308403-7-1428040864.sh.run.tcloudbase.com/api/v1",
+  "assertions": [
+    {
+      "name": "direct-backend-access-denied",
+      "outcome": "pass"
+    },
+    {
+      "name": "anonymous-session-denied",
+      "outcome": "pass"
+    },
+    {
+      "name": "wrong-invitation-denied",
+      "outcome": "pass"
+    },
+    {
+      "name": "cross-site-login-denied",
+      "outcome": "pass"
+    },
+    {
+      "name": "customer-a-http-only-session",
+      "outcome": "pass"
+    },
+    {
+      "name": "customer-a-no-token-in-browser-json",
+      "outcome": "pass"
+    },
+    {
+      "name": "customer-b-http-only-session",
+      "outcome": "pass"
+    },
+    {
+      "name": "customer-b-no-token-in-browser-json",
+      "outcome": "pass"
+    },
+    {
+      "name": "companion-http-only-session",
+      "outcome": "pass"
+    },
+    {
+      "name": "companion-no-token-in-browser-json",
+      "outcome": "pass"
+    },
+    {
+      "name": "test-personas-distinct",
+      "outcome": "pass"
+    },
+    {
+      "name": "cloud-catalog-loaded",
+      "outcome": "pass"
+    },
+    {
+      "name": "community-post-persisted",
+      "outcome": "pass"
+    },
+    {
+      "name": "community-post-visible-to-second-account",
+      "outcome": "pass"
+    },
+    {
+      "name": "community-like-persisted",
+      "outcome": "pass"
+    },
+    {
+      "name": "favorite-persisted",
+      "outcome": "pass"
+    },
+    {
+      "name": "booking-persisted",
+      "outcome": "pass"
+    },
+    {
+      "name": "other-user-cannot-see-booking",
+      "outcome": "pass"
+    },
+    {
+      "name": "companion-confirmed-booking",
+      "outcome": "pass"
+    },
+    {
+      "name": "test-booking-cancelled",
+      "outcome": "pass"
+    },
+    {
+      "name": "customer-message-delivered-to-companion",
+      "outcome": "pass"
+    },
+    {
+      "name": "companion-reply-delivered-to-customer",
+      "outcome": "pass"
+    },
+    {
+      "name": "other-user-chat-isolation",
+      "outcome": "pass"
+    },
+    {
+      "name": "core-user-pages-have-live-data",
+      "outcome": "pass"
+    },
+    {
+      "name": "companion-workbench-has-live-data",
+      "outcome": "pass"
+    },
+    {
+      "name": "logout-succeeded",
+      "outcome": "pass"
+    },
+    {
+      "name": "logged-out-session-revoked",
+      "outcome": "pass"
+    }
+  ],
+  "payment": "not configured; no charges made",
+  "outcome": "pass"
+}

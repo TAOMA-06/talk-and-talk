@@ -36,6 +36,7 @@ import { publicDisclosure } from "../lib/public-disclosure";
 import type { AuthUser } from "../lib/types";
 
 type SessionContextValue = {
+  partnerPreview: boolean;
   user: AuthUser | null;
   loading: boolean;
   refresh: () => Promise<void>;
@@ -43,6 +44,7 @@ type SessionContextValue = {
 };
 
 const SessionContext = createContext<SessionContextValue>({
+  partnerPreview: false,
   user: null,
   loading: true,
   refresh: async () => undefined,
@@ -87,13 +89,13 @@ function pathIsActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export default function AppShell({ children }: { children: React.ReactNode }) {
+export default function AppShell({ children, partnerPreview = false }: { children: React.ReactNode; partnerPreview?: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
   const miniprogramEntry = resolveMiniprogramEntry();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const isMarketing = marketingPaths.some(
+  const isMarketing = !partnerPreview && marketingPaths.some(
     (path) => pathname === path || (path !== "/" && pathname.startsWith(`${path}/`)),
   );
 
@@ -122,20 +124,20 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       if (withdrawConsent) {
         clearConsent();
       }
-      router.push("/");
+      router.push(partnerPreview ? "/login" : "/");
       router.refresh();
     },
-    [router],
+    [router, partnerPreview],
   );
 
   const context = useMemo(
-    () => ({ user, loading, refresh, signOut }),
-    [user, loading, refresh, signOut],
+    () => ({ user, loading, refresh, signOut, partnerPreview }),
+    [user, loading, refresh, signOut, partnerPreview],
   );
 
   const isCompanion = user?.role === "companion";
   const displayName = user?.profile?.displayName || (isCompanion ? "陪伴者" : "你好");
-  const desktopNavigation = isMarketing || !user ? publicNavigation : memberNavigation;
+  const desktopNavigation = partnerPreview ? memberNavigation : isMarketing || !user ? publicNavigation : memberNavigation;
   const showMobileNav = !isMarketing;
 
   return (
@@ -144,7 +146,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <a className="skip-link" href="#main-content">跳到主要内容</a>
         <header className={isMarketing ? "site-header marketing-header" : "site-header"}>
           <div className="header-inner">
-            <Link href="/" className="brand-lockup" aria-label="Talk&Talk 首页">
+            <Link href={partnerPreview ? "/discover" : "/"} className="brand-lockup" aria-label="Talk&Talk 首页">
               <BrandMark size={36} className="brand-mark brand-mark-header" priority />
               <span className="brand-wordmark">
                 <strong>Talk&amp;Talk</strong>
@@ -225,9 +227,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </nav>
         )}
 
+        {partnerPreview && <div className="partner-preview-note">合伙人测试版 · 预约与试聊会保存，试聊不收费 · 微信支付尚未接入</div>}
         <main id="main-content" className="site-main" tabIndex={-1}>{children}</main>
 
-        <footer className="site-footer">
+        {!partnerPreview && <footer className="site-footer">
           <div className="footer-brand-column">
             <div className="brand-lockup footer-brand">
               <BrandMark size={36} className="brand-mark brand-mark-footer" />
@@ -270,7 +273,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <p className="footer-bottom">
             © 2026 Talk&amp;Talk · 官方网站
           </p>
-        </footer>
+        </footer>}
 
         {showMobileNav && (
           <nav className="mobile-nav" aria-label="移动端主导航">

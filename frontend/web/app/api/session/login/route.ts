@@ -15,10 +15,13 @@ import {
   LEGAL_TERMS_URL,
 } from "../../../../lib/legal-consent";
 import type { AuthUser } from "../../../../lib/types";
+import { isPartnerPreviewEnabled } from "../../../../lib/partner-preview";
 
 type LoginBody = {
   phone?: unknown;
   code?: unknown;
+  accessCode?: unknown;
+  persona?: unknown;
   consent?: Record<string, unknown>;
 };
 
@@ -44,6 +47,10 @@ function validConsent(consent?: Record<string, unknown>): boolean {
 export async function POST(request: Request) {
   const surfaceRefusal = enforceApiSurface("/api/session");
   if (surfaceRefusal) return surfaceRefusal;
+  const origin = request.headers.get("origin");
+  if (request.headers.get("sec-fetch-site") === "cross-site" || (origin && origin !== new URL(request.url).origin)) {
+    return NextResponse.json(errorEnvelope("CROSS_SITE_REQUEST_BLOCKED", "请从本站登录"), { status: 403 });
+  }
 
   let input: LoginBody;
   try {
@@ -54,7 +61,13 @@ export async function POST(request: Request) {
 
   const phone = typeof input.phone === "string" ? input.phone.trim() : "";
   const code = typeof input.code === "string" ? input.code.trim() : "";
-  if (!/^1\d{10}$/.test(phone) || !/^\d{4,8}$/.test(code)) {
+  const partner = isPartnerPreviewEnabled();
+  const accessCode = typeof input.accessCode === "string" ? input.accessCode.trim() : "";
+  const persona = typeof input.persona === "string" ? input.persona : "";
+  if (partner && (accessCode.length < 24 || accessCode.length > 128 || !["customer-a", "customer-b", "companion"].includes(persona))) {
+    return NextResponse.json(errorEnvelope("LOGIN_INPUT_INVALID", "请输入完整测试口令并选择账号"), { status: 400 });
+  }
+  if (!partner && (!/^1\d{10}$/.test(phone) || !/^\d{4,8}$/.test(code))) {
     return NextResponse.json(errorEnvelope("LOGIN_INPUT_INVALID", "请填写正确的手机号和验证码"), {
       status: 400,
     });
@@ -67,9 +80,9 @@ export async function POST(request: Request) {
   }
 
   try {
-    const loginResponse = await backendRequest("auth/phone/login", {
+    const loginResponse = await backendRequest(partner ? "auth/partner/login" : "auth/phone/login", {
       method: "POST",
-      body: JSON.stringify({ phone, code }),
+      body: JSON.stringify(partner ? { accessCode, persona } : { phone, code }),
     });
     const loginEnvelope = await responseJson<{
       accessToken: string;

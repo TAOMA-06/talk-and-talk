@@ -6,6 +6,7 @@
 import type { Metadata } from "next";
 import { Fraunces, Noto_Sans_SC } from "next/font/google";
 import AppShell from "../components/AppShell";
+import { isPartnerPreviewEnabled } from "../lib/partner-preview";
 import { publicDisclosure } from "../lib/public-disclosure";
 import "./globals.css";
 import "./styles/ui3-marketing.css";
@@ -119,7 +120,7 @@ export default function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
         />
-        <AppShell>{children}</AppShell>
+        <AppShell partnerPreview={isPartnerPreviewEnabled()}>{children}</AppShell>
       </body>
     </html>
   );

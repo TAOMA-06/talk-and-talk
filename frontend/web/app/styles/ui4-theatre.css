@@ -1494,3 +1494,16 @@
     transform: none !important;
   }
 }
+/* Shared browser test entry follows the Mini Program's pale card palette. */
+.partner-preview-note { padding: 12px 20px; text-align: center; background: #e4eef6; color: #294658; font-size: 14px; }
+.partner-login-page .field select { width: 100%; padding: 14px; border: 1px solid #cad7dd; border-radius: 12px; background: #fff; font: inherit; color: inherit; }
+.partner-login-page form { display: grid; gap: 20px; }
+.partner-login-page .check-row { align-items: flex-start; }
+.partner-discover .discovery-section { padding-top: 32px; }
+@media (max-width: 700px) {
+  .partner-login-page { gap: 22px; padding-top: 24px; }
+  .partner-login-page .login-story h1 { font-size: 28px; margin: 8px 0; }
+  .partner-login-page .login-story > p { font-size: 14px; line-height: 1.7; margin: 8px 0; }
+  .partner-login-page .login-story > p:last-child { display: none; }
+  .partner-login-page .login-card { padding: 22px; }
+}

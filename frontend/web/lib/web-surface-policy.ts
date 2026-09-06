@@ -10,6 +10,8 @@
  *   (or development), but only outside a production process.
  */
 
+import { isPartnerPreviewEnabled, partnerRuntime } from "./partner-preview.ts";
+
 export type WebSurfaceKind =
   | "publicMarketing"
   | "privateConditional"
@@ -148,6 +150,8 @@ export function dispositionForPath(
   env: NodeJS.ProcessEnv = process.env,
 ): WebSurfaceDisposition {
   const kind = classifyWebSurface(pathname);
+  const preview = env === process.env ? partnerRuntime() : env;
+  if (isPartnerPreviewEnabled(preview) && kind !== "privateConditional") return "allow";
   if (kind === "publicMarketing") return "allow";
 
   if (kind === "privateConditional") {

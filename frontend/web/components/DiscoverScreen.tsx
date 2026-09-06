@@ -25,6 +25,7 @@ import { previewCompanions } from "../lib/fixtures";
 import { availabilityLabel, currency, pickList, readableError } from "../lib/format";
 import type { Companion } from "../lib/types";
 import { CompanionCard, EmptyState, LoadingState } from "./ui";
+import { useSession } from "./AppShell";
 
 const topics = ["全部", "情绪倾听", "职场减压", "睡前陪伴", "成长困惑"];
 const modes = [
@@ -34,6 +35,7 @@ const modes = [
 ];
 
 export default function DiscoverScreen() {
+  const { partnerPreview } = useSession();
   const [companions, setCompanions] = useState<Companion[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -53,8 +55,8 @@ export default function DiscoverScreen() {
       })
       .catch((reason) => {
         if (!active) return;
-        setCompanions(previewCompanions);
-        setPreview(true);
+        setCompanions(partnerPreview ? [] : previewCompanions);
+        setPreview(!partnerPreview);
         setError(readableError(reason));
       })
       .finally(() => {
@@ -63,7 +65,7 @@ export default function DiscoverScreen() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [partnerPreview]);
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -100,7 +102,8 @@ export default function DiscoverScreen() {
   };
 
   return (
-    <div className="discover-page">
+    <div className={partnerPreview ? "discover-page partner-discover" : "discover-page"}>
+      {!partnerPreview && <>
       <section className="marketplace-hero" aria-labelledby="hero-title">
         <div className="marketplace-hero-copy">
           <p className="hero-brand">Talk&amp;Talk</p>
@@ -209,12 +212,13 @@ export default function DiscoverScreen() {
         </div>
       </section>
 
+      </>}
       <section className="discovery-section" id="companions">
         <header className="section-heading marketplace-heading">
           <div>
-            <p className="eyebrow">精选陪伴者</p>
+            <p className="eyebrow">{partnerPreview ? "发现陪伴" : "精选陪伴者"}</p>
             <h2>找到与你此刻更合拍的人</h2>
-            <p>每次下单前，系统都会重新核对服务、价格、时间和剩余容量。</p>
+            <p>{partnerPreview ? "选择一位陪伴者，查看服务与可预约时间。" : "每次下单前，系统都会重新核对服务、价格、时间和剩余容量。"}</p>
           </div>
           <button
             type="button"
@@ -313,6 +317,7 @@ export default function DiscoverScreen() {
         )}
       </section>
 
+      {!partnerPreview && <>
       <section className="how-section commercial-how">
         <div className="how-intro">
           <p className="eyebrow">一条可解释的服务链路</p>
@@ -408,6 +413,7 @@ export default function DiscoverScreen() {
           查看安全与支持说明 <ArrowRight size={17} />
         </Link>
       </section>
+      </>}
     </div>
   );
 }

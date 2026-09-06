@@ -11,6 +11,8 @@ const eslintConfig = defineConfig([
     ".next/**",
     "out/**",
     "build/**",
+    // Generated directly from frontend/miniprogram by the browser adapter.
+    "public/mini/**",
     "next-env.d.ts",
   ]),
 ]);

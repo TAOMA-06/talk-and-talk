@@ -1,4 +1,4 @@
-import { createHash, randomInt, randomUUID } from "node:crypto";
+import { createHash, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
 
 import { HttpStatus, Inject, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -80,6 +80,43 @@ export class AuthService {
     private readonly tombstones: AuthIdentityTombstoneService,
     private readonly counters: SecurityCounterService
   ) {}
+
+  async loginPartner(accessCode: string, persona: "customer-a" | "customer-b" | "companion", ip?: string) {
+    const hash = this.config.get<string>("PARTNER_ACCESS_CODE_SHA256", "");
+    const expiresAt = Date.parse(this.config.get<string>("PARTNER_ACCESS_EXPIRES_AT", ""));
+    if (this.config.get<string>("APP_ENV") !== "staging"
+      || !/^[a-f0-9]{64}$/.test(hash) || !Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+      throw new AppException("PARTNER_ACCESS_CLOSED", "测试入口暂未开放或已到期", HttpStatus.NOT_FOUND);
+    }
+    const count = await this.counters.increment(`partner-login:${ip || "unknown"}`, 600);
+    if (count > 30) throw new AppException("RATE_LIMITED", "尝试次数过多，请稍后重试", HttpStatus.TOO_MANY_REQUESTS);
+    const validCode = timingSafeEqual(createHash("sha256").update(accessCode).digest(), Buffer.from(hash, "hex"));
+    if (!validCode || !["customer-a", "customer-b", "companion"].includes(persona)) {
+      throw new AppException("PARTNER_ACCESS_INVALID", "测试口令不正确", HttpStatus.UNAUTHORIZED);
+    }
+    const id = persona === "companion" ? "seed-owner-c1" : `partner-${persona}`;
+    const user = persona === "companion"
+      ? await this.prisma.user.findUnique({ where: { id }, include: { profile: true } })
+      : await this.prisma.user.upsert({
+        where: { id },
+        create: { id, role: "user", profile: { create: { displayName: persona === "customer-a" ? "体验用户 A" : "体验用户 B" } } },
+        update: {},
+        include: { profile: true }
+      });
+    if (!user || user.role !== (persona === "companion" ? "companion" : "user")) {
+      throw new AppException("PARTNER_ACCOUNT_UNAVAILABLE", "测试账号尚未准备完成", HttpStatus.SERVICE_UNAVAILABLE);
+    }
+    const tokens = await this.issueTokens(user, { sessionLabel: "合伙人网页测试", clientPlatform: "web" });
+    if (persona !== "companion") {
+      await this.prisma.conversation.upsert({
+        where: { userId_externalId: { userId: user.id, externalId: "c1" } },
+        create: { id: `partner-chat-${persona}`, userId: user.id, companionId: "c1", externalId: "c1" },
+        update: {}
+      });
+    }
+    await this.recordLoginAudit(user.id, user.role, "partner");
+    return { ...tokens, user };
+  }
 
   wechatMiniProgramStatus() {
     const appId = this.config.get<string>("WECHAT_MINIPROGRAM_APP_ID", "").trim();

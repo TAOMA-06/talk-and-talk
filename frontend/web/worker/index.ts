@@ -25,11 +25,15 @@ const PUBLIC_BRAND_IMAGE_WIDTHS = [36, 40, 44, 220, 420];
 
 function withSecurityHeaders(response: Response, url: URL): Response {
   const headers = new Headers(response.headers);
-  headers.set("Content-Security-Policy", CONTENT_SECURITY_POLICY);
+  const miniDocument = url.pathname === "/mini/app.html";
+  const policy = miniDocument
+    ? CONTENT_SECURITY_POLICY.replace("frame-ancestors 'none'", "frame-ancestors 'self'") + "; frame-src 'self' https://talk-and-talk-staging-d6d04a14b8-1428040864.tcloudbaseapp.com"
+    : CONTENT_SECURITY_POLICY;
+  headers.set("Content-Security-Policy", policy);
   headers.set("Permissions-Policy", "camera=(), geolocation=(), microphone=(), payment=(), usb=()");
   headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   headers.set("X-Content-Type-Options", "nosniff");
-  headers.set("X-Frame-Options", "DENY");
+  headers.set("X-Frame-Options", miniDocument ? "SAMEORIGIN" : "DENY");
   if (url.protocol === "https:") {
     headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
   }
@@ -49,6 +53,8 @@ interface Env {
   ASSETS?: Fetcher;
   DB: D1Database;
   TALKTALK_API_BASE_URL?: string;
+  WEB_PARTNER_PREVIEW?: string;
+  WEB_GATEWAY_SECRET?: string;
   TALKTALK_IMAGE_TRANSFORM_ENABLED?: string;
   IMAGES?: {
     input?: (stream: ReadableStream) => {
@@ -79,8 +85,14 @@ const worker = {
     const runtimeEnv = env ?? ({} as Env);
     const runtime = globalThis as typeof globalThis & {
       __TALKTALK_API_BASE_URL__?: string;
+      __TALKTALK_PARTNER_RUNTIME__?: { WEB_PARTNER_PREVIEW?: string; TALKTALK_API_BASE_URL?: string; WEB_GATEWAY_SECRET?: string };
     };
     runtime.__TALKTALK_API_BASE_URL__ = runtimeEnv.TALKTALK_API_BASE_URL?.trim() || undefined;
+    runtime.__TALKTALK_PARTNER_RUNTIME__ = env ? {
+      WEB_PARTNER_PREVIEW: runtimeEnv.WEB_PARTNER_PREVIEW,
+      TALKTALK_API_BASE_URL: runtimeEnv.TALKTALK_API_BASE_URL,
+      WEB_GATEWAY_SECRET: runtimeEnv.WEB_GATEWAY_SECRET,
+    } : undefined;
 
     if (url.pathname === "/_vinext/image") {
       const assets = runtimeEnv.ASSETS;
@@ -118,7 +130,9 @@ const worker = {
       return withSecurityHeaders(response, url);
     }
 
-    return withSecurityHeaders(await handler.fetch(request, runtimeEnv, ctx), url);
+    const response = withSecurityHeaders(await handler.fetch(request, runtimeEnv, ctx), url);
+    if (runtimeEnv.WEB_PARTNER_PREVIEW === "true") response.headers.set("X-Robots-Tag", "noindex, nofollow");
+    return response;
   },
 };
 

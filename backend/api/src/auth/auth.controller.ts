@@ -13,6 +13,7 @@ import { AppleLoginDto } from "./dto/apple-login.dto";
 import { WechatMiniProgramLoginDto } from "./dto/wechat-mini-program-login.dto";
 import { RefreshTokenDto } from "./dto/refresh-token.dto";
 import { StaffLoginDto } from "./dto/staff-login.dto";
+import { PartnerLoginDto } from "./dto/partner-login.dto";
 import { CurrentUser } from "./decorators/current-user.decorator";
 import { SkipLegalConsent } from "./decorators/skip-legal-consent.decorator";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard";
@@ -52,6 +53,11 @@ function cloudBaseMiniProgramIdentity(req?: Request): CloudBaseMiniProgramIdenti
 @Controller("auth")
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  @Post("partner/login")
+  async partnerLogin(@Body() dto: PartnerLoginDto, @Req() req: Request) {
+    return this.authService.loginPartner(dto.accessCode, dto.persona, clientIp(req));
+  }
 
   @Post("sms/send-code")
   async sendCode(@Body() dto: SendCodeDto, @Req() req: Request) {

@@ -16,6 +16,8 @@ backend/api/.env
 backend/api/.env.staging
 backend/api/.env.production
 backend/api/.env.cloudbase.*
+backend/api/.env.partner-access
+artifacts/delivery/partner-access.md
 backend/api/dist/
 backend/api/coverage/
 backend/api/backups/
